@@ -11,6 +11,21 @@ export default {
   rules: {
     // Allow empty scope
     "scope-empty": [0],
+    "scope-enum": [
+      2,
+      "always",
+      [
+        "core",
+        "ui",
+        "middleware",
+        "ci",
+        "test",
+        "docs",
+        "repo",
+        "infra",
+        "deps",
+      ],
+    ],
     "type-enum": [
       2,
       "always",
@@ -34,7 +49,7 @@ export default {
     settings: {
       enableMultipleScopes: false,
       scopeEnumSeparator: ",",
-      allowCustomScopes: true,
+      allowCustomScopes: false,
     },
     messages: {
       skip: "or skip",
