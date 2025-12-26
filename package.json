@@ -1,0 +1,48 @@
+{
+  "name": "gridfinity-studio",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint": "eslint .",
+    "commit": "cz",
+    "commit:interactive": "cz",
+    "commitlint": "commitlint --edit",
+    "prepare": "husky"
+  },
+  "config": {
+    "commitizen": {
+      "path": "@commitlint/cz-commitlint"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/unstable-studios/gridfinity-studio.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/unstable-studios/gridfinity-studio/issues"
+  },
+  "homepage": "https://github.com/unstable-studios/gridfinity-studio#readme",
+  "engines": {
+    "node": ">=24"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.2.0",
+    "@commitlint/config-conventional": "^20.2.0",
+    "@commitlint/cz-commitlint": "^20.2.0",
+    "@commitlint/prompt": "^20.2.0",
+    "@commitlint/prompt-cli": "^20.2.0",
+    "@eslint/js": "^9.39.2",
+    "commitizen": "^4.3.1",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "husky": "^9.1.7",
+    "prettier": "^3.7.4"
+  }
+}

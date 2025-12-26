@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Abort on first error
+set -e
+
+# Run linting if npm scripts exist
+if grep -q "lint" package.json; then
+  npm run lint
+fi
