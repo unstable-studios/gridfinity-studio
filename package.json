@@ -7,7 +7,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint .",
     "commit": "cz",
-    "commit:interactive": "cz",
     "commitlint": "commitlint --edit",
     "prepare": "husky"
   },
@@ -31,6 +30,7 @@
   "engines": {
     "node": ">=24"
   },
+  "packageManager": "pnpm@10.26.2",
   "devDependencies": {
     "@commitlint/cli": "^20.2.0",
     "@commitlint/config-conventional": "^20.2.0",

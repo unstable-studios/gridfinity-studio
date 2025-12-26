@@ -10,5 +10,5 @@ if [ "$HUSKY_SKIP_CZ" = "1" ]; then
 	exit 0
 fi
 
-# Launch commitizen prompt for git commit (dotrc style)
+# Launch commitizen prompt for git commit (pnpm)
 exec < /dev/tty && pnpm cz --hook || true

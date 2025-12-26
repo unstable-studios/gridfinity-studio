@@ -3,5 +3,5 @@
 # Abort on first error
 set -e
 
-# Run linting via pnpm (matches dotrc setup)
+# Run linting via pnpm
 pnpm lint
