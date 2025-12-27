@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite'
+import electron from 'vite-plugin-electron'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   root: 'src/renderer',
-  plugins: [react(), tailwindcss()],
+  publicDir: 'public',
+  plugins: [react(), tailwindcss(), electron({ entry: 'src/main/main.ts' })],
   server: {
     port: 5173,
     strictPort: true

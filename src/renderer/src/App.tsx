@@ -1,7 +1,7 @@
 function App(): React.JSX.Element {
   return (
     <>
-      <h1>Hello, Electron!</h1>
+      <h1 className="font-bold">Hello, Electron! dd</h1>
     </>
   )
 }
