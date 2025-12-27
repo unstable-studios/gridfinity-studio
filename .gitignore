@@ -1,5 +1,42 @@
+### Environment files
 .env
 .env.*
+!.env.example
+
+### Local tooling/data
 .gim*
 *.csv
-node_modules
+
+### Dependencies
+node_modules/
+.pnp*
+
+### Build outputs
+dist/
+out/
+build/
+release/
+
+### Logs and caches
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log*
+.eslintcache
+.cache/
+
+### Vite
+vite.svg
+.vite/
+
+### TypeScript
+*.tsbuildinfo
+
+### macOS
+.DS_Store
+
+### Editor/IDE
+.idea/
+.vscode/
+

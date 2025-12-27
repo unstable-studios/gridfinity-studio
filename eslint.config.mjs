@@ -1,31 +1,32 @@
-import js from "@eslint/js";
-import importPlugin from "eslint-plugin-import";
-import prettier from "eslint-config-prettier";
+import { defineConfig } from 'eslint/config'
+import tseslint from '@electron-toolkit/eslint-config-ts'
+import eslintConfigPrettier from '@electron-toolkit/eslint-config-prettier'
+import eslintPluginReact from 'eslint-plugin-react'
+import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
+import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 
-export default [
-  {
-    ignores: ["node_modules", ".husky", "package-lock.json"],
-  },
-  js.configs.recommended,
-  importPlugin.flatConfigs.recommended,
-  prettier,
+export default defineConfig(
+  { ignores: ['**/node_modules', '**/dist', '**/out', '.husky'] },
+  tseslint.configs.recommended,
+  eslintPluginReact.configs.flat.recommended,
+  eslintPluginReact.configs.flat['jsx-runtime'],
   {
     settings: {
-      "import/resolver": {
-        node: {
-          extensions: [".js", ".mjs", ".cjs", ".json"],
-        },
-      },
-    },
-    languageOptions: {
-      ecmaVersion: "latest",
-      sourceType: "module",
-    },
+      react: {
+        version: 'detect'
+      }
+    }
   },
   {
-    files: ["**/*.cjs"],
-    languageOptions: {
-      sourceType: "commonjs",
+    files: ['**/*.{ts,tsx}'],
+    plugins: {
+      'react-hooks': eslintPluginReactHooks,
+      'react-refresh': eslintPluginReactRefresh
     },
+    rules: {
+      ...eslintPluginReactHooks.configs.recommended.rules,
+      ...eslintPluginReactRefresh.configs.vite.rules
+    }
   },
-];
+  eslintConfigPrettier
+)
