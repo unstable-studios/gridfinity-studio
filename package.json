@@ -17,7 +17,7 @@
     "build:win": "pnpm run build && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux",
-    "commitlint": "commitlint",
+    "commitlint": "commitlint --edit",
     "commit": "cz",
     "prepare": "husky"
   },
