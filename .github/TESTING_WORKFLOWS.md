@@ -27,7 +27,7 @@ act pull_request
 ### Test push to main (triggers release-please):
 
 ```bash
-act push -b main
+act push -e <(echo '{"ref":"refs/heads/main"}')
 ```
 
 ## Important Notes
@@ -47,8 +47,17 @@ act pull_request
 act pull_request -j commitlint
 
 # Test release-please (won't publish without real secrets)
-act push -b main -s GH_PAT_RELEASEPLEASE=fake
+act push -e <(echo '{"ref":"refs/heads/main"}') -s GH_PAT_RELEASEPLEASE=fake
 ```
+
+## Configuration
+
+### `.actrc` Configuration
+
+This project includes an `.actrc` file for local workflow testing with `act`. Note:
+
+- **Architecture**: Configured for `linux/arm64` (Apple Silicon Macs). If you're on x86_64 (Intel/AMD), remove the `--container-architecture` line or change it to `linux/amd64`.
+- **Docker Socket**: The `--container-daemon-socket -` flag disables Docker socket binding, which is required for some environments (e.g., Colima on macOS). If you're using Docker Desktop, you may need to remove this line.
 
 ## Gotchas
 
