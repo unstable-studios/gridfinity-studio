@@ -40,3 +40,6 @@ vite.svg
 .idea/
 .vscode/
 
+### act (local GitHub Actions)
+act-*.log
+

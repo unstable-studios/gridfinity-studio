@@ -1,0 +1,5 @@
+--container-architecture linux/arm64
+-P ubuntu-latest=catthehacker/ubuntu:runner-latest
+-P ubuntu-22.04=catthehacker/ubuntu:runner-22.04
+-P ubuntu-20.04=catthehacker/ubuntu:runner-20.04
+--container-daemon-socket -

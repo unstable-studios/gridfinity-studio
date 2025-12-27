@@ -1,0 +1,69 @@
+version: 2
+updates:
+  # npm dependencies via pnpm
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 10
+    groups:
+      # Group Electron-related updates together
+      electron:
+        patterns:
+          - "electron"
+          - "electron-*"
+      # Group React-related updates together
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Group Vite tooling together
+      vite:
+        patterns:
+          - "vite"
+          - "electron-vite"
+          - "@vitejs/*"
+      # Group TypeScript tooling together
+      typescript:
+        patterns:
+          - "typescript"
+          - "typescript-eslint"
+          - "@typescript-eslint/*"
+          - "tsup"
+      # Group ESLint-related
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+      # Group commitlint and commitizen
+      commit-tools:
+        patterns:
+          - "@commitlint/*"
+          - "commitizen"
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Los_Angeles"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"
