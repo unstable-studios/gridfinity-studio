@@ -1,56 +1,103 @@
-name: Build/release Electron app
+name: Build and Release
 
 on:
-  push:
-    tags:
-      - v*.*.*
+  workflow_run:
+    workflows: ["Release Please"]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: write
 
 jobs:
-  release:
+  build-matrix:
+    # Only run if release-please was successful and created a release
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.name == 'Release Please'
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: macos
+          - os: windows-latest
+            platform: windows
 
     steps:
-      - name: Check out Git repository
+      - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
-      - name: Install Node.js
+      - name: Get latest release tag
+        id: release_tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=$(gh release list --limit 1 --json tagName -q '.[0].tagName')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Latest release tag: $TAG"
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
+          cache: pnpm
 
-      - name: Install Dependencies
-        run: npm install
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: build-linux
-        if: matrix.os == 'ubuntu-latest'
-        run: npm run build:linux
+      - name: Build
+        run: pnpm build
 
-      - name: build-mac
-        if: matrix.os == 'macos-latest'
-        run: npm run build:mac
-
-      - name: build-win
-        if: matrix.os == 'windows-latest'
-        run: npm run build:win
-
-      - name: release
-        uses: softprops/action-gh-release@v2
-        with:
-          draft: true
-          files: |
-            dist/*.exe
-            dist/*.zip
-            dist/*.dmg
-            dist/*.AppImage
-            dist/*.snap
-            dist/*.deb
-            dist/*.rpm
-            dist/*.tar.gz
-            dist/*.yml
-            dist/*.blockmap
+      - name: Create app package
+        run: pnpm package
         env:
-          GITHUB_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Upload to release (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ steps.release_tag.outputs.tag }} \
+            release/*.AppImage \
+            release/*.deb \
+            release/*.snap \
+            release/*.yml \
+            release/*.blockmap* \
+            --clobber
+
+      - name: Upload to release (macOS)
+        if: matrix.os == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ steps.release_tag.outputs.tag }} \
+            release/*.dmg \
+            release/*.zip \
+            release/*.yml \
+            release/*.blockmap* \
+            --clobber
+
+      - name: Upload to release (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload ${{ steps.release_tag.outputs.tag }} \
+            release/*.exe \
+            release/*.msi \
+            release/*.zip \
+            release/*.yml \
+            release/*.blockmap* \
+            --clobber
