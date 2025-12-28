@@ -1,0 +1,359 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://gridfinity.studio/schemas/project.v0.schema.json",
+  "title": "Gridfinity Studio Project",
+  "description": "Schema for Gridfinity Studio project files (v0)",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "settings",
+    "gridfinity",
+    "entities",
+    "groups",
+    "generators",
+    "bins"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Schema version for validation and migration",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "settings": {
+      "type": "object",
+      "description": "Global project settings",
+      "required": ["name", "createdAt", "modifiedAt", "units"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Project name",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "description": "Project description"
+        },
+        "author": {
+          "type": "string",
+          "description": "Project author"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Project creation date (ISO 8601)"
+        },
+        "modifiedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last modified date (ISO 8601)"
+        },
+        "units": {
+          "type": "string",
+          "enum": ["mm", "cm", "in"],
+          "description": "Units used in the project"
+        }
+      }
+    },
+    "gridfinity": {
+      "type": "object",
+      "description": "Gridfinity-specific configuration",
+      "required": [
+        "baseUnit",
+        "gridSpacing",
+        "unitHeight",
+        "tolerance",
+        "magnetHoles",
+        "screwHoles"
+      ],
+      "properties": {
+        "baseUnit": {
+          "type": "number",
+          "description": "Base unit size (default: 42mm for standard Gridfinity)",
+          "minimum": 0,
+          "exclusiveMinimum": true
+        },
+        "gridSpacing": {
+          "type": "number",
+          "description": "Grid spacing",
+          "minimum": 0,
+          "exclusiveMinimum": true
+        },
+        "unitHeight": {
+          "type": "number",
+          "description": "Height of a single Gridfinity unit",
+          "minimum": 0,
+          "exclusiveMinimum": true
+        },
+        "tolerance": {
+          "type": "number",
+          "description": "Tolerance for fitting (in mm)",
+          "minimum": 0
+        },
+        "magnetHoles": {
+          "type": "object",
+          "required": ["enabled", "diameter", "depth"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "diameter": {
+              "type": "number",
+              "minimum": 0
+            },
+            "depth": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "screwHoles": {
+          "type": "object",
+          "required": ["enabled", "diameter", "depth"],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "diameter": {
+              "type": "number",
+              "minimum": 0
+            },
+            "depth": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "entities": {
+      "type": "array",
+      "description": "All entities in the project",
+      "items": {
+        "$ref": "#/definitions/Entity"
+      }
+    },
+    "groups": {
+      "type": "array",
+      "description": "Groups of entities",
+      "items": {
+        "$ref": "#/definitions/Group"
+      }
+    },
+    "generators": {
+      "type": "array",
+      "description": "Generators for procedural content",
+      "items": {
+        "$ref": "#/definitions/Generator"
+      }
+    },
+    "bins": {
+      "type": "array",
+      "description": "Bin configurations",
+      "items": {
+        "$ref": "#/definitions/Bin"
+      }
+    }
+  },
+  "definitions": {
+    "Position": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "Rotation": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "Scale": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "z": { "type": "number" }
+      }
+    },
+    "Transform": {
+      "type": "object",
+      "required": ["position", "rotation", "scale"],
+      "properties": {
+        "position": { "$ref": "#/definitions/Position" },
+        "rotation": { "$ref": "#/definitions/Rotation" },
+        "scale": { "$ref": "#/definitions/Scale" }
+      }
+    },
+    "Entity": {
+      "type": "object",
+      "required": ["id", "name", "type", "transform", "visible", "locked", "properties"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the entity"
+        },
+        "name": {
+          "type": "string",
+          "description": "Entity name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["bin", "divider", "label", "custom"],
+          "description": "Entity type"
+        },
+        "transform": {
+          "$ref": "#/definitions/Transform"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Visibility flag"
+        },
+        "locked": {
+          "type": "boolean",
+          "description": "Lock flag (prevents editing)"
+        },
+        "groupId": {
+          "type": "string",
+          "description": "Parent group ID (if part of a group)"
+        },
+        "properties": {
+          "type": "object",
+          "description": "Custom properties"
+        }
+      }
+    },
+    "Group": {
+      "type": "object",
+      "required": ["id", "name", "entityIds", "visible", "locked", "properties"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the group"
+        },
+        "name": {
+          "type": "string",
+          "description": "Group name"
+        },
+        "entityIds": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Entity IDs in this group"
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Visibility flag"
+        },
+        "locked": {
+          "type": "boolean",
+          "description": "Lock flag (prevents editing)"
+        },
+        "properties": {
+          "type": "object",
+          "description": "Custom properties"
+        }
+      }
+    },
+    "Generator": {
+      "type": "object",
+      "required": ["id", "name", "type", "parameters", "enabled"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the generator"
+        },
+        "name": {
+          "type": "string",
+          "description": "Generator name"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["grid", "pattern", "array", "custom"],
+          "description": "Generator type"
+        },
+        "parameters": {
+          "type": "object",
+          "description": "Generator parameters"
+        },
+        "target": {
+          "type": "string",
+          "description": "Target entity ID or template"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "Is this generator enabled?"
+        }
+      }
+    },
+    "Bin": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "width",
+        "depth",
+        "height",
+        "hasDividers",
+        "hasLabel",
+        "hasStackingLip",
+        "properties"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the bin"
+        },
+        "name": {
+          "type": "string",
+          "description": "Bin name"
+        },
+        "width": {
+          "type": "number",
+          "description": "Width in Gridfinity units",
+          "minimum": 1
+        },
+        "depth": {
+          "type": "number",
+          "description": "Depth in Gridfinity units",
+          "minimum": 1
+        },
+        "height": {
+          "type": "number",
+          "description": "Height in Gridfinity units",
+          "minimum": 1
+        },
+        "hasDividers": {
+          "type": "boolean",
+          "description": "Enable/disable dividers"
+        },
+        "dividerCount": {
+          "type": "number",
+          "description": "Number of dividers (if enabled)",
+          "minimum": 0
+        },
+        "hasLabel": {
+          "type": "boolean",
+          "description": "Enable/disable label area"
+        },
+        "labelText": {
+          "type": "string",
+          "description": "Label text (if enabled)"
+        },
+        "hasStackingLip": {
+          "type": "boolean",
+          "description": "Enable/disable stacking lip"
+        },
+        "properties": {
+          "type": "object",
+          "description": "Custom properties for advanced configurations"
+        }
+      }
+    }
+  }
+}
