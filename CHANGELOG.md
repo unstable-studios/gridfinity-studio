@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.3.0...v1.4.0) (2025-12-28)
+
+
+### Features
+
+* fix minor CI issues ([#136](https://github.com/unstable-studios/gridfinity-studio/issues/136)) ([a7d1a4f](https://github.com/unstable-studios/gridfinity-studio/commit/a7d1a4fb43afea8c5615cbd4dd8fa584a3de6ca6))
+
 ## [1.3.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.2.0...v1.3.0) (2025-12-28)
 
 
