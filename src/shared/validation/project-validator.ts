@@ -212,7 +212,7 @@ export class ProjectValidator {
           message: `${field} must be a number`,
           value: c[field]
         })
-      } else if (c[field] as number <= 0 && field !== 'tolerance') {
+      } else if ((c[field] as number) <= 0 && field !== 'tolerance') {
         errors.push({
           field: `gridfinity.${field}`,
           message: `${field} must be greater than 0`,
