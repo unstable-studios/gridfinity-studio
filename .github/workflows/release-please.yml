@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "pnpm-lock.yaml"
 
 permissions:
   contents: write
@@ -70,4 +72,4 @@ jobs:
           git config user.name "release-please[bot]"
           git add pnpm-lock.yaml
           git commit -m "chore: update pnpm-lock.yaml for release-please"
-          git push
+          git push origin HEAD:${{ needs.release-please.outputs.pr_branch }}
