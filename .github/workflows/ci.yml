@@ -93,9 +93,8 @@ jobs:
         run: pnpm typecheck
 
   build:
-    name: Build (smoke)
-    needs: commitlint
-    if: github.event_name == 'push' || github.event.pull_request.draft == false
+    name: Build
+    needs: [typecheck, lint]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

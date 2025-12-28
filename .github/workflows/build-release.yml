@@ -1,9 +1,8 @@
-name: Build Release
+name: Build for Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [created]
 
 permissions:
   contents: write
@@ -13,7 +12,7 @@ defaults:
     shell: bash
 
 concurrency:
-  group: release-build-${{ github.ref }}
+  group: release-build-${{ github.event.release.tag_name }}
   cancel-in-progress: false
 
 env:
@@ -26,14 +25,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: [macos-latest, windows-latest, ubuntu-latest]
 
     steps:
       - name: Checkout tag
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.ref }}
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -50,14 +49,14 @@ jobs:
       - name: Build macOS
         if: matrix.os == 'macos-latest'
         run: pnpm run build:mac -- --publish=never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         run: pnpm run build:win -- --publish=never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Linux
+        if: matrix.os == 'ubuntu-latest'
+        run: pnpm run build:linux -- --publish=never
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v4
@@ -69,31 +68,36 @@ jobs:
 
   publish:
     name: Publish release assets
+    if: github.event.release.draft == true
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Checkout tag
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.ref }}
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: dist-*
-          merge-multiple: false
+          merge-multiple: true
 
-      - name: Ensure GitHub Release exists
+      - name: Upload installers to draft release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT_RELEASEPLEASE != '' && secrets.GH_PAT_RELEASEPLEASE || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" --notes "Automated release for ${GITHUB_REF_NAME}"
+          shopt -s globstar nullglob
+          files=(
+            **/dist/gridfinity-studio-*-setup.exe
+            **/dist/gridfinity-studio-*.dmg
+            **/dist/gridfinity-studio-*.AppImage
+            **/dist/*.deb
+            **/dist/*.snap
+            **/dist/latest*.yml
+            **/dist/*.blockmap
+          )
 
-      - name: Upload installers to Release
+          ((${#files[@]})) || { echo "No release artifacts found"; exit 1; }
+          gh release upload "${{ github.event.release.tag_name }}" "${files[@]}" --clobber
+
+      - name: Publish GitHub Release
         env:
-          GH_TOKEN: ${{ secrets.GH_PAT_RELEASEPLEASE != '' && secrets.GH_PAT_RELEASEPLEASE || secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          shopt -s globstar
-          gh release upload "${GITHUB_REF_NAME}" dist-*/dist/**/* --clobber
+          gh release edit "${{ github.event.release.tag_name }}" --draft=false
