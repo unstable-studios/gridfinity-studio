@@ -11,7 +11,8 @@ export default defineConfig({
     publicDir: resolve('src/renderer/public'),
     resolve: {
       alias: {
-        '@renderer': resolve('src/renderer/src')
+        '@renderer': resolve('src/renderer/src'),
+        '@': resolve(__dirname, 'src/renderer/src')
       }
     },
     plugins: [react(), svgr(), tailwindcss()]
