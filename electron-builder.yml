@@ -37,5 +37,6 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://unstablestudios.com/gridfinity-studio/updates/
+  provider: github
+  owner: unstablestudios
+  repo: gridfinity-studio
