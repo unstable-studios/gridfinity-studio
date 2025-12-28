@@ -1,25 +1,52 @@
 import Logo from './Logo'
-
-function NavItem(props: { label: string; href: string }): React.JSX.Element {
-  return (
-    <a
-      href={props.href}
-      className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-md font-semibold cursor-pointer"
-    >
-      {props.label}
-    </a>
-  )
-}
+import { Button } from '@/components/ui/button'
+import { ModeToggle } from '@/components/ui/mode-toggle'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuShortcut,
+  DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu'
 
 export default function Navbar(): React.JSX.Element {
   return (
-    <div className="h-16 w-full border-b gap-4 border-gray-300 flex items-center justify-between px-4 shadow-sm bg-white dark:bg-gray-800 dark:border-gray-700">
+    <div className="h-16 w-full border-b gap-4 border-zinc-300 flex items-center justify-between px-4 shadow-sm bg-white dark:bg-zinc-800 dark:border-zinc-700">
       <Logo />
-      <div>
-        <NavItem label="File" href="#" />
-        <NavItem label="Edit" href="#" />
-        <NavItem label="View" href="#" />
-        <NavItem label="Help" href="#" />
+      <div className="flex items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline">Menu</Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-56" align="start">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuItem>
+                Profile
+                <DropdownMenuShortcut>⇧⌘P</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                Billing
+                <DropdownMenuShortcut>⌘B</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                Settings
+                <DropdownMenuShortcut>⌘S</DropdownMenuShortcut>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                Keyboard shortcuts
+                <DropdownMenuShortcut>⌘K</DropdownMenuShortcut>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuItem>
+              Log out
+              <DropdownMenuShortcut>⇧⌘Q</DropdownMenuShortcut>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <ModeToggle />
       </div>
     </div>
   )
