@@ -14,7 +14,7 @@ export default {
     'scope-enum': [
       2,
       'always',
-      ['core', 'ui', 'middleware', 'ci', 'test', 'docs', 'repo', 'infra', 'deps']
+      ['core', 'ui', 'middleware', 'ci', 'test', 'docs', 'repo', 'infra', 'deps', 'release']
     ],
     'type-enum': [
       2,
@@ -143,6 +143,11 @@ export default {
             description: 'Dependency updates',
             title: 'Dependencies',
             emoji: '⬆️ '
+          },
+          release: {
+            description: 'Release related changes',
+            title: 'Release',
+            emoji: '🏷️'
           }
         }
       },
