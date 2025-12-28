@@ -1,7 +1,8 @@
 {
   "name": "gridfinity-studio",
+  "author": "Mike Hansen <mike@unstablestudios.com>",
   "version": "1.2.0",
-  "description": "Electron + React scaffold",
+  "description": "Gridfinity Studio is an Electron-based application for designing and managing Gridfinity modular storage systems.",
   "main": "./out/main/index.js",
   "scripts": {
     "format": "prettier --write .",
@@ -13,8 +14,8 @@
     "dev": "electron-vite dev",
     "build": "pnpm run typecheck && electron-vite build",
     "postinstall": "electron-builder install-app-deps",
-    "build:unpack": "pnpm run build && electron-builder --dir",
-    "build:win": "pnpm run build && electron-builder --win",
+    "build:unpack": "electron-vite build && electron-builder --dir",
+    "build:win": "electron-vite build && electron-builder --win",
     "build:mac": "electron-vite build && electron-builder --mac",
     "build:linux": "electron-vite build && electron-builder --linux",
     "commitlint": "commitlint --edit",

@@ -41,6 +41,6 @@
     }
   },
   "pull-request-title-pattern": "chore(release): ${version}",
-  "release-type": "node",
-  "skip-github-releases": true
+  "draft": true,
+  "release-type": "node"
 }
