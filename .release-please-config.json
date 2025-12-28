@@ -41,6 +41,5 @@
     }
   },
   "pull-request-title-pattern": "chore(release): ${version}",
-  "draft": true,
   "release-type": "node"
 }
