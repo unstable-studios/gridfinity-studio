@@ -1,7 +1,7 @@
 const navItems = [
   { label: 'Viewport', description: 'Camera, grid, lighting' },
   { label: 'Assets', description: 'Parts and presets' },
-  { label: 'Export', description: 'Prepare build plates' }
+  { label: 'Export', description: 'Prepare models for export' }
 ]
 
 export default function Sidebar(): React.JSX.Element {
@@ -38,10 +38,6 @@ export default function Sidebar(): React.JSX.Element {
             </p>
           </button>
         ))}
-      </div>
-
-      <div className="mt-6 rounded-lg border border-dashed border-zinc-300/70 bg-zinc-50 px-3 py-3 text-xs text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900">
-        Canvas auto-resizes with the Electron window, keeping camera aspect locked to the viewport.
       </div>
     </aside>
   )
