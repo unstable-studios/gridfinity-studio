@@ -9,12 +9,21 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: 24
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
+      pr_number: ${{ steps.release.outputs.pr }}
+      pr_branch: ${{ steps.release.outputs.pr-branch }}
     steps:
       - uses: googleapis/release-please-action@v4
         id: release
@@ -22,3 +31,41 @@ jobs:
           token: ${{ secrets.GH_PAT_RELEASEPLEASE }}
           config-file: .release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      # Keep pnpm-lock.yaml in sync when release-please opens a PR
+      - name: Checkout release PR branch
+        if: steps.release.outputs.pr
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT_RELEASEPLEASE }}
+          ref: ${{ steps.release.outputs.pr-branch }}
+
+      - name: Setup pnpm
+        if: steps.release.outputs.pr
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        if: steps.release.outputs.pr
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - name: Update pnpm lockfile
+        if: steps.release.outputs.pr
+        run: pnpm install --lockfile-only
+
+      - name: Commit lockfile update
+        if: steps.release.outputs.pr
+        run: |
+          git status --porcelain
+          if git diff --quiet; then
+            echo "No lockfile changes"
+            exit 0
+          fi
+          git config user.email "release-please[bot]@users.noreply.github.com"
+          git config user.name "release-please[bot]"
+          git add pnpm-lock.yaml
+          git commit -m "chore: update pnpm-lock.yaml for release-please"
+          git push

@@ -70,6 +70,9 @@ function HelpMenu() {
         <DropdownMenuItem>Community Forums</DropdownMenuItem>
         <DropdownMenuItem>Report a Bug</DropdownMenuItem>
         <DropdownMenuItem>About</DropdownMenuItem>
+        <DropdownMenuItem disabled className="opacity-80 cursor-default">
+          Version {__APP_VERSION__}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
