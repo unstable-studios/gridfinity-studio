@@ -40,7 +40,6 @@ export function ProjectProvider({ children }: ProjectProviderProps): React.JSX.E
     setIsModified(true)
     setCurrentFilePath(null)
     setError(null)
-    console.log('New project created:', newProject.settings.name)
   }, [])
 
   /**
@@ -54,7 +53,6 @@ export function ProjectProvider({ children }: ProjectProviderProps): React.JSX.E
         setIsModified(false)
         setCurrentFilePath(null) // We don't get the path back from dialog
         setError(null)
-        console.log('Project loaded:', result.data.settings.name)
       } else if (result.error && !result.error.includes('cancelled')) {
         setError(result.error)
       }
@@ -79,7 +77,6 @@ export function ProjectProvider({ children }: ProjectProviderProps): React.JSX.E
         setIsModified(false)
         setCurrentFilePath(result.data)
         setError(null)
-        console.log('Project saved to:', result.data)
       } else if (result.error && !result.error.includes('cancelled')) {
         setError(result.error)
       }
@@ -105,7 +102,6 @@ export function ProjectProvider({ children }: ProjectProviderProps): React.JSX.E
         setIsModified(false)
         setCurrentFilePath(result.data)
         setError(null)
-        console.log('Project saved to:', result.data)
       } else if (result.error && !result.error.includes('cancelled')) {
         setError(result.error)
       }
