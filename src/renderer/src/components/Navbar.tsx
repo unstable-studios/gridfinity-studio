@@ -7,8 +7,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { useProjectContext } from '@/contexts/ProjectContext'
+import { useEffect } from 'react'
 
 export default function Navbar(): React.JSX.Element {
+  const { error, clearError } = useProjectContext()
+
+  // Show error alerts
+  useEffect(() => {
+    if (error) {
+      alert(error)
+      clearError()
+    }
+  }, [error, clearError])
+
   return (
     <div className="h-16 w-full border-b gap-4 border-zinc-300 flex items-center justify-between px-4 shadow-sm bg-white dark:bg-zinc-800 dark:border-zinc-700">
       <Logo />
@@ -23,19 +35,42 @@ export default function Navbar(): React.JSX.Element {
 }
 
 function FileMenu() {
+  const { createNewProject, openProject, saveProject, saveProjectAs, project } =
+    useProjectContext()
+
+  const handleNewProject = () => {
+    createNewProject()
+  }
+
+  const handleOpenProject = async () => {
+    await openProject()
+  }
+
+  const handleSave = async () => {
+    await saveProject()
+  }
+
+  const handleSaveAs = async () => {
+    await saveProjectAs()
+  }
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline">File</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem>New Project</DropdownMenuItem>
-        <DropdownMenuItem>Open Project</DropdownMenuItem>
-        <DropdownMenuItem>Open Recent...</DropdownMenuItem>
-        <DropdownMenuItem>Save</DropdownMenuItem>
-        <DropdownMenuItem>Save As...</DropdownMenuItem>
-        <DropdownMenuItem>Import...</DropdownMenuItem>
-        <DropdownMenuItem>Export...</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleNewProject}>New Project</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleOpenProject}>Open Project</DropdownMenuItem>
+        <DropdownMenuItem disabled>Open Recent...</DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSave} disabled={!project}>
+          Save
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSaveAs} disabled={!project}>
+          Save As...
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled>Import...</DropdownMenuItem>
+        <DropdownMenuItem disabled>Export...</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
