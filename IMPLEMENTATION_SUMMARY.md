@@ -4,6 +4,8 @@
 
 Successfully implemented a canonical project.json schema (v0) for Gridfinity Studio that serves as the single source of truth for project data, with complete validation and round-trip guarantees.
 
+**Note**: This implementation has been rebased onto main to incorporate the latest commit standards and all commit messages have been updated to follow conventional commit format.
+
 ## ✅ Acceptance Criteria - All Met
 
 - ✅ **Schema includes**: global settings, gridfinity config, entities, groups, generators, bins
