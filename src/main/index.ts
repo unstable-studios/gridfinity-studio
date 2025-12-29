@@ -2,6 +2,8 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+import { saveProject, loadProject, validateProjectData } from './project-handler'
+import type { ProjectData } from '../shared/types/project'
 
 function createWindow(): void {
   // Create the browser window.
@@ -51,6 +53,19 @@ app.whenReady().then(() => {
 
   // IPC test
   ipcMain.on('ping', () => console.log('pong'))
+
+  // Project IPC handlers
+  ipcMain.handle('project:save', async (_, projectData: ProjectData, filePath?: string) => {
+    return await saveProject(projectData, filePath)
+  })
+
+  ipcMain.handle('project:load', async (_, filePath?: string) => {
+    return await loadProject(filePath)
+  })
+
+  ipcMain.handle('project:validate', async (_, projectData: unknown) => {
+    return validateProjectData(projectData)
+  })
 
   createWindow()
 

@@ -1,8 +1,16 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
+import type { ProjectData } from '../shared/types/project'
 
 // Custom APIs for renderer
-const api = {}
+const api = {
+  project: {
+    save: (projectData: ProjectData, filePath?: string) =>
+      ipcRenderer.invoke('project:save', projectData, filePath),
+    load: (filePath?: string) => ipcRenderer.invoke('project:load', filePath),
+    validate: (projectData: unknown) => ipcRenderer.invoke('project:validate', projectData)
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
