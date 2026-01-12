@@ -63,7 +63,7 @@
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@react-three/eslint-plugin": "^0.1.2",
     "@types/node": "^25.0.3",
-    "@types/react": "^19.2.7",
+    "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "@types/three": "^0.182.0",
     "@vitejs/plugin-react": "^5.1.2",
