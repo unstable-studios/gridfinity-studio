@@ -68,7 +68,7 @@
     "@types/three": "^0.182.0",
     "@vitejs/plugin-react": "^5.1.2",
     "commitizen": "^4.3.1",
-    "electron": "^39.2.7",
+    "electron": "^40.0.0",
     "electron-builder": "^26.4.0",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.2",
