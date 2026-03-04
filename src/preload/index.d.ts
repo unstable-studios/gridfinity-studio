@@ -12,11 +12,16 @@ interface ProjectAPI {
   getRecent: () => Promise<{ success: boolean; data?: string[]; error?: string }>
 }
 
+interface ExportAPI {
+  stl: (stlData: ArrayBuffer) => Promise<{ success: boolean; error?: string; data?: string }>
+}
+
 declare global {
   interface Window {
     electron: ElectronAPI
     api: {
       project: ProjectAPI
+      export: ExportAPI
     }
   }
 }
