@@ -41,6 +41,9 @@ vite.svg
 .idea/
 .vscode/
 
+### Claude Code
+.claude/
+
 ### act (local GitHub Actions)
 act-*.log
 
