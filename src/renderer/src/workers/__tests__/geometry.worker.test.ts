@@ -102,20 +102,16 @@ describe('WorkerRequest/Response construction', () => {
     }).not.toThrow()
   })
 
-  it('Float32Array serialization/deserialization roundtrip', () => {
+  it('Float32Array structured clone roundtrip', () => {
     const original = new Float32Array([1.5, 2.3, -0.7, 42.0, 0.001])
 
-    // Simulate structured clone / postMessage serialization
-    const serialized = JSON.stringify({
-      data: Array.from(original)
-    })
-    const deserialized = JSON.parse(serialized)
-    const restored = new Float32Array(deserialized.data)
+    // Use structuredClone to match actual postMessage behavior
+    const cloned = structuredClone(original)
 
-    expect(restored).toBeInstanceOf(Float32Array)
-    expect(restored.length).toBe(original.length)
+    expect(cloned).toBeInstanceOf(Float32Array)
+    expect(cloned.length).toBe(original.length)
     for (let i = 0; i < original.length; i++) {
-      expect(restored[i]).toBeCloseTo(original[i], 5)
+      expect(cloned[i]).toBeCloseTo(original[i], 5)
     }
   })
 })

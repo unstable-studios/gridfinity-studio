@@ -83,7 +83,8 @@ export default function TransformGizmo({
     (event: ThreeEvent<PointerEvent>) => {
       if (!centroid) return
       event.stopPropagation()
-      ;(event.target as HTMLElement).setPointerCapture?.(event.nativeEvent.pointerId)
+      const domTarget = event.nativeEvent.target as HTMLElement | null
+      domTarget?.setPointerCapture?.(event.nativeEvent.pointerId)
       const pos = { x: event.point.x, y: event.point.y }
       dragStart.current = pos
       lastPos.current = pos

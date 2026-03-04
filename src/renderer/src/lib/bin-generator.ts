@@ -116,11 +116,10 @@ function addOctagonalRecess(
     idxBuf.push(topRing[i], bottomRing[next], bottomRing[i])
   }
 
-  // Top ring cap (facing down, seals the floor surface)
-  for (let i = 0; i < n; i++) {
-    const next = (i + 1) % n
-    idxBuf.push(topCenter, topRing[i], topRing[next])
-  }
+  // NOTE: No top cap — the recess is an open-ended cutter mesh.
+  // When manifold booleans are wired, this geometry will be subtracted
+  // from the bin floor to create the actual recess cavity.
+  void topCenter
 }
 
 // ─── Main generator ───────────────────────────────────────────────

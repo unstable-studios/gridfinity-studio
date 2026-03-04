@@ -127,10 +127,9 @@ export function resolveSnapTargets(
  * target list is empty.
  */
 export function snapToNearest(
-  cursor: Cursor,
+  _cursor: Cursor,
   targets: SnapTarget[]
 ): { x: number; y: number } | null {
-  void cursor
   if (targets.length === 0) return null
   return { x: targets[0].point.x, y: targets[0].point.y }
 }

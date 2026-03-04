@@ -4,6 +4,7 @@ import Sidebar from '@/components/Sidebar'
 import Viewport from '@/components/Viewport'
 import { ThemeProvider } from '@/components/ui/theme-provider'
 import { AppModeCtx } from '@/hooks/useAppMode'
+import { ProjectProvider } from '@/hooks/useProject'
 import type { AppMode, ActiveTool } from '@/hooks/useAppMode'
 
 export default function App(): React.JSX.Element {
@@ -12,15 +13,17 @@ export default function App(): React.JSX.Element {
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <AppModeCtx.Provider value={{ mode, setMode, activeTool, setActiveTool }}>
-        <div className="flex h-screen flex-col bg-background text-foreground">
-          <Navbar />
-          <div className="flex flex-1 gap-4 overflow-hidden p-4 min-h-0">
-            <Sidebar />
-            <Viewport />
+      <ProjectProvider>
+        <AppModeCtx.Provider value={{ mode, setMode, activeTool, setActiveTool }}>
+          <div className="flex h-screen flex-col bg-background text-foreground">
+            <Navbar />
+            <div className="flex flex-1 gap-4 overflow-hidden p-4 min-h-0">
+              <Sidebar />
+              <Viewport />
+            </div>
           </div>
-        </div>
-      </AppModeCtx.Provider>
+        </AppModeCtx.Provider>
+      </ProjectProvider>
     </ThemeProvider>
   )
 }

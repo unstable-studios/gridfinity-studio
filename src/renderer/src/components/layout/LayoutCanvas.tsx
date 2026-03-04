@@ -1,5 +1,4 @@
 import { Canvas } from '@react-three/fiber'
-import { OrthographicCamera } from '@react-three/drei'
 import { Suspense, useRef, useCallback, useState } from 'react'
 import GridOverlay from './GridOverlay'
 import EntityRenderer from './EntityRenderer'
@@ -26,7 +25,6 @@ function LayoutScene({
 }): React.JSX.Element {
   return (
     <>
-      <OrthographicCamera makeDefault position={[0, 0, 100]} zoom={4} near={0.1} far={1000} />
       <ambientLight intensity={1} />
       <color attach="background" args={['#111318']} />
       <GridOverlay baseUnit={baseUnit} />

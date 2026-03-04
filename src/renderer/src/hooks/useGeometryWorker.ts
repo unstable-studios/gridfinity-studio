@@ -98,15 +98,18 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
         const id = crypto.randomUUID()
         pendingRef.current.set(id, { resolve, reject })
 
+        // Copy vertices so transferring the buffer doesn't detach the caller's array
+        const verticesCopy = new Float32Array(vertices)
+
         const message: WorkerRequest = {
           type: 'extrude',
           id,
-          vertices,
+          vertices: verticesCopy,
           depth,
           direction,
           role
         }
-        worker.postMessage(message, [vertices.buffer] as unknown as Transferable[])
+        worker.postMessage(message, [verticesCopy.buffer] as unknown as Transferable[])
       })
     },
     []

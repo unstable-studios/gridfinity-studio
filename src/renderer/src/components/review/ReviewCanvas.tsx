@@ -1,6 +1,6 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { Suspense } from 'react'
+import { Suspense, useMemo } from 'react'
 import * as THREE from 'three'
 
 interface ReviewCanvasProps {
@@ -36,10 +36,13 @@ function BakedMeshPreview({
 }: {
   mesh: { positions: Float32Array; indices: Uint32Array; normals: Float32Array }
 }): React.JSX.Element {
-  const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3))
-  geometry.setIndex(new THREE.BufferAttribute(mesh.indices, 1))
-  geometry.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3))
+    geo.setIndex(new THREE.BufferAttribute(mesh.indices, 1))
+    geo.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
+    return geo
+  }, [mesh.positions, mesh.indices, mesh.normals])
 
   return (
     <mesh geometry={geometry} castShadow>

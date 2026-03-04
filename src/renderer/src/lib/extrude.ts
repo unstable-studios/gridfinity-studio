@@ -5,7 +5,7 @@
  * then stitches side quads between the top and bottom rings.
  */
 
-import { Earcut } from 'three/src/extras/Earcut.js'
+import earcut from 'earcut'
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -86,7 +86,7 @@ export function extrudePolygon(
   for (const v of vertices) {
     flat.push(v.x, v.y)
   }
-  const capIndices = Earcut.triangulate(flat, undefined, 2)
+  const capIndices = earcut(flat, undefined, 2)
 
   // ── Count geometry ────────────────────────────────────────────
   // Top cap: n verts, Bottom cap: n verts, Sides: 4 verts per edge (n edges)
