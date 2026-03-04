@@ -1,5 +1,6 @@
 import { dialog } from 'electron'
 import { readFile, writeFile } from 'fs/promises'
+import { createEmptyProject } from '../shared/types/project'
 import type { ProjectData } from '../shared/types/project'
 import { validateProject, formatValidationErrors } from '../shared/validation/project-validator'
 
@@ -10,6 +11,47 @@ interface OperationResult<T = void> {
   success: boolean
   data?: T
   error?: string
+}
+
+/**
+ * Maximum number of recent project paths to track
+ */
+const MAX_RECENT_PROJECTS = 10
+
+/**
+ * In-memory list of recently opened/saved project file paths
+ */
+let recentProjectPaths: string[] = []
+
+/**
+ * Add a file path to the recent projects list
+ * Deduplicates and caps at MAX_RECENT_PROJECTS
+ */
+function addToRecentProjects(filePath: string): void {
+  recentProjectPaths = [filePath, ...recentProjectPaths.filter((p) => p !== filePath)].slice(
+    0,
+    MAX_RECENT_PROJECTS
+  )
+}
+
+/**
+ * Create a new empty project
+ */
+export function newProject(): OperationResult<ProjectData> {
+  return {
+    success: true,
+    data: createEmptyProject()
+  }
+}
+
+/**
+ * Get the list of recently opened/saved project file paths
+ */
+export function getRecentProjects(): OperationResult<string[]> {
+  return {
+    success: true,
+    data: [...recentProjectPaths]
+  }
 }
 
 /**
@@ -63,6 +105,8 @@ export async function saveProject(
 
     // Write to file
     await writeFile(targetPath, JSON.stringify(dataToSave, null, 2), 'utf-8')
+
+    addToRecentProjects(targetPath)
 
     return {
       success: true,
@@ -126,6 +170,8 @@ export async function loadProject(filePath?: string): Promise<OperationResult<Pr
         error: formatValidationErrors(validationResult.errors)
       }
     }
+
+    addToRecentProjects(targetPath)
 
     return {
       success: true,

@@ -1,3 +1,4 @@
+import { useEffect, useCallback } from 'react'
 import Logo from './Logo'
 import { Button } from '@/components/ui/button'
 import { ModeToggle } from '@/components/ui/mode-toggle'
@@ -5,8 +6,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { useProject } from '@/hooks/useProject'
+import { useUndo } from '@/hooks/useUndo'
 
 export default function Navbar(): React.JSX.Element {
   return (
@@ -23,37 +30,125 @@ export default function Navbar(): React.JSX.Element {
 }
 
 function FileMenu() {
+  const {
+    project,
+    saveProject,
+    saveProjectAs,
+    loadProject,
+    createNewProject,
+    recentProjects,
+    loadRecentProjects
+  } = useProject()
+
+  useEffect(() => {
+    loadRecentProjects()
+  }, [loadRecentProjects])
+
+  const handleNewProject = (): void => {
+    createNewProject()
+  }
+
+  const handleOpenProject = (): void => {
+    void loadProject()
+  }
+
+  const handleSave = (): void => {
+    void saveProject()
+  }
+
+  const handleSaveAs = (): void => {
+    void saveProjectAs()
+  }
+
+  const handleOpenRecent = (filePath: string): void => {
+    void loadProject(filePath)
+  }
+
+  const hasProject = project !== null
+
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => open && void loadRecentProjects()}>
       <DropdownMenuTrigger asChild>
         <Button variant="outline">File</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem>New Project</DropdownMenuItem>
-        <DropdownMenuItem>Open Project</DropdownMenuItem>
-        <DropdownMenuItem>Open Recent...</DropdownMenuItem>
-        <DropdownMenuItem>Save</DropdownMenuItem>
-        <DropdownMenuItem>Save As...</DropdownMenuItem>
-        <DropdownMenuItem>Import...</DropdownMenuItem>
-        <DropdownMenuItem>Export...</DropdownMenuItem>
+        <DropdownMenuItem onSelect={handleNewProject}>New Project</DropdownMenuItem>
+        <DropdownMenuItem onSelect={handleOpenProject}>Open Project</DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>Open Recent</DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            {recentProjects.length === 0 ? (
+              <DropdownMenuItem disabled>No recent projects</DropdownMenuItem>
+            ) : (
+              recentProjects.map((filePath) => (
+                <DropdownMenuItem key={filePath} onSelect={() => handleOpenRecent(filePath)}>
+                  {filePath.split('/').pop() ?? filePath}
+                </DropdownMenuItem>
+              ))
+            )}
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled={!hasProject} onSelect={handleSave}>
+          Save
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!hasProject} onSelect={handleSaveAs}>
+          Save As...
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>Import...</DropdownMenuItem>
+        <DropdownMenuItem disabled>Export...</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
 }
 
 function EditMenu() {
+  const { undo, redo, canUndo, canRedo, lastLabel } = useUndo()
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (mod && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        undo()
+      } else if (mod && e.key === 'z' && e.shiftKey) {
+        e.preventDefault()
+        redo()
+      } else if (mod && e.key === 'y') {
+        e.preventDefault()
+        redo()
+      }
+    },
+    [undo, redo]
+  )
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
+
+  const undoLabel = lastLabel ? `Undo ${lastLabel}` : 'Undo'
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="outline">Edit</Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem>Undo</DropdownMenuItem>
-        <DropdownMenuItem>Redo</DropdownMenuItem>
-        <DropdownMenuItem>Cut</DropdownMenuItem>
-        <DropdownMenuItem>Copy</DropdownMenuItem>
-        <DropdownMenuItem>Paste</DropdownMenuItem>
-        <DropdownMenuItem>Select All</DropdownMenuItem>
+        <DropdownMenuItem disabled={!canUndo} onSelect={undo}>
+          {undoLabel}
+          <span className="ml-auto text-xs text-zinc-500">Cmd+Z</span>
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={!canRedo} onSelect={redo}>
+          Redo
+          <span className="ml-auto text-xs text-zinc-500">Cmd+Shift+Z</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem disabled>Cut</DropdownMenuItem>
+        <DropdownMenuItem disabled>Copy</DropdownMenuItem>
+        <DropdownMenuItem disabled>Paste</DropdownMenuItem>
+        <DropdownMenuItem disabled>Select All</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

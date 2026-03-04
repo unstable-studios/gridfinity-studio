@@ -2,7 +2,13 @@ import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import { saveProject, loadProject, validateProjectData } from './project-handler'
+import {
+  saveProject,
+  loadProject,
+  validateProjectData,
+  newProject,
+  getRecentProjects
+} from './project-handler'
 import type { ProjectData } from '../shared/types/project'
 
 function createWindow(): void {
@@ -65,6 +71,14 @@ app.whenReady().then(() => {
 
   ipcMain.handle('project:validate', async (_, projectData: unknown) => {
     return validateProjectData(projectData)
+  })
+
+  ipcMain.handle('project:new', () => {
+    return newProject()
+  })
+
+  ipcMain.handle('project:get-recent', () => {
+    return getRecentProjects()
   })
 
   createWindow()

@@ -1,6 +1,5 @@
 /**
- * Example React hook demonstrating project schema usage
- * This can be used as a reference for implementing project management in the UI
+ * React hook for project state management and file operations
  */
 
 import { useState, useCallback } from 'react'
@@ -9,10 +8,14 @@ import type { ProjectData } from '../../../shared/types/project'
 
 interface UseProjectResult {
   project: ProjectData | null
+  filePath: string | null
   isModified: boolean
-  saveProject: (filePath?: string) => Promise<boolean>
-  loadProject: (filePath?: string) => Promise<boolean>
+  recentProjects: string[]
+  saveProject: (targetPath?: string) => Promise<boolean>
+  saveProjectAs: () => Promise<boolean>
+  loadProject: (targetPath?: string) => Promise<boolean>
   createNewProject: (name?: string) => void
+  loadRecentProjects: () => Promise<void>
   error: string | null
 }
 
@@ -37,28 +40,34 @@ interface UseProjectResult {
  */
 export function useProject(): UseProjectResult {
   const [project, setProject] = useState<ProjectData | null>(null)
+  const [filePath, setFilePath] = useState<string | null>(null)
   const [isModified, setIsModified] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [recentProjects, setRecentProjects] = useState<string[]>([])
 
   /**
    * Save the current project to disk
+   * If a filePath is already known and no explicit targetPath is given, reuses it
    */
   const saveProject = useCallback(
-    async (filePath?: string): Promise<boolean> => {
+    async (targetPath?: string): Promise<boolean> => {
       if (!project) {
         setError('No project to save')
         return false
       }
 
       try {
-        const result = await window.api.project.save(project, filePath)
+        const pathToUse = targetPath ?? filePath ?? undefined
+        const result = await window.api.project.save(project, pathToUse)
         if (result.success) {
+          if (result.data) {
+            setFilePath(result.data)
+          }
           setIsModified(false)
           setError(null)
-          console.log('Project saved to:', result.data)
           return true
         } else {
-          setError(result.error || 'Failed to save project')
+          setError(result.error ?? 'Failed to save project')
           return false
         }
       } catch (err) {
@@ -67,23 +76,55 @@ export function useProject(): UseProjectResult {
         return false
       }
     },
-    [project]
+    [project, filePath]
   )
+
+  /**
+   * Save the current project with a new file path (always shows dialog)
+   */
+  const saveProjectAs = useCallback(async (): Promise<boolean> => {
+    if (!project) {
+      setError('No project to save')
+      return false
+    }
+
+    try {
+      // Pass undefined to force the save dialog to appear
+      const result = await window.api.project.save(project, undefined)
+      if (result.success) {
+        if (result.data) {
+          setFilePath(result.data)
+        }
+        setIsModified(false)
+        setError(null)
+        return true
+      } else {
+        setError(result.error ?? 'Failed to save project')
+        return false
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Save error: ${message}`)
+      return false
+    }
+  }, [project])
 
   /**
    * Load a project from disk
    */
-  const loadProject = useCallback(async (filePath?: string): Promise<boolean> => {
+  const loadProject = useCallback(async (targetPath?: string): Promise<boolean> => {
     try {
-      const result = await window.api.project.load(filePath)
+      const result = await window.api.project.load(targetPath)
       if (result.success && result.data) {
         setProject(result.data)
         setIsModified(false)
         setError(null)
-        console.log('Project loaded:', result.data.settings.name)
+        // We don't know the exact path from the load result unless one was provided
+        // The main process tracks it in recent projects either way
+        setFilePath(targetPath ?? null)
         return true
       } else {
-        setError(result.error || 'Failed to load project')
+        setError(result.error ?? 'Failed to load project')
         return false
       }
     } catch (err) {
@@ -97,19 +138,37 @@ export function useProject(): UseProjectResult {
    * Create a new project
    */
   const createNewProject = useCallback((name?: string): void => {
-    const newProject = createEmptyProject(name || 'Untitled Project')
+    const newProject = createEmptyProject(name ?? 'Untitled Project')
     setProject(newProject)
+    setFilePath(null)
     setIsModified(true)
     setError(null)
-    console.log('New project created:', newProject.settings.name)
+  }, [])
+
+  /**
+   * Load the list of recent project file paths from the main process
+   */
+  const loadRecentProjects = useCallback(async (): Promise<void> => {
+    try {
+      const result = await window.api.project.getRecent()
+      if (result.success && result.data) {
+        setRecentProjects(result.data)
+      }
+    } catch {
+      // Silently ignore errors fetching recent projects
+    }
   }, [])
 
   return {
     project,
+    filePath,
     isModified,
+    recentProjects,
     saveProject,
+    saveProjectAs,
     loadProject,
     createNewProject,
+    loadRecentProjects,
     error
   }
 }

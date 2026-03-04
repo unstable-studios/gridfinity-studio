@@ -1,45 +1,27 @@
 /**
- * Canonical Project Data Model (v0)
+ * Canonical Project Data Model (v0.2.0)
  * Single source of truth for Gridfinity Studio projects
  */
 
 /**
  * Schema version for project file format
  */
-export const CURRENT_SCHEMA_VERSION = '0.1.0'
+export const CURRENT_SCHEMA_VERSION = '0.2.0'
+
+/**
+ * Supported schema versions for backward compatibility
+ */
+export const SUPPORTED_SCHEMA_VERSIONS = ['0.1.0', '0.2.0']
 
 /**
  * Global settings for the project
  */
 export interface GlobalSettings {
-  /**
-   * Project name
-   */
   name: string
-
-  /**
-   * Project description
-   */
   description?: string
-
-  /**
-   * Project author
-   */
   author?: string
-
-  /**
-   * Project creation date (ISO 8601)
-   */
   createdAt: string
-
-  /**
-   * Last modified date (ISO 8601)
-   */
   modifiedAt: string
-
-  /**
-   * Units used in the project (mm, cm, in)
-   */
   units: 'mm' | 'cm' | 'in'
 }
 
@@ -47,38 +29,15 @@ export interface GlobalSettings {
  * Gridfinity-specific configuration
  */
 export interface GridfinityConfig {
-  /**
-   * Base unit size (default: 42mm for standard Gridfinity)
-   */
   baseUnit: number
-
-  /**
-   * Grid spacing
-   */
   gridSpacing: number
-
-  /**
-   * Height of a single Gridfinity unit
-   */
   unitHeight: number
-
-  /**
-   * Tolerance for fitting (in mm)
-   */
   tolerance: number
-
-  /**
-   * Magnet holes configuration
-   */
   magnetHoles: {
     enabled: boolean
     diameter: number
     depth: number
   }
-
-  /**
-   * Screw holes configuration
-   */
   screwHoles: {
     enabled: boolean
     diameter: number
@@ -87,279 +46,217 @@ export interface GridfinityConfig {
 }
 
 /**
- * 3D position
+ * Named tolerance presets for different printer/fit requirements
  */
+export type TolerancePreset = 'standard' | 'loose' | 'tight'
+
+export const TOLERANCE_PRESETS: Record<TolerancePreset, number> = {
+  standard: 0.5,
+  loose: 0.6,
+  tight: 0.3
+}
+
+export const GRIDFINITY_PRESETS: Record<TolerancePreset, GridfinityConfig> = {
+  standard: {
+    baseUnit: 42,
+    gridSpacing: 42,
+    unitHeight: 7,
+    tolerance: 0.5,
+    magnetHoles: { enabled: true, diameter: 6.5, depth: 2.4 },
+    screwHoles: { enabled: false, diameter: 3, depth: 6 }
+  },
+  loose: {
+    baseUnit: 42,
+    gridSpacing: 42,
+    unitHeight: 7,
+    tolerance: 0.6,
+    magnetHoles: { enabled: true, diameter: 6.5, depth: 2.4 },
+    screwHoles: { enabled: false, diameter: 3, depth: 6 }
+  },
+  tight: {
+    baseUnit: 42,
+    gridSpacing: 42,
+    unitHeight: 7,
+    tolerance: 0.3,
+    magnetHoles: { enabled: true, diameter: 6.5, depth: 2.4 },
+    screwHoles: { enabled: false, diameter: 3, depth: 6 }
+  }
+}
+
+// ─── Geometric primitives ──────────────────────────────────────────
+
 export interface Position {
   x: number
   y: number
   z: number
 }
 
-/**
- * 3D rotation (in radians)
- */
 export interface Rotation {
   x: number
   y: number
   z: number
 }
 
-/**
- * 3D scale
- */
 export interface Scale {
   x: number
   y: number
   z: number
 }
 
-/**
- * Transform for 3D objects
- */
 export interface Transform {
   position: Position
   rotation: Rotation
   scale: Scale
 }
 
-/**
- * Base entity in the scene
- */
-export interface Entity {
-  /**
-   * Unique identifier for the entity
-   */
+export interface Vertex2D {
+  x: number
+  y: number
+}
+
+// ─── Extrusion ─────────────────────────────────────────────────────
+
+export interface ExtrusionConfig {
+  depth: number
+  direction: 'up' | 'down'
+  role: 'solid' | 'cutter'
+}
+
+// ─── Entity types (discriminated union) ────────────────────────────
+
+interface BaseEntity {
   id: string
-
-  /**
-   * Entity name
-   */
   name: string
-
-  /**
-   * Entity type
-   */
-  type: 'bin' | 'divider' | 'label' | 'custom'
-
-  /**
-   * Transform data
-   */
   transform: Transform
-
-  /**
-   * Visibility flag
-   */
   visible: boolean
-
-  /**
-   * Lock flag (prevents editing)
-   */
   locked: boolean
-
-  /**
-   * Parent group ID (if part of a group)
-   */
   groupId?: string
-
-  /**
-   * Custom properties
-   */
+  extrusion?: ExtrusionConfig
   properties: Record<string, unknown>
 }
 
-/**
- * Group of entities
- */
+export interface LegacyEntity extends BaseEntity {
+  type: 'bin' | 'divider' | 'label' | 'custom'
+}
+
+export interface CircleEntity extends BaseEntity {
+  type: 'circle'
+  diameter: number
+}
+
+export interface RectangleEntity extends BaseEntity {
+  type: 'rectangle'
+  width: number
+  height: number
+  cornerRadius?: number
+}
+
+export interface PolygonEntity extends BaseEntity {
+  type: 'polygon'
+  vertices: Vertex2D[]
+}
+
+export interface SvgRegionEntity extends BaseEntity {
+  type: 'svg-region'
+  pathData: string
+  sourceFile?: string
+}
+
+export interface MeshEntity extends BaseEntity {
+  type: 'mesh'
+  sourceFile: string
+}
+
+export type Entity =
+  | LegacyEntity
+  | CircleEntity
+  | RectangleEntity
+  | PolygonEntity
+  | SvgRegionEntity
+  | MeshEntity
+
+export type EntityType = Entity['type']
+
+export const ENTITY_TYPES: EntityType[] = [
+  'bin',
+  'divider',
+  'label',
+  'custom',
+  'circle',
+  'rectangle',
+  'polygon',
+  'svg-region',
+  'mesh'
+]
+
+// ─── Groups ────────────────────────────────────────────────────────
+
 export interface Group {
-  /**
-   * Unique identifier for the group
-   */
   id: string
-
-  /**
-   * Group name
-   */
   name: string
-
-  /**
-   * Entity IDs in this group
-   */
   entityIds: string[]
-
-  /**
-   * Visibility flag
-   */
   visible: boolean
-
-  /**
-   * Lock flag (prevents editing)
-   */
   locked: boolean
-
-  /**
-   * Custom properties
-   */
   properties: Record<string, unknown>
 }
 
-/**
- * Generator parameters for procedural content
- */
+// ─── Generators (pattern system) ───────────────────────────────────
+
+export type SpacingMode = 'constant-pitch' | 'size-aware' | 'explicit'
+
+export interface LinearPatternConfig {
+  axis: 'x' | 'y'
+  count: number
+  spacingMode: SpacingMode
+  constantPitch?: number
+  gap?: number
+  positions?: number[]
+}
+
+export type GeneratorConfig = LinearPatternConfig | Record<string, unknown>
+
 export interface Generator {
-  /**
-   * Unique identifier for the generator
-   */
   id: string
-
-  /**
-   * Generator name
-   */
   name: string
-
-  /**
-   * Generator type
-   */
-  type: 'grid' | 'pattern' | 'array' | 'custom'
-
-  /**
-   * Generator parameters
-   */
-  parameters: Record<string, unknown>
-
-  /**
-   * Target entity ID or template
-   */
-  target?: string
-
-  /**
-   * Is this generator enabled?
-   */
+  type: 'grid' | 'pattern' | 'array' | 'custom' | 'linear-pattern'
+  config: GeneratorConfig
+  sourceEntityId?: string
   enabled: boolean
 }
 
-/**
- * Bin configuration (Gridfinity-specific)
- */
+// ─── Bins ──────────────────────────────────────────────────────────
+
 export interface Bin {
-  /**
-   * Unique identifier for the bin
-   */
   id: string
-
-  /**
-   * Bin name
-   */
   name: string
-
-  /**
-   * Width in Gridfinity units
-   */
   width: number
-
-  /**
-   * Depth in Gridfinity units
-   */
   depth: number
-
-  /**
-   * Height in Gridfinity units
-   */
   height: number
-
-  /**
-   * Enable/disable dividers
-   */
   hasDividers: boolean
-
-  /**
-   * Number of dividers (if enabled)
-   */
   dividerCount?: number
-
-  /**
-   * Enable/disable label area
-   */
   hasLabel: boolean
-
-  /**
-   * Label text (if enabled)
-   */
   labelText?: string
-
-  /**
-   * Enable/disable stacking lip
-   */
   hasStackingLip: boolean
-
-  /**
-   * Custom properties for advanced configurations
-   */
+  entityIds: string[]
   properties: Record<string, unknown>
 }
 
-/**
- * Complete project data structure
- */
+// ─── Project ───────────────────────────────────────────────────────
+
 export interface ProjectData {
-  /**
-   * Schema version for validation and migration
-   */
   schemaVersion: string
-
-  /**
-   * Global project settings
-   */
   settings: GlobalSettings
-
-  /**
-   * Gridfinity-specific configuration
-   */
   gridfinity: GridfinityConfig
-
-  /**
-   * All entities in the project
-   */
   entities: Entity[]
-
-  /**
-   * Groups of entities
-   */
   groups: Group[]
-
-  /**
-   * Generators for procedural content
-   */
   generators: Generator[]
-
-  /**
-   * Bin configurations
-   */
   bins: Bin[]
 }
 
-/**
- * Default Gridfinity configuration
- */
-export const DEFAULT_GRIDFINITY_CONFIG: GridfinityConfig = {
-  baseUnit: 42,
-  gridSpacing: 42,
-  unitHeight: 7,
-  tolerance: 0.5,
-  magnetHoles: {
-    enabled: true,
-    diameter: 6.5,
-    depth: 2.4
-  },
-  screwHoles: {
-    enabled: false,
-    diameter: 3,
-    depth: 6
-  }
-}
+// ─── Defaults & factories ──────────────────────────────────────────
 
-/**
- * Create a new empty project with default values
- */
+export const DEFAULT_GRIDFINITY_CONFIG: GridfinityConfig = GRIDFINITY_PRESETS.standard
+
 export function createEmptyProject(name: string = 'Untitled Project'): ProjectData {
   const now = new Date().toISOString()
 
@@ -373,7 +270,7 @@ export function createEmptyProject(name: string = 'Untitled Project'): ProjectDa
       modifiedAt: now,
       units: 'mm'
     },
-    gridfinity: DEFAULT_GRIDFINITY_CONFIG,
+    gridfinity: { ...DEFAULT_GRIDFINITY_CONFIG },
     entities: [],
     groups: [],
     generators: [],
@@ -381,9 +278,6 @@ export function createEmptyProject(name: string = 'Untitled Project'): ProjectDa
   }
 }
 
-/**
- * Create a default transform
- */
 export function createDefaultTransform(): Transform {
   return {
     position: { x: 0, y: 0, z: 0 },
