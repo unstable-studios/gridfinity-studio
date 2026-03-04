@@ -11,6 +11,9 @@ const api = {
     validate: (projectData: unknown) => ipcRenderer.invoke('project:validate', projectData),
     new: () => ipcRenderer.invoke('project:new'),
     getRecent: () => ipcRenderer.invoke('project:get-recent')
+  },
+  export: {
+    stl: (stlData: ArrayBuffer) => ipcRenderer.invoke('export:stl', stlData)
   }
 }
 

@@ -5,17 +5,29 @@
 import { useState, useCallback } from 'react'
 import { createEmptyProject } from '../../../shared/types/project'
 import type { ProjectData } from '../../../shared/types/project'
+import type { MeshDataWithNormals } from '../../../shared/types/worker'
+
+export interface BakeResult {
+  mesh: MeshDataWithNormals
+  timestamp: number
+  dirty: boolean
+  warnings: string[]
+}
 
 interface UseProjectResult {
   project: ProjectData | null
   filePath: string | null
   isModified: boolean
   recentProjects: string[]
+  bakeResult: BakeResult | null
+  setBakeResult: (result: BakeResult | null) => void
+  markBakeDirty: () => void
   saveProject: (targetPath?: string) => Promise<boolean>
   saveProjectAs: () => Promise<boolean>
   loadProject: (targetPath?: string) => Promise<boolean>
   createNewProject: (name?: string) => void
   loadRecentProjects: () => Promise<void>
+  exportSTL: (stlData: ArrayBuffer) => Promise<boolean>
   error: string | null
 }
 
@@ -44,6 +56,28 @@ export function useProject(): UseProjectResult {
   const [isModified, setIsModified] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [recentProjects, setRecentProjects] = useState<string[]>([])
+  const [bakeResult, setBakeResult] = useState<BakeResult | null>(null)
+
+  const markBakeDirty = useCallback(() => {
+    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+  }, [])
+
+  const exportSTL = useCallback(async (stlData: ArrayBuffer): Promise<boolean> => {
+    try {
+      const result = await window.api.export.stl(stlData)
+      if (result.success) {
+        setError(null)
+        return true
+      } else {
+        setError(result.error ?? 'Failed to export STL')
+        return false
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Export error: ${message}`)
+      return false
+    }
+  }, [])
 
   /**
    * Save the current project to disk
@@ -164,11 +198,15 @@ export function useProject(): UseProjectResult {
     filePath,
     isModified,
     recentProjects,
+    bakeResult,
+    setBakeResult,
+    markBakeDirty,
     saveProject,
     saveProjectAs,
     loadProject,
     createNewProject,
     loadRecentProjects,
+    exportSTL,
     error
   }
 }

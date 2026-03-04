@@ -14,17 +14,91 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useProject } from '@/hooks/useProject'
 import { useUndo } from '@/hooks/useUndo'
+import { useAppMode } from '@/hooks/useAppMode'
 
 export default function Navbar(): React.JSX.Element {
   return (
     <div className="h-16 w-full border-b gap-4 border-zinc-300 flex items-center justify-between px-4 shadow-sm bg-white dark:bg-zinc-800 dark:border-zinc-700">
-      <Logo />
       <div className="flex items-center gap-2">
+        <Logo />
         <FileMenu />
         <EditMenu />
         <HelpMenu />
+      </div>
+      <div className="flex items-center gap-2">
+        <ViewModeToggle />
+        <ToolBar />
         <ModeToggle />
       </div>
+    </div>
+  )
+}
+
+function ViewModeToggle() {
+  const { mode, setMode, setActiveTool } = useAppMode()
+
+  return (
+    <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+      <button
+        type="button"
+        className={`px-3 py-1.5 text-xs font-medium transition ${
+          mode === 'layout'
+            ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100'
+            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+        }`}
+        onClick={() => {
+          setMode('layout')
+          setActiveTool('select')
+        }}
+      >
+        Layout
+      </button>
+      <button
+        type="button"
+        className={`px-3 py-1.5 text-xs font-medium transition ${
+          mode === 'review'
+            ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100'
+            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+        }`}
+        onClick={() => {
+          setMode('review')
+          setActiveTool(null)
+        }}
+      >
+        Review
+      </button>
+    </div>
+  )
+}
+
+function ToolBar() {
+  const { mode, activeTool, setActiveTool } = useAppMode()
+
+  if (mode !== 'layout') return null
+
+  const tools = [
+    { id: 'select' as const, label: 'Select' },
+    { id: 'rectangle' as const, label: 'Rect' },
+    { id: 'circle' as const, label: 'Circle' },
+    { id: 'polygon' as const, label: 'Polygon' }
+  ]
+
+  return (
+    <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+      {tools.map((tool) => (
+        <button
+          key={tool.id}
+          type="button"
+          className={`px-3 py-1.5 text-xs font-medium transition ${
+            activeTool === tool.id
+              ? 'bg-blue-600 text-white'
+              : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+          }`}
+          onClick={() => setActiveTool(tool.id)}
+        >
+          {tool.label}
+        </button>
+      ))}
     </div>
   )
 }

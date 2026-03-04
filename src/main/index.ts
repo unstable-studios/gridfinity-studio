@@ -9,6 +9,7 @@ import {
   newProject,
   getRecentProjects
 } from './project-handler'
+import { exportSTL } from './export-handler'
 import type { ProjectData } from '../shared/types/project'
 
 function createWindow(): void {
@@ -79,6 +80,13 @@ app.whenReady().then(() => {
 
   ipcMain.handle('project:get-recent', () => {
     return getRecentProjects()
+  })
+
+  // Export IPC handlers
+  ipcMain.handle('export:stl', async (_event, stlData: ArrayBuffer) => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) return { success: false, error: 'No active window' }
+    return exportSTL(win, stlData)
   })
 
   createWindow()
