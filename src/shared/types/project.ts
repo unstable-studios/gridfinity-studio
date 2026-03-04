@@ -237,7 +237,7 @@ export interface Bin {
   hasLabel: boolean
   labelText?: string
   hasStackingLip: boolean
-  entityIds: string[]
+  entityIds?: string[]
   properties: Record<string, unknown>
 }
 

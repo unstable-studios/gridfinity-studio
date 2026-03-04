@@ -290,6 +290,20 @@ export class ProjectValidator {
         })
       }
 
+      // Properties validation (required by BaseEntity schema)
+      if (
+        !e.properties ||
+        typeof e.properties !== 'object' ||
+        e.properties === null ||
+        Array.isArray(e.properties)
+      ) {
+        errors.push({
+          field: `entities[${index}].properties`,
+          message: 'properties is required and must be an object',
+          value: e.properties
+        })
+      }
+
       // Type-specific validation
       this.validateEntityTypeFields(e, index, errors)
 
@@ -574,8 +588,14 @@ export class ProjectValidator {
         })
       }
 
-      // Validate linear-pattern config
-      if (g.type === 'linear-pattern' && g.config) {
+      // Validate config exists
+      if (!g.config || typeof g.config !== 'object') {
+        errors.push({
+          field: `generators[${index}].config`,
+          message: 'Generator config is required and must be an object',
+          value: g.config
+        })
+      } else if (g.type === 'linear-pattern') {
         this.validateLinearPatternConfig(g.config, `generators[${index}].config`, errors)
       }
     })

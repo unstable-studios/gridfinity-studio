@@ -82,7 +82,7 @@ function FileMenu() {
             ) : (
               recentProjects.map((filePath) => (
                 <DropdownMenuItem key={filePath} onSelect={() => handleOpenRecent(filePath)}>
-                  {filePath.split('/').pop() ?? filePath}
+                  {filePath.split(/[\\/]/).pop() ?? filePath}
                 </DropdownMenuItem>
               ))
             )}
@@ -109,13 +109,13 @@ function EditMenu() {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
-      if (mod && e.key === 'z' && !e.shiftKey) {
+      if (mod && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault()
         undo()
-      } else if (mod && e.key === 'z' && e.shiftKey) {
+      } else if (mod && e.code === 'KeyZ' && e.shiftKey) {
         e.preventDefault()
         redo()
-      } else if (mod && e.key === 'y') {
+      } else if (mod && e.code === 'KeyY') {
         e.preventDefault()
         redo()
       }
