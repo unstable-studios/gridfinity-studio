@@ -75,3 +75,10 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 - **3D**: Three.js via @react-three/fiber and @react-three/drei
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
 - **Release**: release-please for automated versioning and CHANGELOG
+
+## Active Technologies
+- TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep) (001-full-roadmap)
+- `.gfstudio` files (JSON, project schema v0.2.0+) (001-full-roadmap)
+
+## Recent Changes
+- 001-full-roadmap: Added TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep)

@@ -48,6 +48,9 @@ export default defineConfig({
         '@': resolve(__dirname, 'src/renderer/src')
       }
     },
+    worker: {
+      format: 'es'
+    },
     plugins: [react(), svgr(), tailwindcss()]
   }
 })

@@ -8,7 +8,9 @@ const api = {
     save: (projectData: ProjectData, filePath?: string) =>
       ipcRenderer.invoke('project:save', projectData, filePath),
     load: (filePath?: string) => ipcRenderer.invoke('project:load', filePath),
-    validate: (projectData: unknown) => ipcRenderer.invoke('project:validate', projectData)
+    validate: (projectData: unknown) => ipcRenderer.invoke('project:validate', projectData),
+    new: () => ipcRenderer.invoke('project:new'),
+    getRecent: () => ipcRenderer.invoke('project:get-recent')
   }
 }
 
