@@ -118,6 +118,88 @@ src/
 
 **Structure Decision**: Follows the existing Electron multi-process layout. New code is organized by domain within the renderer (layout/, review/, primitives/, patterns/, export/). Shared geometry logic lives in `lib/` and the heavy computation in `workers/`.
 
+## Integration Architecture
+
+> **Lesson learned**: The original plan treated each issue as an isolated component. Components were built correctly in isolation but never connected. This section defines the data flow contracts that glue components together.
+
+### Data Flow: Tool → Canvas → State → Renderer
+
+```text
+User clicks canvas with tool active
+       ↓
+LayoutScene mounts active tool component (CircleTool, RectangleTool, PolygonTool)
+  based on activeTool from useAppMode()
+       ↓
+Tool captures Three.js pointer events on its invisible hit plane
+  (tools use ThreeEvent, NOT DOM PointerEvent — they must live inside <Canvas>)
+       ↓
+Tool calls onPlace(partialEntity) when placement completes
+       ↓
+onPlace handler generates ID + defaults, calls useProject().addEntity(entity)
+       ↓
+project.entities updates → EntityRenderer re-renders all entities
+       ↓
+useSelection() tracks selected entity IDs (shared across Viewport + Sidebar)
+       ↓
+TransformGizmo reads selectedIds + entities, calls useProject().updateEntity(id, patch) on drag
+  useSnapping() resolves snap targets during drag
+       ↓
+Sidebar reads selectedIds → shows properties for selected entity
+  Property edits call useProject().updateEntity(id, patch)
+```
+
+### Required Wiring Points
+
+These are the integration seams that must exist for any interactive editing to work. Each represents a connection between two independently-built components.
+
+| Seam | Owner File | What It Connects | Contract |
+|------|-----------|------------------|----------|
+| **Entity mutations** | `useProject.tsx` | Tools/Sidebar → project state | `addEntity(e)`, `updateEntity(id, patch)`, `removeEntity(id)` |
+| **Tool mounting** | `LayoutCanvas.tsx` (LayoutScene) | activeTool → tool component | Conditional render based on `useAppMode().activeTool` |
+| **Entity ID + defaults** | `Viewport.tsx` or a factory util | Tool's `Partial<Entity>` → complete `Entity` | Generate UUID, set `name`, `visible: true`, `locked: false`, `properties: {}` |
+| **Selection sharing** | `Viewport.tsx` | Selection hook → LayoutCanvas + Sidebar | Single `useSelection()` instance, passed as props |
+| **Snapping in transforms** | `TransformGizmo.tsx` | Drag handler → snap resolution | `useSnapping().snap(cursor, gridSize, entities)` |
+| **Sidebar ↔ selection** | `Sidebar.tsx` | Shared selection → property panel | Read `selectedIds` from shared hook, not local state |
+| **Sidebar ↔ mutations** | `Sidebar.tsx` | Property edits → project state | Call `updateEntity(id, patch)` on field change |
+
+### Anti-Pattern to Avoid
+
+**Do NOT** create a component, mark it done, and move on without verifying it is mounted in the component tree and connected to state. Each component task must include:
+1. The component implementation
+2. Mounting it in its parent
+3. Connecting its callbacks to state mutations
+4. Verifying the round-trip: action → state change → re-render
+
+## Current State Audit (as of 2026-03-04)
+
+> This section tracks what is actually implemented vs what needs work. Updated after the Phase 3 integration gap was discovered.
+
+### Working (isolated, not connected)
+- **Tool components**: CircleTool, RectangleTool, PolygonTool — complete, never mounted in LayoutScene
+- **EntityRenderer** — renders entities correctly, but no entities ever reach project state
+- **useSelection, useSnapping** — complete hooks, never instantiated
+- **TransformGizmo, SelectionBox** — complete, never mounted in LayoutScene
+- **Navbar tool selection** — sets activeTool correctly
+- **GridOverlay** — renders correctly
+- **extrude.ts** — real earcut-based extrusion
+- **bin-generator.ts** — real mesh generation (holes additive, awaits CSG)
+- **mesh-convert.ts, stl-io.ts** — functional utilities
+- **useGeometryWorker** — working worker lifecycle
+
+### Broken (integration missing)
+- **useProject** — no `addEntity`/`updateEntity`/`removeEntity` methods
+- **Viewport** — doesn't instantiate selection/snapping or pass pointer events
+- **LayoutScene** — doesn't mount tools, TransformGizmo, or SelectionBox
+- **Sidebar** — display-only, local selection state, no mutation callbacks
+- **geometry.worker boolean/bake** — returns "not yet implemented" errors
+
+### Phases 1–2: Complete
+- Vitest, dependencies, project structure, schema extensions, unit system, IPC, undo stack
+
+### Phase 3 (US1): Components built, integration incomplete
+- All individual components exist and are internally correct
+- The wiring layer (see Integration Architecture above) was never implemented
+
 ## Phased Implementation
 
 ### Phase 1: Foundation (#83, #84, #108)
@@ -136,15 +218,21 @@ src/
 
 **Goal**: Interactive 2D canvas where users can place and manipulate shapes.
 
+**CRITICAL**: This phase is not complete until a user can select a tool, click on the canvas, and see the created shape persist in the entity list. Each component must be wired into the integration layer (see Integration Architecture).
+
 | Issue | Title | Key Work |
 |-------|-------|----------|
+| — | **Entity mutation API** | Add `addEntity`, `updateEntity`, `removeEntity` to `useProject` — **prerequisite for all tools** |
 | #86 | 2D Layout mode (orthographic) | OrthographicCamera, pan/zoom, mode toggle in navbar |
 | #87 | Gridfinity grid overlay | Grid lines at baseUnit intervals, toggle, layout-mode only |
-| #88 | 2D primitive — Circle | Circle tool, diameter editing, anchor points |
-| #89 | 2D primitive — Rectangle | Rectangle tool, width/height editing, corner radius |
-| #90 | 2D primitive — Polygon | Polygon tool, vertex editing, click-to-place vertices |
-| #92 | Selection + transform (2D) | Click/marquee select, move/rotate gizmo, multi-select |
-| #93 | Grid snapping system | Snap to grid + entity anchors, modifier key override |
+| #88 | 2D primitive — Circle | Circle tool component + **mount in LayoutScene** + **onPlace → addEntity** |
+| #89 | 2D primitive — Rectangle | Rectangle tool component + **mount in LayoutScene** + **onPlace → addEntity** |
+| #90 | 2D primitive — Polygon | Polygon tool component + **mount in LayoutScene** + **onPlace → addEntity** |
+| #92 | Selection + transform (2D) | Click/marquee select, move/rotate gizmo + **mount in LayoutScene** + **shared useSelection in Viewport** |
+| #93 | Grid snapping system | Snap to grid + entity anchors + **integrate into TransformGizmo drag** |
+| — | **Sidebar wiring** | Connect sidebar entity list + properties to shared selection and `updateEntity` |
+
+**Completion criteria**: User can draw a rectangle on the canvas, see it appear, select it, move it with snapping, edit properties in sidebar, and see changes persist when saving/loading the project.
 
 ### Phase 3: Layout Tools (#91, #94, #95, #96)
 
@@ -173,15 +261,19 @@ src/
 
 **Goal**: Transform 2D layouts into 3D printable geometry.
 
+**NOTE**: Worker infrastructure and extrude logic exist but boolean/bake message handlers are stubs returning "not yet implemented". Manifold WASM is not initialized. The Sidebar bake/generate buttons are no-ops. This phase must wire the full pipeline: entity → extrude → boolean → bake → preview.
+
 | Issue | Title | Key Work |
 |-------|-------|----------|
-| #105 | Geometry worker thread | Web Worker setup, message protocol, manifold WASM loading |
-| #106 | Mesh boolean engine | Union/subtract/intersect via manifold, worker integration |
+| #105 | Geometry worker thread | Web Worker setup, message protocol, **manifold WASM initialization** |
+| #106 | Mesh boolean engine | Union/subtract/intersect via manifold, **implement boolean/bake worker handlers** |
 | #102 | Extrude 2D region to solid | Earcut triangulation + Z extrusion, configurable depth |
 | #103 | Extrude 2D region to cutter | Same as solid but role=cutter, subtracted during bake |
 | #104 | STL import as mesh entity | STLLoader, mesh entity type, transform support |
-| #109 | Gridfinity bin geometry generator | Parametric bin from GridfinityConfig, lip/magnet options |
-| #107 | Bake geometry action | Explicit bake button, combines bin + solids - cutters, dirty tracking |
+| #109 | Gridfinity bin geometry generator | Parametric bin from GridfinityConfig, lip/magnet options, **wire Sidebar Generate button** |
+| #107 | Bake geometry action | **Wire Sidebar Bake button** → boolean pipeline → bakeResult state, dirty tracking |
+
+**Completion criteria**: User can extrude an entity, generate a bin, bake the combined mesh, and see the result in 3D review mode.
 
 ### Phase 6: Export & Review (#111, #112, #113, #119)
 
