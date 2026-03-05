@@ -144,7 +144,7 @@ function BinProperties({
 }): React.JSX.Element {
   const { project, setBakeResult } = useProject()
 
-  const handleGenerate = (): void => {
+  useEffect(() => {
     if (!project) return
     const gridCfg = project.gridfinity
     const binMesh = generateBinMesh({
@@ -170,7 +170,7 @@ function BinProperties({
       dirty: false,
       warnings: []
     })
-  }
+  }, [project, setBakeResult, bin.width, bin.depth, bin.height, bin.hasStackingLip])
 
   return (
     <div className="space-y-2 text-xs">
@@ -205,9 +205,6 @@ function BinProperties({
           Lip
         </label>
       </div>
-      <Button variant="outline" size="sm" className="w-full" onClick={handleGenerate}>
-        Generate Bin
-      </Button>
       <Button
         variant="outline"
         size="sm"
