@@ -5,7 +5,7 @@
  * reads from a single shared ProjectProvider at the top of the tree.
  */
 
-import { useState, useCallback, useContext, createContext } from 'react'
+import { useState, useCallback, useEffect, useContext, createContext } from 'react'
 import { createEmptyProject, createDefaultTransform } from '../../../shared/types/project'
 import type {
   ProjectData,
@@ -74,13 +74,35 @@ export function useProject(): UseProjectResult {
 
 // ─── Internal state implementation ──────────────────────────────
 
+const SESSION_KEY = 'gfstudio:session'
+
+function loadSession(): {
+  project: ProjectData | null
+  filePath: string | null
+  isModified: boolean
+} {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {
+    // ignore corrupt data
+  }
+  return { project: null, filePath: null, isModified: false }
+}
+
 function useProjectState(): UseProjectResult {
-  const [project, setProject] = useState<ProjectData | null>(null)
-  const [filePath, setFilePath] = useState<string | null>(null)
-  const [isModified, setIsModified] = useState(false)
+  const saved = loadSession()
+  const [project, setProject] = useState<ProjectData | null>(saved.project)
+  const [filePath, setFilePath] = useState<string | null>(saved.filePath)
+  const [isModified, setIsModified] = useState(saved.isModified)
   const [error, setError] = useState<string | null>(null)
   const [recentProjects, setRecentProjects] = useState<string[]>([])
   const [bakeResult, setBakeResult] = useState<BakeResult | null>(null)
+
+  // Persist to sessionStorage so refresh doesn't lose state
+  useEffect(() => {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ project, filePath, isModified }))
+  }, [project, filePath, isModified])
 
   const markBakeDirty = useCallback(() => {
     setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
