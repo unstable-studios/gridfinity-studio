@@ -126,11 +126,24 @@
 - [x] T047 [US1] Mount SelectionBox and TransformGizmo in LayoutScene in `src/renderer/src/components/layout/LayoutCanvas.tsx`
 - [x] T048 [US1] Wire TransformGizmo drag callbacks to `useProject().updateEntity(id, patch)` in `src/renderer/src/components/layout/TransformGizmo.tsx`
 
-### Grid Snapping (#93) — Hook exists, integration missing
+### Grid Snapping (#93) — Basic snap done, full system planned
 
 - [x] T049 [US1] Implement snap target resolution (grid intersections, entity edges/centers) in `src/renderer/src/lib/snap.ts`
 - [x] T050 [US1] Create `useSnapping` hook with global toggle and Shift-to-override in `src/renderer/src/hooks/useSnapping.ts`
 - [x] T051 [US1] Integrate snapping into TransformGizmo drag handlers (call `useSnapping().snap()` during drag) in `src/renderer/src/components/layout/TransformGizmo.tsx`
+
+### Snap System Overhaul — See `specs/001-full-roadmap/snap-system-spec.md`
+
+- [ ] T200 [US2] Refactor snap engine for per-axis resolution with multi-point sources (center, edges, corners per entity type) in `src/renderer/src/lib/snap.ts`
+- [ ] T201 [US2] Implement screen-space threshold (convert pixel threshold to world units using camera zoom) in `src/renderer/src/lib/snap.ts`
+- [ ] T202 [US2] Add alignment snap layer — detect shared X/Y coordinates between dragged and other objects, return guide line data in `src/renderer/src/lib/snap.ts`
+- [ ] T203 [US2] Add bin edge snap layer — snap to bin footprint boundaries (left, right, top, bottom edges) in `src/renderer/src/lib/snap.ts`
+- [ ] T204 [US2] Implement snap point extraction for all entity types (rectangles: 4 corners + 4 edge midpoints + center; circles: 4 cardinal + center; polygons: vertices + center) in `src/renderer/src/lib/snap.ts`
+- [ ] T205 [US2] Create SnapGuides component to render alignment guide lines (dashed lines between aligned points) in `src/renderer/src/components/layout/SnapGuides.tsx`
+- [ ] T206 [US2] Add snap configuration UI — toolbar toggles for each snap layer + preferences panel in `src/renderer/src/components/layout/SnapToolbar.tsx`
+- [ ] T207 [US2] Integrate per-axis snap into TransformGizmo resize handles in `src/renderer/src/components/layout/TransformGizmo.tsx`
+- [ ] T208 [US2] Integrate snap into primitive tool placement (circle, rectangle, polygon tools) in `src/renderer/src/components/primitives/`
+- [ ] T209 [US2] Add keyboard shortcut to temporarily disable snap (hold Ctrl) in `src/renderer/src/hooks/useSnapping.ts`
 
 ### Sidebar Wiring — Currently display-only, needs mutation callbacks
 
