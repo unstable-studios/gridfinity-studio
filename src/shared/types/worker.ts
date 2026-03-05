@@ -14,6 +14,7 @@ export interface MeshData {
 
 export interface MeshDataWithNormals extends MeshData {
   normals: Float32Array
+  colors: Float32Array
 }
 
 // ─── Request types ────────────────────────────────────────────────

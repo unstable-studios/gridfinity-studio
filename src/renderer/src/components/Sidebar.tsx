@@ -164,6 +164,7 @@ function BinProperties({
       unitHeight: gridCfg.unitHeight,
       tolerance: gridCfg.tolerance,
       hasLip: bin.hasStackingLip,
+      hasDividers: bin.hasDividers,
       magnetHoles: gridCfg.magnetHoles,
       screwHoles: gridCfg.screwHoles
     })
@@ -171,6 +172,7 @@ function BinProperties({
     setBakeResult({
       mesh: {
         positions: binMesh.positions,
+        colors: binMesh.colors,
         indices: binMesh.indices,
         normals: binMesh.normals
       },
@@ -310,6 +312,7 @@ function ReviewSidebar(): React.JSX.Element {
         unitHeight: gridCfg.unitHeight,
         tolerance: gridCfg.tolerance,
         hasLip: binConfig?.hasStackingLip ?? true,
+        hasDividers: binConfig?.hasDividers ?? false,
         magnetHoles: gridCfg.magnetHoles,
         screwHoles: gridCfg.screwHoles
       })
@@ -352,7 +355,8 @@ function ReviewSidebar(): React.JSX.Element {
             mesh: {
               positions: extruded.positions,
               indices: extruded.indices,
-              normals: extruded.normals
+              normals: extruded.normals,
+              colors: new Float32Array(0)
             },
             role: entity.extrusion.role,
             entityId: entity.id
@@ -363,6 +367,7 @@ function ReviewSidebar(): React.JSX.Element {
       setBakeResult({
         mesh: {
           positions: binMesh.positions,
+          colors: binMesh.colors,
           indices: binMesh.indices,
           normals: binMesh.normals
         },

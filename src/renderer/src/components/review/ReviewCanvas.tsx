@@ -4,15 +4,22 @@ import { Suspense, useMemo } from 'react'
 import * as THREE from 'three'
 import type { AuxMesh } from '@/hooks/useProject'
 
+interface BakedMeshData {
+  positions: Float32Array
+  colors: Float32Array
+  indices: Uint32Array
+  normals: Float32Array
+}
+
 interface ReviewCanvasProps {
-  bakedMesh?: { positions: Float32Array; indices: Uint32Array; normals: Float32Array } | null
+  bakedMesh?: BakedMeshData | null
   auxMeshes?: AuxMesh[]
 }
 
 function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Element {
   return (
     <>
-      <ambientLight intensity={0.6} />
+      <ambientLight intensity={0.8} />
       <directionalLight
         position={[6, 10, 6]}
         intensity={1.2}
@@ -20,9 +27,11 @@ function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Ele
         shadow-mapSize-height={1024}
         shadow-mapSize-width={1024}
       />
-      <directionalLight position={[-4, 8, -4]} intensity={0.5} />
-      <pointLight position={[-6, -4, -6]} intensity={0.5} />
-      <pointLight position={[6, 2, -6]} intensity={0.3} />
+      <directionalLight position={[-4, 8, -4]} intensity={0.6} />
+      <directionalLight position={[0, -8, 0]} intensity={0.5} />
+      <pointLight position={[-6, -4, -6]} intensity={0.6} />
+      <pointLight position={[6, 2, -6]} intensity={0.4} />
+      <pointLight position={[0, -6, 4]} intensity={0.4} />
       <OrbitControls enableDamping makeDefault />
 
       {bakedMesh ? <BakedMeshPreview mesh={bakedMesh} /> : <EmptyState />}
@@ -39,22 +48,30 @@ function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Ele
   )
 }
 
-function BakedMeshPreview({
-  mesh
-}: {
-  mesh: { positions: Float32Array; indices: Uint32Array; normals: Float32Array }
-}): React.JSX.Element {
+function BakedMeshPreview({ mesh }: { mesh: BakedMeshData }): React.JSX.Element {
+  const hasColors = mesh.colors && mesh.colors.length > 0
+
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3))
     geo.setIndex(new THREE.BufferAttribute(mesh.indices, 1))
-    geo.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
+    // Let Three.js compute correct normals from triangle winding
+    geo.computeVertexNormals()
+    if (hasColors) {
+      geo.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3))
+    }
     return geo
-  }, [mesh.positions, mesh.indices, mesh.normals])
+  }, [mesh.positions, mesh.indices, mesh.normals, mesh.colors, hasColors])
 
   return (
     <mesh geometry={geometry} castShadow rotation={[-Math.PI / 2, 0, 0]}>
-      <meshStandardMaterial color="#4f9ef8" metalness={0.15} roughness={0.35} />
+      <meshStandardMaterial
+        vertexColors={hasColors}
+        color={hasColors ? undefined : '#4f9ef8'}
+        metalness={0.15}
+        roughness={0.35}
+        side={THREE.DoubleSide}
+      />
     </mesh>
   )
 }

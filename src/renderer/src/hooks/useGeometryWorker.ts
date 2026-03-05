@@ -62,7 +62,8 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
         pending.resolve({
           positions: msg.positions,
           indices: msg.indices,
-          normals: msg.normals
+          normals: msg.normals,
+          colors: msg.colors
         })
       }
     }
