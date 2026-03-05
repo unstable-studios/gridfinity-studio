@@ -106,7 +106,7 @@ export default function ReviewCanvas({
     >
       <Suspense fallback={null}>
         <color attach="background" args={['#0a0c12']} />
-        <fog attach="fog" args={['#0a0c12', 180, 420]} />
+        <fog attach="fog" args={['#0a0c12', 500, 900]} />
         <ReviewScene bakedMesh={bakedMesh} auxMeshes={auxMeshes} />
       </Suspense>
     </Canvas>

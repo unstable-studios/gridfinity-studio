@@ -40,13 +40,13 @@ export default function Navbar(): React.JSX.Element {
 
   return (
     <>
-      <NavbarRoot brand={<Logo />} className="max-w-none [&>div]:max-w-none">
-        <NavbarContent>
+      <NavbarRoot brand={<Logo />} className="relative z-50 max-w-none [&>div]:max-w-none py-2">
+        <NavbarContent className="gap-1">
           <FileMenu />
           <EditMenu onOpenPreferences={() => setPrefsOpen(true)} />
           <HelpMenu />
         </NavbarContent>
-        <NavbarActions className="ml-auto">
+        <NavbarActions className="ml-auto gap-2">
           <ViewModeToggle />
           <ToolBar />
           <ThemeToggle />

@@ -1,3 +1,4 @@
+import { useEffect, useCallback } from 'react'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
 import { useSharedSelection } from '@/hooks/useSelection'
@@ -8,7 +9,16 @@ import type { Entity } from '../../../shared/types/project'
 
 export default function Viewport(): React.JSX.Element {
   const { mode } = useAppMode()
-  const { project, addEntity, updateEntity, moveEntity, updateBin, bakeResult } = useProject()
+  const {
+    project,
+    addEntity,
+    updateEntity,
+    moveEntity,
+    removeEntity,
+    updateBin,
+    removeBin,
+    bakeResult
+  } = useProject()
   const selection = useSharedSelection()
   const snapping = useSnapping()
 
@@ -37,6 +47,31 @@ export default function Viewport(): React.JSX.Element {
     const others = entities.filter((e) => !selection.selectedIds.has(e.id))
     return snapping.snap(pos, baseUnit, others)
   }
+
+  const handleDelete = useCallback(() => {
+    if (selection.selectedIds.size === 0) return
+    for (const id of selection.selectedIds) {
+      if (selection.selectionType === 'entity') {
+        removeEntity(id)
+      } else {
+        removeBin(id)
+      }
+    }
+    selection.clearSelection()
+  }, [selection, removeEntity, removeBin])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Don't delete if user is typing in an input
+        if ((e.target as HTMLElement).tagName === 'INPUT') return
+        e.preventDefault()
+        handleDelete()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [handleDelete])
 
   return (
     <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-zinc-300 bg-linear-to-b from-zinc-100/50 via-white to-zinc-100 shadow-inner dark:border-zinc-800 dark:from-zinc-900/50 dark:via-zinc-900 dark:to-zinc-900/70">

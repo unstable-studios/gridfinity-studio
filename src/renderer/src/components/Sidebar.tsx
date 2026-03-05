@@ -25,8 +25,9 @@ export default function Sidebar(): React.JSX.Element {
 }
 
 function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element {
-  const { project, updateEntity, addBin, updateBin, removeBin } = useProject()
-  const { selectedIds, selectionType, select, selectBin } = useSharedSelection()
+  const { project, updateEntity, removeEntity, addBin, updateBin, removeBin } = useProject()
+  const selection = useSharedSelection()
+  const { selectedIds, selectionType, select, selectBin } = selection
 
   const bins = project?.bins ?? []
   const baseUnit = project?.gridfinity.baseUnit ?? 42
@@ -118,7 +119,16 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
           </div>
         )}
       </SidebarSection>
-      {selectedEntity && <EntityProperties entity={selectedEntity} onUpdate={updateEntity} />}
+      {selectedEntity && (
+        <EntityProperties
+          entity={selectedEntity}
+          onUpdate={updateEntity}
+          onDelete={() => {
+            removeEntity(selectedEntity.id)
+            selection.clearSelection()
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -429,10 +439,12 @@ function SidebarSection({
 
 function EntityProperties({
   entity,
-  onUpdate
+  onUpdate,
+  onDelete
 }: {
   entity: Entity
   onUpdate: (id: string, patch: Partial<Entity>) => void
+  onDelete: () => void
 }): React.JSX.Element {
   const { project } = useProject()
   const unit = (project?.settings.units ?? 'mm') as DisplayUnit
@@ -500,6 +512,14 @@ function EntityProperties({
         )}
 
         <ExtrusionControls entity={entity} onExtrusionChange={handleExtrusionChange} />
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full mt-2 text-red-400 hover:text-red-300"
+          onClick={onDelete}
+        >
+          Delete Entity
+        </Button>
       </div>
     </SidebarSection>
   )
@@ -650,10 +670,10 @@ function EditableNumericField({
         <input
           type="number"
           className="w-10 bg-zinc-800 text-zinc-300 font-mono text-xs rounded px-1 py-0.5 text-center"
-          defaultValue={value}
+          value={value}
           min={1}
           step={1}
-          onBlur={(e) => {
+          onChange={(e) => {
             const num = parseInt(e.target.value)
             if (!isNaN(num) && num > 0) onChange(num)
           }}
