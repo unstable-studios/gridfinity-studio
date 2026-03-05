@@ -20,7 +20,7 @@ env:
 jobs:
   release:
     name: Release Please
-    runs-on: ubuntu-latest
+    runs-on: echo-turbine
     steps:
       - name: Run release-please
         uses: googleapis/release-please-action@v4
