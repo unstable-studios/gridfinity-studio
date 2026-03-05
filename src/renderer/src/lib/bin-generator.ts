@@ -41,7 +41,6 @@ const LIP_PROFILE = [
 
 const BASE_PROFILE_HEIGHT = 4.95
 const LIP_HEIGHT = 4.4
-const LIP_SUPPORT_HEIGHT = 1.2
 
 const WALL_THICKNESS = 0.95 // exterior wall per spec
 const DIVIDER_WIDTH = 1.2
@@ -591,7 +590,8 @@ export function generateBinMesh(params: BinParams): MeshResult {
 
   // ── 2. Main outer walls ───────────────────────────────────────
   m.setColor(COLORS.outerWalls)
-  m.connectRoundedRings(outerRing, BASE_PROFILE_HEIGHT, outerRing, totalH)
+  const outerWallTop = hasLip ? totalH + LIP_HEIGHT : totalH
+  m.connectRoundedRings(outerRing, BASE_PROFILE_HEIGHT, outerRing, outerWallTop)
 
   // ── 3. Interior cavity ────────────────────────────────────────
 
@@ -724,37 +724,46 @@ export function generateBinMesh(params: BinParams): MeshResult {
 
   // ── 5. Top rim / stacking lip ─────────────────────────────────
   if (hasLip) {
-    const lipBase = totalH
+    // The stacking lip is a GROOVE (female) at the top of the bin that
+    // receives the base profile (male) of the next bin stacked on top.
+    //
+    // The outer wall already extends to totalH + LIP_HEIGHT (section 2).
+    // The groove inner wall follows LIP_PROFILE, stepping inward going up.
+    // The groove is the channel between the outer wall and the inner wall.
+    //
+    // Cross-section (right side):
+    //   outer wall │          │ groove inner wall
+    //              │  groove  ╱  ← chamfer (inset 0.7→2.6)
+    //              │          │   ← vertical (inset 0.7)
+    //              │       ╱──    ← chamfer (inset 0→0.7)
+    //   totalH     └──────┘       ← groove bottom (zero width, both at inset 0)
 
-    // Lip profile rings (outside of the bin, going upward)
+    const lipBase = totalH
+    const lipTopZ = lipBase + LIP_HEIGHT
+    const maxLipInset = LIP_PROFILE[LIP_PROFILE.length - 1][0] // 2.6
+    // Groove bottom ring (widest groove, at totalH)
+    const grooveBottomRing = roundedRectPoints(hw, hd, maxLipInset)
+
+    // Groove inner wall: INVERTED lip profile (wide at bottom, closed at top)
+    // At totalH the groove is widest (inset 2.6), at lipTopZ it closes (inset 0)
     m.setColor(COLORS.lipProfile)
     for (let i = 0; i < LIP_PROFILE.length - 1; i++) {
       const [inset0, z0] = LIP_PROFILE[i]
       const [inset1, z1] = LIP_PROFILE[i + 1]
-      const lower = roundedRectPoints(hw, hd, inset0)
-      const upper = roundedRectPoints(hw, hd, inset1)
+      const lower = roundedRectPoints(hw, hd, maxLipInset - inset0)
+      const upper = roundedRectPoints(hw, hd, maxLipInset - inset1)
       m.connectRoundedRings(lower, lipBase + z0, upper, lipBase + z1)
     }
 
-    // Inner lip faces — connect lip tip back down to inner wall
-    const lipTopInset = LIP_PROFILE[LIP_PROFILE.length - 1][0] // 2.6
-    const lipTopZ = lipBase + LIP_HEIGHT
-    const supportBottomZ = lipBase - LIP_SUPPORT_HEIGHT
-    const lipInnerRing = roundedRectPoints(hw, hd, lipTopInset)
-
-    m.setColor(COLORS.lipInner)
-    // Connect lip tip (lipInnerRing at lipTopZ) down to inner wall (innerRing at supportBottomZ)
-    // Reversing the order so normals face inward
-    m.connectRoundedRings(innerRing, supportBottomZ, lipInnerRing, lipTopZ, true)
-
-    // Lip top cap — fill the top of the lip
-    m.setColor(COLORS.lipCap)
-    m.addFlatFan(lipInnerRing, lipTopZ, 1)
-
-    // Horizontal step connecting outer wall top to lip base
+    // Groove floor at totalH: flat ring from outer wall to groove inner edge
     m.setColor(COLORS.lipStep)
-    const lipBaseRing = roundedRectPoints(hw, hd, LIP_PROFILE[0][0])
-    m.addFlatRing(outerRing, lipBaseRing, lipBase, 1)
+    m.addFlatRing(outerRing, grooveBottomRing, totalH, 1)
+
+    // Inner lip wall: visible from inside the bin cavity, faces inward
+    // Goes from inner cavity wall (inset 0.95 at totalH) up to where
+    // the groove inner wall closes (inset 0 at lipTopZ)
+    m.setColor(COLORS.lipInner)
+    m.connectRoundedRings(innerRing, totalH, outerRing, lipTopZ, true)
   } else {
     // No lip — flat top rim connecting outer to inner
     m.setColor(COLORS.rim)
