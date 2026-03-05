@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, createContext, useContext } from 'react'
 import type { Entity } from '../../../shared/types/project'
 
 export interface UseSelectionResult {
@@ -11,6 +11,18 @@ export interface UseSelectionResult {
   isSelected: (id: string) => boolean
   marqueeSelect: (ids: string[]) => void
 }
+
+const SelectionCtx = createContext<UseSelectionResult | null>(null)
+
+export function useSharedSelection(): UseSelectionResult {
+  const ctx = useContext(SelectionCtx)
+  if (!ctx) {
+    throw new Error('useSharedSelection must be used within a SelectionProvider')
+  }
+  return ctx
+}
+
+export { SelectionCtx }
 
 export function useSelection(): UseSelectionResult {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())

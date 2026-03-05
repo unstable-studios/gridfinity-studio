@@ -1,5 +1,6 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
+import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import {
@@ -12,11 +13,60 @@ import {
 import { exportSTL } from './export-handler'
 import type { ProjectData } from '../shared/types/project'
 
+interface WindowBounds {
+  x: number
+  y: number
+  width: number
+  height: number
+  isMaximized: boolean
+}
+
+function getBoundsPath(): string {
+  return join(app.getPath('userData'), 'window-bounds.json')
+}
+
+function loadWindowBounds(): WindowBounds | null {
+  try {
+    const data = readFileSync(getBoundsPath(), 'utf-8')
+    return JSON.parse(data) as WindowBounds
+  } catch {
+    return null
+  }
+}
+
+function saveWindowBounds(bounds: WindowBounds): void {
+  try {
+    writeFileSync(getBoundsPath(), JSON.stringify(bounds))
+  } catch {
+    // Silently ignore write errors
+  }
+}
+
+function isVisibleOnDisplay(bounds: WindowBounds): boolean {
+  const rect = { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height }
+  const matched = screen.getDisplayMatching(rect)
+  // Check that at least part of the window is on a visible display
+  const displayBounds = matched.bounds
+  return (
+    bounds.x < displayBounds.x + displayBounds.width &&
+    bounds.x + bounds.width > displayBounds.x &&
+    bounds.y < displayBounds.y + displayBounds.height &&
+    bounds.y + bounds.height > displayBounds.y
+  )
+}
+
 function createWindow(): void {
-  // Create the browser window.
+  const saved = loadWindowBounds()
+
+  const defaults = {
+    width: 1280,
+    height: 800
+  }
+
+  const bounds = saved && isVisibleOnDisplay(saved) ? saved : defaults
+
   const mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
+    ...bounds,
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
@@ -24,6 +74,23 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false
     }
+  })
+
+  if (saved?.isMaximized) {
+    mainWindow.maximize()
+  }
+
+  // Save bounds on close
+  mainWindow.on('close', () => {
+    const isMaximized = mainWindow.isMaximized()
+    const currentBounds = mainWindow.getBounds()
+    saveWindowBounds({
+      x: currentBounds.x,
+      y: currentBounds.y,
+      width: currentBounds.width,
+      height: currentBounds.height,
+      isMaximized
+    })
   })
 
   mainWindow.on('ready-to-show', () => {

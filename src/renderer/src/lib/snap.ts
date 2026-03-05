@@ -20,7 +20,9 @@ interface Cursor {
 interface SnapEntity {
   type: string
   transform: { position: { x: number; y: number } }
-  [key: string]: unknown
+  diameter?: number
+  width?: number
+  height?: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -60,8 +62,8 @@ function entityCenterTargets(entities: SnapEntity[]): SnapTarget[] {
 
 function rectangleEdgeMidpoints(entity: SnapEntity): SnapTarget[] {
   const { x, y } = entity.transform.position
-  const w = (entity as { width?: number }).width ?? 0
-  const h = (entity as { height?: number }).height ?? 0
+  const w = entity.width ?? 0
+  const h = entity.height ?? 0
   const hw = w / 2
   const hh = h / 2
 
@@ -75,7 +77,7 @@ function rectangleEdgeMidpoints(entity: SnapEntity): SnapTarget[] {
 
 function circleCardinalPoints(entity: SnapEntity): SnapTarget[] {
   const { x, y } = entity.transform.position
-  const r = ((entity as { diameter?: number }).diameter ?? 0) / 2
+  const r = (entity.diameter ?? 0) / 2
 
   return [
     { point: { x: x - r, y }, type: 'entity-edge' },

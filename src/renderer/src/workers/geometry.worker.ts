@@ -1,19 +1,116 @@
-import type { WorkerRequest, WorkerResponse } from '../../../shared/types/worker'
+import type { WorkerRequest, WorkerResponse, MeshData } from '../../../shared/types/worker'
 import { extrudePolygon } from '../lib/extrude'
 
-// Worker globals are available at runtime but TS compiles with DOM lib.
+// Worker globals
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ctx = self as any as {
   postMessage: (msg: WorkerResponse, opts?: StructuredSerializeOptions) => void
 }
+
+// ─── Manifold WASM state ─────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let manifoldModule: any = null
+
+async function initManifold(): Promise<boolean> {
+  try {
+    const Module = (await import('manifold-3d')).default
+    manifoldModule = await Module()
+    manifoldModule.setup()
+    return true
+  } catch (err) {
+    console.error('[geometry.worker] Failed to initialize manifold WASM:', err)
+    return false
+  }
+}
+
+// ─── Manifold helpers ────────────────────────────────────────────
+
+function meshDataToManifold(data: MeshData): {
+  vertProperties: Float32Array
+  triVerts: Uint32Array
+} {
+  return {
+    vertProperties: data.positions,
+    triVerts: data.indices
+  }
+}
+
+function manifoldToMeshData(mesh: {
+  vertProperties: Float32Array
+  triVerts: Uint32Array
+  numProp: number
+}): { positions: Float32Array; indices: Uint32Array; normals: Float32Array } {
+  const positions = new Float32Array(mesh.vertProperties.length)
+  const vertCount = mesh.vertProperties.length / mesh.numProp
+  for (let i = 0; i < vertCount; i++) {
+    const offset = i * mesh.numProp
+    positions[i * 3] = mesh.vertProperties[offset]
+    positions[i * 3 + 1] = mesh.vertProperties[offset + 1]
+    positions[i * 3 + 2] = mesh.vertProperties[offset + 2]
+  }
+
+  const indices = new Uint32Array(mesh.triVerts)
+
+  // Compute normals
+  const normals = new Float32Array(vertCount * 3)
+  for (let i = 0; i < indices.length; i += 3) {
+    const ai = indices[i] * 3
+    const bi = indices[i + 1] * 3
+    const ci = indices[i + 2] * 3
+
+    const ax = positions[bi] - positions[ai]
+    const ay = positions[bi + 1] - positions[ai + 1]
+    const az = positions[bi + 2] - positions[ai + 2]
+    const bx = positions[ci] - positions[ai]
+    const by = positions[ci + 1] - positions[ai + 1]
+    const bz = positions[ci + 2] - positions[ai + 2]
+
+    const nx = ay * bz - az * by
+    const ny = az * bx - ax * bz
+    const nz = ax * by - ay * bx
+
+    normals[ai] += nx
+    normals[ai + 1] += ny
+    normals[ai + 2] += nz
+    normals[bi] += nx
+    normals[bi + 1] += ny
+    normals[bi + 2] += nz
+    normals[ci] += nx
+    normals[ci + 1] += ny
+    normals[ci + 2] += nz
+  }
+
+  for (let i = 0; i < vertCount; i++) {
+    const offset = i * 3
+    const len = Math.sqrt(
+      normals[offset] ** 2 + normals[offset + 1] ** 2 + normals[offset + 2] ** 2
+    )
+    if (len > 0) {
+      normals[offset] /= len
+      normals[offset + 1] /= len
+      normals[offset + 2] /= len
+    }
+  }
+
+  return { positions, indices, normals }
+}
+
+// ─── Message handler ─────────────────────────────────────────────
 
 addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
   const msg = event.data
 
   switch (msg.type) {
     case 'init': {
-      const response: WorkerResponse = { type: 'init', success: true }
-      ctx.postMessage(response)
+      void initManifold().then((success) => {
+        const response: WorkerResponse = {
+          type: 'init',
+          success,
+          error: success ? undefined : 'Failed to load manifold WASM'
+        }
+        ctx.postMessage(response)
+      })
       break
     }
 
@@ -39,22 +136,106 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
     }
 
     case 'boolean': {
-      const response: WorkerResponse = {
-        type: 'error',
-        id: msg.id,
-        error: 'Boolean operations not yet implemented'
+      if (!manifoldModule) {
+        ctx.postMessage({
+          type: 'error',
+          id: msg.id,
+          error: 'Manifold WASM not initialized'
+        } satisfies WorkerResponse)
+        break
       }
-      ctx.postMessage(response)
+
+      try {
+        const { Manifold, Mesh } = manifoldModule
+        const meshA = new Mesh(meshDataToManifold(msg.meshA))
+        const meshB = new Mesh(meshDataToManifold(msg.meshB))
+        const manifoldA = new Manifold(meshA)
+        const manifoldB = new Manifold(meshB)
+
+        let resultManifold
+        switch (msg.op) {
+          case 'union':
+            resultManifold = Manifold.union(manifoldA, manifoldB)
+            break
+          case 'subtract':
+            resultManifold = Manifold.difference(manifoldA, manifoldB)
+            break
+          case 'intersect':
+            resultManifold = Manifold.intersection(manifoldA, manifoldB)
+            break
+        }
+
+        const resultMesh = resultManifold.getMesh()
+        const result = manifoldToMeshData(resultMesh)
+
+        const response: WorkerResponse = {
+          type: 'boolean',
+          id: msg.id,
+          ...result
+        }
+        ctx.postMessage(response, {
+          transfer: [result.positions.buffer, result.indices.buffer, result.normals.buffer]
+        })
+      } catch (err) {
+        ctx.postMessage({
+          type: 'error',
+          id: msg.id,
+          error: `Boolean operation failed: ${err instanceof Error ? err.message : String(err)}`
+        } satisfies WorkerResponse)
+      }
       break
     }
 
     case 'bake': {
-      const response: WorkerResponse = {
-        type: 'error',
-        id: msg.id,
-        error: 'Bake not yet implemented'
+      if (!manifoldModule) {
+        ctx.postMessage({
+          type: 'error',
+          id: msg.id,
+          error: 'Manifold WASM not initialized'
+        } satisfies WorkerResponse)
+        break
       }
-      ctx.postMessage(response)
+
+      try {
+        const { Manifold, Mesh } = manifoldModule
+
+        // Start with the bin mesh
+        const binMesh = new Mesh(meshDataToManifold(msg.bin))
+        let result = new Manifold(binMesh)
+
+        // Union all solids
+        for (const solid of msg.solids) {
+          const solidMesh = new Mesh(meshDataToManifold(solid))
+          const solidManifold = new Manifold(solidMesh)
+          result = Manifold.union(result, solidManifold)
+        }
+
+        // Subtract all cutters
+        for (const cutter of msg.cutters) {
+          const cutterMesh = new Mesh(meshDataToManifold(cutter))
+          const cutterManifold = new Manifold(cutterMesh)
+          result = Manifold.difference(result, cutterManifold)
+        }
+
+        const resultMesh = result.getMesh()
+        const meshData = manifoldToMeshData(resultMesh)
+
+        const response: WorkerResponse = {
+          type: 'bake',
+          id: msg.id,
+          warnings: [],
+          ...meshData
+        }
+        ctx.postMessage(response, {
+          transfer: [meshData.positions.buffer, meshData.indices.buffer, meshData.normals.buffer]
+        })
+      } catch (err) {
+        ctx.postMessage({
+          type: 'error',
+          id: msg.id,
+          error: `Bake failed: ${err instanceof Error ? err.message : String(err)}`
+        } satisfies WorkerResponse)
+      }
       break
     }
 

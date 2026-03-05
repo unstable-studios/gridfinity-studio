@@ -1,11 +1,17 @@
-import { useState, useCallback } from 'react'
-import { Button } from '@/components/ui/button'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { Button } from '@unstable-studios/ui'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
-import { useGeometryWorker } from '@/hooks/useGeometryWorker'
+import { useSharedSelection } from '@/hooks/useSelection'
+
 import { exportSTL as createSTLBlob } from '@/lib/stl-io'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
-import type { Entity } from '../../../shared/types/project'
+import { generateBinMesh } from '@/lib/bin-generator'
+import { extrudePolygon } from '@/lib/extrude'
+import type { Entity, ExtrusionConfig, Vertex2D } from '../../../shared/types/project'
+import type { AuxMesh } from '@/hooks/useProject'
+import { formatDimension, parseDimension, unitLabel } from '../../../shared/types/units'
+import type { DisplayUnit } from '../../../shared/types/units'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
@@ -19,8 +25,11 @@ export default function Sidebar(): React.JSX.Element {
 }
 
 function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element {
-  const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null)
-  const selectedEntity = entities.find((e) => e.id === selectedEntityId) ?? null
+  const { updateEntity } = useProject()
+  const { selectedIds, select } = useSharedSelection()
+
+  const selectedEntity =
+    selectedIds.size > 0 ? (entities.find((e) => selectedIds.has(e.id)) ?? null) : null
 
   return (
     <div className="space-y-4">
@@ -32,26 +41,18 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
         ) : (
           <div className="space-y-1">
             {entities.map((entity) => (
-              <button
+              <EntityListItem
                 key={entity.id}
-                type="button"
-                className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-                  selectedEntityId === entity.id
-                    ? 'bg-blue-600/20 text-blue-400'
-                    : 'text-zinc-400 hover:bg-zinc-800'
-                }`}
-                onClick={() => setSelectedEntityId(entity.id)}
-              >
-                <span className="font-medium">{entity.name}</span>
-                <span className="ml-2 text-zinc-600">{entity.type}</span>
-              </button>
+                entity={entity}
+                selected={selectedIds.has(entity.id)}
+                onSelect={select}
+                onRename={(name) => updateEntity(entity.id, { name })}
+              />
             ))}
           </div>
         )}
       </SidebarSection>
-
-      {selectedEntity && <EntityProperties entity={selectedEntity} />}
-
+      {selectedEntity && <EntityProperties entity={selectedEntity} onUpdate={updateEntity} />}
       <SidebarSection title="Bin">
         <BinCreator />
       </SidebarSection>
@@ -59,17 +60,159 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
   )
 }
 
+function EntityListItem({
+  entity,
+  selected,
+  onSelect,
+  onRename
+}: {
+  entity: Entity
+  selected: boolean
+  onSelect: (id: string) => void
+  onRename: (name: string) => void
+}): React.JSX.Element {
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(entity.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  const commitName = (): void => {
+    const trimmed = editName.trim()
+    if (trimmed && trimmed !== entity.name) {
+      onRename(trimmed)
+    } else {
+      setEditName(entity.name)
+    }
+    setEditing(false)
+  }
+
+  return (
+    <button
+      type="button"
+      className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
+        selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
+      }`}
+      onClick={() => onSelect(entity.id)}
+      onDoubleClick={() => {
+        setEditName(entity.name)
+        setEditing(true)
+      }}
+    >
+      {editing ? (
+        <input
+          ref={inputRef}
+          type="text"
+          className="w-full bg-transparent text-xs font-medium outline-none border-b border-blue-400"
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitName()
+            if (e.key === 'Escape') {
+              setEditName(entity.name)
+              setEditing(false)
+            }
+          }}
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <>
+          <span className="font-medium">{entity.name}</span>
+          <span className="ml-2 text-zinc-600">{entity.type}</span>
+        </>
+      )}
+    </button>
+  )
+}
+
 function ReviewSidebar(): React.JSX.Element {
-  const { bakeResult, exportSTL: doExport } = useProject()
-  const { ready: workerReady } = useGeometryWorker()
+  const { bakeResult, setBakeResult, project, exportSTL: doExport } = useProject()
   const [baking, setBaking] = useState(false)
   const [exporting, setExporting] = useState(false)
 
   const handleBake = useCallback(async () => {
+    if (!project) return
     setBaking(true)
-    // TODO: Wire actual bake pipeline when manifold booleans are ready
-    setBaking(false)
-  }, [])
+    try {
+      const binConfig = project.bins[0]
+      const gridCfg = project.gridfinity
+
+      const binMesh = generateBinMesh({
+        widthUnits: binConfig?.width ?? 1,
+        depthUnits: binConfig?.depth ?? 1,
+        heightUnits: binConfig?.height ?? 3,
+        baseUnit: gridCfg.baseUnit,
+        unitHeight: gridCfg.unitHeight,
+        tolerance: gridCfg.tolerance,
+        hasLip: binConfig?.hasStackingLip ?? true,
+        magnetHoles: gridCfg.magnetHoles,
+        screwHoles: gridCfg.screwHoles
+      })
+
+      // Generate extrusion meshes for entities with extrusion config
+      const auxMeshes: AuxMesh[] = []
+      for (const entity of project.entities) {
+        if (!entity.extrusion || entity.extrusion.depth <= 0) continue
+
+        let vertices: Vertex2D[] = []
+        const pos = entity.transform.position
+
+        if (entity.type === 'rectangle') {
+          const hw = entity.width / 2
+          const hh = entity.height / 2
+          vertices = [
+            { x: pos.x - hw, y: pos.y - hh },
+            { x: pos.x + hw, y: pos.y - hh },
+            { x: pos.x + hw, y: pos.y + hh },
+            { x: pos.x - hw, y: pos.y + hh }
+          ]
+        } else if (entity.type === 'circle') {
+          const r = entity.diameter / 2
+          const segments = 32
+          vertices = Array.from({ length: segments }, (_, i) => {
+            const angle = (2 * Math.PI * i) / segments
+            return { x: pos.x + r * Math.cos(angle), y: pos.y + r * Math.sin(angle) }
+          })
+        } else if (entity.type === 'polygon') {
+          vertices = entity.vertices
+        }
+
+        if (vertices.length >= 3) {
+          const extruded = extrudePolygon(
+            vertices,
+            entity.extrusion.depth,
+            entity.extrusion.direction
+          )
+          auxMeshes.push({
+            mesh: {
+              positions: extruded.positions,
+              indices: extruded.indices,
+              normals: extruded.normals
+            },
+            role: entity.extrusion.role,
+            entityId: entity.id
+          })
+        }
+      }
+
+      setBakeResult({
+        mesh: {
+          positions: binMesh.positions,
+          indices: binMesh.indices,
+          normals: binMesh.normals
+        },
+        auxMeshes,
+        timestamp: Date.now(),
+        dirty: false,
+        warnings: []
+      })
+    } finally {
+      setBaking(false)
+    }
+  }, [project, setBakeResult])
 
   const handleExport = useCallback(async () => {
     if (!bakeResult) return
@@ -93,7 +236,7 @@ function ReviewSidebar(): React.JSX.Element {
         <Button
           variant="outline"
           className="w-full"
-          disabled={!workerReady || baking}
+          disabled={baking}
           onClick={() => void handleBake()}
         >
           {baking ? 'Baking...' : bakeResult?.dirty ? 'Re-bake Model' : 'Bake Model'}
@@ -137,34 +280,91 @@ function SidebarSection({
   )
 }
 
-function EntityProperties({ entity }: { entity: Entity }): React.JSX.Element {
+function EntityProperties({
+  entity,
+  onUpdate
+}: {
+  entity: Entity
+  onUpdate: (id: string, patch: Partial<Entity>) => void
+}): React.JSX.Element {
+  const { project } = useProject()
+  const unit = (project?.settings.units ?? 'mm') as DisplayUnit
+
+  const handlePositionChange = (axis: 'x' | 'y', value: number): void => {
+    onUpdate(entity.id, {
+      transform: {
+        ...entity.transform,
+        position: { ...entity.transform.position, [axis]: value }
+      }
+    })
+  }
+
+  const handleExtrusionChange = (patch: Partial<ExtrusionConfig>): void => {
+    const current = entity.extrusion ?? {
+      depth: 5,
+      direction: 'down' as const,
+      role: 'cutter' as const
+    }
+    onUpdate(entity.id, { extrusion: { ...current, ...patch } })
+  }
+
   return (
     <SidebarSection title="Properties">
       <div className="space-y-2 text-xs">
-        <PropertyRow label="Name" value={entity.name} />
         <PropertyRow label="Type" value={entity.type} />
-        <PropertyRow label="X" value={entity.transform.position.x.toFixed(1)} />
-        <PropertyRow label="Y" value={entity.transform.position.y.toFixed(1)} />
+        <EditableNumberRow
+          label={`X (${unitLabel(unit)})`}
+          value={entity.transform.position.x}
+          unit={unit}
+          onChange={(v) => handlePositionChange('x', v)}
+        />
+        <EditableNumberRow
+          label={`Y (${unitLabel(unit)})`}
+          value={entity.transform.position.y}
+          unit={unit}
+          onChange={(v) => handlePositionChange('y', v)}
+        />
         {entity.type === 'circle' && (
-          <PropertyRow label="Diameter" value={entity.diameter.toFixed(1)} />
+          <EditableNumberRow
+            label={`Diameter (${unitLabel(unit)})`}
+            value={entity.diameter}
+            unit={unit}
+            onChange={(v) => onUpdate(entity.id, { diameter: Math.max(0.1, v) })}
+          />
         )}
         {entity.type === 'rectangle' && (
           <>
-            <PropertyRow label="Width" value={entity.width.toFixed(1)} />
-            <PropertyRow label="Height" value={entity.height.toFixed(1)} />
+            <EditableNumberRow
+              label={`Width (${unitLabel(unit)})`}
+              value={entity.width}
+              unit={unit}
+              onChange={(v) => onUpdate(entity.id, { width: Math.max(0.1, v) })}
+            />
+            <EditableNumberRow
+              label={`Height (${unitLabel(unit)})`}
+              value={entity.height}
+              unit={unit}
+              onChange={(v) => onUpdate(entity.id, { height: Math.max(0.1, v) })}
+            />
           </>
         )}
         {entity.type === 'polygon' && (
           <PropertyRow label="Vertices" value={String(entity.vertices.length)} />
         )}
 
-        <ExtrusionControls entity={entity} />
+        <ExtrusionControls entity={entity} onExtrusionChange={handleExtrusionChange} />
       </div>
     </SidebarSection>
   )
 }
 
-function ExtrusionControls({ entity }: { entity: Entity }): React.JSX.Element {
+function ExtrusionControls({
+  entity,
+  onExtrusionChange
+}: {
+  entity: Entity
+  onExtrusionChange: (patch: Partial<ExtrusionConfig>) => void
+}): React.JSX.Element {
   const hasExtrusion = entity.extrusion !== undefined
 
   return (
@@ -172,34 +372,122 @@ function ExtrusionControls({ entity }: { entity: Entity }): React.JSX.Element {
       <p className="text-xs font-medium text-zinc-400 mb-1">Extrusion</p>
       {hasExtrusion ? (
         <div className="space-y-1">
-          <PropertyRow label="Depth" value={entity.extrusion!.depth.toFixed(1)} />
-          <PropertyRow label="Direction" value={entity.extrusion!.direction} />
-          <PropertyRow label="Role" value={entity.extrusion!.role} />
+          <EditableNumberRow
+            label="Depth"
+            value={entity.extrusion!.depth}
+            onChange={(v) => {
+              if (v > 0) onExtrusionChange({ depth: v })
+            }}
+          />
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Direction</span>
+            <select
+              className="bg-zinc-800 text-zinc-300 text-xs rounded px-1 py-0.5"
+              value={entity.extrusion!.direction}
+              onChange={(e) => onExtrusionChange({ direction: e.target.value as 'up' | 'down' })}
+            >
+              <option value="up">Up</option>
+              <option value="down">Down</option>
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-zinc-500">Role</span>
+            <select
+              className="bg-zinc-800 text-zinc-300 text-xs rounded px-1 py-0.5"
+              value={entity.extrusion!.role}
+              onChange={(e) => onExtrusionChange({ role: e.target.value as 'solid' | 'cutter' })}
+            >
+              <option value="solid">Solid</option>
+              <option value="cutter">Cutter</option>
+            </select>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-full mt-1"
+            onClick={() => onExtrusionChange({ depth: 0 })}
+          >
+            Remove Extrusion
+          </Button>
         </div>
       ) : (
-        <p className="text-zinc-600 text-xs">No extrusion configured</p>
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full"
+          onClick={() => onExtrusionChange({ depth: 5, direction: 'down', role: 'cutter' })}
+        >
+          Add Extrusion
+        </Button>
       )}
     </div>
   )
 }
 
 function BinCreator(): React.JSX.Element {
+  const { project, setBakeResult } = useProject()
+  const [width, setWidth] = useState(1)
+  const [depth, setDepth] = useState(1)
+  const [height, setHeight] = useState(3)
+  const [lip, setLip] = useState(true)
+  const [magnets, setMagnets] = useState(true)
+
+  const handleGenerate = (): void => {
+    if (!project) return
+    const gridCfg = project.gridfinity
+    const binMesh = generateBinMesh({
+      widthUnits: width,
+      depthUnits: depth,
+      heightUnits: height,
+      baseUnit: gridCfg.baseUnit,
+      unitHeight: gridCfg.unitHeight,
+      tolerance: gridCfg.tolerance,
+      hasLip: lip,
+      magnetHoles: { ...gridCfg.magnetHoles, enabled: magnets },
+      screwHoles: gridCfg.screwHoles
+    })
+
+    setBakeResult({
+      mesh: {
+        positions: binMesh.positions,
+        indices: binMesh.indices,
+        normals: binMesh.normals
+      },
+      auxMeshes: [],
+      timestamp: Date.now(),
+      dirty: false,
+      warnings: []
+    })
+  }
+
   return (
     <div className="space-y-2 text-xs">
       <div className="grid grid-cols-3 gap-1">
-        <NumericField label="W" value={1} suffix="u" />
-        <NumericField label="D" value={1} suffix="u" />
-        <NumericField label="H" value={3} suffix="u" />
+        <EditableNumericField label="W" value={width} suffix="u" onChange={setWidth} />
+        <EditableNumericField label="D" value={depth} suffix="u" onChange={setDepth} />
+        <EditableNumericField label="H" value={height} suffix="u" onChange={setHeight} />
       </div>
       <div className="flex items-center gap-2">
         <label className="text-zinc-400">
-          <input type="checkbox" className="mr-1" defaultChecked /> Lip
+          <input
+            type="checkbox"
+            className="mr-1"
+            checked={lip}
+            onChange={(e) => setLip(e.target.checked)}
+          />{' '}
+          Lip
         </label>
         <label className="text-zinc-400">
-          <input type="checkbox" className="mr-1" defaultChecked /> Magnets
+          <input
+            type="checkbox"
+            className="mr-1"
+            checked={magnets}
+            onChange={(e) => setMagnets(e.target.checked)}
+          />{' '}
+          Magnets
         </label>
       </div>
-      <Button variant="outline" size="sm" className="w-full" disabled>
+      <Button variant="outline" size="sm" className="w-full" onClick={handleGenerate}>
         Generate Bin
       </Button>
     </div>
@@ -215,22 +503,86 @@ function PropertyRow({ label, value }: { label: string; value: string }): React.
   )
 }
 
-function NumericField({
+function EditableNumberRow({
   label,
   value,
-  suffix
+  unit,
+  onChange
+}: {
+  label: string
+  value: number
+  unit?: DisplayUnit
+  onChange: (value: number) => void
+}): React.JSX.Element {
+  const displayUnit = unit ?? 'mm'
+  const [localValue, setLocalValue] = useState(formatDimension(value, displayUnit))
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sync from external changes (e.g. gizmo drag)
+  useEffect(() => {
+    setLocalValue(formatDimension(value, displayUnit))
+  }, [value, displayUnit])
+
+  const commit = useCallback(
+    (raw: string) => {
+      const mm = parseDimension(raw, displayUnit)
+      if (!isNaN(mm)) onChange(mm)
+    },
+    [onChange, displayUnit]
+  )
+
+  const handleChange = (raw: string): void => {
+    setLocalValue(raw)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => commit(raw), 150)
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-zinc-500">{label}</span>
+      <input
+        type="number"
+        className="w-20 bg-zinc-800 text-zinc-300 font-mono text-xs rounded px-1 py-0.5 text-right"
+        value={localValue}
+        step={0.1}
+        onChange={(e) => handleChange(e.target.value)}
+        onBlur={() => commit(localValue)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit(localValue)
+        }}
+      />
+    </div>
+  )
+}
+
+function EditableNumericField({
+  label,
+  value,
+  suffix,
+  onChange
 }: {
   label: string
   value: number
   suffix?: string
+  onChange: (value: number) => void
 }): React.JSX.Element {
   return (
     <div className="flex flex-col items-center">
       <span className="text-zinc-500 text-[10px]">{label}</span>
-      <span className="text-zinc-300 font-mono">
-        {value}
-        {suffix}
-      </span>
+      <div className="flex items-center gap-0.5">
+        <input
+          type="number"
+          className="w-10 bg-zinc-800 text-zinc-300 font-mono text-xs rounded px-1 py-0.5 text-center"
+          defaultValue={value}
+          min={1}
+          step={1}
+          onBlur={(e) => {
+            const num = parseInt(e.target.value)
+            if (!isNaN(num) && num > 0) onChange(num)
+          }}
+        />
+        {suffix && <span className="text-zinc-500 text-[10px]">{suffix}</span>}
+      </div>
     </div>
   )
 }

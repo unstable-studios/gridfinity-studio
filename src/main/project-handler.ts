@@ -123,7 +123,9 @@ export async function saveProject(
 /**
  * Load project from file
  */
-export async function loadProject(filePath?: string): Promise<OperationResult<ProjectData>> {
+export async function loadProject(
+  filePath?: string
+): Promise<OperationResult<{ project: ProjectData; filePath: string }>> {
   try {
     // If no file path provided, show open dialog
     let targetPath = filePath
@@ -175,7 +177,7 @@ export async function loadProject(filePath?: string): Promise<OperationResult<Pr
 
     return {
       success: true,
-      data: projectData as ProjectData
+      data: { project: projectData as ProjectData, filePath: targetPath }
     }
   } catch (error) {
     return {
