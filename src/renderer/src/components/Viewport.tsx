@@ -8,7 +8,7 @@ import type { Entity } from '../../../shared/types/project'
 
 export default function Viewport(): React.JSX.Element {
   const { mode } = useAppMode()
-  const { project, addEntity, updateEntity, updateBin, bakeResult } = useProject()
+  const { project, addEntity, updateEntity, moveEntity, updateBin, bakeResult } = useProject()
   const selection = useSharedSelection()
   const snapping = useSnapping()
 
@@ -22,18 +22,7 @@ export default function Viewport(): React.JSX.Element {
   }
 
   const handleMove = (id: string, dx: number, dy: number): void => {
-    const entity = entities.find((e) => e.id === id)
-    if (!entity) return
-    updateEntity(id, {
-      transform: {
-        ...entity.transform,
-        position: {
-          x: entity.transform.position.x + dx,
-          y: entity.transform.position.y + dy,
-          z: entity.transform.position.z
-        }
-      }
-    })
+    moveEntity(id, dx, dy)
   }
 
   const handleResize = (id: string, patch: Partial<Entity>): void => {
@@ -45,7 +34,8 @@ export default function Viewport(): React.JSX.Element {
   }
 
   const snapFn = (pos: { x: number; y: number }): { x: number; y: number } => {
-    return snapping.snap(pos, baseUnit, entities)
+    const others = entities.filter((e) => !selection.selectedIds.has(e.id))
+    return snapping.snap(pos, baseUnit, others)
   }
 
   return (

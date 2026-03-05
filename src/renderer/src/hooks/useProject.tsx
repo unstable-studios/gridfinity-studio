@@ -40,6 +40,7 @@ export interface UseProjectResult {
   markBakeDirty: () => void
   addEntity: (partial: Partial<Entity> & { type: Entity['type'] }) => Entity
   updateEntity: (id: string, patch: Partial<Entity>) => void
+  moveEntity: (id: string, dx: number, dy: number) => void
   removeEntity: (id: string) => void
   saveProject: (targetPath?: string) => Promise<boolean>
   saveProjectAs: () => Promise<boolean>
@@ -122,6 +123,31 @@ function useProjectState(): UseProjectResult {
       return {
         ...prev,
         entities: prev.entities.map((e) => (e.id === id ? ({ ...e, ...patch } as Entity) : e))
+      }
+    })
+    setIsModified(true)
+    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+  }, [])
+
+  const moveEntity = useCallback((id: string, dx: number, dy: number) => {
+    setProject((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        entities: prev.entities.map((e) => {
+          if (e.id !== id) return e
+          return {
+            ...e,
+            transform: {
+              ...e.transform,
+              position: {
+                x: e.transform.position.x + dx,
+                y: e.transform.position.y + dy,
+                z: e.transform.position.z
+              }
+            }
+          } as Entity
+        })
       }
     })
     setIsModified(true)
@@ -324,6 +350,7 @@ function useProjectState(): UseProjectResult {
     markBakeDirty,
     addEntity,
     updateEntity,
+    moveEntity,
     removeEntity,
     updateSettings,
     updateGridfinity,
