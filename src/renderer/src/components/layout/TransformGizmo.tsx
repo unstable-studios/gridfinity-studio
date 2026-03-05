@@ -92,9 +92,8 @@ export default function TransformGizmo({
       event.stopPropagation()
       const domTarget = event.nativeEvent.target as HTMLElement | null
       domTarget?.setPointerCapture?.(event.nativeEvent.pointerId)
-      const pos = { x: event.point.x, y: event.point.y }
-      dragStart.current = pos
-      lastPos.current = pos
+      dragStart.current = { x: event.point.x, y: event.point.y }
+      lastPos.current = { x: centroid.x, y: centroid.y }
       shiftHeld.current = event.nativeEvent.shiftKey
       axisLock.current = null
       setDragging(true)
@@ -106,34 +105,34 @@ export default function TransformGizmo({
     (event: ThreeEvent<PointerEvent>) => {
       if (!dragging || !centroid) return
 
-      let pos = { x: event.point.x, y: event.point.y }
+      let target = { x: event.point.x, y: event.point.y }
 
       shiftHeld.current = event.nativeEvent.shiftKey
 
       if (shiftHeld.current) {
-        const totalDx = pos.x - dragStart.current.x
-        const totalDy = pos.y - dragStart.current.y
+        const totalDx = target.x - dragStart.current.x
+        const totalDy = target.y - dragStart.current.y
 
         if (!axisLock.current && (Math.abs(totalDx) > 0.5 || Math.abs(totalDy) > 0.5)) {
           axisLock.current = Math.abs(totalDx) >= Math.abs(totalDy) ? 'x' : 'y'
         }
 
         if (axisLock.current === 'x') {
-          pos = { x: pos.x, y: dragStart.current.y }
+          target = { x: target.x, y: dragStart.current.y }
         } else if (axisLock.current === 'y') {
-          pos = { x: dragStart.current.x, y: pos.y }
+          target = { x: dragStart.current.x, y: target.y }
         }
       } else {
         axisLock.current = null
       }
 
       if (snap) {
-        pos = snap(pos)
+        target = snap(target)
       }
 
-      const dx = pos.x - lastPos.current.x
-      const dy = pos.y - lastPos.current.y
-      lastPos.current = pos
+      const dx = target.x - lastPos.current.x
+      const dy = target.y - lastPos.current.y
+      lastPos.current = target
 
       if (dx !== 0 || dy !== 0) {
         for (const id of selectedIds) {

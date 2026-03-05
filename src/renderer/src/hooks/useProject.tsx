@@ -5,11 +5,12 @@
  * reads from a single shared ProjectProvider at the top of the tree.
  */
 
-import { useState, useCallback, useContext, createContext } from 'react'
+import { useState, useCallback, useEffect, useContext, createContext } from 'react'
 import { createEmptyProject, createDefaultTransform } from '../../../shared/types/project'
 import type {
   ProjectData,
   Entity,
+  Bin,
   GlobalSettings,
   GridfinityConfig
 } from '../../../shared/types/project'
@@ -39,6 +40,7 @@ export interface UseProjectResult {
   markBakeDirty: () => void
   addEntity: (partial: Partial<Entity> & { type: Entity['type'] }) => Entity
   updateEntity: (id: string, patch: Partial<Entity>) => void
+  moveEntity: (id: string, dx: number, dy: number) => void
   removeEntity: (id: string) => void
   saveProject: (targetPath?: string) => Promise<boolean>
   saveProjectAs: () => Promise<boolean>
@@ -47,6 +49,9 @@ export interface UseProjectResult {
   loadRecentProjects: () => Promise<void>
   updateSettings: (patch: Partial<GlobalSettings>) => void
   updateGridfinity: (config: GridfinityConfig) => void
+  addBin: (patch?: Partial<Bin>) => Bin
+  updateBin: (id: string, patch: Partial<Bin>) => void
+  removeBin: (id: string) => void
   exportSTL: (stlData: ArrayBuffer) => Promise<boolean>
   error: string | null
 }
@@ -69,13 +74,35 @@ export function useProject(): UseProjectResult {
 
 // ─── Internal state implementation ──────────────────────────────
 
+const SESSION_KEY = 'gfstudio:session'
+
+function loadSession(): {
+  project: ProjectData | null
+  filePath: string | null
+  isModified: boolean
+} {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {
+    // ignore corrupt data
+  }
+  return { project: null, filePath: null, isModified: false }
+}
+
 function useProjectState(): UseProjectResult {
-  const [project, setProject] = useState<ProjectData | null>(null)
-  const [filePath, setFilePath] = useState<string | null>(null)
-  const [isModified, setIsModified] = useState(false)
+  const saved = loadSession()
+  const [project, setProject] = useState<ProjectData | null>(saved.project)
+  const [filePath, setFilePath] = useState<string | null>(saved.filePath)
+  const [isModified, setIsModified] = useState(saved.isModified)
   const [error, setError] = useState<string | null>(null)
   const [recentProjects, setRecentProjects] = useState<string[]>([])
   const [bakeResult, setBakeResult] = useState<BakeResult | null>(null)
+
+  // Persist to sessionStorage so refresh doesn't lose state
+  useEffect(() => {
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify({ project, filePath, isModified }))
+  }, [project, filePath, isModified])
 
   const markBakeDirty = useCallback(() => {
     setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
@@ -124,6 +151,31 @@ function useProjectState(): UseProjectResult {
     setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
   }, [])
 
+  const moveEntity = useCallback((id: string, dx: number, dy: number) => {
+    setProject((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        entities: prev.entities.map((e) => {
+          if (e.id !== id) return e
+          return {
+            ...e,
+            transform: {
+              ...e.transform,
+              position: {
+                x: e.transform.position.x + dx,
+                y: e.transform.position.y + dy,
+                z: e.transform.position.z
+              }
+            }
+          } as Entity
+        })
+      }
+    })
+    setIsModified(true)
+    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+  }, [])
+
   const removeEntity = useCallback((id: string) => {
     setProject((prev) => {
       if (!prev) return prev
@@ -145,6 +197,54 @@ function useProjectState(): UseProjectResult {
     setProject((prev) => {
       if (!prev) return prev
       return { ...prev, gridfinity: config }
+    })
+    setIsModified(true)
+    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+  }, [])
+
+  const addBin = useCallback(
+    (patch?: Partial<Bin>): Bin => {
+      const existingCount = project?.bins.length ?? 0
+      const bin: Bin = {
+        id: crypto.randomUUID(),
+        name: `Bin ${existingCount + 1}`,
+        width: 1,
+        depth: 1,
+        height: 3,
+        position: { x: 0, y: 0 },
+        hasDividers: false,
+        hasLabel: false,
+        hasStackingLip: true,
+        properties: {},
+        ...patch
+      }
+      setProject((prev) => {
+        if (!prev) return prev
+        return { ...prev, bins: [...prev.bins, bin] }
+      })
+      setIsModified(true)
+      setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+      return bin
+    },
+    [project?.bins.length]
+  )
+
+  const updateBin = useCallback((id: string, patch: Partial<Bin>) => {
+    setProject((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        bins: prev.bins.map((b) => (b.id === id ? { ...b, ...patch } : b))
+      }
+    })
+    setIsModified(true)
+    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+  }, [])
+
+  const removeBin = useCallback((id: string) => {
+    setProject((prev) => {
+      if (!prev) return prev
+      return { ...prev, bins: prev.bins.filter((b) => b.id !== id) }
     })
     setIsModified(true)
     setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
@@ -272,9 +372,13 @@ function useProjectState(): UseProjectResult {
     markBakeDirty,
     addEntity,
     updateEntity,
+    moveEntity,
     removeEntity,
     updateSettings,
     updateGridfinity,
+    addBin,
+    updateBin,
+    removeBin,
     saveProject,
     saveProjectAs,
     loadProject,

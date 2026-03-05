@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Navbar from '@/components/Navbar'
 import Sidebar from '@/components/Sidebar'
 import Viewport from '@/components/Viewport'
@@ -27,10 +27,18 @@ function AppContent(): React.JSX.Element {
   )
 }
 
+const APP_MODE_KEY = 'gfstudio:appMode'
+
 export default function App(): React.JSX.Element {
-  const [mode, setMode] = useState<AppMode>('layout')
+  const [mode, setMode] = useState<AppMode>(() => {
+    return (sessionStorage.getItem(APP_MODE_KEY) as AppMode) ?? 'layout'
+  })
   const [activeTool, setActiveTool] = useState<ActiveTool>('select')
   const selection = useSelection()
+
+  useEffect(() => {
+    sessionStorage.setItem(APP_MODE_KEY, mode)
+  }, [mode])
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">

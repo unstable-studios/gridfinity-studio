@@ -58,8 +58,9 @@ function pushNormal(buf: number[], nx: number, ny: number, nz: number): void {
 }
 
 function pushQuad(idxBuf: number[], a: number, b: number, c: number, d: number): void {
-  idxBuf.push(a, b, c)
-  idxBuf.push(a, c, d)
+  // Winding order produces CCW triangles matching the stated normals
+  idxBuf.push(a, c, b)
+  idxBuf.push(a, d, c)
 }
 
 /**
