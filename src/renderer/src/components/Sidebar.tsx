@@ -181,7 +181,15 @@ function BinProperties({
       dirty: false,
       warnings: []
     })
-  }, [project, setBakeResult, bin.width, bin.depth, bin.height, bin.hasStackingLip])
+  }, [
+    project,
+    setBakeResult,
+    bin.width,
+    bin.depth,
+    bin.height,
+    bin.hasStackingLip,
+    bin.hasDividers
+  ])
 
   return (
     <div className="space-y-2 text-xs">

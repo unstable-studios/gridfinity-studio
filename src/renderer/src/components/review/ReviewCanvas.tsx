@@ -61,7 +61,7 @@ function BakedMeshPreview({ mesh }: { mesh: BakedMeshData }): React.JSX.Element 
       geo.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3))
     }
     return geo
-  }, [mesh.positions, mesh.indices, mesh.normals, mesh.colors, hasColors])
+  }, [mesh.positions, mesh.indices, mesh.colors, hasColors])
 
   return (
     <mesh geometry={geometry} castShadow rotation={[-Math.PI / 2, 0, 0]}>
