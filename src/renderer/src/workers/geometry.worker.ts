@@ -40,7 +40,7 @@ function manifoldToMeshData(mesh: {
   vertProperties: Float32Array
   triVerts: Uint32Array
   numProp: number
-}): { positions: Float32Array; indices: Uint32Array; normals: Float32Array } {
+}): { positions: Float32Array; indices: Uint32Array; normals: Float32Array; colors: Float32Array } {
   const positions = new Float32Array(mesh.vertProperties.length)
   const vertCount = mesh.vertProperties.length / mesh.numProp
   for (let i = 0; i < vertCount; i++) {
@@ -93,7 +93,9 @@ function manifoldToMeshData(mesh: {
     }
   }
 
-  return { positions, indices, normals }
+  // Empty colors — worker-generated meshes don't have debug colors
+  const colors = new Float32Array(0)
+  return { positions, indices, normals, colors }
 }
 
 // ─── Message handler ─────────────────────────────────────────────
@@ -122,12 +124,14 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
       }
 
       const result = extrudePolygon(vertices, msg.depth, msg.direction)
+      const colors = new Float32Array(0)
       const response: WorkerResponse = {
         type: 'extrude',
         id: msg.id,
         positions: result.positions,
         indices: result.indices,
-        normals: result.normals
+        normals: result.normals,
+        colors
       }
       ctx.postMessage(response, {
         transfer: [result.positions.buffer, result.indices.buffer, result.normals.buffer]

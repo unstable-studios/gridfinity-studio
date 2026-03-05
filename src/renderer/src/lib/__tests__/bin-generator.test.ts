@@ -10,6 +10,7 @@ const defaultParams: BinParams = {
   unitHeight: 7,
   tolerance: 0.5,
   hasLip: true,
+  hasDividers: false,
   magnetHoles: { enabled: false, diameter: 6.5, depth: 2.4 },
   screwHoles: { enabled: false, diameter: 3, depth: 6 }
 }
@@ -24,18 +25,41 @@ describe('generateBinMesh', () => {
     expect(result.positions.length).toBeGreaterThan(0)
     expect(result.indices.length).toBeGreaterThan(0)
     expect(result.normals.length).toBeGreaterThan(0)
+    expect(result.colors.length).toBe(result.positions.length)
   })
 
-  it('2x2x4 bin produces more vertices than 1x1x3', () => {
-    const small = generateBinMesh(defaultParams)
-    const large = generateBinMesh({
+  it('2x2x4 bin with magnets produces more vertices than 1x1x3 with magnets', () => {
+    const withMagnets = {
       ...defaultParams,
+      magnetHoles: { enabled: true, diameter: 6.5, depth: 2.4 }
+    }
+    const small = generateBinMesh(withMagnets)
+    const large = generateBinMesh({
+      ...withMagnets,
       widthUnits: 2,
       depthUnits: 2,
       heightUnits: 4
     })
 
+    // 2x2 = 4 grid cells × 4 corners = 16 holes vs 1x1 = 4 holes
     expect(large.positions.length).toBeGreaterThan(small.positions.length)
+  })
+
+  it('2x2 bin with dividers produces more vertices than without', () => {
+    const noDividers = generateBinMesh({
+      ...defaultParams,
+      widthUnits: 2,
+      depthUnits: 2,
+      hasDividers: false
+    })
+    const withDividers = generateBinMesh({
+      ...defaultParams,
+      widthUnits: 2,
+      depthUnits: 2,
+      hasDividers: true
+    })
+
+    expect(withDividers.positions.length).toBeGreaterThan(noDividers.positions.length)
   })
 
   it('bin dimensions respect baseUnit (outer width ~ widthUnits * baseUnit - 2 * tolerance)', () => {

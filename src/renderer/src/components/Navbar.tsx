@@ -7,15 +7,18 @@ import {
   ThemeToggle
 } from '@unstable-studios/ui'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu'
+  Menubar,
+  MenubarMenu,
+  MenubarTrigger,
+  MenubarContent,
+  MenubarItem,
+  MenubarSeparator,
+  MenubarSub,
+  MenubarSubTrigger,
+  MenubarSubContent,
+  MenubarShortcut
+} from '@/components/ui/menubar'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import PreferencesModal from '@/components/settings/PreferencesModal'
 import { useProject } from '@/hooks/useProject'
 import { useUndo } from '@/hooks/useUndo'
@@ -42,9 +45,7 @@ export default function Navbar(): React.JSX.Element {
     <>
       <NavbarRoot brand={<Logo />} className="relative z-50 max-w-none [&>div]:max-w-none py-2">
         <NavbarContent className="gap-1">
-          <FileMenu />
-          <EditMenu onOpenPreferences={() => setPrefsOpen(true)} />
-          <HelpMenu />
+          <AppMenubar onOpenPreferences={() => setPrefsOpen(true)} />
         </NavbarContent>
         <NavbarActions className="ml-auto gap-2">
           <ViewModeToggle />
@@ -57,95 +58,7 @@ export default function Navbar(): React.JSX.Element {
   )
 }
 
-function ViewModeToggle() {
-  const { mode, setMode, setActiveTool } = useAppMode()
-
-  return (
-    <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
-      <button
-        type="button"
-        className={`px-3 py-1.5 text-xs font-medium transition ${
-          mode === 'layout'
-            ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100'
-            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-        }`}
-        onClick={() => {
-          setMode('layout')
-          setActiveTool('select')
-        }}
-      >
-        Layout
-      </button>
-      <button
-        type="button"
-        className={`px-3 py-1.5 text-xs font-medium transition ${
-          mode === 'review'
-            ? 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100'
-            : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-        }`}
-        onClick={() => {
-          setMode('review')
-          setActiveTool(null)
-        }}
-      >
-        Review
-      </button>
-    </div>
-  )
-}
-
-function ToolBar() {
-  const { mode, activeTool, setActiveTool } = useAppMode()
-
-  const hidden = mode !== 'layout'
-
-  const tools = [
-    { id: 'select' as const, label: 'Select' },
-    { id: 'rectangle' as const, label: 'Rect' },
-    { id: 'circle' as const, label: 'Circle' },
-    { id: 'polygon' as const, label: 'Polygon' }
-  ]
-
-  return (
-    <div
-      className={`flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden transition-opacity ${
-        hidden ? 'opacity-0 pointer-events-none' : ''
-      }`}
-    >
-      {tools.map((tool) => (
-        <button
-          key={tool.id}
-          type="button"
-          className={`px-3 py-1.5 text-xs font-medium transition ${
-            activeTool === tool.id
-              ? 'bg-blue-600 text-white'
-              : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-          }`}
-          onClick={() => setActiveTool(tool.id)}
-        >
-          {tool.label}
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function MenuTrigger({ children }: { children: React.ReactNode }) {
-  return (
-    <button
-      type="button"
-      className="px-2 py-1 text-sm text-muted-foreground hover:text-foreground transition rounded-md hover:bg-accent"
-    >
-      {children}
-    </button>
-  )
-}
-
-function ShortcutLabel({ children }: { children: React.ReactNode }) {
-  return <span className="ml-auto text-xs text-zinc-500">{children}</span>
-}
-
-function FileMenu() {
+function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
   const {
     project,
     saveProject,
@@ -155,12 +68,14 @@ function FileMenu() {
     recentProjects,
     loadRecentProjects
   } = useProject()
+  const { undo, redo, canUndo, canRedo, lastLabel } = useUndo()
 
   useEffect(() => {
     loadRecentProjects()
   }, [loadRecentProjects])
 
-  const handleKeyDown = useCallback(
+  // File keyboard shortcuts
+  const handleFileKeys = useCallback(
     (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
       if (!mod) return
@@ -181,62 +96,8 @@ function FileMenu() {
     [createNewProject, loadProject, saveProject, saveProjectAs]
   )
 
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
-
-  const hasProject = project !== null
-
-  return (
-    <DropdownMenu onOpenChange={(open) => open && void loadRecentProjects()}>
-      <DropdownMenuTrigger asChild>
-        <MenuTrigger>File</MenuTrigger>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem onSelect={() => createNewProject()}>
-          New Project
-          <ShortcutLabel>Cmd+N</ShortcutLabel>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void loadProject()}>
-          Open Project
-          <ShortcutLabel>Cmd+O</ShortcutLabel>
-        </DropdownMenuItem>
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Open Recent</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {recentProjects.length === 0 ? (
-              <DropdownMenuItem disabled>No recent projects</DropdownMenuItem>
-            ) : (
-              recentProjects.map((filePath) => (
-                <DropdownMenuItem key={filePath} onSelect={() => void loadProject(filePath)}>
-                  {filePath.split(/[\\/]/).pop() ?? filePath}
-                </DropdownMenuItem>
-              ))
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={!hasProject} onSelect={() => void saveProject()}>
-          Save
-          <ShortcutLabel>Cmd+S</ShortcutLabel>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!hasProject} onSelect={() => void saveProjectAs()}>
-          Save As...
-          <ShortcutLabel>Cmd+Shift+S</ShortcutLabel>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>Import...</DropdownMenuItem>
-        <DropdownMenuItem disabled>Export...</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  )
-}
-
-function EditMenu({ onOpenPreferences }: { onOpenPreferences: () => void }) {
-  const { undo, redo, canUndo, canRedo, lastLabel } = useUndo()
-
-  const handleKeyDown = useCallback(
+  // Edit keyboard shortcuts
+  const handleEditKeys = useCallback(
     (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
       if (mod && e.code === 'KeyZ' && !e.shiftKey) {
@@ -254,59 +115,159 @@ function EditMenu({ onOpenPreferences }: { onOpenPreferences: () => void }) {
   )
 
   useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
+    window.addEventListener('keydown', handleFileKeys)
+    window.addEventListener('keydown', handleEditKeys)
+    return () => {
+      window.removeEventListener('keydown', handleFileKeys)
+      window.removeEventListener('keydown', handleEditKeys)
+    }
+  }, [handleFileKeys, handleEditKeys])
 
+  const hasProject = project !== null
   const undoLabel = lastLabel ? `Undo ${lastLabel}` : 'Undo'
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <MenuTrigger>Edit</MenuTrigger>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem disabled={!canUndo} onSelect={undo}>
-          {undoLabel}
-          <ShortcutLabel>Cmd+Z</ShortcutLabel>
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!canRedo} onSelect={redo}>
-          Redo
-          <ShortcutLabel>Cmd+Shift+Z</ShortcutLabel>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled>Cut</DropdownMenuItem>
-        <DropdownMenuItem disabled>Copy</DropdownMenuItem>
-        <DropdownMenuItem disabled>Paste</DropdownMenuItem>
-        <DropdownMenuItem disabled>Select All</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={onOpenPreferences}>
-          Preferences...
-          <ShortcutLabel>Cmd+,</ShortcutLabel>
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Menubar>
+      {/* ── File ── */}
+      <MenubarMenu>
+        <MenubarTrigger>File</MenubarTrigger>
+        <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
+          <MenubarItem onSelect={() => createNewProject()}>
+            New Project
+            <MenubarShortcut>Cmd+N</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem onSelect={() => void loadProject()}>
+            Open Project
+            <MenubarShortcut>Cmd+O</MenubarShortcut>
+          </MenubarItem>
+          <MenubarSub>
+            <MenubarSubTrigger>Open Recent</MenubarSubTrigger>
+            <MenubarSubContent>
+              {recentProjects.length === 0 ? (
+                <MenubarItem disabled>No recent projects</MenubarItem>
+              ) : (
+                recentProjects.map((filePath) => (
+                  <MenubarItem key={filePath} onSelect={() => void loadProject(filePath)}>
+                    {filePath.split(/[\\/]/).pop() ?? filePath}
+                  </MenubarItem>
+                ))
+              )}
+            </MenubarSubContent>
+          </MenubarSub>
+          <MenubarSeparator />
+          <MenubarItem disabled={!hasProject} onSelect={() => void saveProject()}>
+            Save
+            <MenubarShortcut>Cmd+S</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem disabled={!hasProject} onSelect={() => void saveProjectAs()}>
+            Save As...
+            <MenubarShortcut>Cmd+Shift+S</MenubarShortcut>
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem disabled>Import...</MenubarItem>
+          <MenubarItem disabled>Export...</MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+
+      {/* ── Edit ── */}
+      <MenubarMenu>
+        <MenubarTrigger>Edit</MenubarTrigger>
+        <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
+          <MenubarItem disabled={!canUndo} onSelect={undo}>
+            {undoLabel}
+            <MenubarShortcut>Cmd+Z</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem disabled={!canRedo} onSelect={redo}>
+            Redo
+            <MenubarShortcut>Cmd+Shift+Z</MenubarShortcut>
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem disabled>Cut</MenubarItem>
+          <MenubarItem disabled>Copy</MenubarItem>
+          <MenubarItem disabled>Paste</MenubarItem>
+          <MenubarItem disabled>Select All</MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem onSelect={onOpenPreferences}>
+            Preferences...
+            <MenubarShortcut>Cmd+,</MenubarShortcut>
+          </MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+
+      {/* ── Help ── */}
+      <MenubarMenu>
+        <MenubarTrigger>Help</MenubarTrigger>
+        <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
+          <MenubarItem onSelect={() => window.open(GITHUB_REPO, '_blank')}>
+            Documentation
+          </MenubarItem>
+          <MenubarItem onSelect={() => window.open(`${GITHUB_REPO}/issues/new`, '_blank')}>
+            Report a Bug
+          </MenubarItem>
+          <MenubarSeparator />
+          <MenubarItem disabled className="opacity-80 cursor-default">
+            Version {__APP_VERSION__}
+          </MenubarItem>
+        </MenubarContent>
+      </MenubarMenu>
+    </Menubar>
   )
 }
 
-function HelpMenu() {
+function ViewModeToggle() {
+  const { mode, setMode, setActiveTool } = useAppMode()
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <MenuTrigger>Help</MenuTrigger>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem onSelect={() => window.open(GITHUB_REPO, '_blank')}>
-          Documentation
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => window.open(`${GITHUB_REPO}/issues/new`, '_blank')}>
-          Report a Bug
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem disabled className="opacity-80 cursor-default">
-          Version {__APP_VERSION__}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <ToggleGroup
+      type="single"
+      value={mode}
+      onValueChange={(value) => {
+        if (!value) return
+        if (value === 'layout') {
+          setMode('layout')
+          setActiveTool('select')
+        } else {
+          setMode('review')
+          setActiveTool(null)
+        }
+      }}
+    >
+      <ToggleGroupItem value="layout">Layout</ToggleGroupItem>
+      <ToggleGroupItem value="review">Review</ToggleGroupItem>
+    </ToggleGroup>
+  )
+}
+
+function ToolBar() {
+  const { mode, activeTool, setActiveTool } = useAppMode()
+
+  const hidden = mode !== 'layout'
+
+  const tools = [
+    { id: 'select' as const, label: 'Select' },
+    { id: 'rectangle' as const, label: 'Rect' },
+    { id: 'circle' as const, label: 'Circle' },
+    { id: 'polygon' as const, label: 'Polygon' }
+  ]
+
+  return (
+    <ToggleGroup
+      type="single"
+      value={activeTool ?? ''}
+      onValueChange={(value) => {
+        if (value) setActiveTool(value as typeof activeTool)
+      }}
+      className={`transition-opacity ${hidden ? 'opacity-0 pointer-events-none' : ''}`}
+    >
+      {tools.map((tool) => (
+        <ToggleGroupItem
+          key={tool.id}
+          value={tool.id}
+          className="data-[state=on]:bg-blue-600 data-[state=on]:text-white dark:data-[state=on]:bg-blue-600 dark:data-[state=on]:text-white"
+        >
+          {tool.label}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   )
 }

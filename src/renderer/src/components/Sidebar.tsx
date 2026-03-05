@@ -1,5 +1,14 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { Button } from '@unstable-studios/ui'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue
+} from '@/components/ui/select'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useSharedSelection } from '@/hooks/useSelection'
@@ -155,6 +164,7 @@ function BinProperties({
       unitHeight: gridCfg.unitHeight,
       tolerance: gridCfg.tolerance,
       hasLip: bin.hasStackingLip,
+      hasDividers: bin.hasDividers,
       magnetHoles: gridCfg.magnetHoles,
       screwHoles: gridCfg.screwHoles
     })
@@ -162,6 +172,7 @@ function BinProperties({
     setBakeResult({
       mesh: {
         positions: binMesh.positions,
+        colors: binMesh.colors,
         indices: binMesh.indices,
         normals: binMesh.normals
       },
@@ -170,7 +181,15 @@ function BinProperties({
       dirty: false,
       warnings: []
     })
-  }, [project, setBakeResult, bin.width, bin.depth, bin.height, bin.hasStackingLip])
+  }, [
+    project,
+    setBakeResult,
+    bin.width,
+    bin.depth,
+    bin.height,
+    bin.hasStackingLip,
+    bin.hasDividers
+  ])
 
   return (
     <div className="space-y-2 text-xs">
@@ -194,17 +213,13 @@ function BinProperties({
           onChange={(v) => onUpdate({ height: v })}
         />
       </div>
-      <div className="flex items-center gap-2">
-        <label className="text-zinc-400">
-          <input
-            type="checkbox"
-            className="mr-1"
-            checked={bin.hasStackingLip}
-            onChange={(e) => onUpdate({ hasStackingLip: e.target.checked })}
-          />{' '}
-          Lip
-        </label>
-      </div>
+      <label className="flex items-center gap-2 text-zinc-400 cursor-pointer">
+        <Checkbox
+          checked={bin.hasStackingLip}
+          onCheckedChange={(checked) => onUpdate({ hasStackingLip: checked === true })}
+        />
+        <span className="text-xs">Lip</span>
+      </label>
       <Button
         variant="outline"
         size="sm"
@@ -259,10 +274,10 @@ function EntityListItem({
       }}
     >
       {editing ? (
-        <input
+        <Input
           ref={inputRef}
           type="text"
-          className="w-full bg-transparent text-xs font-medium outline-none border-b border-blue-400"
+          className="w-full bg-transparent text-xs font-medium border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 focus:ring-0"
           value={editName}
           onChange={(e) => setEditName(e.target.value)}
           onBlur={commitName}
@@ -305,6 +320,7 @@ function ReviewSidebar(): React.JSX.Element {
         unitHeight: gridCfg.unitHeight,
         tolerance: gridCfg.tolerance,
         hasLip: binConfig?.hasStackingLip ?? true,
+        hasDividers: binConfig?.hasDividers ?? false,
         magnetHoles: gridCfg.magnetHoles,
         screwHoles: gridCfg.screwHoles
       })
@@ -347,7 +363,8 @@ function ReviewSidebar(): React.JSX.Element {
             mesh: {
               positions: extruded.positions,
               indices: extruded.indices,
-              normals: extruded.normals
+              normals: extruded.normals,
+              colors: new Float32Array(0)
             },
             role: entity.extrusion.role,
             entityId: entity.id
@@ -358,6 +375,7 @@ function ReviewSidebar(): React.JSX.Element {
       setBakeResult({
         mesh: {
           positions: binMesh.positions,
+          colors: binMesh.colors,
           indices: binMesh.indices,
           normals: binMesh.normals
         },
@@ -548,25 +566,33 @@ function ExtrusionControls({
           />
           <div className="flex items-center justify-between">
             <span className="text-zinc-500">Direction</span>
-            <select
-              className="bg-zinc-800 text-zinc-300 text-xs rounded px-1 py-0.5"
+            <Select
               value={entity.extrusion!.direction}
-              onChange={(e) => onExtrusionChange({ direction: e.target.value as 'up' | 'down' })}
+              onValueChange={(v) => onExtrusionChange({ direction: v as 'up' | 'down' })}
             >
-              <option value="up">Up</option>
-              <option value="down">Down</option>
-            </select>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="up">Up</SelectItem>
+                <SelectItem value="down">Down</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-zinc-500">Role</span>
-            <select
-              className="bg-zinc-800 text-zinc-300 text-xs rounded px-1 py-0.5"
+            <Select
               value={entity.extrusion!.role}
-              onChange={(e) => onExtrusionChange({ role: e.target.value as 'solid' | 'cutter' })}
+              onValueChange={(v) => onExtrusionChange({ role: v as 'solid' | 'cutter' })}
             >
-              <option value="solid">Solid</option>
-              <option value="cutter">Cutter</option>
-            </select>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="solid">Solid</SelectItem>
+                <SelectItem value="cutter">Cutter</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <Button
             variant="outline"
@@ -637,9 +663,9 @@ function EditableNumberRow({
   return (
     <div className="flex items-center justify-between">
       <span className="text-zinc-500">{label}</span>
-      <input
+      <Input
         type="number"
-        className="w-20 bg-zinc-800 text-zinc-300 font-mono text-xs rounded px-1 py-0.5 text-right"
+        className="w-20 font-mono text-xs text-right py-0.5 px-1"
         value={localValue}
         step={0.1}
         onChange={(e) => handleChange(e.target.value)}
@@ -667,9 +693,9 @@ function EditableNumericField({
     <div className="flex flex-col items-center">
       <span className="text-zinc-500 text-[10px]">{label}</span>
       <div className="flex items-center gap-0.5">
-        <input
+        <Input
           type="number"
-          className="w-10 bg-zinc-800 text-zinc-300 font-mono text-xs rounded px-1 py-0.5 text-center"
+          className="w-10 font-mono text-xs text-center py-0.5 px-1"
           value={value}
           min={1}
           step={1}

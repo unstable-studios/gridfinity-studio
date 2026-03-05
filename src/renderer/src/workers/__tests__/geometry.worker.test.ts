@@ -50,7 +50,8 @@ describe('WorkerResponse message protocol', () => {
       id: 'req-1',
       positions: new Float32Array([0, 0, 0, 1, 0, 0, 0.5, 1, 0]),
       indices: new Uint32Array([0, 1, 2]),
-      normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1])
+      normals: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+      colors: new Float32Array(0)
     }
 
     expect(response.type).toBe('extrude')
