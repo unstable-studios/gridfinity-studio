@@ -99,7 +99,6 @@ describe('entity mutation logic', () => {
         width: 10,
         height: 5
       } as Partial<RectangleEntity> & { type: 'rectangle' })
-      project = r3.project
       expect(r3.entity.name).toBe('Rectangle 1')
     })
 
