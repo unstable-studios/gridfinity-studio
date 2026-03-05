@@ -1,7 +1,11 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import Logo from './Logo'
-import { Button } from '@/components/ui/button'
-import { ModeToggle } from '@/components/ui/mode-toggle'
+import {
+  Navbar as NavbarRoot,
+  NavbarContent,
+  NavbarActions,
+  ThemeToggle
+} from '@unstable-studios/ui'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,25 +16,44 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import PreferencesModal from '@/components/settings/PreferencesModal'
 import { useProject } from '@/hooks/useProject'
 import { useUndo } from '@/hooks/useUndo'
 import { useAppMode } from '@/hooks/useAppMode'
 
+const GITHUB_REPO = 'https://github.com/unstable-studios/gridfinity-studio'
+
 export default function Navbar(): React.JSX.Element {
+  const [prefsOpen, setPrefsOpen] = useState(false)
+
+  // Cmd+, shortcut for preferences
+  useEffect(() => {
+    const handler = (e: KeyboardEvent): void => {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'Comma') {
+        e.preventDefault()
+        setPrefsOpen(true)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   return (
-    <div className="h-16 w-full border-b gap-4 border-zinc-300 flex items-center justify-between px-4 shadow-sm bg-white dark:bg-zinc-800 dark:border-zinc-700">
-      <div className="flex items-center gap-2">
-        <Logo />
-        <FileMenu />
-        <EditMenu />
-        <HelpMenu />
-      </div>
-      <div className="flex items-center gap-2">
-        <ViewModeToggle />
-        <ToolBar />
-        <ModeToggle />
-      </div>
-    </div>
+    <>
+      <NavbarRoot brand={<Logo />} className="max-w-none [&>div]:max-w-none">
+        <NavbarContent>
+          <FileMenu />
+          <EditMenu onOpenPreferences={() => setPrefsOpen(true)} />
+          <HelpMenu />
+        </NavbarContent>
+        <NavbarActions className="ml-auto">
+          <ViewModeToggle />
+          <ToolBar />
+          <ThemeToggle />
+        </NavbarActions>
+      </NavbarRoot>
+      <PreferencesModal open={prefsOpen} onOpenChange={setPrefsOpen} />
+    </>
   )
 }
 
@@ -74,7 +97,7 @@ function ViewModeToggle() {
 function ToolBar() {
   const { mode, activeTool, setActiveTool } = useAppMode()
 
-  if (mode !== 'layout') return null
+  const hidden = mode !== 'layout'
 
   const tools = [
     { id: 'select' as const, label: 'Select' },
@@ -84,7 +107,11 @@ function ToolBar() {
   ]
 
   return (
-    <div className="flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden">
+    <div
+      className={`flex rounded-lg border border-zinc-300 dark:border-zinc-700 overflow-hidden transition-opacity ${
+        hidden ? 'opacity-0 pointer-events-none' : ''
+      }`}
+    >
       {tools.map((tool) => (
         <button
           key={tool.id}
@@ -103,6 +130,21 @@ function ToolBar() {
   )
 }
 
+function MenuTrigger({ children }: { children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="px-2 py-1 text-sm text-muted-foreground hover:text-foreground transition rounded-md hover:bg-accent"
+    >
+      {children}
+    </button>
+  )
+}
+
+function ShortcutLabel({ children }: { children: React.ReactNode }) {
+  return <span className="ml-auto text-xs text-zinc-500">{children}</span>
+}
+
 function FileMenu() {
   const {
     project,
@@ -118,36 +160,48 @@ function FileMenu() {
     loadRecentProjects()
   }, [loadRecentProjects])
 
-  const handleNewProject = (): void => {
-    createNewProject()
-  }
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey
+      if (!mod) return
+      if (e.code === 'KeyN' && !e.shiftKey) {
+        e.preventDefault()
+        createNewProject()
+      } else if (e.code === 'KeyO' && !e.shiftKey) {
+        e.preventDefault()
+        void loadProject()
+      } else if (e.code === 'KeyS' && !e.shiftKey) {
+        e.preventDefault()
+        void saveProject()
+      } else if (e.code === 'KeyS' && e.shiftKey) {
+        e.preventDefault()
+        void saveProjectAs()
+      }
+    },
+    [createNewProject, loadProject, saveProject, saveProjectAs]
+  )
 
-  const handleOpenProject = (): void => {
-    void loadProject()
-  }
-
-  const handleSave = (): void => {
-    void saveProject()
-  }
-
-  const handleSaveAs = (): void => {
-    void saveProjectAs()
-  }
-
-  const handleOpenRecent = (filePath: string): void => {
-    void loadProject(filePath)
-  }
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleKeyDown])
 
   const hasProject = project !== null
 
   return (
     <DropdownMenu onOpenChange={(open) => open && void loadRecentProjects()}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline">File</Button>
+        <MenuTrigger>File</MenuTrigger>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem onSelect={handleNewProject}>New Project</DropdownMenuItem>
-        <DropdownMenuItem onSelect={handleOpenProject}>Open Project</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => createNewProject()}>
+          New Project
+          <ShortcutLabel>Cmd+N</ShortcutLabel>
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => void loadProject()}>
+          Open Project
+          <ShortcutLabel>Cmd+O</ShortcutLabel>
+        </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>Open Recent</DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
@@ -155,7 +209,7 @@ function FileMenu() {
               <DropdownMenuItem disabled>No recent projects</DropdownMenuItem>
             ) : (
               recentProjects.map((filePath) => (
-                <DropdownMenuItem key={filePath} onSelect={() => handleOpenRecent(filePath)}>
+                <DropdownMenuItem key={filePath} onSelect={() => void loadProject(filePath)}>
                   {filePath.split(/[\\/]/).pop() ?? filePath}
                 </DropdownMenuItem>
               ))
@@ -163,11 +217,13 @@ function FileMenu() {
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={!hasProject} onSelect={handleSave}>
+        <DropdownMenuItem disabled={!hasProject} onSelect={() => void saveProject()}>
           Save
+          <ShortcutLabel>Cmd+S</ShortcutLabel>
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!hasProject} onSelect={handleSaveAs}>
+        <DropdownMenuItem disabled={!hasProject} onSelect={() => void saveProjectAs()}>
           Save As...
+          <ShortcutLabel>Cmd+Shift+S</ShortcutLabel>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>Import...</DropdownMenuItem>
@@ -177,7 +233,7 @@ function FileMenu() {
   )
 }
 
-function EditMenu() {
+function EditMenu({ onOpenPreferences }: { onOpenPreferences: () => void }) {
   const { undo, redo, canUndo, canRedo, lastLabel } = useUndo()
 
   const handleKeyDown = useCallback(
@@ -207,22 +263,27 @@ function EditMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline">Edit</Button>
+        <MenuTrigger>Edit</MenuTrigger>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
         <DropdownMenuItem disabled={!canUndo} onSelect={undo}>
           {undoLabel}
-          <span className="ml-auto text-xs text-zinc-500">Cmd+Z</span>
+          <ShortcutLabel>Cmd+Z</ShortcutLabel>
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!canRedo} onSelect={redo}>
           Redo
-          <span className="ml-auto text-xs text-zinc-500">Cmd+Shift+Z</span>
+          <ShortcutLabel>Cmd+Shift+Z</ShortcutLabel>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>Cut</DropdownMenuItem>
         <DropdownMenuItem disabled>Copy</DropdownMenuItem>
         <DropdownMenuItem disabled>Paste</DropdownMenuItem>
         <DropdownMenuItem disabled>Select All</DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={onOpenPreferences}>
+          Preferences...
+          <ShortcutLabel>Cmd+,</ShortcutLabel>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -232,13 +293,16 @@ function HelpMenu() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline">Help</Button>
+        <MenuTrigger>Help</MenuTrigger>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="start">
-        <DropdownMenuItem>Documentation</DropdownMenuItem>
-        <DropdownMenuItem>Community Forums</DropdownMenuItem>
-        <DropdownMenuItem>Report a Bug</DropdownMenuItem>
-        <DropdownMenuItem>About</DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => window.open(GITHUB_REPO, '_blank')}>
+          Documentation
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => window.open(`${GITHUB_REPO}/issues/new`, '_blank')}>
+          Report a Bug
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem disabled className="opacity-80 cursor-default">
           Version {__APP_VERSION__}
         </DropdownMenuItem>

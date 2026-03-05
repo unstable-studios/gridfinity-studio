@@ -13,7 +13,9 @@ export interface UseSnappingResult {
     entities: Array<{
       type: string
       transform: { position: { x: number; y: number } }
-      [key: string]: unknown
+      diameter?: number
+      width?: number
+      height?: number
     }>
   ) => { x: number; y: number }
   snapTargets: SnapTarget[]
@@ -31,7 +33,9 @@ export function useSnapping(): UseSnappingResult {
       entities: Array<{
         type: string
         transform: { position: { x: number; y: number } }
-        [key: string]: unknown
+        diameter?: number
+        width?: number
+        height?: number
       }>
     ): { x: number; y: number } => {
       if (!enabled) {

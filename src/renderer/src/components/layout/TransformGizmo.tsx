@@ -7,16 +7,23 @@ interface TransformGizmoProps {
   selectedIds: Set<string>
   entities: Entity[]
   onMove: (id: string, dx: number, dy: number) => void
+  onResize?: (id: string, patch: Partial<Entity>) => void
   snap?: (pos: { x: number; y: number }) => { x: number; y: number }
 }
+
+type HandlePosition = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw'
+
+const HANDLE_SIZE = 1.5
 
 export default function TransformGizmo({
   selectedIds,
   entities,
   onMove,
+  onResize,
   snap
 }: TransformGizmoProps): React.JSX.Element | null {
   const [dragging, setDragging] = useState(false)
+  const [resizing, setResizing] = useState<HandlePosition | null>(null)
   const dragStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const lastPos = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
   const shiftHeld = useRef(false)
@@ -101,15 +108,12 @@ export default function TransformGizmo({
 
       let pos = { x: event.point.x, y: event.point.y }
 
-      // Update shift state live
       shiftHeld.current = event.nativeEvent.shiftKey
 
-      // Shift-constrain: lock to the dominant axis
       if (shiftHeld.current) {
         const totalDx = pos.x - dragStart.current.x
         const totalDy = pos.y - dragStart.current.y
 
-        // Determine axis lock once movement exceeds a small threshold
         if (!axisLock.current && (Math.abs(totalDx) > 0.5 || Math.abs(totalDy) > 0.5)) {
           axisLock.current = Math.abs(totalDx) >= Math.abs(totalDy) ? 'x' : 'y'
         }
@@ -150,7 +154,102 @@ export default function TransformGizmo({
     [dragging]
   )
 
+  // Resize handle logic
+  const handleResizeDown = useCallback(
+    (event: ThreeEvent<PointerEvent>, handle: HandlePosition) => {
+      event.stopPropagation()
+      const domTarget = event.nativeEvent.target as HTMLElement | null
+      domTarget?.setPointerCapture?.(event.nativeEvent.pointerId)
+      lastPos.current = { x: event.point.x, y: event.point.y }
+      setResizing(handle)
+    },
+    []
+  )
+
+  const handleResizeMove = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      if (!resizing || selectedEntities.length !== 1 || !onResize) return
+      const entity = selectedEntities[0]
+      const pos = { x: event.point.x, y: event.point.y }
+      const dx = pos.x - lastPos.current.x
+      const dy = pos.y - lastPos.current.y
+      lastPos.current = pos
+
+      if (entity.type === 'rectangle') {
+        let { width, height } = entity
+        const posUpdate = { ...entity.transform.position }
+        if (resizing.includes('e')) {
+          width += dx
+          posUpdate.x += dx / 2
+        }
+        if (resizing.includes('w')) {
+          width -= dx
+          posUpdate.x += dx / 2
+        }
+        if (resizing.includes('n')) {
+          height += dy
+          posUpdate.y += dy / 2
+        }
+        if (resizing.includes('s')) {
+          height -= dy
+          posUpdate.y += dy / 2
+        }
+        width = Math.max(1, width)
+        height = Math.max(1, height)
+        onResize(entity.id, {
+          width,
+          height,
+          transform: { ...entity.transform, position: posUpdate }
+        })
+      } else if (entity.type === 'circle') {
+        const delta = Math.abs(dx) > Math.abs(dy) ? dx : dy
+        const sign = resizing === 'e' || resizing === 'n' ? 1 : -1
+        const diameter = Math.max(1, entity.diameter + delta * sign)
+        onResize(entity.id, { diameter })
+      }
+    },
+    [resizing, selectedEntities, onResize]
+  )
+
+  const handleResizeUp = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      if (!resizing) return
+      event.stopPropagation()
+      setResizing(null)
+    },
+    [resizing]
+  )
+
   if (!centroid || selectedEntities.length === 0) return null
+
+  // Compute resize handles for single entity selection
+  const singleEntity = selectedEntities.length === 1 ? selectedEntities[0] : null
+  const handles: Array<{ pos: HandlePosition; x: number; y: number }> = []
+  if (singleEntity && onResize) {
+    const { x, y } = singleEntity.transform.position
+    if (singleEntity.type === 'rectangle') {
+      const hw = singleEntity.width / 2
+      const hh = singleEntity.height / 2
+      handles.push(
+        { pos: 'n', x, y: y + hh },
+        { pos: 's', x, y: y - hh },
+        { pos: 'e', x: x + hw, y },
+        { pos: 'w', x: x - hw, y },
+        { pos: 'ne', x: x + hw, y: y + hh },
+        { pos: 'nw', x: x - hw, y: y + hh },
+        { pos: 'se', x: x + hw, y: y - hh },
+        { pos: 'sw', x: x - hw, y: y - hh }
+      )
+    } else if (singleEntity.type === 'circle') {
+      const r = singleEntity.diameter / 2
+      handles.push(
+        { pos: 'n', x, y: y + r },
+        { pos: 's', x, y: y - r },
+        { pos: 'e', x: x + r, y },
+        { pos: 'w', x: x - r, y }
+      )
+    }
+  }
 
   return (
     <group>
@@ -168,12 +267,44 @@ export default function TransformGizmo({
         <meshBasicMaterial transparent opacity={dragging ? 0.1 : 0} color="#f59e0b" />
       </mesh>
 
-      {/* Full-screen capture plane while dragging */}
-      {dragging && (
+      {/* Resize handles */}
+      {handles.map((h) => (
+        <mesh
+          key={h.pos}
+          position={[h.x, h.y, 0.06]}
+          onPointerDown={(e) => handleResizeDown(e, h.pos)}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          onPointerOver={(e) => {
+            const el = (e.nativeEvent.target as HTMLElement | null)?.closest?.('div')
+            if (el) {
+              const cursor =
+                h.pos === 'n' || h.pos === 's'
+                  ? 'ns-resize'
+                  : h.pos === 'e' || h.pos === 'w'
+                    ? 'ew-resize'
+                    : h.pos === 'ne' || h.pos === 'sw'
+                      ? 'nesw-resize'
+                      : 'nwse-resize'
+              el.style.cursor = cursor
+            }
+          }}
+          onPointerOut={(e) => {
+            const el = (e.nativeEvent.target as HTMLElement | null)?.closest?.('div')
+            if (el) el.style.cursor = ''
+          }}
+        >
+          <circleGeometry args={[HANDLE_SIZE, 16]} />
+          <meshBasicMaterial color="#3b82f6" />
+        </mesh>
+      ))}
+
+      {/* Full-screen capture plane while dragging or resizing */}
+      {(dragging || resizing) && (
         <mesh
           position={[0, 0, 0.03]}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
+          onPointerMove={resizing ? handleResizeMove : handlePointerMove}
+          onPointerUp={resizing ? handleResizeUp : handlePointerUp}
         >
           <planeGeometry args={[10000, 10000]} />
           <meshBasicMaterial transparent opacity={0} />

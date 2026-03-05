@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@unstable-studios/ui'
 import type { GridfinityConfig, TolerancePreset } from '../../../../shared/types/project'
 import { GRIDFINITY_PRESETS, TOLERANCE_PRESETS } from '../../../../shared/types/project'
 

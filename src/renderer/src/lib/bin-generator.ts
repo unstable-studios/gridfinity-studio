@@ -229,6 +229,91 @@ export function generateBinMesh(params: BinParams): MeshResult {
     1
   )
 
+  // ── Internal grid divider walls (for multi-unit bins) ──────────
+  const halfWall = WALL_THICKNESS / 2
+
+  // X-axis dividers (walls parallel to Y axis)
+  for (let gx = 1; gx < widthUnits; gx++) {
+    const x = -hw + gx * baseUnit
+    // Front face (+X normal)
+    quad(
+      x + halfWall,
+      -id,
+      innerFloorZ,
+      x + halfWall,
+      id,
+      innerFloorZ,
+      x + halfWall,
+      id,
+      totalH,
+      x + halfWall,
+      -id,
+      totalH,
+      1,
+      0,
+      0
+    )
+    // Back face (-X normal)
+    quad(
+      x - halfWall,
+      id,
+      innerFloorZ,
+      x - halfWall,
+      -id,
+      innerFloorZ,
+      x - halfWall,
+      -id,
+      totalH,
+      x - halfWall,
+      id,
+      totalH,
+      -1,
+      0,
+      0
+    )
+  }
+
+  // Y-axis dividers (walls parallel to X axis)
+  for (let gy = 1; gy < depthUnits; gy++) {
+    const y = -hd + gy * baseUnit
+    // Front face (+Y normal)
+    quad(
+      -iw,
+      y + halfWall,
+      innerFloorZ,
+      iw,
+      y + halfWall,
+      innerFloorZ,
+      iw,
+      y + halfWall,
+      totalH,
+      -iw,
+      y + halfWall,
+      totalH,
+      0,
+      1,
+      0
+    )
+    // Back face (-Y normal)
+    quad(
+      iw,
+      y - halfWall,
+      innerFloorZ,
+      -iw,
+      y - halfWall,
+      innerFloorZ,
+      -iw,
+      y - halfWall,
+      totalH,
+      iw,
+      y - halfWall,
+      totalH,
+      0,
+      -1,
+      0
+    )
+  }
+
   // ── Top rim (connects outer and inner walls at the top) ─────────
   // Front rim
   quad(-hw, hd, totalH, hw, hd, totalH, iw, id, totalH, -iw, id, totalH, 0, 0, 1)

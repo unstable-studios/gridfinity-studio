@@ -6,7 +6,11 @@ interface ProjectAPI {
     projectData: ProjectData,
     filePath?: string
   ) => Promise<{ success: boolean; data?: string; error?: string }>
-  load: (filePath?: string) => Promise<{ success: boolean; data?: ProjectData; error?: string }>
+  load: (filePath?: string) => Promise<{
+    success: boolean
+    data?: { project: ProjectData; filePath: string }
+    error?: string
+  }>
   validate: (projectData: unknown) => Promise<{ success: boolean; error?: string }>
   new: () => Promise<{ success: boolean; data?: ProjectData; error?: string }>
   getRecent: () => Promise<{ success: boolean; data?: string[]; error?: string }>

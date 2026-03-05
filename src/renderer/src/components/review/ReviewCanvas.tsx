@@ -2,12 +2,14 @@ import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 import { Suspense, useMemo } from 'react'
 import * as THREE from 'three'
+import type { AuxMesh } from '@/hooks/useProject'
 
 interface ReviewCanvasProps {
   bakedMesh?: { positions: Float32Array; indices: Uint32Array; normals: Float32Array } | null
+  auxMeshes?: AuxMesh[]
 }
 
-function ReviewScene({ bakedMesh }: ReviewCanvasProps): React.JSX.Element {
+function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Element {
   return (
     <>
       <ambientLight intensity={0.35} />
@@ -22,6 +24,10 @@ function ReviewScene({ bakedMesh }: ReviewCanvasProps): React.JSX.Element {
       <OrbitControls enableDamping makeDefault />
 
       {bakedMesh ? <BakedMeshPreview mesh={bakedMesh} /> : <EmptyState />}
+
+      {auxMeshes?.map((aux) => (
+        <AuxMeshPreview key={aux.entityId} aux={aux} />
+      ))}
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[200, 200]} />
@@ -51,6 +57,30 @@ function BakedMeshPreview({
   )
 }
 
+function AuxMeshPreview({ aux }: { aux: AuxMesh }): React.JSX.Element {
+  const geometry = useMemo(() => {
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(aux.mesh.positions, 3))
+    geo.setIndex(new THREE.BufferAttribute(aux.mesh.indices, 1))
+    geo.setAttribute('normal', new THREE.BufferAttribute(aux.mesh.normals, 3))
+    return geo
+  }, [aux.mesh.positions, aux.mesh.indices, aux.mesh.normals])
+
+  const color = aux.role === 'cutter' ? '#ef4444' : '#22c55e'
+
+  return (
+    <mesh geometry={geometry} castShadow>
+      <meshStandardMaterial
+        color={color}
+        metalness={0.1}
+        roughness={0.5}
+        transparent
+        opacity={0.7}
+      />
+    </mesh>
+  )
+}
+
 function EmptyState(): React.JSX.Element {
   return (
     <mesh position={[0, 10, 0]}>
@@ -60,7 +90,10 @@ function EmptyState(): React.JSX.Element {
   )
 }
 
-export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JSX.Element {
+export default function ReviewCanvas({
+  bakedMesh,
+  auxMeshes
+}: ReviewCanvasProps): React.JSX.Element {
   return (
     <Canvas
       shadows
@@ -72,7 +105,7 @@ export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JS
       <Suspense fallback={null}>
         <color attach="background" args={['#0a0c12']} />
         <fog attach="fog" args={['#0a0c12', 180, 420]} />
-        <ReviewScene bakedMesh={bakedMesh} />
+        <ReviewScene bakedMesh={bakedMesh} auxMeshes={auxMeshes} />
       </Suspense>
     </Canvas>
   )

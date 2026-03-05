@@ -80,5 +80,17 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 - TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep) (001-full-roadmap)
 - `.gfstudio` files (JSON, project schema v0.2.0+) (001-full-roadmap)
 
+## Development Principles
+
+### Integration-First Development
+
+**Every feature must be exercised end-to-end before it is considered done.** Building a component in isolation and marking it complete is not acceptable — it must be mounted in the component tree, connected to state, and verified to actually work when a user interacts with it.
+
+Concretely:
+- **Test user flows, not units in isolation.** If a pan/zoom handler updates state but the camera never reads that state, the feature is broken — and any test that only checks "state updated" misses the point entirely.
+- **The deliverable is a working user flow, not a component.** A tool that creates entities is not done until: tool click → entity appears in the list → entity renders on canvas → entity is selectable → properties are editable in the sidebar.
+- **Smoke-test interactively.** After implementing a UI feature, describe what a user would see and do. If you can't trace the interaction from click to visible result, something is disconnected.
+- **Never mark a task done without verifying integration.** A component that compiles but isn't wired into the app is dead code, not a feature.
+
 ## Recent Changes
 - 001-full-roadmap: Added TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep)
