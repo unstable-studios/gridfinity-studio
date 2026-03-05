@@ -8,7 +8,7 @@ import { exportSTL as createSTLBlob } from '@/lib/stl-io'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
 import { generateBinMesh } from '@/lib/bin-generator'
 import { extrudePolygon } from '@/lib/extrude'
-import type { Entity, ExtrusionConfig, Vertex2D } from '../../../shared/types/project'
+import type { Entity, Bin, ExtrusionConfig, Vertex2D } from '../../../shared/types/project'
 import type { AuxMesh } from '@/hooks/useProject'
 import { formatDimension, parseDimension, unitLabel } from '../../../shared/types/units'
 import type { DisplayUnit } from '../../../shared/types/units'
@@ -25,14 +25,80 @@ export default function Sidebar(): React.JSX.Element {
 }
 
 function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element {
-  const { updateEntity } = useProject()
-  const { selectedIds, select } = useSharedSelection()
+  const { project, updateEntity, addBin, updateBin, removeBin } = useProject()
+  const { selectedIds, selectionType, select, selectBin } = useSharedSelection()
+
+  const bins = project?.bins ?? []
+  const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   const selectedEntity =
-    selectedIds.size > 0 ? (entities.find((e) => selectedIds.has(e.id)) ?? null) : null
+    selectionType === 'entity' && selectedIds.size > 0
+      ? (entities.find((e) => selectedIds.has(e.id)) ?? null)
+      : null
+
+  const selectedBin =
+    selectionType === 'bin' && selectedIds.size > 0
+      ? (bins.find((b) => selectedIds.has(b.id)) ?? null)
+      : null
+
+  const handleAddBin = (): void => {
+    // Find next available grid-aligned position
+    const occupied = new Set(bins.map((b) => `${b.position.x},${b.position.y}`))
+    let posX = 0
+    let posY = 0
+    // Try positions along x-axis first, then wrap
+    while (occupied.has(`${posX},${posY}`)) {
+      posX += baseUnit
+      if (posX > baseUnit * 10) {
+        posX = 0
+        posY += baseUnit
+      }
+    }
+    const bin = addBin({ position: { x: posX, y: posY } })
+    selectBin(bin.id)
+  }
 
   return (
     <div className="space-y-4">
+      <SidebarSection title="Bins">
+        {bins.length === 0 ? (
+          <p className="text-xs text-zinc-500">No bins yet. Add one to get started.</p>
+        ) : (
+          <div className="space-y-1">
+            {bins.map((bin) => (
+              <button
+                key={bin.id}
+                type="button"
+                className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
+                  selectionType === 'bin' && selectedIds.has(bin.id)
+                    ? 'bg-blue-600/20 text-blue-400'
+                    : 'text-zinc-400 hover:bg-zinc-800'
+                }`}
+                onClick={() => selectBin(bin.id)}
+              >
+                <span className="font-medium">{bin.name}</span>
+                <span className="ml-2 text-zinc-600">
+                  {bin.width}x{bin.depth}x{bin.height}u
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleAddBin}>
+          Add Bin
+        </Button>
+      </SidebarSection>
+
+      {selectedBin && (
+        <SidebarSection title="Bin Properties">
+          <BinProperties
+            bin={selectedBin}
+            onUpdate={(patch) => updateBin(selectedBin.id, patch)}
+            onDelete={() => removeBin(selectedBin.id)}
+          />
+        </SidebarSection>
+      )}
+
       <SidebarSection title="Entities">
         {entities.length === 0 ? (
           <p className="text-xs text-zinc-500">
@@ -44,7 +110,7 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
               <EntityListItem
                 key={entity.id}
                 entity={entity}
-                selected={selectedIds.has(entity.id)}
+                selected={selectionType === 'entity' && selectedIds.has(entity.id)}
                 onSelect={select}
                 onRename={(name) => updateEntity(entity.id, { name })}
               />
@@ -53,9 +119,93 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
         )}
       </SidebarSection>
       {selectedEntity && <EntityProperties entity={selectedEntity} onUpdate={updateEntity} />}
-      <SidebarSection title="Bin">
-        <BinCreator />
-      </SidebarSection>
+    </div>
+  )
+}
+
+function BinProperties({
+  bin,
+  onUpdate,
+  onDelete
+}: {
+  bin: Bin
+  onUpdate: (patch: Partial<Bin>) => void
+  onDelete: () => void
+}): React.JSX.Element {
+  const { project, setBakeResult } = useProject()
+
+  const handleGenerate = (): void => {
+    if (!project) return
+    const gridCfg = project.gridfinity
+    const binMesh = generateBinMesh({
+      widthUnits: bin.width,
+      depthUnits: bin.depth,
+      heightUnits: bin.height,
+      baseUnit: gridCfg.baseUnit,
+      unitHeight: gridCfg.unitHeight,
+      tolerance: gridCfg.tolerance,
+      hasLip: bin.hasStackingLip,
+      magnetHoles: gridCfg.magnetHoles,
+      screwHoles: gridCfg.screwHoles
+    })
+
+    setBakeResult({
+      mesh: {
+        positions: binMesh.positions,
+        indices: binMesh.indices,
+        normals: binMesh.normals
+      },
+      auxMeshes: [],
+      timestamp: Date.now(),
+      dirty: false,
+      warnings: []
+    })
+  }
+
+  return (
+    <div className="space-y-2 text-xs">
+      <div className="grid grid-cols-3 gap-1">
+        <EditableNumericField
+          label="W"
+          value={bin.width}
+          suffix="u"
+          onChange={(v) => onUpdate({ width: v })}
+        />
+        <EditableNumericField
+          label="D"
+          value={bin.depth}
+          suffix="u"
+          onChange={(v) => onUpdate({ depth: v })}
+        />
+        <EditableNumericField
+          label="H"
+          value={bin.height}
+          suffix="u"
+          onChange={(v) => onUpdate({ height: v })}
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <label className="text-zinc-400">
+          <input
+            type="checkbox"
+            className="mr-1"
+            checked={bin.hasStackingLip}
+            onChange={(e) => onUpdate({ hasStackingLip: e.target.checked })}
+          />{' '}
+          Lip
+        </label>
+      </div>
+      <Button variant="outline" size="sm" className="w-full" onClick={handleGenerate}>
+        Generate Bin
+      </Button>
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full text-red-400 hover:text-red-300"
+        onClick={onDelete}
+      >
+        Delete Bin
+      </Button>
     </div>
   )
 }
@@ -420,76 +570,6 @@ function ExtrusionControls({
           Add Extrusion
         </Button>
       )}
-    </div>
-  )
-}
-
-function BinCreator(): React.JSX.Element {
-  const { project, setBakeResult } = useProject()
-  const [width, setWidth] = useState(1)
-  const [depth, setDepth] = useState(1)
-  const [height, setHeight] = useState(3)
-  const [lip, setLip] = useState(true)
-  const [magnets, setMagnets] = useState(true)
-
-  const handleGenerate = (): void => {
-    if (!project) return
-    const gridCfg = project.gridfinity
-    const binMesh = generateBinMesh({
-      widthUnits: width,
-      depthUnits: depth,
-      heightUnits: height,
-      baseUnit: gridCfg.baseUnit,
-      unitHeight: gridCfg.unitHeight,
-      tolerance: gridCfg.tolerance,
-      hasLip: lip,
-      magnetHoles: { ...gridCfg.magnetHoles, enabled: magnets },
-      screwHoles: gridCfg.screwHoles
-    })
-
-    setBakeResult({
-      mesh: {
-        positions: binMesh.positions,
-        indices: binMesh.indices,
-        normals: binMesh.normals
-      },
-      auxMeshes: [],
-      timestamp: Date.now(),
-      dirty: false,
-      warnings: []
-    })
-  }
-
-  return (
-    <div className="space-y-2 text-xs">
-      <div className="grid grid-cols-3 gap-1">
-        <EditableNumericField label="W" value={width} suffix="u" onChange={setWidth} />
-        <EditableNumericField label="D" value={depth} suffix="u" onChange={setDepth} />
-        <EditableNumericField label="H" value={height} suffix="u" onChange={setHeight} />
-      </div>
-      <div className="flex items-center gap-2">
-        <label className="text-zinc-400">
-          <input
-            type="checkbox"
-            className="mr-1"
-            checked={lip}
-            onChange={(e) => setLip(e.target.checked)}
-          />{' '}
-          Lip
-        </label>
-        <label className="text-zinc-400">
-          <input
-            type="checkbox"
-            className="mr-1"
-            checked={magnets}
-            onChange={(e) => setMagnets(e.target.checked)}
-          />{' '}
-          Magnets
-        </label>
-      </div>
-      <Button variant="outline" size="sm" className="w-full" onClick={handleGenerate}>
-        Generate Bin
-      </Button>
     </div>
   )
 }

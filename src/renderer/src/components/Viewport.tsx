@@ -8,14 +8,13 @@ import type { Entity } from '../../../shared/types/project'
 
 export default function Viewport(): React.JSX.Element {
   const { mode } = useAppMode()
-  const { project, addEntity, updateEntity, bakeResult } = useProject()
+  const { project, addEntity, updateEntity, updateBin, bakeResult } = useProject()
   const selection = useSharedSelection()
   const snapping = useSnapping()
 
   const entities = project?.entities ?? []
+  const bins = project?.bins ?? []
   const baseUnit = project?.gridfinity.baseUnit ?? 42
-  const binWidthUnits = project?.bins[0]?.width ?? 1
-  const binDepthUnits = project?.bins[0]?.depth ?? 1
 
   const handlePlace = (partial: Partial<Entity> & { type: Entity['type'] }): void => {
     const entity = addEntity(partial)
@@ -41,6 +40,10 @@ export default function Viewport(): React.JSX.Element {
     updateEntity(id, patch)
   }
 
+  const handleBinMove = (id: string, position: { x: number; y: number }): void => {
+    updateBin(id, { position })
+  }
+
   const snapFn = (pos: { x: number; y: number }): { x: number; y: number } => {
     return snapping.snap(pos, baseUnit, entities)
   }
@@ -50,14 +53,16 @@ export default function Viewport(): React.JSX.Element {
       {mode === 'layout' ? (
         <LayoutCanvas
           entities={entities}
+          bins={bins}
           selectedIds={selection.selectedIds}
+          selectionType={selection.selectionType}
           baseUnit={baseUnit}
-          binWidthUnits={binWidthUnits}
-          binDepthUnits={binDepthUnits}
           onPlace={handlePlace}
           onMove={handleMove}
           onResize={handleResize}
+          onBinMove={handleBinMove}
           onSelect={selection.select}
+          onSelectBin={selection.selectBin}
           onClearSelection={selection.clearSelection}
           snap={snapFn}
         />

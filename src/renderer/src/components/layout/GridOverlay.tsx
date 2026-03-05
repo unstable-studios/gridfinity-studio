@@ -14,30 +14,29 @@ export default function GridOverlay({
   const { camera, size } = useThree()
 
   const gridGeometry = useMemo(() => {
-    // Calculate visible area from orthographic camera
     const cam = camera as THREE.OrthographicCamera
     const halfW = size.width / cam.zoom / 2
     const halfH = size.height / cam.zoom / 2
 
-    // Grid count from visible area + padding, quantized to steps of 5
-    const rawCountX = Math.ceil((halfW * 2) / baseUnit) + 4
-    const rawCountY = Math.ceil((halfH * 2) / baseUnit) + 4
-    const rawCount = Math.max(rawCountX, rawCountY)
-    const gridCount = Math.ceil(rawCount / 5) * 5
+    const camX = cam.position.x
+    const camY = cam.position.y
 
-    // Center grid on camera position (rounded to nearest baseUnit)
-    const cx = Math.round(cam.position.x / baseUnit) * baseUnit
-    const cy = Math.round(cam.position.y / baseUnit) * baseUnit
+    // Compute world-space multiples of baseUnit that fall within the visible area
+    const startX = Math.floor((camX - halfW) / baseUnit) * baseUnit
+    const endX = Math.ceil((camX + halfW) / baseUnit) * baseUnit
+    const startY = Math.floor((camY - halfH) / baseUnit) * baseUnit
+    const endY = Math.ceil((camY + halfH) / baseUnit) * baseUnit
 
     const points: number[] = []
-    const halfSize = (gridCount * baseUnit) / 2
 
-    for (let i = 0; i <= gridCount; i++) {
-      const pos = i * baseUnit - halfSize
-      // Horizontal line
-      points.push(cx - halfSize, cy + pos, 0, cx + halfSize, cy + pos, 0)
-      // Vertical line
-      points.push(cx + pos, cy - halfSize, 0, cx + pos, cy + halfSize, 0)
+    // Vertical lines
+    for (let x = startX; x <= endX; x += baseUnit) {
+      points.push(x, startY, 0, x, endY, 0)
+    }
+
+    // Horizontal lines
+    for (let y = startY; y <= endY; y += baseUnit) {
+      points.push(startX, y, 0, endX, y, 0)
     }
 
     const geometry = new THREE.BufferGeometry()

@@ -232,6 +232,7 @@ export interface Bin {
   width: number
   depth: number
   height: number
+  position: { x: number; y: number }
   hasDividers: boolean
   dividerCount?: number
   hasLabel: boolean

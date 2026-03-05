@@ -1,4 +1,4 @@
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Suspense, useRef, useCallback, useState, useEffect } from 'react'
 import GridOverlay from './GridOverlay'
 import EntityRenderer from './EntityRenderer'
@@ -8,45 +8,137 @@ import BinFootprint from './BinFootprint'
 import CircleTool from '../primitives/CircleTool'
 import RectangleTool from '../primitives/RectangleTool'
 import PolygonTool from '../primitives/PolygonTool'
-import type { Entity } from '../../../../shared/types/project'
+import type { Entity, Bin } from '../../../../shared/types/project'
+import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
 
 interface LayoutCanvasProps {
   entities: Entity[]
+  bins: Bin[]
   selectedIds: Set<string>
+  selectionType: SelectionType
   baseUnit?: number
-  binWidthUnits?: number
-  binDepthUnits?: number
   onPlace: (partial: Partial<Entity> & { type: Entity['type'] }) => void
   onMove: (id: string, dx: number, dy: number) => void
   onResize?: (id: string, patch: Partial<Entity>) => void
+  onBinMove: (id: string, position: { x: number; y: number }) => void
   onSelect: (id: string, additive?: boolean) => void
+  onSelectBin: (id: string) => void
   onClearSelection: () => void
   snap: (pos: { x: number; y: number }) => { x: number; y: number }
 }
 
+function BinDragHandler({
+  bin,
+  baseUnit,
+  onSelectBin,
+  onBinMove
+}: {
+  bin: Bin
+  baseUnit: number
+  onSelectBin: (id: string) => void
+  onBinMove: (id: string, position: { x: number; y: number }) => void
+}): React.JSX.Element {
+  const [dragging, setDragging] = useState(false)
+  const offsetRef = useRef({ x: 0, y: 0 })
+
+  const widthMm = bin.width * baseUnit
+  const depthMm = bin.depth * baseUnit
+  const cx = bin.position.x + widthMm / 2
+  const cy = bin.position.y + depthMm / 2
+
+  const handlePointerDown = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      if (e.nativeEvent.button !== 0) return
+      e.stopPropagation()
+      onSelectBin(bin.id)
+      offsetRef.current = {
+        x: e.point.x - bin.position.x,
+        y: e.point.y - bin.position.y
+      }
+      setDragging(true)
+    },
+    [bin.id, bin.position.x, bin.position.y, onSelectBin]
+  )
+
+  const handlePointerMove = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      if (!dragging) return
+      e.stopPropagation()
+      const rawX = e.point.x - offsetRef.current.x
+      const rawY = e.point.y - offsetRef.current.y
+      const snappedX = Math.round(rawX / baseUnit) * baseUnit
+      const snappedY = Math.round(rawY / baseUnit) * baseUnit
+      if (snappedX !== bin.position.x || snappedY !== bin.position.y) {
+        onBinMove(bin.id, { x: snappedX, y: snappedY })
+      }
+    },
+    [dragging, baseUnit, bin.id, bin.position.x, bin.position.y, onBinMove]
+  )
+
+  const handlePointerUp = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      if (!dragging) return
+      e.stopPropagation()
+      setDragging(false)
+    },
+    [dragging]
+  )
+
+  return (
+    <>
+      {/* Hit area over the bin footprint */}
+      <mesh
+        position={[cx, cy, 0.001]}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+      >
+        <planeGeometry args={[widthMm, depthMm]} />
+        <meshBasicMaterial transparent opacity={0} />
+      </mesh>
+
+      {/* Full-screen capture plane while dragging */}
+      {dragging && (
+        <mesh
+          position={[0, 0, 0.002]}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          <planeGeometry args={[10000, 10000]} />
+          <meshBasicMaterial transparent opacity={0} />
+        </mesh>
+      )}
+    </>
+  )
+}
+
 function LayoutScene({
   entities,
+  bins,
   selectedIds,
+  selectionType,
   baseUnit,
-  binWidthUnits,
-  binDepthUnits,
   onPlace,
   onMove,
   onResize,
+  onBinMove,
   onSelect,
+  onSelectBin,
   onClearSelection,
   snap
 }: {
   entities: Entity[]
+  bins: Bin[]
   selectedIds: Set<string>
+  selectionType: SelectionType
   baseUnit: number
-  binWidthUnits: number
-  binDepthUnits: number
   onPlace: LayoutCanvasProps['onPlace']
   onMove: LayoutCanvasProps['onMove']
   onResize: LayoutCanvasProps['onResize']
+  onBinMove: LayoutCanvasProps['onBinMove']
   onSelect: LayoutCanvasProps['onSelect']
+  onSelectBin: LayoutCanvasProps['onSelectBin']
   onClearSelection: LayoutCanvasProps['onClearSelection']
   snap: LayoutCanvasProps['snap']
 }): React.JSX.Element {
@@ -70,10 +162,32 @@ function LayoutScene({
       <ambientLight intensity={1} />
       <color attach="background" args={['#111318']} />
       <GridOverlay baseUnit={baseUnit} />
-      <BinFootprint widthMm={binWidthUnits * baseUnit} depthMm={binDepthUnits * baseUnit} />
+
+      {/* Multi-bin footprints */}
+      {bins.map((bin) => (
+        <BinFootprint
+          key={bin.id}
+          widthMm={bin.width * baseUnit}
+          depthMm={bin.depth * baseUnit}
+          position={bin.position}
+          selected={selectionType === 'bin' && selectedIds.has(bin.id)}
+        />
+      ))}
+
+      {/* Bin drag handlers (only for selected bins) */}
+      {bins.map((bin) => (
+        <BinDragHandler
+          key={`drag-${bin.id}`}
+          bin={bin}
+          baseUnit={baseUnit}
+          onSelectBin={onSelectBin}
+          onBinMove={onBinMove}
+        />
+      ))}
+
       <EntityRenderer
         entities={entities}
-        selectedIds={selectedIds}
+        selectedIds={selectionType === 'entity' ? selectedIds : new Set()}
         onEntityClick={handleEntityClick}
       />
 
@@ -82,18 +196,20 @@ function LayoutScene({
       {activeTool === 'rectangle' && <RectangleTool onPlace={handleToolPlace} />}
       {activeTool === 'polygon' && <PolygonTool onPlace={handleToolPlace} />}
 
-      {/* Selection & transform (only in select mode) */}
+      {/* Selection & transform (only in select mode, only for entity selections) */}
       {activeTool === 'select' && (
         <>
-          <TransformGizmo
-            selectedIds={selectedIds}
-            entities={entities}
-            onMove={onMove}
-            onResize={onResize}
-            snap={snap}
-          />
+          {selectionType === 'entity' && (
+            <TransformGizmo
+              selectedIds={selectedIds}
+              entities={entities}
+              onMove={onMove}
+              onResize={onResize}
+              snap={snap}
+            />
+          )}
           <SelectionBox start={marqueeStart} end={marqueeEnd} visible={marqueeActive} />
-          {/* Click-away deselect plane (behind everything, only when no tool active) */}
+          {/* Click-away deselect plane */}
           <mesh
             position={[0, 0, -0.01]}
             onPointerDown={(e) => {
@@ -145,14 +261,16 @@ const ZOOM_STEP = 1.06
 
 export default function LayoutCanvas({
   entities,
+  bins,
   selectedIds,
+  selectionType,
   baseUnit = 42,
-  binWidthUnits = 1,
-  binDepthUnits = 1,
   onPlace,
   onMove,
   onResize,
+  onBinMove,
   onSelect,
+  onSelectBin,
   onClearSelection,
   snap
 }: LayoutCanvasProps): React.JSX.Element {
@@ -168,7 +286,6 @@ export default function LayoutCanvas({
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault()
-    // Clamp deltaY magnitude to normalize trackpad vs discrete wheel
     const clamped = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100)
     const steps = clamped / 100
     const factor = Math.pow(ZOOM_STEP, -steps * 3)
@@ -176,7 +293,6 @@ export default function LayoutCanvas({
   }, [])
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    // Pan with middle-click or right-click
     if (e.button === 1 || e.button === 2) {
       isPanning.current = true
       setPanCursor(true)
@@ -216,47 +332,53 @@ export default function LayoutCanvas({
   }, [])
 
   const handleZoomToFit = useCallback(() => {
-    let minX: number
-    let maxX: number
-    let minY: number
-    let maxY: number
+    // Compute bounding box from ALL bins
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
 
-    if (entities.length === 0) {
-      // Fit to grid footprint
-      const gridW = binWidthUnits * baseUnit
-      const gridD = binDepthUnits * baseUnit
-      minX = -gridW / 2
-      maxX = gridW / 2
-      minY = -gridD / 2
-      maxY = gridD / 2
-    } else {
-      minX = Infinity
-      maxX = -Infinity
-      minY = Infinity
-      maxY = -Infinity
+    for (const bin of bins) {
+      const bx = bin.position.x
+      const by = bin.position.y
+      const bw = bin.width * baseUnit
+      const bd = bin.depth * baseUnit
+      minX = Math.min(minX, bx)
+      maxX = Math.max(maxX, bx + bw)
+      minY = Math.min(minY, by)
+      maxY = Math.max(maxY, by + bd)
+    }
 
-      for (const entity of entities) {
-        const { x, y } = entity.transform.position
-        let halfW = 5
-        let halfH = 5
+    // Also include entities
+    for (const entity of entities) {
+      const { x, y } = entity.transform.position
+      let halfW = 5
+      let halfH = 5
 
-        if (entity.type === 'circle') {
-          halfW = halfH = entity.diameter / 2
-        } else if (entity.type === 'rectangle') {
-          halfW = entity.width / 2
-          halfH = entity.height / 2
-        } else if (entity.type === 'polygon') {
-          for (const v of entity.vertices) {
-            halfW = Math.max(halfW, Math.abs(v.x - x))
-            halfH = Math.max(halfH, Math.abs(v.y - y))
-          }
+      if (entity.type === 'circle') {
+        halfW = halfH = entity.diameter / 2
+      } else if (entity.type === 'rectangle') {
+        halfW = entity.width / 2
+        halfH = entity.height / 2
+      } else if (entity.type === 'polygon') {
+        for (const v of entity.vertices) {
+          halfW = Math.max(halfW, Math.abs(v.x - x))
+          halfH = Math.max(halfH, Math.abs(v.y - y))
         }
-
-        minX = Math.min(minX, x - halfW)
-        maxX = Math.max(maxX, x + halfW)
-        minY = Math.min(minY, y - halfH)
-        maxY = Math.max(maxY, y + halfH)
       }
+
+      minX = Math.min(minX, x - halfW)
+      maxX = Math.max(maxX, x + halfW)
+      minY = Math.min(minY, y - halfH)
+      maxY = Math.max(maxY, y + halfH)
+    }
+
+    // Fallback if no bins and no entities
+    if (!isFinite(minX)) {
+      minX = 0
+      maxX = baseUnit
+      minY = 0
+      maxY = baseUnit
     }
 
     const cx = (minX + maxX) / 2
@@ -274,7 +396,7 @@ export default function LayoutCanvas({
 
     setPan({ x: cx, y: cy })
     setZoom(clampZoom(fitZoom))
-  }, [entities, baseUnit, binWidthUnits, binDepthUnits])
+  }, [entities, bins, baseUnit])
 
   const cursor = panCursor ? 'grabbing' : activeTool === 'select' ? 'default' : 'crosshair'
 
@@ -299,14 +421,16 @@ export default function LayoutCanvas({
           <Suspense fallback={null}>
             <LayoutScene
               entities={entities}
+              bins={bins}
               selectedIds={selectedIds}
+              selectionType={selectionType}
               baseUnit={baseUnit}
-              binWidthUnits={binWidthUnits}
-              binDepthUnits={binDepthUnits}
               onPlace={onPlace}
               onMove={onMove}
               onResize={onResize}
+              onBinMove={onBinMove}
               onSelect={onSelect}
+              onSelectBin={onSelectBin}
               onClearSelection={onClearSelection}
               snap={snap}
             />

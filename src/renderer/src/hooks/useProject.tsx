@@ -10,6 +10,7 @@ import { createEmptyProject, createDefaultTransform } from '../../../shared/type
 import type {
   ProjectData,
   Entity,
+  Bin,
   GlobalSettings,
   GridfinityConfig
 } from '../../../shared/types/project'
@@ -47,6 +48,9 @@ export interface UseProjectResult {
   loadRecentProjects: () => Promise<void>
   updateSettings: (patch: Partial<GlobalSettings>) => void
   updateGridfinity: (config: GridfinityConfig) => void
+  addBin: (patch?: Partial<Bin>) => Bin
+  updateBin: (id: string, patch: Partial<Bin>) => void
+  removeBin: (id: string) => void
   exportSTL: (stlData: ArrayBuffer) => Promise<boolean>
   error: string | null
 }
@@ -145,6 +149,54 @@ function useProjectState(): UseProjectResult {
     setProject((prev) => {
       if (!prev) return prev
       return { ...prev, gridfinity: config }
+    })
+    setIsModified(true)
+    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+  }, [])
+
+  const addBin = useCallback(
+    (patch?: Partial<Bin>): Bin => {
+      const existingCount = project?.bins.length ?? 0
+      const bin: Bin = {
+        id: crypto.randomUUID(),
+        name: `Bin ${existingCount + 1}`,
+        width: 1,
+        depth: 1,
+        height: 3,
+        position: { x: 0, y: 0 },
+        hasDividers: false,
+        hasLabel: false,
+        hasStackingLip: true,
+        properties: {},
+        ...patch
+      }
+      setProject((prev) => {
+        if (!prev) return prev
+        return { ...prev, bins: [...prev.bins, bin] }
+      })
+      setIsModified(true)
+      setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+      return bin
+    },
+    [project?.bins.length]
+  )
+
+  const updateBin = useCallback((id: string, patch: Partial<Bin>) => {
+    setProject((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        bins: prev.bins.map((b) => (b.id === id ? { ...b, ...patch } : b))
+      }
+    })
+    setIsModified(true)
+    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+  }, [])
+
+  const removeBin = useCallback((id: string) => {
+    setProject((prev) => {
+      if (!prev) return prev
+      return { ...prev, bins: prev.bins.filter((b) => b.id !== id) }
     })
     setIsModified(true)
     setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
@@ -275,6 +327,9 @@ function useProjectState(): UseProjectResult {
     removeEntity,
     updateSettings,
     updateGridfinity,
+    addBin,
+    updateBin,
+    removeBin,
     saveProject,
     saveProjectAs,
     loadProject,

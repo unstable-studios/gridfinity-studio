@@ -12,15 +12,17 @@ interface ReviewCanvasProps {
 function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Element {
   return (
     <>
-      <ambientLight intensity={0.35} />
+      <ambientLight intensity={0.6} />
       <directionalLight
         position={[6, 10, 6]}
-        intensity={1.1}
+        intensity={1.2}
         castShadow
         shadow-mapSize-height={1024}
         shadow-mapSize-width={1024}
       />
-      <pointLight position={[-6, -4, -6]} intensity={0.45} />
+      <directionalLight position={[-4, 8, -4]} intensity={0.5} />
+      <pointLight position={[-6, -4, -6]} intensity={0.5} />
+      <pointLight position={[6, 2, -6]} intensity={0.3} />
       <OrbitControls enableDamping makeDefault />
 
       {bakedMesh ? <BakedMeshPreview mesh={bakedMesh} /> : <EmptyState />}
@@ -29,7 +31,7 @@ function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Ele
         <AuxMeshPreview key={aux.entityId} aux={aux} />
       ))}
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
         <planeGeometry args={[200, 200]} />
         <meshStandardMaterial color="#0c0f17" roughness={1} />
       </mesh>
@@ -51,7 +53,7 @@ function BakedMeshPreview({
   }, [mesh.positions, mesh.indices, mesh.normals])
 
   return (
-    <mesh geometry={geometry} castShadow>
+    <mesh geometry={geometry} castShadow rotation={[-Math.PI / 2, 0, 0]}>
       <meshStandardMaterial color="#4f9ef8" metalness={0.15} roughness={0.35} />
     </mesh>
   )
@@ -69,7 +71,7 @@ function AuxMeshPreview({ aux }: { aux: AuxMesh }): React.JSX.Element {
   const color = aux.role === 'cutter' ? '#ef4444' : '#22c55e'
 
   return (
-    <mesh geometry={geometry} castShadow>
+    <mesh geometry={geometry} castShadow rotation={[-Math.PI / 2, 0, 0]}>
       <meshStandardMaterial
         color={color}
         metalness={0.1}
