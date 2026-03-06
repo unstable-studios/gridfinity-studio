@@ -5,7 +5,7 @@ import Viewport from '@/components/Viewport'
 import WelcomeScreen from '@/components/WelcomeScreen'
 import { ThemeProvider } from '@unstable-studios/ui'
 import { AppModeCtx } from '@/hooks/useAppMode'
-import { ProjectProvider, useProject } from '@/hooks/useProject'
+import { useProject } from '@/hooks/useProject'
 import { useSelection, SelectionCtx } from '@/hooks/useSelection'
 import { ReviewPrefsCtx } from '@/hooks/useReviewPrefs'
 import type { AppMode, ActiveTool } from '@/hooks/useAppMode'
@@ -60,19 +60,15 @@ export default function App(): React.JSX.Element {
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <ProjectProvider>
-        <AppModeCtx.Provider value={{ mode, setMode, activeTool, setActiveTool }}>
-          <SelectionCtx.Provider value={selection}>
-            <ReviewPrefsCtx.Provider
-              value={{ debugColors, setDebugColors, wireframe, setWireframe }}
-            >
-              <div className="flex h-screen flex-col bg-background text-foreground">
-                <AppContent />
-              </div>
-            </ReviewPrefsCtx.Provider>
-          </SelectionCtx.Provider>
-        </AppModeCtx.Provider>
-      </ProjectProvider>
+      <AppModeCtx.Provider value={{ mode, setMode, activeTool, setActiveTool }}>
+        <SelectionCtx.Provider value={selection}>
+          <ReviewPrefsCtx.Provider value={{ debugColors, setDebugColors, wireframe, setWireframe }}>
+            <div className="flex h-screen flex-col bg-background text-foreground">
+              <AppContent />
+            </div>
+          </ReviewPrefsCtx.Provider>
+        </SelectionCtx.Provider>
+      </AppModeCtx.Provider>
     </ThemeProvider>
   )
 }
