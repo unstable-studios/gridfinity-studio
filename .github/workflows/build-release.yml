@@ -6,13 +6,14 @@ on:
 
 permissions:
   contents: write
+  packages: read
 
 concurrency:
   group: release-build-${{ github.event.release.tag_name }}
   cancel-in-progress: false
 
 env:
-  NODE_VERSION: 24
+  NODE_VERSION: "24"
 
 jobs:
   build:
@@ -30,22 +31,17 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event.release.tag_name }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
-      - name: Authenticate GitHub Packages
-        run: echo "//npm.pkg.github.com/:_authToken=$NPM_TOKEN" >> .npmrc
-        env:
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build macOS
         if: matrix.os == 'macos-latest'
@@ -80,7 +76,6 @@ jobs:
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
-        if: ${{ github.event.action == 'created' }}
         with:
           files: |
             **/dist/gridfinity-studio-*-setup.exe

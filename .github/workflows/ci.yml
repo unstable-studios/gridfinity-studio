@@ -11,40 +11,35 @@ permissions:
   packages: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: 24
+  NODE_VERSION: "24"
 
 jobs:
+  # Lightweight gate for release PRs — skip full CI
+  release-check:
+    if: startsWith(github.head_ref, 'release-please') || github.actor == 'release-please[bot]'
+    uses: unstable-studios/.github/.github/workflows/release-pr-check.yml@main
+
+  # Commitlint
   commitlint:
     name: Commitlint
-    if: ${{ github.actor != 'release-please[bot]' }}
-    runs-on: echo-turbine
+    if: "!startsWith(github.head_ref || '', 'release-please') && github.actor != 'release-please[bot]'"
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-
-      - name: Authenticate GitHub Packages
-        run: echo "//npm.pkg.github.com/:_authToken=$NPM_TOKEN" >> .npmrc
+      - run: pnpm install --frozen-lockfile
         env:
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Validate commit messages
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
@@ -53,93 +48,57 @@ jobs:
             pnpm exec commitlint --from "${{ github.event.before }}" --to "${{ github.sha }}"
           fi
 
+  # Lint, typecheck, build run in parallel
   lint:
     name: Lint
-    if: ${{ github.actor != 'release-please[bot]' }}
-    runs-on: echo-turbine
+    if: "!startsWith(github.head_ref || '', 'release-please') && github.actor != 'release-please[bot]'"
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-
-      - name: Authenticate GitHub Packages
-        run: echo "//npm.pkg.github.com/:_authToken=$NPM_TOKEN" >> .npmrc
+      - run: pnpm install --frozen-lockfile
         env:
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint
-        run: pnpm lint
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm lint
 
   typecheck:
     name: Type Check
-    if: ${{ github.actor != 'release-please[bot]' }}
-    runs-on: echo-turbine
+    if: "!startsWith(github.head_ref || '', 'release-please') && github.actor != 'release-please[bot]'"
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-
-      - name: Authenticate GitHub Packages
-        run: echo "//npm.pkg.github.com/:_authToken=$NPM_TOKEN" >> .npmrc
+      - run: pnpm install --frozen-lockfile
         env:
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check
-        run: pnpm typecheck
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm typecheck
 
   build:
     name: Build
-    if: ${{ github.actor != 'release-please[bot]' }}
+    if: "!startsWith(github.head_ref || '', 'release-please') && github.actor != 'release-please[bot]'"
     needs: [commitlint, typecheck, lint]
-    runs-on: echo-turbine
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
-
-      - name: Authenticate GitHub Packages
-        run: echo "//npm.pkg.github.com/:_authToken=$NPM_TOKEN" >> .npmrc
+      - run: pnpm install --frozen-lockfile
         env:
-          NPM_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        run: pnpm build
-
-      - name: Check build output
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: pnpm build
+      - name: Validate build output
         run: |
-          test -d out/main && echo "\u2713 Main process built"
-          test -d out/preload && echo "\u2713 Preload scripts built"
-          test -d out/renderer && echo "\u2713 Renderer built"
+          test -d out/main && echo "✓ Main process built"
+          test -d out/preload && echo "✓ Preload scripts built"
+          test -d out/renderer && echo "✓ Renderer built"
