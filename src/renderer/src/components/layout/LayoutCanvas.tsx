@@ -180,21 +180,22 @@ function LayoutScene({
         />
       ))}
 
-      {/* Bin drag handlers (only for selected bins) */}
-      {bins.map((bin) => (
-        <BinDragHandler
-          key={`drag-${bin.id}`}
-          bin={bin}
-          baseUnit={baseUnit}
-          onSelectBin={onSelectBin}
-          onBinMove={onBinMove}
-        />
-      ))}
+      {/* Bin drag handlers (only in select mode) */}
+      {activeTool === 'select' &&
+        bins.map((bin) => (
+          <BinDragHandler
+            key={`drag-${bin.id}`}
+            bin={bin}
+            baseUnit={baseUnit}
+            onSelectBin={onSelectBin}
+            onBinMove={onBinMove}
+          />
+        ))}
 
       <EntityRenderer
         entities={entities}
         selectedIds={selectionType === 'entity' ? selectedIds : new Set()}
-        onEntityClick={handleEntityClick}
+        onEntityClick={activeTool === 'select' ? handleEntityClick : undefined}
       />
 
       {/* Active tool */}
