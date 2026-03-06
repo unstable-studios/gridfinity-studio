@@ -5,11 +5,13 @@ import * as THREE from 'three'
 interface GridOverlayProps {
   baseUnit: number
   visible?: boolean
+  gridColor?: string
 }
 
 export default function GridOverlay({
   baseUnit,
-  visible = true
+  visible = true,
+  gridColor = '#3a3f55'
 }: GridOverlayProps): React.JSX.Element | null {
   const { camera, size } = useThree()
 
@@ -48,7 +50,7 @@ export default function GridOverlay({
 
   return (
     <lineSegments geometry={gridGeometry}>
-      <lineBasicMaterial color="#3a3f55" opacity={0.5} transparent />
+      <lineBasicMaterial color={gridColor} opacity={0.5} transparent />
     </lineSegments>
   )
 }

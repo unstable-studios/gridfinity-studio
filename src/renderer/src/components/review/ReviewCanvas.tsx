@@ -3,7 +3,13 @@ import { OrbitControls } from '@react-three/drei'
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
+import { useTheme } from '@unstable-studios/ui'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+
+const THEME_COLORS = {
+  dark: { bg: '#0a0c12', floor: '#0c0f17', fog: '#0a0c12' },
+  light: { bg: '#e8eaed', floor: '#d4d7dd', fog: '#e8eaed' }
+} as const
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
 
@@ -22,9 +28,10 @@ interface SceneProps {
   bakedMesh?: BakedMeshData | null
   debugColors: boolean
   wireframe: boolean
+  colors: { bg: string; floor: string; fog: string }
 }
 
-function ReviewScene({ bakedMesh, debugColors, wireframe }: SceneProps): React.JSX.Element {
+function ReviewScene({ bakedMesh, debugColors, wireframe, colors }: SceneProps): React.JSX.Element {
   const controlsRef = useRef<OrbitControlsImpl>(null)
 
   const saveCamera = (): void => {
@@ -73,7 +80,15 @@ function ReviewScene({ bakedMesh, debugColors, wireframe }: SceneProps): React.J
       <pointLight position={[-6, -4, -6]} intensity={0.6} />
       <pointLight position={[6, 2, -6]} intensity={0.4} />
       <pointLight position={[0, -6, 4]} intensity={0.4} />
-      <OrbitControls ref={controlsRef} enableDamping makeDefault onEnd={saveCamera} />
+      <OrbitControls
+        ref={controlsRef}
+        enableDamping
+        makeDefault
+        onEnd={saveCamera}
+        minDistance={5}
+        maxDistance={500}
+        maxPolarAngle={Math.PI * 0.85}
+      />
 
       {bakedMesh ? (
         <BakedMeshPreview mesh={bakedMesh} debugColors={debugColors} wireframe={wireframe} />
@@ -83,7 +98,7 @@ function ReviewScene({ bakedMesh, debugColors, wireframe }: SceneProps): React.J
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
         <planeGeometry args={[200, 200]} />
-        <meshStandardMaterial color="#0c0f17" roughness={1} />
+        <meshStandardMaterial color={colors.floor} roughness={1} />
       </mesh>
     </>
   )
@@ -144,19 +159,26 @@ function EmptyState(): React.JSX.Element {
 
 export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JSX.Element {
   const { debugColors, wireframe } = useReviewPrefs()
+  const { resolvedTheme } = useTheme()
+  const colors = THEME_COLORS[resolvedTheme === 'light' ? 'light' : 'dark']
 
   return (
     <Canvas
       shadows
-      camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: 1000 }}
+      camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: 2000 }}
       dpr={[1, 1.75]}
       style={{ width: '100%', height: '100%' }}
       gl={{ antialias: true }}
     >
       <Suspense fallback={null}>
-        <color attach="background" args={['#0a0c12']} />
-        <fog attach="fog" args={['#0a0c12', 500, 900]} />
-        <ReviewScene bakedMesh={bakedMesh} debugColors={debugColors} wireframe={wireframe} />
+        <color attach="background" args={[colors.bg]} />
+        <fog attach="fog" args={[colors.fog, 500, 900]} />
+        <ReviewScene
+          bakedMesh={bakedMesh}
+          debugColors={debugColors}
+          wireframe={wireframe}
+          colors={colors}
+        />
       </Suspense>
     </Canvas>
   )
