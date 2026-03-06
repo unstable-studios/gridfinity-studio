@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -19,18 +19,19 @@ import { computeDefaultPocketDepth } from '../../../shared/types/project'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
-  const { project, setBakeResult } = useProject()
+  const { project, clearAllBakeResults } = useProject()
   const bins = project?.bins ?? []
-  const bakeBin = bins[0] ?? null
 
-  // Clear stale bake result when all bins are removed
+  // Clear stale bake results when all bins are removed
   useEffect(() => {
-    if (bins.length === 0) setBakeResult(null)
-  }, [bins.length, setBakeResult])
+    if (bins.length === 0) clearAllBakeResults()
+  }, [bins.length, clearAllBakeResults])
 
   return (
     <aside className="w-72 shrink-0 rounded-xl border border-zinc-300/80 bg-white/80 px-4 py-5 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 overflow-y-auto">
-      {bakeBin && <BinBaker bin={bakeBin} />}
+      {bins.map((bin) => (
+        <BinBaker key={bin.id} bin={bin} />
+      ))}
       {mode === 'layout' ? <LayoutSidebar entities={project?.entities ?? []} /> : <ReviewSidebar />}
     </aside>
   )
@@ -229,7 +230,7 @@ function BinBaker({ bin }: { bin: Bin }): null {
       void bakePockets(binParams).then((result) => {
         // Ignore results from stale bake requests
         if (bakeSeq.current !== seq) return
-        setBakeResult({
+        setBakeResult(bin.id, {
           mesh: {
             positions: result.positions,
             colors: result.colors,
@@ -251,6 +252,7 @@ function BinBaker({ bin }: { bin: Bin }): null {
     ready,
     bakePockets,
     setBakeResult,
+    bin.id,
     bin.width,
     bin.depth,
     bin.height,
@@ -391,32 +393,61 @@ function EntityListItem({
 }
 
 function ReviewSidebar(): React.JSX.Element {
-  const { bakeResult, exportSTL: doExport } = useProject()
+  const { project, bakeResults, exportSTL: doExport, exportBatch } = useProject()
   const { debugColors, setDebugColors, wireframe, setWireframe } = useReviewPrefs()
   const [exporting, setExporting] = useState(false)
 
-  const handleExport = useCallback(async () => {
-    if (!bakeResult) return
+  const bins = useMemo(() => project?.bins ?? [], [project?.bins])
+  const bakedCount = bakeResults.size
+  const totalBins = bins.length
+  const allWarnings = [...bakeResults.values()].flatMap((r) => r.warnings)
+
+  const handleExportSingle = useCallback(async () => {
+    if (bakeResults.size === 0) return
+    // Export the first baked bin as a single STL
+    const first = [...bakeResults.values()][0]
     setExporting(true)
     try {
-      const geometry = meshDataToBufferGeometry(bakeResult.mesh)
+      const geometry = meshDataToBufferGeometry(first.mesh)
       const blob = createSTLBlob(geometry)
       const buffer = await blob.arrayBuffer()
       await doExport(buffer)
     } finally {
       setExporting(false)
     }
-  }, [bakeResult, doExport])
+  }, [bakeResults, doExport])
+
+  const handleExportAll = useCallback(async () => {
+    if (bakeResults.size === 0) return
+    setExporting(true)
+    try {
+      const files: Array<{ filename: string; data: ArrayBuffer }> = []
+      for (const bin of bins) {
+        const result = bakeResults.get(bin.id)
+        if (!result) continue
+        const geometry = meshDataToBufferGeometry(result.mesh)
+        const blob = createSTLBlob(geometry)
+        const buffer = await blob.arrayBuffer()
+        const safeName = bin.name.replace(/[^a-zA-Z0-9_-]/g, '_')
+        files.push({ filename: `${safeName}.stl`, data: buffer })
+      }
+      if (files.length > 0) await exportBatch(files)
+    } finally {
+      setExporting(false)
+    }
+  }, [bakeResults, bins, exportBatch])
 
   return (
     <div className="space-y-4">
       <SidebarSection title="Status">
-        {bakeResult ? (
-          <p className="text-xs text-green-500">Model ready</p>
+        {bakedCount > 0 ? (
+          <p className="text-xs text-green-500">
+            {bakedCount === 1 ? 'Model ready' : `${bakedCount}/${totalBins} bins ready`}
+          </p>
         ) : (
           <p className="text-xs text-zinc-500">Add a bin to generate a model.</p>
         )}
-        {bakeResult?.warnings.map((w, i) => (
+        {allWarnings.map((w, i) => (
           <p key={i} className="text-xs text-amber-500">
             {w}
           </p>
@@ -437,14 +468,35 @@ function ReviewSidebar(): React.JSX.Element {
       </SidebarSection>
 
       <SidebarSection title="Export">
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={!bakeResult || exporting}
-          onClick={() => void handleExport()}
-        >
-          {exporting ? 'Exporting...' : 'Export STL'}
-        </Button>
+        {totalBins <= 1 ? (
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={bakedCount === 0 || exporting}
+            onClick={() => void handleExportSingle()}
+          >
+            {exporting ? 'Exporting...' : 'Export STL'}
+          </Button>
+        ) : (
+          <div className="space-y-1.5">
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={bakedCount === 0 || exporting}
+              onClick={() => void handleExportSingle()}
+            >
+              {exporting ? 'Exporting...' : 'Export Selected STL'}
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              disabled={bakedCount === 0 || exporting}
+              onClick={() => void handleExportAll()}
+            >
+              {exporting ? 'Exporting...' : `Export All (${bakedCount} bins)`}
+            </Button>
+          </div>
+        )}
       </SidebarSection>
     </div>
   )

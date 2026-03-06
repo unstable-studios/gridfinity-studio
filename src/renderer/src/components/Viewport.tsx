@@ -17,7 +17,7 @@ export default function Viewport(): React.JSX.Element {
     removeEntity,
     updateBin,
     removeBin,
-    bakeResult
+    bakeResults
   } = useProject()
   const selection = useSharedSelection()
   const snapping = useSnapping()
@@ -98,7 +98,7 @@ export default function Viewport(): React.JSX.Element {
         />
       </div>
       <div className={mode === 'review' ? 'h-full' : 'hidden'}>
-        <ReviewCanvas bakedMesh={bakeResult?.mesh ?? null} />
+        <ReviewCanvas bakeResults={bakeResults} bins={bins} baseUnit={baseUnit} />
       </div>
     </div>
   )
