@@ -7,7 +7,7 @@
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
-**Current State**: Phases 1–3 complete. Phase 3.5 (UX Foundations) is next — fixing fundamental interaction and presentation issues before continuing with feature work.
+**Current State**: Phases 1–3 complete. Phase 3.5 partially complete — CSG-first bin generator (T171/T210–T217) done, pocket system working, review canvas with proper normals. Remaining Phase 3.5 work: echo-libs integration, canvas interaction fixes, real-time property editing, unit system, preferences modal, window management.
 
 ## Format: `[ID] [P?] [Story] Description`
 
@@ -252,9 +252,22 @@
 - [ ] T169 [P] Make entity name editable via inline text input in sidebar entity list in `src/renderer/src/components/Sidebar.tsx`
 - [ ] T170 [P] Make entity dimensions (width, height, diameter) editable with real-time preview update in `src/renderer/src/components/Sidebar.tsx`
 
-### Extrusion & Bin Visualization
+### CSG-First Bin Generator (replaces T171) — COMPLETE
 
-- [ ] T171 Investigate and fix bin mesh generator — user reports "intersecting planes with no volume" for generated bins; verify multi-unit bin geometry is correct and produces a proper closed solid in `src/renderer/src/lib/bin-generator.ts`
+> The original bin mesh generator (triangle soup) was replaced with a proper CSG solid model using Manifold WASM. This is the equivalent of gridfinity-rebuilt-openscad's approach: union(feet, bridge, body, lip) then difference(holes, pockets). Bins are solid inserts with pockets cut from the top surface downward. PR #193, closes #106.
+
+- [x] T171 ~~Investigate and fix bin mesh generator~~ → **Superseded**: rewrote as CSG-first builder using Manifold primitives in `src/renderer/src/lib/bin-csg-builder.ts`
+- [x] T210 [US1] Create `bin-csg-builder.ts` — pure CSG builder using Manifold primitives: `buildBaseFeet`, `buildBridge`, `buildBody`, `buildLip`, `subtractHoles`, `subtractPockets`, `computeCreaseNormals` in `src/renderer/src/lib/bin-csg-builder.ts`
+- [x] T211 [US1] Implement tapered stacking lip following LIP_PROFILE groove spec — annular solid tapers from 2.85mm (bottom) to 0.25mm (top) via hulled annular ring discs in `src/renderer/src/lib/bin-csg-builder.ts`
+- [x] T212 [US1] Implement crease-angle normal computation (30° threshold) for proper smooth/hard edge rendering — outputs non-indexed mesh for per-face-vertex normals in `src/renderer/src/lib/bin-csg-builder.ts`
+- [x] T213 [US1] Add `CSGBinParams` type to worker protocol, replace `BinCSGGeometry` — passes full bin params including pockets to CSG builder in `src/shared/types/worker.ts`
+- [x] T214 [US1] Wire `buildBinCSG` into geometry worker `bake-pockets` handler — all CSG computation off-main-thread in `src/renderer/src/workers/geometry.worker.ts`
+- [x] T215 [US1] Create `BinBaker` headless component — auto-bakes bin mesh via CSG worker whenever bin params or pocket entities change in `src/renderer/src/components/Sidebar.tsx`
+- [x] T216 [US1] Add pocket system to entities — `PocketConfig` (depth, clearance) on Entity type, `entityToVertices()` utility, pocket controls in sidebar in `src/renderer/src/lib/entity-shapes.ts` and `src/renderer/src/components/Sidebar.tsx`
+- [x] T217 [US1] Add schema migrations (v0.2.0 → v0.3.0) for pocket/hole params, `hasDividers` field, entity pocket config in `src/shared/validation/migrations.ts`
+
+### Remaining Extrusion & Visualization
+
 - [ ] T172 Wire `extrudePolygon()` from `extrude.ts` into the entity rendering pipeline — show extruded shapes as 3D preview in review mode when entities have extrusion config in `src/renderer/src/components/review/ReviewCanvas.tsx`
 - [ ] T173 [P] Add visual feedback in layout mode when "Generate Bin" is clicked — show bin footprint outline on the layout canvas, not just silently set bakeResult for review mode, in `src/renderer/src/components/layout/LayoutCanvas.tsx`
 
@@ -583,15 +596,15 @@ Task: T105 "Implement distribute actions in src/renderer/src/lib/distribute.ts"
 
 ## Implementation Strategy
 
-### Immediate Priority: UX Foundations (Phase 3.5)
+### Immediate Priority: UX Foundations (Phase 3.5) — Partially Complete
 
-US1 is complete but the app has fundamental UX issues that must be resolved before adding more features. The next work should focus on:
+US1 is complete. The CSG-first bin generator (T171/T210–T217) is done — bins are proper manifold-valid solids with pockets cut from the top surface. Remaining UX work:
 
 1. **T155–T158**: Echo-libs integration — consistent design system
 2. **T159–T162**: Top bar & navigation — stable layout, tab-style menus
 3. **T163–T167**: Canvas interaction — pan direction, zoom sensitivity, resize handles
 4. **T168–T170**: Real-time property editing — controlled inputs
-5. **T171–T173**: Bin/extrusion visualization — fix broken mesh, wire dead code
+5. **T172–T173**: Remaining visualization — extrusion preview, layout feedback
 6. **T174–T176**: Unit system — metric internal, presentation-layer conversion
 7. **T177–T179**: Preferences modal — central settings hub
 8. **T180–T181**: Window management — larger default, persist bounds
@@ -610,7 +623,7 @@ US1 is complete but the app has fundamental UX issues that must be resolved befo
 
 1. ~~Setup + Foundational → Foundation ready~~ DONE
 2. ~~US1 integration → Design-to-export pipeline works~~ DONE
-3. **UX Foundations → App feels like a real CAD tool (CURRENT)**
+3. **UX Foundations → App feels like a real CAD tool (IN PROGRESS — CSG bin generator done, remaining UX work pending)**
 4. Add US3 → Test independently → Demo (Undo/redo for all mutations)
 5. Add US2 → Test independently → Demo (SVG import + patterns for socket trays)
 6. Add US4 → Test independently → Demo (Multi-bin layouts with batch export)
