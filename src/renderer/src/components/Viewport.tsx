@@ -87,6 +87,7 @@ export default function Viewport(): React.JSX.Element {
           selectedIds={selection.selectedIds}
           selectionType={selection.selectionType}
           baseUnit={baseUnit}
+          gridfinityConfig={project?.gridfinity}
           onPlace={handlePlace}
           onMove={handleMove}
           onResize={handleResize}

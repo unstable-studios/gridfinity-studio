@@ -10,8 +10,10 @@ import { useSharedSelection } from '@/hooks/useSelection'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 
 import { exportSTL as createSTLBlob } from '@/lib/stl-io'
+import { export3MF as create3MFBlob } from '@/lib/threemf-writer'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
 import { entityToVertices } from '@/lib/entity-shapes'
+import { autoWrap } from '@/lib/auto-wrap'
 import { useGeometryWorker } from '@/hooks/useGeometryWorker'
 import type { PocketSpec, CSGBinParams } from '../../../shared/types/worker'
 import type { Entity, Bin, PocketConfig } from '../../../shared/types/project'
@@ -72,6 +74,17 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
     selectBin(bin.id)
   }
 
+  const handleAutoWrap = (): void => {
+    if (entities.length === 0) return
+    const result = autoWrap(entities, baseUnit)
+    const bin = addBin({
+      width: result.width,
+      depth: result.depth,
+      position: result.position
+    })
+    selectBin(bin.id)
+  }
+
   return (
     <div className="space-y-4">
       <SidebarSection title="Bins">
@@ -98,9 +111,20 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
             ))}
           </div>
         )}
-        <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleAddBin}>
-          Add Bin
-        </Button>
+        <div className="flex gap-1.5 mt-2">
+          <Button variant="outline" size="sm" className="flex-1" onClick={handleAddBin}>
+            Add Bin
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="flex-1"
+            disabled={entities.length === 0}
+            onClick={handleAutoWrap}
+          >
+            Auto-wrap
+          </Button>
+        </div>
       </SidebarSection>
 
       {selectedBin && (
@@ -393,7 +417,13 @@ function EntityListItem({
 }
 
 function ReviewSidebar(): React.JSX.Element {
-  const { project, bakeResults, exportSTL: doExport, exportBatch } = useProject()
+  const {
+    project,
+    bakeResults,
+    exportSTL: doExport,
+    export3MF: doExport3MF,
+    exportBatch
+  } = useProject()
   const { debugColors, setDebugColors, wireframe, setWireframe } = useReviewPrefs()
   const [exporting, setExporting] = useState(false)
 
@@ -404,7 +434,6 @@ function ReviewSidebar(): React.JSX.Element {
 
   const handleExportSingle = useCallback(async () => {
     if (bakeResults.size === 0) return
-    // Export the first baked bin as a single STL
     const first = [...bakeResults.values()][0]
     setExporting(true)
     try {
@@ -416,6 +445,20 @@ function ReviewSidebar(): React.JSX.Element {
       setExporting(false)
     }
   }, [bakeResults, doExport])
+
+  const handleExport3MF = useCallback(async () => {
+    if (bakeResults.size === 0) return
+    const first = [...bakeResults.values()][0]
+    setExporting(true)
+    try {
+      const geometry = meshDataToBufferGeometry(first.mesh)
+      const blob = await create3MFBlob(geometry, bins[0]?.name ?? 'model')
+      const buffer = await blob.arrayBuffer()
+      await doExport3MF(buffer)
+    } finally {
+      setExporting(false)
+    }
+  }, [bakeResults, bins, doExport3MF])
 
   const handleExportAll = useCallback(async () => {
     if (bakeResults.size === 0) return
@@ -468,25 +511,26 @@ function ReviewSidebar(): React.JSX.Element {
       </SidebarSection>
 
       <SidebarSection title="Export">
-        {totalBins <= 1 ? (
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={bakedCount === 0 || exporting}
-            onClick={() => void handleExportSingle()}
-          >
-            {exporting ? 'Exporting...' : 'Export STL'}
-          </Button>
-        ) : (
-          <div className="space-y-1.5">
+        <div className="space-y-1.5">
+          <div className="flex gap-1.5">
             <Button
               variant="outline"
-              className="w-full"
+              className="flex-1"
               disabled={bakedCount === 0 || exporting}
               onClick={() => void handleExportSingle()}
             >
-              {exporting ? 'Exporting...' : 'Export Selected STL'}
+              {exporting ? '...' : 'STL'}
             </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              disabled={bakedCount === 0 || exporting}
+              onClick={() => void handleExport3MF()}
+            >
+              {exporting ? '...' : '3MF'}
+            </Button>
+          </div>
+          {totalBins > 1 && (
             <Button
               variant="outline"
               className="w-full"
@@ -495,8 +539,8 @@ function ReviewSidebar(): React.JSX.Element {
             >
               {exporting ? 'Exporting...' : `Export All (${bakedCount} bins)`}
             </Button>
-          </div>
-        )}
+          )}
+        </div>
       </SidebarSection>
     </div>
   )

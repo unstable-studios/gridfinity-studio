@@ -1,14 +1,16 @@
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
-import { Suspense, useRef, useCallback, useState, useEffect } from 'react'
+import { Suspense, useRef, useCallback, useState, useEffect, useMemo } from 'react'
 import GridOverlay from './GridOverlay'
 import EntityRenderer from './EntityRenderer'
 import TransformGizmo from './TransformGizmo'
 import SelectionBox from './SelectionBox'
 import BinFootprint from './BinFootprint'
+import KeepOutOverlay from './KeepOutOverlay'
 import CircleTool from '../primitives/CircleTool'
 import RectangleTool from '../primitives/RectangleTool'
 import PolygonTool from '../primitives/PolygonTool'
-import type { Entity, Bin } from '../../../../shared/types/project'
+import { detectCollisions } from '@/lib/collision'
+import type { Entity, Bin, GridfinityConfig } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useTheme } from '@unstable-studios/ui'
@@ -20,6 +22,7 @@ interface LayoutCanvasProps {
   selectedIds: Set<string>
   selectionType: SelectionType
   baseUnit?: number
+  gridfinityConfig?: GridfinityConfig
   onPlace: (partial: Partial<Entity> & { type: Entity['type'] }) => void
   onMove: (id: string, dx: number, dy: number) => void
   onResize?: (id: string, patch: Partial<Entity>) => void
@@ -121,6 +124,7 @@ function LayoutScene({
   selectedIds,
   selectionType,
   baseUnit,
+  gridfinityConfig,
   bgColor,
   gridColor,
   onPlace,
@@ -139,6 +143,7 @@ function LayoutScene({
   selectedIds: Set<string>
   selectionType: SelectionType
   baseUnit: number
+  gridfinityConfig?: GridfinityConfig
   onPlace: LayoutCanvasProps['onPlace']
   onMove: LayoutCanvasProps['onMove']
   onResize: LayoutCanvasProps['onResize']
@@ -152,6 +157,17 @@ function LayoutScene({
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null)
   const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null)
   const [marqueeActive, setMarqueeActive] = useState(false)
+
+  // Compute colliding entity IDs for visual warning
+  const collidingIds = useMemo(() => {
+    const pairs = detectCollisions(entities)
+    const ids = new Set<string>()
+    for (const { a, b } of pairs) {
+      ids.add(a)
+      ids.add(b)
+    }
+    return ids
+  }, [entities])
 
   const handleToolPlace = (partial: Partial<Entity>): void => {
     if (!partial.type) return
@@ -169,15 +185,17 @@ function LayoutScene({
       <color attach="background" args={[bgColor]} />
       <GridOverlay baseUnit={baseUnit} gridColor={gridColor} />
 
-      {/* Multi-bin footprints */}
+      {/* Multi-bin footprints + keep-out overlays */}
       {bins.map((bin) => (
-        <BinFootprint
-          key={bin.id}
-          widthMm={bin.width * baseUnit}
-          depthMm={bin.depth * baseUnit}
-          position={bin.position}
-          selected={selectionType === 'bin' && selectedIds.has(bin.id)}
-        />
+        <group key={bin.id}>
+          <BinFootprint
+            widthMm={bin.width * baseUnit}
+            depthMm={bin.depth * baseUnit}
+            position={bin.position}
+            selected={selectionType === 'bin' && selectedIds.has(bin.id)}
+          />
+          {gridfinityConfig && <KeepOutOverlay bin={bin} config={gridfinityConfig} />}
+        </group>
       ))}
 
       {/* Bin drag handlers (only in select mode) */}
@@ -195,6 +213,7 @@ function LayoutScene({
       <EntityRenderer
         entities={entities}
         selectedIds={selectionType === 'entity' ? selectedIds : new Set()}
+        collidingIds={collidingIds}
         onEntityClick={activeTool === 'select' ? handleEntityClick : undefined}
       />
 
@@ -272,6 +291,7 @@ export default function LayoutCanvas({
   selectedIds,
   selectionType,
   baseUnit = 42,
+  gridfinityConfig,
   onPlace,
   onMove,
   onResize,
@@ -434,6 +454,7 @@ export default function LayoutCanvas({
               selectedIds={selectedIds}
               selectionType={selectionType}
               baseUnit={baseUnit}
+              gridfinityConfig={gridfinityConfig}
               bgColor={colors.layoutBg}
               gridColor={colors.layoutGrid}
               onPlace={onPlace}

@@ -6,12 +6,14 @@ import type { Entity } from '../../../../shared/types/project'
 interface EntityRendererProps {
   entities: Entity[]
   selectedIds?: Set<string>
+  collidingIds?: Set<string>
   onEntityClick?: (id: string, shiftKey: boolean) => void
 }
 
 export default function EntityRenderer({
   entities,
   selectedIds,
+  collidingIds,
   onEntityClick
 }: EntityRendererProps): React.JSX.Element {
   return (
@@ -23,6 +25,7 @@ export default function EntityRenderer({
             key={entity.id}
             entity={entity}
             selected={selectedIds?.has(entity.id) ?? false}
+            colliding={collidingIds?.has(entity.id) ?? false}
             onClick={onEntityClick}
           />
         ))}
@@ -33,13 +36,15 @@ export default function EntityRenderer({
 function EntityShape({
   entity,
   selected,
+  colliding,
   onClick
 }: {
   entity: Entity
   selected: boolean
+  colliding: boolean
   onClick?: (id: string, shiftKey: boolean) => void
 }): React.JSX.Element | null {
-  const color = selected ? '#60a5fa' : '#94a3b8'
+  const color = colliding ? '#f87171' : selected ? '#60a5fa' : '#94a3b8'
   const { x, y } = entity.transform.position
 
   const handleClick = (e: ThreeEvent<MouseEvent>): void => {
