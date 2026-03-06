@@ -31,8 +31,9 @@ export interface UseProjectResult {
   filePath: string | null
   isModified: boolean
   recentProjects: string[]
-  bakeResult: BakeResult | null
-  setBakeResult: (result: BakeResult | null) => void
+  bakeResults: Map<string, BakeResult>
+  setBakeResult: (binId: string, result: BakeResult | null) => void
+  clearAllBakeResults: () => void
   addEntity: (partial: Partial<Entity> & { type: Entity['type'] }, binId?: string) => Entity
   updateEntity: (id: string, patch: Partial<Entity>) => void
   moveEntity: (id: string, dx: number, dy: number) => void
@@ -48,6 +49,10 @@ export interface UseProjectResult {
   updateBin: (id: string, patch: Partial<Bin>) => void
   removeBin: (id: string) => void
   exportSTL: (stlData: ArrayBuffer) => Promise<boolean>
+  export3MF: (data: ArrayBuffer) => Promise<boolean>
+  exportBatch: (
+    files: Array<{ filename: string; data: ArrayBuffer }>
+  ) => Promise<{ success: boolean; exported: number }>
   error: string | null
 }
 
@@ -92,7 +97,23 @@ function useProjectState(): UseProjectResult {
   const [isModified, setIsModified] = useState(saved.isModified)
   const [error, setError] = useState<string | null>(null)
   const [recentProjects, setRecentProjects] = useState<string[]>([])
-  const [bakeResult, setBakeResult] = useState<BakeResult | null>(null)
+  const [bakeResults, setBakeResults] = useState<Map<string, BakeResult>>(new Map())
+
+  const setBakeResult = useCallback((binId: string, result: BakeResult | null) => {
+    setBakeResults((prev) => {
+      const next = new Map(prev)
+      if (result) {
+        next.set(binId, result)
+      } else {
+        next.delete(binId)
+      }
+      return next
+    })
+  }, [])
+
+  const clearAllBakeResults = useCallback(() => {
+    setBakeResults(new Map())
+  }, [])
 
   // Persist to sessionStorage so refresh doesn't lose state
   useEffect(() => {
@@ -257,13 +278,17 @@ function useProjectState(): UseProjectResult {
     setIsModified(true)
   }, [])
 
-  const removeBin = useCallback((id: string) => {
-    setProject((prev) => {
-      if (!prev) return prev
-      return { ...prev, bins: prev.bins.filter((b) => b.id !== id) }
-    })
-    setIsModified(true)
-  }, [])
+  const removeBin = useCallback(
+    (id: string) => {
+      setProject((prev) => {
+        if (!prev) return prev
+        return { ...prev, bins: prev.bins.filter((b) => b.id !== id) }
+      })
+      setBakeResult(id, null)
+      setIsModified(true)
+    },
+    [setBakeResult]
+  )
 
   const exportSTL = useCallback(async (stlData: ArrayBuffer): Promise<boolean> => {
     try {
@@ -281,6 +306,45 @@ function useProjectState(): UseProjectResult {
       return false
     }
   }, [])
+
+  const export3MF = useCallback(async (data: ArrayBuffer): Promise<boolean> => {
+    try {
+      const result = await window.api.export.threemf(data)
+      if (result.success) {
+        setError(null)
+        return true
+      } else {
+        setError(result.error ?? 'Failed to export 3MF')
+        return false
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Export error: ${message}`)
+      return false
+    }
+  }, [])
+
+  const exportBatch = useCallback(
+    async (
+      files: Array<{ filename: string; data: ArrayBuffer }>
+    ): Promise<{ success: boolean; exported: number }> => {
+      try {
+        const result = await window.api.export.batch(files)
+        if (result.success) {
+          setError(null)
+          return { success: true, exported: result.exported }
+        } else {
+          setError(result.error ?? 'Batch export failed')
+          return { success: false, exported: result.exported }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        setError(`Export error: ${message}`)
+        return { success: false, exported: 0 }
+      }
+    },
+    []
+  )
 
   const saveProject = useCallback(
     async (targetPath?: string): Promise<boolean> => {
@@ -338,33 +402,41 @@ function useProjectState(): UseProjectResult {
     }
   }, [project])
 
-  const loadProject = useCallback(async (targetPath?: string): Promise<boolean> => {
-    try {
-      const result = await window.api.project.load(targetPath)
-      if (result.success && result.data) {
-        setProject(result.data.project)
-        setFilePath(result.data.filePath)
-        setIsModified(false)
-        setError(null)
-        return true
-      } else {
-        setError(result.error ?? 'Failed to load project')
+  const loadProject = useCallback(
+    async (targetPath?: string): Promise<boolean> => {
+      try {
+        const result = await window.api.project.load(targetPath)
+        if (result.success && result.data) {
+          setProject(result.data.project)
+          setFilePath(result.data.filePath)
+          setIsModified(false)
+          setError(null)
+          clearAllBakeResults()
+          return true
+        } else {
+          setError(result.error ?? 'Failed to load project')
+          return false
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        setError(`Load error: ${message}`)
         return false
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      setError(`Load error: ${message}`)
-      return false
-    }
-  }, [])
+    },
+    [clearAllBakeResults]
+  )
 
-  const createNewProject = useCallback((name?: string): void => {
-    const newProject = createEmptyProject(name ?? 'Untitled Project')
-    setProject(newProject)
-    setFilePath(null)
-    setIsModified(true)
-    setError(null)
-  }, [])
+  const createNewProject = useCallback(
+    (name?: string): void => {
+      const newProject = createEmptyProject(name ?? 'Untitled Project')
+      setProject(newProject)
+      setFilePath(null)
+      setIsModified(true)
+      setError(null)
+      clearAllBakeResults()
+    },
+    [clearAllBakeResults]
+  )
 
   const loadRecentProjects = useCallback(async (): Promise<void> => {
     try {
@@ -382,8 +454,9 @@ function useProjectState(): UseProjectResult {
     filePath,
     isModified,
     recentProjects,
-    bakeResult,
+    bakeResults,
     setBakeResult,
+    clearAllBakeResults,
     addEntity,
     updateEntity,
     moveEntity,
@@ -399,6 +472,8 @@ function useProjectState(): UseProjectResult {
     createNewProject,
     loadRecentProjects,
     exportSTL,
+    export3MF,
+    exportBatch,
     error
   }
 }

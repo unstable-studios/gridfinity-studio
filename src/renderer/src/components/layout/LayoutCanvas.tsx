@@ -1,14 +1,16 @@
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
-import { Suspense, useRef, useCallback, useState, useEffect } from 'react'
+import { Suspense, useRef, useCallback, useState, useEffect, useMemo } from 'react'
 import GridOverlay from './GridOverlay'
 import EntityRenderer from './EntityRenderer'
 import TransformGizmo from './TransformGizmo'
 import SelectionBox from './SelectionBox'
 import BinFootprint from './BinFootprint'
+import KeepOutOverlay from './KeepOutOverlay'
 import CircleTool from '../primitives/CircleTool'
 import RectangleTool from '../primitives/RectangleTool'
 import PolygonTool from '../primitives/PolygonTool'
-import type { Entity, Bin } from '../../../../shared/types/project'
+import { detectCollisions, binOverlapsAny } from '@/lib/collision'
+import type { Entity, Bin, GridfinityConfig } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useTheme } from '@unstable-studios/ui'
@@ -20,8 +22,10 @@ interface LayoutCanvasProps {
   selectedIds: Set<string>
   selectionType: SelectionType
   baseUnit?: number
+  gridfinityConfig?: GridfinityConfig
   onPlace: (partial: Partial<Entity> & { type: Entity['type'] }) => void
   onMove: (id: string, dx: number, dy: number) => void
+  onMoveEnd?: (ids: Set<string>) => void
   onResize?: (id: string, patch: Partial<Entity>) => void
   onBinMove: (id: string, position: { x: number; y: number }) => void
   onSelect: (id: string, additive?: boolean) => void
@@ -33,11 +37,13 @@ interface LayoutCanvasProps {
 function BinDragHandler({
   bin,
   baseUnit,
+  otherBins,
   onSelectBin,
   onBinMove
 }: {
   bin: Bin
   baseUnit: number
+  otherBins: Bin[]
   onSelectBin: (id: string) => void
   onBinMove: (id: string, position: { x: number; y: number }) => void
 }): React.JSX.Element {
@@ -48,6 +54,18 @@ function BinDragHandler({
   const depthMm = bin.depth * baseUnit
   const cx = bin.position.x + widthMm / 2
   const cy = bin.position.y + depthMm / 2
+
+  // Pre-compute other bin rects for collision checks
+  const otherRects = useMemo(
+    () =>
+      otherBins.map((b) => ({
+        x: b.position.x,
+        y: b.position.y,
+        w: b.width * baseUnit,
+        d: b.depth * baseUnit
+      })),
+    [otherBins, baseUnit]
+  )
 
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
@@ -71,11 +89,25 @@ function BinDragHandler({
       const rawY = e.point.y - offsetRef.current.y
       const snappedX = Math.round(rawX / baseUnit) * baseUnit
       const snappedY = Math.round(rawY / baseUnit) * baseUnit
-      if (snappedX !== bin.position.x || snappedY !== bin.position.y) {
-        onBinMove(bin.id, { x: snappedX, y: snappedY })
-      }
+      if (snappedX === bin.position.x && snappedY === bin.position.y) return
+
+      // Reject move if it would overlap another bin
+      const candidate = { x: snappedX, y: snappedY, w: widthMm, d: depthMm }
+      if (binOverlapsAny(candidate, otherRects)) return
+
+      onBinMove(bin.id, { x: snappedX, y: snappedY })
     },
-    [dragging, baseUnit, bin.id, bin.position.x, bin.position.y, onBinMove]
+    [
+      dragging,
+      baseUnit,
+      bin.id,
+      bin.position.x,
+      bin.position.y,
+      widthMm,
+      depthMm,
+      otherRects,
+      onBinMove
+    ]
   )
 
   const handlePointerUp = useCallback(
@@ -121,10 +153,12 @@ function LayoutScene({
   selectedIds,
   selectionType,
   baseUnit,
+  gridfinityConfig,
   bgColor,
   gridColor,
   onPlace,
   onMove,
+  onMoveEnd,
   onResize,
   onBinMove,
   onSelect,
@@ -139,8 +173,10 @@ function LayoutScene({
   selectedIds: Set<string>
   selectionType: SelectionType
   baseUnit: number
+  gridfinityConfig?: GridfinityConfig
   onPlace: LayoutCanvasProps['onPlace']
   onMove: LayoutCanvasProps['onMove']
+  onMoveEnd: LayoutCanvasProps['onMoveEnd']
   onResize: LayoutCanvasProps['onResize']
   onBinMove: LayoutCanvasProps['onBinMove']
   onSelect: LayoutCanvasProps['onSelect']
@@ -152,6 +188,17 @@ function LayoutScene({
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null)
   const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null)
   const [marqueeActive, setMarqueeActive] = useState(false)
+
+  // Compute colliding entity IDs for visual warning
+  const collidingIds = useMemo(() => {
+    const pairs = detectCollisions(entities)
+    const ids = new Set<string>()
+    for (const { a, b } of pairs) {
+      ids.add(a)
+      ids.add(b)
+    }
+    return ids
+  }, [entities])
 
   const handleToolPlace = (partial: Partial<Entity>): void => {
     if (!partial.type) return
@@ -169,15 +216,17 @@ function LayoutScene({
       <color attach="background" args={[bgColor]} />
       <GridOverlay baseUnit={baseUnit} gridColor={gridColor} />
 
-      {/* Multi-bin footprints */}
+      {/* Multi-bin footprints + keep-out overlays */}
       {bins.map((bin) => (
-        <BinFootprint
-          key={bin.id}
-          widthMm={bin.width * baseUnit}
-          depthMm={bin.depth * baseUnit}
-          position={bin.position}
-          selected={selectionType === 'bin' && selectedIds.has(bin.id)}
-        />
+        <group key={bin.id}>
+          <BinFootprint
+            widthMm={bin.width * baseUnit}
+            depthMm={bin.depth * baseUnit}
+            position={bin.position}
+            selected={selectionType === 'bin' && selectedIds.has(bin.id)}
+          />
+          {gridfinityConfig && <KeepOutOverlay bin={bin} config={gridfinityConfig} />}
+        </group>
       ))}
 
       {/* Bin drag handlers (only in select mode) */}
@@ -187,6 +236,7 @@ function LayoutScene({
             key={`drag-${bin.id}`}
             bin={bin}
             baseUnit={baseUnit}
+            otherBins={bins.filter((b) => b.id !== bin.id)}
             onSelectBin={onSelectBin}
             onBinMove={onBinMove}
           />
@@ -195,6 +245,7 @@ function LayoutScene({
       <EntityRenderer
         entities={entities}
         selectedIds={selectionType === 'entity' ? selectedIds : new Set()}
+        collidingIds={collidingIds}
         onEntityClick={activeTool === 'select' ? handleEntityClick : undefined}
       />
 
@@ -211,6 +262,7 @@ function LayoutScene({
               selectedIds={selectedIds}
               entities={entities}
               onMove={onMove}
+              onMoveEnd={onMoveEnd}
               onResize={onResize}
               snap={snap}
             />
@@ -272,8 +324,10 @@ export default function LayoutCanvas({
   selectedIds,
   selectionType,
   baseUnit = 42,
+  gridfinityConfig,
   onPlace,
   onMove,
+  onMoveEnd,
   onResize,
   onBinMove,
   onSelect,
@@ -434,10 +488,12 @@ export default function LayoutCanvas({
               selectedIds={selectedIds}
               selectionType={selectionType}
               baseUnit={baseUnit}
+              gridfinityConfig={gridfinityConfig}
               bgColor={colors.layoutBg}
               gridColor={colors.layoutGrid}
               onPlace={onPlace}
               onMove={onMove}
+              onMoveEnd={onMoveEnd}
               onResize={onResize}
               onBinMove={onBinMove}
               onSelect={onSelect}

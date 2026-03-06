@@ -5,6 +5,8 @@ import * as THREE from 'three'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 import { useTheme } from '@unstable-studios/ui'
 import { resolveColors, type CanvasThemeColors } from '@/lib/theme-config'
+import type { BakeResult } from '@/hooks/useProject'
+import type { Bin } from '../../../../shared/types/project'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
@@ -17,17 +19,28 @@ interface BakedMeshData {
 }
 
 interface ReviewCanvasProps {
-  bakedMesh?: BakedMeshData | null
+  bakeResults: Map<string, BakeResult>
+  bins: Bin[]
+  baseUnit: number
 }
 
 interface SceneProps {
-  bakedMesh?: BakedMeshData | null
+  bakeResults: Map<string, BakeResult>
+  bins: Bin[]
+  baseUnit: number
   debugColors: boolean
   wireframe: boolean
   colors: CanvasThemeColors
 }
 
-function ReviewScene({ bakedMesh, debugColors, wireframe, colors }: SceneProps): React.JSX.Element {
+function ReviewScene({
+  bakeResults,
+  bins,
+  baseUnit,
+  debugColors,
+  wireframe,
+  colors
+}: SceneProps): React.JSX.Element {
   const controlsRef = useRef<OrbitControlsImpl>(null)
 
   const saveCamera = (): void => {
@@ -86,13 +99,25 @@ function ReviewScene({ bakedMesh, debugColors, wireframe, colors }: SceneProps):
         maxPolarAngle={Math.PI * 0.85}
       />
 
-      {bakedMesh ? (
-        <BakedMeshPreview
-          mesh={bakedMesh}
-          debugColors={debugColors}
-          wireframe={wireframe}
-          meshColor={colors.meshColor}
-        />
+      {bakeResults.size > 0 ? (
+        bins.map((bin) => {
+          const result = bakeResults.get(bin.id)
+          if (!result) return null
+          // Position each bin mesh at its canvas position
+          // CSG mesh is centered at origin, so offset by bin center
+          const cx = bin.position.x + (bin.width * baseUnit) / 2
+          const cy = bin.position.y + (bin.depth * baseUnit) / 2
+          return (
+            <BakedMeshPreview
+              key={bin.id}
+              mesh={result.mesh}
+              debugColors={debugColors}
+              wireframe={wireframe}
+              meshColor={colors.meshColor}
+              position={[cx, 0, -cy]}
+            />
+          )
+        })
       ) : (
         <EmptyState color={colors.emptyState} />
       )}
@@ -109,12 +134,14 @@ function BakedMeshPreview({
   mesh,
   debugColors,
   wireframe,
-  meshColor
+  meshColor,
+  position
 }: {
   mesh: BakedMeshData
   debugColors: boolean
   wireframe: boolean
   meshColor: string
+  position?: [number, number, number]
 }): React.JSX.Element {
   const hasColors = mesh.colors && mesh.colors.length > 0
   const useColors = hasColors && debugColors
@@ -131,7 +158,7 @@ function BakedMeshPreview({
   }, [mesh.positions, mesh.indices, mesh.normals, mesh.colors, hasColors])
 
   return (
-    <group rotation={[-Math.PI / 2, 0, 0]}>
+    <group rotation={[-Math.PI / 2, 0, 0]} position={position}>
       <mesh geometry={geometry} castShadow>
         <meshStandardMaterial
           key={useColors ? 'vc' : 'solid'}
@@ -160,7 +187,11 @@ function EmptyState({ color }: { color: string }): React.JSX.Element {
   )
 }
 
-export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JSX.Element {
+export default function ReviewCanvas({
+  bakeResults,
+  bins,
+  baseUnit
+}: ReviewCanvasProps): React.JSX.Element {
   const { debugColors, wireframe } = useReviewPrefs()
   const { resolvedTheme } = useTheme()
   const colors = resolveColors(resolvedTheme)
@@ -177,7 +208,9 @@ export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JS
         <color attach="background" args={[colors.reviewBg]} />
         <fog attach="fog" args={[colors.reviewFog, 500, 900]} />
         <ReviewScene
-          bakedMesh={bakedMesh}
+          bakeResults={bakeResults}
+          bins={bins}
+          baseUnit={baseUnit}
           debugColors={debugColors}
           wireframe={wireframe}
           colors={colors}

@@ -10,6 +10,7 @@ import { DEFAULT_GRIDFINITY_CONFIG, TOLERANCE_PRESETS } from '../../../../shared
 interface GridfinitySettingsProps {
   config: GridfinityConfig
   onChange: (config: GridfinityConfig) => void
+  hasBins?: boolean
 }
 
 const PRESET_KEYS: TolerancePreset[] = ['tight', 'standard', 'loose']
@@ -23,7 +24,8 @@ function detectTolerancePreset(tolerance: number): TolerancePreset | 'custom' {
 
 export default function GridfinitySettings({
   config,
-  onChange
+  onChange,
+  hasBins = false
 }: GridfinitySettingsProps): React.JSX.Element {
   const activePreset = useMemo(() => detectTolerancePreset(config.tolerance), [config.tolerance])
 
@@ -55,6 +57,7 @@ export default function GridfinitySettings({
           label="Base Unit"
           value={config.baseUnit}
           suffix="mm"
+          disabled={hasBins}
           onChange={(v) => updateNumber('baseUnit', v)}
         />
         <NumberField
@@ -64,6 +67,11 @@ export default function GridfinitySettings({
           onChange={(v) => updateNumber('unitHeight', v)}
         />
       </div>
+      {hasBins && (
+        <p className="text-xs text-zinc-500">
+          Base unit is locked while bins exist. Remove all bins or start a new project to change it.
+        </p>
+      )}
 
       {/* Tolerance with inline preset */}
       <div>
@@ -135,19 +143,27 @@ function NumberField({
   value,
   suffix,
   step = 1,
+  disabled,
   onChange
 }: {
   label: string
   value: number
   suffix?: string
   step?: number
+  disabled?: boolean
   onChange: (raw: string) => void
 }): React.JSX.Element {
   return (
     <div>
       <Label className="mb-1 block">{label}</Label>
       <div className="flex items-center gap-1.5">
-        <Input type="number" step={step} value={value} onChange={(e) => onChange(e.target.value)} />
+        <Input
+          type="number"
+          step={step}
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        />
         {suffix && (
           <span className="shrink-0 text-xs text-zinc-400 dark:text-zinc-500">{suffix}</span>
         )}

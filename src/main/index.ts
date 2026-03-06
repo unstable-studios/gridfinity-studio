@@ -10,7 +10,8 @@ import {
   newProject,
   getRecentProjects
 } from './project-handler'
-import { exportSTL } from './export-handler'
+import { exportSTL, export3MF, exportBatch } from './export-handler'
+import type { BatchExportFile } from './export-handler'
 import type { ProjectData } from '../shared/types/project'
 
 interface WindowBounds {
@@ -154,6 +155,18 @@ app.whenReady().then(() => {
     const win = BrowserWindow.getFocusedWindow()
     if (!win) return { success: false, error: 'No active window' }
     return exportSTL(win, stlData)
+  })
+
+  ipcMain.handle('export:3mf', async (_event, data: ArrayBuffer) => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) return { success: false, error: 'No active window' }
+    return export3MF(win, data)
+  })
+
+  ipcMain.handle('export:batch', async (_event, files: BatchExportFile[]) => {
+    const win = BrowserWindow.getFocusedWindow()
+    if (!win) return { success: false, error: 'No active window', exported: 0 }
+    return exportBatch(win, files)
   })
 
   createWindow()

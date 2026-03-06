@@ -18,6 +18,10 @@ interface ProjectAPI {
 
 interface ExportAPI {
   stl: (stlData: ArrayBuffer) => Promise<{ success: boolean; error?: string; data?: string }>
+  threemf: (data: ArrayBuffer) => Promise<{ success: boolean; error?: string; data?: string }>
+  batch: (
+    files: Array<{ filename: string; data: ArrayBuffer }>
+  ) => Promise<{ success: boolean; error?: string; exported: number; directory?: string }>
 }
 
 declare global {
