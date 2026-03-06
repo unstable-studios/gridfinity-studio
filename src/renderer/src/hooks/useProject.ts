@@ -128,7 +128,17 @@ function saveUndoHistory(pastStates: UndoPartial[], futureStates: UndoPartial[])
 // ─── Temporal helpers ───────────────────────────────────────
 
 function temporalPause(): void {
-  useProjectStore.temporal.getState().pause()
+  const t = useProjectStore.temporal.getState()
+  // Snapshot the current state before pausing so undo can return here
+  const current = { project: useProjectStore.getState().project }
+  const last = t.pastStates[t.pastStates.length - 1] as UndoPartial | undefined
+  if (!last || last.project !== current.project) {
+    useProjectStore.temporal.setState({
+      pastStates: [...t.pastStates, current],
+      futureStates: []
+    })
+  }
+  t.pause()
 }
 
 function temporalResume(): void {
