@@ -8,17 +8,17 @@
 const STORAGE_KEY = 'gfstudio:themeColors'
 
 export interface CanvasThemeColors {
-  /** Layout canvas background */
+  /** Design canvas background */
   layoutBg: string
-  /** Layout grid line color */
+  /** Design grid line color */
   layoutGrid: string
-  /** Review canvas background */
+  /** Preview canvas background */
   reviewBg: string
-  /** Review floor plane color */
+  /** Preview floor plane color */
   reviewFloor: string
-  /** Review fog color (should match reviewBg for seamless fade) */
+  /** Preview fog color (should match reviewBg for seamless fade) */
   reviewFog: string
-  /** Bin mesh color in review mode */
+  /** Bin mesh color in preview mode */
   meshColor: string
   /** Empty state wireframe color */
   emptyState: string
