@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useMemo } from 'react'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
 import { useSharedSelection } from '@/hooks/useSelection'
@@ -22,8 +22,8 @@ export default function Viewport(): React.JSX.Element {
   const selection = useSharedSelection()
   const snapping = useSnapping()
 
-  const entities = project?.entities ?? []
-  const bins = project?.bins ?? []
+  const entities = useMemo(() => project?.entities ?? [], [project?.entities])
+  const bins = useMemo(() => project?.bins ?? [], [project?.bins])
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   const handlePlace = (partial: Partial<Entity> & { type: Entity['type'] }): void => {
