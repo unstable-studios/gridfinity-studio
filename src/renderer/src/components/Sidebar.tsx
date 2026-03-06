@@ -115,10 +115,23 @@ function LayoutSidebar({
       pos = findNonOverlappingPosition(w, d, baseUnit, existing, pos.x, pos.y)
     }
 
+    const heightUnits = 3
+    const unitHeight = project?.gridfinity.unitHeight ?? 7
+    const defaultDepth = computeDefaultPocketDepth(heightUnits, unitHeight)
+
+    // Assign default pockets to entities that don't already have one
+    for (const entity of entities) {
+      if (!entity.pocket) {
+        updateEntity(entity.id, { pocket: { depth: defaultDepth, clearance: 0.2 } })
+      }
+    }
+
     const bin = addBin({
       width: result.width,
       depth: result.depth,
-      position: pos
+      height: heightUnits,
+      position: pos,
+      entityIds: entities.map((e) => e.id)
     })
     selectBin(bin.id)
   }
