@@ -70,6 +70,20 @@ function LayoutSidebar({
   const bins = useMemo(() => project?.bins ?? [], [project?.bins])
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
+  // Build entity lookup and assignment sets
+  const assignedEntityIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const bin of bins) {
+      for (const eid of bin.entityIds) ids.add(eid)
+    }
+    return ids
+  }, [bins])
+
+  const unassignedEntities = useMemo(
+    () => entities.filter((e) => !assignedEntityIds.has(e.id)),
+    [entities, assignedEntityIds]
+  )
+
   const selectedEntity =
     selectionType === 'entity' && selectedIds.size > 0
       ? (entities.find((e) => selectedIds.has(e.id)) ?? null)
@@ -103,8 +117,8 @@ function LayoutSidebar({
   }
 
   const handleAutoWrap = (): void => {
-    if (entities.length === 0) return
-    const result = autoWrap(entities, baseUnit)
+    if (unassignedEntities.length === 0) return
+    const result = autoWrap(unassignedEntities, baseUnit)
     const w = result.width * baseUnit
     const d = result.depth * baseUnit
     const existing = otherBinRects()
@@ -120,7 +134,7 @@ function LayoutSidebar({
     const defaultDepth = computeDefaultPocketDepth(heightUnits, unitHeight)
 
     // Assign default pockets to entities that don't already have one
-    for (const entity of entities) {
+    for (const entity of unassignedEntities) {
       if (!entity.pocket) {
         updateEntity(entity.id, { pocket: { depth: defaultDepth, clearance: 0.2 } })
       }
@@ -131,7 +145,7 @@ function LayoutSidebar({
       depth: result.depth,
       height: heightUnits,
       position: pos,
-      entityIds: entities.map((e) => e.id)
+      entityIds: unassignedEntities.map((e) => e.id)
     })
     selectBin(bin.id)
   }
@@ -164,28 +178,68 @@ function LayoutSidebar({
           Bins overlap — move or resize bins to resolve before models can be generated.
         </div>
       )}
+
+      {/* Bin tree with nested entities */}
       <SidebarSection title="Bins">
-        {bins.length === 0 ? (
-          <p className="text-xs text-zinc-500">No bins yet. Add one to get started.</p>
+        {bins.length === 0 && entities.length === 0 ? (
+          <p className="text-xs text-zinc-500">No bins or entities yet.</p>
         ) : (
-          <div className="space-y-1">
-            {bins.map((bin) => (
-              <button
-                key={bin.id}
-                type="button"
-                className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-                  selectionType === 'bin' && selectedIds.has(bin.id)
-                    ? 'bg-blue-600/20 text-blue-400'
-                    : 'text-zinc-400 hover:bg-zinc-800'
-                }`}
-                onClick={() => selectBin(bin.id)}
-              >
-                <span className="font-medium">{bin.name}</span>
-                <span className="ml-2 text-zinc-600">
-                  {bin.width}x{bin.depth}x{bin.height}u
-                </span>
-              </button>
-            ))}
+          <div className="space-y-0.5">
+            {bins.map((bin) => {
+              const binEntities = entities.filter((e) => bin.entityIds.includes(e.id))
+              const isBinSelected = selectionType === 'bin' && selectedIds.has(bin.id)
+              return (
+                <div key={bin.id}>
+                  <button
+                    type="button"
+                    className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
+                      isBinSelected
+                        ? 'bg-blue-600/20 text-blue-400'
+                        : 'text-zinc-400 hover:bg-zinc-800'
+                    }`}
+                    onClick={() => selectBin(bin.id)}
+                  >
+                    <span className="font-medium">{bin.name}</span>
+                    <span className="ml-2 text-zinc-600">
+                      {bin.width}×{bin.depth}×{bin.height}u
+                    </span>
+                  </button>
+                  {binEntities.length > 0 && (
+                    <div className="ml-3 border-l border-zinc-800 pl-2 space-y-0.5">
+                      {binEntities.map((entity) => (
+                        <EntityListItem
+                          key={entity.id}
+                          entity={entity}
+                          selected={selectionType === 'entity' && selectedIds.has(entity.id)}
+                          onSelect={select}
+                          onRename={(name) => updateEntity(entity.id, { name })}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Unassigned entities */}
+            {unassignedEntities.length > 0 && (
+              <div>
+                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+                  Unassigned
+                </p>
+                <div className="space-y-0.5">
+                  {unassignedEntities.map((entity) => (
+                    <EntityListItem
+                      key={entity.id}
+                      entity={entity}
+                      selected={selectionType === 'entity' && selectedIds.has(entity.id)}
+                      onSelect={select}
+                      onRename={(name) => updateEntity(entity.id, { name })}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
         <div className="flex gap-1.5 mt-2">
@@ -196,7 +250,7 @@ function LayoutSidebar({
             variant="outline"
             size="sm"
             className="flex-1"
-            disabled={entities.length === 0}
+            disabled={unassignedEntities.length === 0}
             onClick={handleAutoWrap}
           >
             Auto-wrap
@@ -215,25 +269,6 @@ function LayoutSidebar({
         </SidebarSection>
       )}
 
-      <SidebarSection title="Entities">
-        {entities.length === 0 ? (
-          <p className="text-xs text-zinc-500">
-            No entities yet. Use the toolbar to create shapes.
-          </p>
-        ) : (
-          <div className="space-y-1">
-            {entities.map((entity) => (
-              <EntityListItem
-                key={entity.id}
-                entity={entity}
-                selected={selectionType === 'entity' && selectedIds.has(entity.id)}
-                onSelect={select}
-                onRename={(name) => updateEntity(entity.id, { name })}
-              />
-            ))}
-          </div>
-        )}
-      </SidebarSection>
       {selectedEntity && (
         <EntityProperties
           key={selectedEntity.id}
