@@ -5,7 +5,7 @@ import { useSharedSelection } from '@/hooks/useSelection'
 import { useSnapping } from '@/hooks/useSnapping'
 import LayoutCanvas from './layout/LayoutCanvas'
 import ReviewCanvas from './review/ReviewCanvas'
-import type { Entity } from '../../../shared/types/project'
+import type { Entity, Bin } from '../../../shared/types/project'
 
 export default function Viewport(): React.JSX.Element {
   const { mode } = useAppMode()
@@ -39,6 +39,49 @@ export default function Viewport(): React.JSX.Element {
   const handleMove = (id: string, dx: number, dy: number): void => {
     moveEntity(id, dx, dy)
   }
+
+  /** After drag ends, reassign moved entities to whatever bin contains their center. */
+  const handleMoveEnd = useCallback(
+    (movedIds: Set<string>) => {
+      for (const entityId of movedIds) {
+        const entity = entities.find((e) => e.id === entityId)
+        if (!entity) continue
+        const cx = entity.transform.position.x
+        const cy = entity.transform.position.y
+
+        // Find the bin whose footprint contains the entity center
+        let targetBin: Bin | undefined
+        for (const bin of bins) {
+          const bx = bin.position.x
+          const by = bin.position.y
+          const bw = bin.width * baseUnit
+          const bd = bin.depth * baseUnit
+          if (cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bd) {
+            targetBin = bin
+            break
+          }
+        }
+
+        // Remove entity from any bin it's currently in
+        for (const bin of bins) {
+          if (bin.entityIds.includes(entityId)) {
+            if (targetBin?.id === bin.id) {
+              // Already in the right bin — no change needed
+              targetBin = undefined
+              break
+            }
+            updateBin(bin.id, { entityIds: bin.entityIds.filter((id) => id !== entityId) })
+          }
+        }
+
+        // Add to the target bin (if it changed)
+        if (targetBin) {
+          updateBin(targetBin.id, { entityIds: [...targetBin.entityIds, entityId] })
+        }
+      }
+    },
+    [entities, bins, baseUnit, updateBin]
+  )
 
   const handleResize = (id: string, patch: Partial<Entity>): void => {
     updateEntity(id, patch)
@@ -90,6 +133,7 @@ export default function Viewport(): React.JSX.Element {
           gridfinityConfig={project?.gridfinity}
           onPlace={handlePlace}
           onMove={handleMove}
+          onMoveEnd={handleMoveEnd}
           onResize={handleResize}
           onBinMove={handleBinMove}
           onSelect={selection.select}

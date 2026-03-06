@@ -25,6 +25,7 @@ interface LayoutCanvasProps {
   gridfinityConfig?: GridfinityConfig
   onPlace: (partial: Partial<Entity> & { type: Entity['type'] }) => void
   onMove: (id: string, dx: number, dy: number) => void
+  onMoveEnd?: (ids: Set<string>) => void
   onResize?: (id: string, patch: Partial<Entity>) => void
   onBinMove: (id: string, position: { x: number; y: number }) => void
   onSelect: (id: string, additive?: boolean) => void
@@ -157,6 +158,7 @@ function LayoutScene({
   gridColor,
   onPlace,
   onMove,
+  onMoveEnd,
   onResize,
   onBinMove,
   onSelect,
@@ -174,6 +176,7 @@ function LayoutScene({
   gridfinityConfig?: GridfinityConfig
   onPlace: LayoutCanvasProps['onPlace']
   onMove: LayoutCanvasProps['onMove']
+  onMoveEnd: LayoutCanvasProps['onMoveEnd']
   onResize: LayoutCanvasProps['onResize']
   onBinMove: LayoutCanvasProps['onBinMove']
   onSelect: LayoutCanvasProps['onSelect']
@@ -259,6 +262,7 @@ function LayoutScene({
               selectedIds={selectedIds}
               entities={entities}
               onMove={onMove}
+              onMoveEnd={onMoveEnd}
               onResize={onResize}
               snap={snap}
             />
@@ -323,6 +327,7 @@ export default function LayoutCanvas({
   gridfinityConfig,
   onPlace,
   onMove,
+  onMoveEnd,
   onResize,
   onBinMove,
   onSelect,
@@ -488,6 +493,7 @@ export default function LayoutCanvas({
               gridColor={colors.layoutGrid}
               onPlace={onPlace}
               onMove={onMove}
+              onMoveEnd={onMoveEnd}
               onResize={onResize}
               onBinMove={onBinMove}
               onSelect={onSelect}

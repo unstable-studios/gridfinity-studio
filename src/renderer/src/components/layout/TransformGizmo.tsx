@@ -7,6 +7,7 @@ interface TransformGizmoProps {
   selectedIds: Set<string>
   entities: Entity[]
   onMove: (id: string, dx: number, dy: number) => void
+  onMoveEnd?: (ids: Set<string>) => void
   onResize?: (id: string, patch: Partial<Entity>) => void
   snap?: (pos: { x: number; y: number }) => { x: number; y: number }
 }
@@ -19,6 +20,7 @@ export default function TransformGizmo({
   selectedIds,
   entities,
   onMove,
+  onMoveEnd,
   onResize,
   snap
 }: TransformGizmoProps): React.JSX.Element | null {
@@ -149,8 +151,9 @@ export default function TransformGizmo({
       event.stopPropagation()
       setDragging(false)
       axisLock.current = null
+      onMoveEnd?.(selectedIds)
     },
-    [dragging]
+    [dragging, onMoveEnd, selectedIds]
   )
 
   // Resize handle logic
