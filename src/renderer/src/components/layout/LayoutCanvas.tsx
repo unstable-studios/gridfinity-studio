@@ -1,5 +1,6 @@
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Suspense, useRef, useCallback, useState, useEffect, useMemo } from 'react'
+import { useProject } from '@/hooks/useProject'
 import GridOverlay from './GridOverlay'
 import EntityRenderer from './EntityRenderer'
 import TransformGizmo from './TransformGizmo'
@@ -67,6 +68,9 @@ function BinDragHandler({
     [otherBins, baseUnit]
   )
 
+  const startDrag = useProject((s) => s.startDrag)
+  const endDrag = useProject((s) => s.endDrag)
+
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
       if (e.nativeEvent.button !== 0) return
@@ -76,9 +80,10 @@ function BinDragHandler({
         x: e.point.x - bin.position.x,
         y: e.point.y - bin.position.y
       }
+      startDrag()
       setDragging(true)
     },
-    [bin.id, bin.position.x, bin.position.y, onSelectBin]
+    [bin.id, bin.position.x, bin.position.y, onSelectBin, startDrag]
   )
 
   const handlePointerMove = useCallback(
@@ -115,8 +120,9 @@ function BinDragHandler({
       if (!dragging) return
       e.stopPropagation()
       setDragging(false)
+      endDrag()
     },
-    [dragging]
+    [dragging, endDrag]
   )
 
   return (

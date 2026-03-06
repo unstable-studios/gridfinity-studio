@@ -51,6 +51,9 @@ export default defineConfig({
         module: resolve(__dirname, 'src/renderer/src/lib/empty-module.ts')
       }
     },
+    optimizeDeps: {
+      include: ['manifold-3d', 'earcut']
+    },
     build: {
       rollupOptions: {
         output: {

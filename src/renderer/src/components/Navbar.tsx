@@ -20,8 +20,7 @@ import {
 } from '@/components/ui/menubar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import PreferencesModal from '@/components/settings/PreferencesModal'
-import { useProject } from '@/hooks/useProject'
-import { useUndo } from '@/hooks/useUndo'
+import { useProject, useUndo } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
   SquareDashedIcon,
@@ -76,7 +75,7 @@ function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
     recentProjects,
     loadRecentProjects
   } = useProject()
-  const { undo, redo, canUndo, canRedo, lastLabel } = useUndo()
+  const { undo, redo, canUndo, canRedo } = useUndo()
 
   useEffect(() => {
     loadRecentProjects()
@@ -132,7 +131,6 @@ function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
   }, [handleFileKeys, handleEditKeys])
 
   const hasProject = project !== null
-  const undoLabel = lastLabel ? `Undo ${lastLabel}` : 'Undo'
 
   return (
     <Menubar>
@@ -181,11 +179,11 @@ function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
       <MenubarMenu>
         <MenubarTrigger>Edit</MenubarTrigger>
         <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <MenubarItem disabled={!canUndo} onSelect={undo}>
-            {undoLabel}
+          <MenubarItem disabled={!canUndo} onSelect={() => undo()}>
+            Undo
             <MenubarShortcut>Cmd+Z</MenubarShortcut>
           </MenubarItem>
-          <MenubarItem disabled={!canRedo} onSelect={redo}>
+          <MenubarItem disabled={!canRedo} onSelect={() => redo()}>
             Redo
             <MenubarShortcut>Cmd+Shift+Z</MenubarShortcut>
           </MenubarItem>
