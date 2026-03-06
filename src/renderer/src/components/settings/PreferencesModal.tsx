@@ -28,7 +28,7 @@ export default function PreferencesModal({
 }: PreferencesModalProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Preferences</DialogTitle>
         </DialogHeader>
@@ -200,8 +200,10 @@ function ColorsTab(): React.JSX.Element {
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         Canvas colors for each theme mode. Refresh to apply.
       </p>
-      <ColorSection mode="dark" colors={config.dark} onUpdate={updateColor} />
-      <ColorSection mode="light" colors={config.light} onUpdate={updateColor} />
+      <div className="grid grid-cols-2 gap-6">
+        <ColorSection mode="dark" colors={config.dark} onUpdate={updateColor} />
+        <ColorSection mode="light" colors={config.light} onUpdate={updateColor} />
+      </div>
       <Button variant="outline" size="sm" onClick={resetToDefaults}>
         Reset to Defaults
       </Button>
