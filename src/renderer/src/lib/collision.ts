@@ -110,3 +110,58 @@ export function detectCollisions(entities: Entity[]): CollisionPair[] {
 
   return pairs
 }
+
+/**
+ * Check if a bin rectangle would overlap any bins in the given array.
+ * All coordinates are in mm. Each bin is an AABB defined by position (top-left) + size.
+ */
+export function binOverlapsAny(
+  candidate: { x: number; y: number; w: number; d: number },
+  others: Array<{ x: number; y: number; w: number; d: number }>
+): boolean {
+  for (const o of others) {
+    if (
+      candidate.x < o.x + o.w &&
+      candidate.x + candidate.w > o.x &&
+      candidate.y < o.y + o.d &&
+      candidate.y + candidate.d > o.y
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
+/**
+ * Find the first non-overlapping grid-aligned position for a bin,
+ * scanning right then wrapping down.
+ */
+export function findNonOverlappingPosition(
+  width: number,
+  depth: number,
+  baseUnit: number,
+  existingBins: Array<{ x: number; y: number; w: number; d: number }>,
+  startX = 0,
+  startY = 0
+): { x: number; y: number } {
+  let posX = startX
+  let posY = startY
+  let attempts = 0
+  const maxAttempts = 200
+
+  while (attempts < maxAttempts) {
+    const candidate = { x: posX, y: posY, w: width, d: depth }
+    if (!binOverlapsAny(candidate, existingBins)) {
+      return { x: posX, y: posY }
+    }
+    posX += baseUnit
+    if (posX > baseUnit * 10) {
+      posX = 0
+      posY += baseUnit
+    }
+    attempts++
+  }
+
+  // Fallback: place far away
+  return { x: posX, y: posY }
+}

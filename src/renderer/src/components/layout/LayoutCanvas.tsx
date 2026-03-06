@@ -9,7 +9,7 @@ import KeepOutOverlay from './KeepOutOverlay'
 import CircleTool from '../primitives/CircleTool'
 import RectangleTool from '../primitives/RectangleTool'
 import PolygonTool from '../primitives/PolygonTool'
-import { detectCollisions } from '@/lib/collision'
+import { detectCollisions, binOverlapsAny } from '@/lib/collision'
 import type { Entity, Bin, GridfinityConfig } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
@@ -31,24 +31,6 @@ interface LayoutCanvasProps {
   onSelectBin: (id: string) => void
   onClearSelection: () => void
   snap: (pos: { x: number; y: number }) => { x: number; y: number }
-}
-
-/** Check if a bin at candidatePos would overlap any of the other bins. */
-function wouldOverlapBins(
-  candidate: { x: number; y: number; w: number; d: number },
-  others: Array<{ x: number; y: number; w: number; d: number }>
-): boolean {
-  for (const o of others) {
-    if (
-      candidate.x < o.x + o.w &&
-      candidate.x + candidate.w > o.x &&
-      candidate.y < o.y + o.d &&
-      candidate.y + candidate.d > o.y
-    ) {
-      return true
-    }
-  }
-  return false
 }
 
 function BinDragHandler({
@@ -110,7 +92,7 @@ function BinDragHandler({
 
       // Reject move if it would overlap another bin
       const candidate = { x: snappedX, y: snappedY, w: widthMm, d: depthMm }
-      if (wouldOverlapBins(candidate, otherRects)) return
+      if (binOverlapsAny(candidate, otherRects)) return
 
       onBinMove(bin.id, { x: snappedX, y: snappedY })
     },

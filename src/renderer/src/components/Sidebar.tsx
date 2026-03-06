@@ -14,6 +14,7 @@ import { export3MF as create3MFBlob } from '@/lib/threemf-writer'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
 import { entityToVertices } from '@/lib/entity-shapes'
 import { autoWrap } from '@/lib/auto-wrap'
+import { binOverlapsAny, findNonOverlappingPosition } from '@/lib/collision'
 import { useGeometryWorker } from '@/hooks/useGeometryWorker'
 import type { PocketSpec, CSGBinParams } from '../../../shared/types/worker'
 import type { Entity, Bin, PocketConfig } from '../../../shared/types/project'
@@ -44,7 +45,7 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
   const selection = useSharedSelection()
   const { selectedIds, selectionType, select, selectBin } = selection
 
-  const bins = project?.bins ?? []
+  const bins = useMemo(() => project?.bins ?? [], [project?.bins])
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   const selectedEntity =
@@ -57,32 +58,68 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
       ? (bins.find((b) => selectedIds.has(b.id)) ?? null)
       : null
 
+  const otherBinRects = useCallback(
+    (excludeId?: string) =>
+      bins
+        .filter((b) => b.id !== excludeId)
+        .map((b) => ({
+          x: b.position.x,
+          y: b.position.y,
+          w: b.width * baseUnit,
+          d: b.depth * baseUnit
+        })),
+    [bins, baseUnit]
+  )
+
   const handleAddBin = (): void => {
-    // Find next available grid-aligned position
-    const occupied = new Set(bins.map((b) => `${b.position.x},${b.position.y}`))
-    let posX = 0
-    let posY = 0
-    // Try positions along x-axis first, then wrap
-    while (occupied.has(`${posX},${posY}`)) {
-      posX += baseUnit
-      if (posX > baseUnit * 10) {
-        posX = 0
-        posY += baseUnit
-      }
-    }
-    const bin = addBin({ position: { x: posX, y: posY } })
+    const w = 1 * baseUnit
+    const d = 1 * baseUnit
+    const existing = otherBinRects()
+    const pos = findNonOverlappingPosition(w, d, baseUnit, existing)
+    const bin = addBin({ position: pos })
     selectBin(bin.id)
   }
 
   const handleAutoWrap = (): void => {
     if (entities.length === 0) return
     const result = autoWrap(entities, baseUnit)
+    const w = result.width * baseUnit
+    const d = result.depth * baseUnit
+    const existing = otherBinRects()
+
+    // If the auto-wrap position overlaps, find the next free spot
+    let pos = result.position
+    if (binOverlapsAny({ x: pos.x, y: pos.y, w, d }, existing)) {
+      pos = findNonOverlappingPosition(w, d, baseUnit, existing, pos.x, pos.y)
+    }
+
     const bin = addBin({
       width: result.width,
       depth: result.depth,
-      position: result.position
+      position: pos
     })
     selectBin(bin.id)
+  }
+
+  const handleBinUpdate = (binId: string, patch: Partial<Bin>): void => {
+    const bin = bins.find((b) => b.id === binId)
+    if (!bin) return
+
+    // If width or depth changed, check for overlap at the new size
+    const newWidth = patch.width ?? bin.width
+    const newDepth = patch.depth ?? bin.depth
+    if (newWidth !== bin.width || newDepth !== bin.depth) {
+      const candidate = {
+        x: bin.position.x,
+        y: bin.position.y,
+        w: newWidth * baseUnit,
+        d: newDepth * baseUnit
+      }
+      const others = otherBinRects(binId)
+      if (binOverlapsAny(candidate, others)) return // reject resize
+    }
+
+    updateBin(binId, patch)
   }
 
   return (
@@ -132,7 +169,7 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
           <BinProperties
             key={selectedBin.id}
             bin={selectedBin}
-            onUpdate={(patch) => updateBin(selectedBin.id, patch)}
+            onUpdate={(patch) => handleBinUpdate(selectedBin.id, patch)}
             onDelete={() => removeBin(selectedBin.id)}
           />
         </SidebarSection>
