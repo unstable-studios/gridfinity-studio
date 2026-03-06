@@ -2,7 +2,7 @@
  * Zustand store for project state with hand-rolled undo/redo.
  *
  * All components call useProject() to access project state and mutations.
- * Undoable mutations go through undoableSet() which snapshots before applying.
+ * Undoable mutations snapshot via pushUndo() before applying updates with set().
  * Drag operations call startDrag/endDrag to batch moves into one undo entry.
  * File operations call set() directly — naturally excluded from undo.
  */
@@ -358,7 +358,13 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     },
 
     endDrag: () => {
-      set({ _dragging: false })
+      const { project, _undoStack } = get()
+      let stack = _undoStack
+      // Drop no-op snapshot if nothing changed during the drag
+      if (stack.length > 0 && stack[stack.length - 1] === project) {
+        stack = stack.slice(0, -1)
+      }
+      set({ _undoStack: stack, _dragging: false })
     },
 
     // ── Undo/redo ──
@@ -552,13 +558,37 @@ const useProjectStore = create<ProjectState>()((set, get) => {
 
 // ─── Session persistence subscriber ────────────────────────
 
+let _lastUndoStack = useProjectStore.getState()._undoStack
+let _lastRedoStack = useProjectStore.getState()._redoStack
+
 useProjectStore.subscribe((state) => {
-  saveSession({
-    project: state.project,
-    filePath: state.filePath,
-    isModified: state.isModified
-  })
-  saveUndoHistory(state._undoStack, state._redoStack)
+  try {
+    saveSession({
+      project: state.project,
+      filePath: state.filePath,
+      isModified: state.isModified
+    })
+
+    const undoChanged = state._undoStack !== _lastUndoStack
+    const redoChanged = state._redoStack !== _lastRedoStack
+    if (undoChanged || redoChanged) {
+      saveUndoHistory(state._undoStack, state._redoStack)
+      _lastUndoStack = state._undoStack
+      _lastRedoStack = state._redoStack
+    }
+  } catch {
+    // sessionStorage quota exceeded — drop undo history to free space
+    try {
+      saveUndoHistory([], [])
+      saveSession({
+        project: state.project,
+        filePath: state.filePath,
+        isModified: state.isModified
+      })
+    } catch {
+      // swallow — don't break store subscribers
+    }
+  }
 })
 
 // ─── Public API ─────────────────────────────────────────────
