@@ -48,6 +48,10 @@ export interface UseProjectResult {
   updateBin: (id: string, patch: Partial<Bin>) => void
   removeBin: (id: string) => void
   exportSTL: (stlData: ArrayBuffer) => Promise<boolean>
+  export3MF: (data: ArrayBuffer) => Promise<boolean>
+  exportBatch: (
+    files: Array<{ filename: string; data: ArrayBuffer }>
+  ) => Promise<{ success: boolean; exported: number }>
   error: string | null
 }
 
@@ -282,6 +286,45 @@ function useProjectState(): UseProjectResult {
     }
   }, [])
 
+  const export3MF = useCallback(async (data: ArrayBuffer): Promise<boolean> => {
+    try {
+      const result = await window.api.export.threemf(data)
+      if (result.success) {
+        setError(null)
+        return true
+      } else {
+        setError(result.error ?? 'Failed to export 3MF')
+        return false
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Export error: ${message}`)
+      return false
+    }
+  }, [])
+
+  const exportBatch = useCallback(
+    async (
+      files: Array<{ filename: string; data: ArrayBuffer }>
+    ): Promise<{ success: boolean; exported: number }> => {
+      try {
+        const result = await window.api.export.batch(files)
+        if (result.success) {
+          setError(null)
+          return { success: true, exported: result.exported }
+        } else {
+          setError(result.error ?? 'Batch export failed')
+          return { success: false, exported: result.exported }
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        setError(`Export error: ${message}`)
+        return { success: false, exported: 0 }
+      }
+    },
+    []
+  )
+
   const saveProject = useCallback(
     async (targetPath?: string): Promise<boolean> => {
       if (!project) {
@@ -346,6 +389,7 @@ function useProjectState(): UseProjectResult {
         setFilePath(result.data.filePath)
         setIsModified(false)
         setError(null)
+        setBakeResult(null)
         return true
       } else {
         setError(result.error ?? 'Failed to load project')
@@ -364,6 +408,7 @@ function useProjectState(): UseProjectResult {
     setFilePath(null)
     setIsModified(true)
     setError(null)
+    setBakeResult(null)
   }, [])
 
   const loadRecentProjects = useCallback(async (): Promise<void> => {
@@ -399,6 +444,8 @@ function useProjectState(): UseProjectResult {
     createNewProject,
     loadRecentProjects,
     exportSTL,
+    export3MF,
+    exportBatch,
     error
   }
 }
