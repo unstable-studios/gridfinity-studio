@@ -3,10 +3,12 @@
  *
  * All components call useProject() to access project state and mutations.
  * Undo/redo is automatic — every mutation that changes project data is tracked.
+ *
+ * Drag operations use pause/resume to batch many moves into one undo entry.
+ * File operations (save, load, new) bypass undo entirely.
  */
 
 import { create, useStore } from 'zustand'
-import type { StoreApi } from 'zustand'
 import { temporal } from 'zundo'
 import {
   createEmptyProject,
@@ -33,10 +35,10 @@ export interface BakeResult {
 interface ProjectState {
   // Tracked by undo (partialize selects these)
   project: ProjectData | null
-  filePath: string | null
-  isModified: boolean
 
   // NOT tracked by undo
+  filePath: string | null
+  isModified: boolean
   error: string | null
   recentProjects: string[]
   bakeResults: Map<string, BakeResult>
@@ -51,6 +53,10 @@ interface ProjectState {
   addBin: (patch?: Partial<Bin>) => Bin
   updateBin: (id: string, patch: Partial<Bin>) => void
   removeBin: (id: string) => void
+
+  // Drag batching — pause/resume undo tracking around drag gestures
+  pauseUndo: () => void
+  resumeUndo: () => void
 
   // File operations (not undoable)
   saveProject: (targetPath?: string) => Promise<boolean>
@@ -74,12 +80,15 @@ interface ProjectState {
 // ─── Session persistence ────────────────────────────────────
 
 const SESSION_KEY = 'gfstudio:session'
+const UNDO_KEY = 'gfstudio:undo'
 
-function loadSession(): {
+interface SessionData {
   project: ProjectData | null
   filePath: string | null
   isModified: boolean
-} {
+}
+
+function loadSession(): SessionData {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY)
     if (raw) return JSON.parse(raw)
@@ -89,37 +98,51 @@ function loadSession(): {
   return { project: null, filePath: null, isModified: false }
 }
 
-function saveSession(state: {
-  project: ProjectData | null
-  filePath: string | null
-  isModified: boolean
-}): void {
+function saveSession(state: SessionData): void {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(state))
 }
 
-// ─── Throttle for undo batching ─────────────────────────────
+type UndoPartial = { project: ProjectData | null }
 
-// Batches rapid state changes (e.g. drag moves) into single undo entries.
-function throttle<T extends (...args: never[]) => void>(fn: T, ms: number): T {
-  let timer: ReturnType<typeof setTimeout> | null = null
-  let lastArgs: Parameters<T> | null = null
-
-  const throttled = (...args: Parameters<T>): void => {
-    lastArgs = args
-    if (timer) return
-    timer = setTimeout(() => {
-      fn(...lastArgs!)
-      timer = null
-      lastArgs = null
-    }, ms)
+function loadUndoHistory(): {
+  pastStates: UndoPartial[]
+  futureStates: UndoPartial[]
+} {
+  try {
+    const raw = sessionStorage.getItem(UNDO_KEY)
+    if (raw) return JSON.parse(raw)
+  } catch {
+    // ignore corrupt data
   }
+  return { pastStates: [], futureStates: [] }
+}
 
-  return throttled as unknown as T
+function saveUndoHistory(pastStates: UndoPartial[], futureStates: UndoPartial[]): void {
+  try {
+    sessionStorage.setItem(UNDO_KEY, JSON.stringify({ pastStates, futureStates }))
+  } catch {
+    // sessionStorage full — silently drop undo history
+  }
+}
+
+// ─── Temporal helpers ───────────────────────────────────────
+
+function temporalPause(): void {
+  useProjectStore.temporal.getState().pause()
+}
+
+function temporalResume(): void {
+  useProjectStore.temporal.getState().resume()
+}
+
+function temporalClear(): void {
+  useProjectStore.temporal.getState().clear()
 }
 
 // ─── Store ──────────────────────────────────────────────────
 
 const saved = loadSession()
+const savedUndo = loadUndoHistory()
 
 const useProjectStore = create<ProjectState>()(
   temporal(
@@ -316,6 +339,11 @@ const useProjectStore = create<ProjectState>()(
         get().setBakeResult(id, null)
       },
 
+      // ── Drag batching ──
+
+      pauseUndo: () => temporalPause(),
+      resumeUndo: () => temporalResume(),
+
       // ── File operations (not undoable) ──
 
       saveProject: async (targetPath) => {
@@ -367,6 +395,7 @@ const useProjectStore = create<ProjectState>()(
         try {
           const result = await window.api.project.load(targetPath)
           if (result.success && result.data) {
+            temporalPause()
             set({
               project: result.data.project,
               filePath: result.data.filePath,
@@ -374,7 +403,8 @@ const useProjectStore = create<ProjectState>()(
               error: null,
               bakeResults: new Map()
             })
-            useProjectStore.temporal.getState().clear()
+            temporalClear()
+            temporalResume()
             return true
           } else {
             set({ error: result.error ?? 'Failed to load project' })
@@ -387,6 +417,7 @@ const useProjectStore = create<ProjectState>()(
       },
 
       createNewProject: (name) => {
+        temporalPause()
         set({
           project: createEmptyProject(name ?? 'Untitled Project'),
           filePath: null,
@@ -394,7 +425,8 @@ const useProjectStore = create<ProjectState>()(
           error: null,
           bakeResults: new Map()
         })
-        useProjectStore.temporal.getState().clear()
+        temporalClear()
+        temporalResume()
       },
 
       loadRecentProjects: async () => {
@@ -474,20 +506,16 @@ const useProjectStore = create<ProjectState>()(
       }
     }),
     {
-      // Only track project data in undo history
+      // Only track project data in undo history — file path, modified flag,
+      // bake results, errors, etc. are excluded
       partialize: (state) => ({
-        project: state.project,
-        filePath: state.filePath,
-        isModified: state.isModified
+        project: state.project
       }),
       limit: 100,
-      // Equality check — skip undo entry when project reference hasn't changed
       equality: (pastState, currentState) => pastState.project === currentState.project,
-      // Batch rapid mutations (drag moves, slider scrubs) into single undo entries
-      handleSet: (handleSet) =>
-        throttle<StoreApi<ProjectState>['setState']>((state) => {
-          handleSet(state)
-        }, 500)
+      // Restore undo history from sessionStorage
+      pastStates: savedUndo.pastStates,
+      futureStates: savedUndo.futureStates
     }
   )
 )
@@ -500,6 +528,11 @@ useProjectStore.subscribe((state) => {
     filePath: state.filePath,
     isModified: state.isModified
   })
+})
+
+// Persist undo history to sessionStorage
+useProjectStore.temporal.subscribe((temporal) => {
+  saveUndoHistory(temporal.pastStates as UndoPartial[], temporal.futureStates as UndoPartial[])
 })
 
 // ─── Public API ─────────────────────────────────────────────
