@@ -5,6 +5,7 @@ import { useSharedSelection } from '@/hooks/useSelection'
 import { useSnapping } from '@/hooks/useSnapping'
 import LayoutCanvas from './layout/LayoutCanvas'
 import ReviewCanvas from './review/ReviewCanvas'
+import HintCard from './HintCard'
 import type { Entity } from '../../../shared/types/project'
 
 export default function Viewport(): React.JSX.Element {
@@ -100,6 +101,7 @@ export default function Viewport(): React.JSX.Element {
       <div className={mode === 'review' ? 'h-full' : 'hidden'}>
         <ReviewCanvas bakedMesh={bakeResult?.mesh ?? null} />
       </div>
+      <HintCard />
     </div>
   )
 }
