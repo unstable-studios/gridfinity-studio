@@ -33,14 +33,34 @@ interface LayoutCanvasProps {
   snap: (pos: { x: number; y: number }) => { x: number; y: number }
 }
 
+/** Check if a bin at candidatePos would overlap any of the other bins. */
+function wouldOverlapBins(
+  candidate: { x: number; y: number; w: number; d: number },
+  others: Array<{ x: number; y: number; w: number; d: number }>
+): boolean {
+  for (const o of others) {
+    if (
+      candidate.x < o.x + o.w &&
+      candidate.x + candidate.w > o.x &&
+      candidate.y < o.y + o.d &&
+      candidate.y + candidate.d > o.y
+    ) {
+      return true
+    }
+  }
+  return false
+}
+
 function BinDragHandler({
   bin,
   baseUnit,
+  otherBins,
   onSelectBin,
   onBinMove
 }: {
   bin: Bin
   baseUnit: number
+  otherBins: Bin[]
   onSelectBin: (id: string) => void
   onBinMove: (id: string, position: { x: number; y: number }) => void
 }): React.JSX.Element {
@@ -51,6 +71,18 @@ function BinDragHandler({
   const depthMm = bin.depth * baseUnit
   const cx = bin.position.x + widthMm / 2
   const cy = bin.position.y + depthMm / 2
+
+  // Pre-compute other bin rects for collision checks
+  const otherRects = useMemo(
+    () =>
+      otherBins.map((b) => ({
+        x: b.position.x,
+        y: b.position.y,
+        w: b.width * baseUnit,
+        d: b.depth * baseUnit
+      })),
+    [otherBins, baseUnit]
+  )
 
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
@@ -74,11 +106,25 @@ function BinDragHandler({
       const rawY = e.point.y - offsetRef.current.y
       const snappedX = Math.round(rawX / baseUnit) * baseUnit
       const snappedY = Math.round(rawY / baseUnit) * baseUnit
-      if (snappedX !== bin.position.x || snappedY !== bin.position.y) {
-        onBinMove(bin.id, { x: snappedX, y: snappedY })
-      }
+      if (snappedX === bin.position.x && snappedY === bin.position.y) return
+
+      // Reject move if it would overlap another bin
+      const candidate = { x: snappedX, y: snappedY, w: widthMm, d: depthMm }
+      if (wouldOverlapBins(candidate, otherRects)) return
+
+      onBinMove(bin.id, { x: snappedX, y: snappedY })
     },
-    [dragging, baseUnit, bin.id, bin.position.x, bin.position.y, onBinMove]
+    [
+      dragging,
+      baseUnit,
+      bin.id,
+      bin.position.x,
+      bin.position.y,
+      widthMm,
+      depthMm,
+      otherRects,
+      onBinMove
+    ]
   )
 
   const handlePointerUp = useCallback(
@@ -205,6 +251,7 @@ function LayoutScene({
             key={`drag-${bin.id}`}
             bin={bin}
             baseUnit={baseUnit}
+            otherBins={bins.filter((b) => b.id !== bin.id)}
             onSelectBin={onSelectBin}
             onBinMove={onBinMove}
           />
