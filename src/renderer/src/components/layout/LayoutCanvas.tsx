@@ -12,11 +12,7 @@ import type { Entity, Bin } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useTheme } from '@unstable-studios/ui'
-
-const LAYOUT_COLORS = {
-  dark: { bg: '#111318', grid: '#3a3f55' },
-  light: { bg: '#e0e2e6', grid: '#b0b4c0' }
-} as const
+import { resolveColors } from '@/lib/theme-config'
 
 interface LayoutCanvasProps {
   entities: Entity[]
@@ -292,7 +288,7 @@ export default function LayoutCanvas({
   const lastMouse = useRef({ x: 0, y: 0 })
   const { activeTool } = useAppMode()
   const { resolvedTheme } = useTheme()
-  const layoutColors = LAYOUT_COLORS[resolvedTheme === 'light' ? 'light' : 'dark']
+  const colors = resolveColors(resolvedTheme)
 
   const clampZoom = (z: number): number => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
 
@@ -437,8 +433,8 @@ export default function LayoutCanvas({
               selectedIds={selectedIds}
               selectionType={selectionType}
               baseUnit={baseUnit}
-              bgColor={layoutColors.bg}
-              gridColor={layoutColors.grid}
+              bgColor={colors.layoutBg}
+              gridColor={colors.layoutGrid}
               onPlace={onPlace}
               onMove={onMove}
               onResize={onResize}

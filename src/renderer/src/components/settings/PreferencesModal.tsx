@@ -1,9 +1,19 @@
+import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Input } from '@/components/ui/input'
 import { useProject } from '@/hooks/useProject'
 import { useTheme } from '@unstable-studios/ui'
+import { Button } from '@unstable-studios/ui'
 import GridfinitySettings from './GridfinitySettings'
+import {
+  loadThemeConfig,
+  saveThemeConfig,
+  DEFAULT_THEME_CONFIG,
+  type ThemeConfig,
+  type CanvasThemeColors
+} from '@/lib/theme-config'
 import type { DisplayUnit } from '../../../../shared/types/units'
 import type { GridfinityConfig } from '../../../../shared/types/project'
 
@@ -28,6 +38,7 @@ export default function PreferencesModal({
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="units">Units</TabsTrigger>
               <TabsTrigger value="gridfinity">Gridfinity</TabsTrigger>
+              <TabsTrigger value="colors">Colors</TabsTrigger>
             </TabsList>
             <div className="flex-1 min-w-0 overflow-y-auto">
               <TabsContent value="general">
@@ -38,6 +49,9 @@ export default function PreferencesModal({
               </TabsContent>
               <TabsContent value="gridfinity">
                 <GridfinityTab />
+              </TabsContent>
+              <TabsContent value="colors">
+                <ColorsTab />
               </TabsContent>
             </div>
           </div>
@@ -114,4 +128,64 @@ function GridfinityTab(): React.JSX.Element {
   }
 
   return <GridfinitySettings config={project.gridfinity} onChange={handleChange} />
+}
+
+const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
+  layoutBg: 'Layout Background',
+  layoutGrid: 'Layout Grid',
+  reviewBg: 'Review Background',
+  reviewFloor: 'Review Floor',
+  reviewFog: 'Review Fog',
+  meshColor: 'Mesh Color',
+  emptyState: 'Empty State'
+}
+
+function ColorsTab(): React.JSX.Element {
+  const [config, setConfig] = useState<ThemeConfig>(loadThemeConfig)
+  const { resolvedTheme } = useTheme()
+  const mode = resolvedTheme === 'light' ? 'light' : 'dark'
+  const colors = config[mode]
+
+  const updateColor = (key: keyof CanvasThemeColors, value: string): void => {
+    const updated = {
+      ...config,
+      [mode]: { ...config[mode], [key]: value }
+    }
+    setConfig(updated)
+    saveThemeConfig(updated)
+  }
+
+  const resetToDefaults = (): void => {
+    setConfig(DEFAULT_THEME_CONFIG)
+    saveThemeConfig(DEFAULT_THEME_CONFIG)
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        Canvas colors for <span className="font-semibold">{mode}</span> mode. Refresh to apply.
+      </p>
+      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-3 gap-y-2 items-center">
+        {(Object.keys(COLOR_LABELS) as Array<keyof CanvasThemeColors>).map((key) => (
+          <label key={key} className="flex items-center gap-2 col-span-3">
+            <input
+              type="color"
+              value={colors[key]}
+              onChange={(e) => updateColor(key, e.target.value)}
+              className="h-7 w-9 cursor-pointer rounded border border-zinc-300 dark:border-zinc-700 bg-transparent p-0.5"
+            />
+            <Input
+              value={colors[key]}
+              onChange={(e) => updateColor(key, e.target.value)}
+              className="w-24 font-mono text-xs h-7"
+            />
+            <span className="text-xs text-zinc-600 dark:text-zinc-400">{COLOR_LABELS[key]}</span>
+          </label>
+        ))}
+      </div>
+      <Button variant="outline" size="sm" onClick={resetToDefaults}>
+        Reset to Defaults
+      </Button>
+    </div>
+  )
 }

@@ -4,12 +4,8 @@ import { Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 import { useTheme } from '@unstable-studios/ui'
+import { resolveColors, type CanvasThemeColors } from '@/lib/theme-config'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-
-const THEME_COLORS = {
-  dark: { bg: '#0a0c12', floor: '#0c0f17', fog: '#0a0c12' },
-  light: { bg: '#e8eaed', floor: '#d4d7dd', fog: '#e8eaed' }
-} as const
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
 
@@ -28,7 +24,7 @@ interface SceneProps {
   bakedMesh?: BakedMeshData | null
   debugColors: boolean
   wireframe: boolean
-  colors: { bg: string; floor: string; fog: string }
+  colors: CanvasThemeColors
 }
 
 function ReviewScene({ bakedMesh, debugColors, wireframe, colors }: SceneProps): React.JSX.Element {
@@ -91,14 +87,19 @@ function ReviewScene({ bakedMesh, debugColors, wireframe, colors }: SceneProps):
       />
 
       {bakedMesh ? (
-        <BakedMeshPreview mesh={bakedMesh} debugColors={debugColors} wireframe={wireframe} />
+        <BakedMeshPreview
+          mesh={bakedMesh}
+          debugColors={debugColors}
+          wireframe={wireframe}
+          meshColor={colors.meshColor}
+        />
       ) : (
-        <EmptyState />
+        <EmptyState color={colors.emptyState} />
       )}
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
         <planeGeometry args={[200, 200]} />
-        <meshStandardMaterial color={colors.floor} roughness={1} />
+        <meshStandardMaterial color={colors.reviewFloor} roughness={1} />
       </mesh>
     </>
   )
@@ -107,11 +108,13 @@ function ReviewScene({ bakedMesh, debugColors, wireframe, colors }: SceneProps):
 function BakedMeshPreview({
   mesh,
   debugColors,
-  wireframe
+  wireframe,
+  meshColor
 }: {
   mesh: BakedMeshData
   debugColors: boolean
   wireframe: boolean
+  meshColor: string
 }): React.JSX.Element {
   const hasColors = mesh.colors && mesh.colors.length > 0
   const useColors = hasColors && debugColors
@@ -133,7 +136,7 @@ function BakedMeshPreview({
         <meshStandardMaterial
           key={useColors ? 'vc' : 'solid'}
           vertexColors={useColors}
-          color={useColors ? undefined : '#4f9ef8'}
+          color={useColors ? undefined : meshColor}
           metalness={0.15}
           roughness={0.35}
           side={THREE.FrontSide}
@@ -148,11 +151,11 @@ function BakedMeshPreview({
   )
 }
 
-function EmptyState(): React.JSX.Element {
+function EmptyState({ color }: { color: string }): React.JSX.Element {
   return (
     <mesh position={[0, 10, 0]}>
       <boxGeometry args={[20, 20, 20]} />
-      <meshStandardMaterial color="#2a2d3a" wireframe opacity={0.3} transparent />
+      <meshStandardMaterial color={color} wireframe opacity={0.3} transparent />
     </mesh>
   )
 }
@@ -160,7 +163,7 @@ function EmptyState(): React.JSX.Element {
 export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JSX.Element {
   const { debugColors, wireframe } = useReviewPrefs()
   const { resolvedTheme } = useTheme()
-  const colors = THEME_COLORS[resolvedTheme === 'light' ? 'light' : 'dark']
+  const colors = resolveColors(resolvedTheme)
 
   return (
     <Canvas
@@ -171,8 +174,8 @@ export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JS
       gl={{ antialias: true }}
     >
       <Suspense fallback={null}>
-        <color attach="background" args={[colors.bg]} />
-        <fog attach="fog" args={[colors.fog, 500, 900]} />
+        <color attach="background" args={[colors.reviewBg]} />
+        <fog attach="fog" args={[colors.reviewFog, 500, 900]} />
         <ReviewScene
           bakedMesh={bakedMesh}
           debugColors={debugColors}
