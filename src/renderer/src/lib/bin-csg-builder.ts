@@ -224,7 +224,7 @@ function buildBridge(params: CSGBinParams, M: ManifoldModule): Manifold {
 
 function buildBody(params: CSGBinParams, M: ManifoldModule): Manifold {
   const { Manifold, CrossSection } = M
-  const { widthUnits, depthUnits, baseUnit, tolerance, heightUnits, unitHeight } = params
+  const { widthUnits, depthUnits, baseUnit, tolerance, heightUnits, unitHeight, hasLip } = params
 
   const outerW = widthUnits * baseUnit - tolerance * 2
   const outerD = depthUnits * baseUnit - tolerance * 2
@@ -232,9 +232,10 @@ function buildBody(params: CSGBinParams, M: ManifoldModule): Manifold {
   const hd = outerD / 2
   const totalH = heightUnits * unitHeight
 
-  // Solid block from BASE_HEIGHT to totalH only.
-  // The lip (if enabled) is added separately as an annular rim.
-  const bodyHeight = totalH - BASE_HEIGHT
+  // Extend the body through the lip height so the outer wall is one
+  // continuous surface with no tessellation seam at the lip junction.
+  const topZ = hasLip ? totalH + LIP_HEIGHT : totalH
+  const bodyHeight = topZ - BASE_HEIGHT
   if (bodyHeight <= 0) {
     const cs = roundedRectCS(hw, hd, OUTER_CORNER_RADIUS, CrossSection)
     return Manifold.extrude(cs, 0.01).translate([0, 0, BASE_HEIGHT])
@@ -245,16 +246,17 @@ function buildBody(params: CSGBinParams, M: ManifoldModule): Manifold {
 }
 
 /**
- * Build the stacking lip as a tapered annular rim on top of the solid block.
+ * Build the lip groove cutter — the tapered inner volume to subtract from
+ * the solid body so the stacking lip profile remains.
  *
- * The lip's inner face follows the LIP_PROFILE (the groove receiving surface):
- *   - At the bottom (z=totalH): inner face at 2.85mm from outer (widest)
- *   - At the top (z=totalH+LIP_HEIGHT): inner face at 0.25mm from outer (thin "point")
+ * The body now extends through the full lip height as a solid block, so we
+ * subtract the groove (the inner tapered shape that follows LIP_PROFILE)
+ * to leave the correct annular lip behind.
  *
- * Built by hulling annular ring discs between each profile step.
- * No separate groove subtraction needed — the lip shape IS the groove interface.
+ * The groove is the union of hulled inner cross-section frustums for each
+ * profile segment, from totalH to totalH + LIP_HEIGHT.
  */
-function buildLip(params: CSGBinParams, M: ManifoldModule): Manifold | null {
+function buildLipGroove(params: CSGBinParams, M: ManifoldModule): Manifold | null {
   if (!params.hasLip) return null
 
   const { Manifold, CrossSection } = M
@@ -268,25 +270,18 @@ function buildLip(params: CSGBinParams, M: ManifoldModule): Manifold | null {
   const maxLipInset = LIP_PROFILE[LIP_PROFILE.length - 1][0] // 2.6
 
   const epsilon = 0.001
-  const lipParts: Manifold[] = []
+  const grooveParts: Manifold[] = []
 
   for (let i = 0; i < LIP_PROFILE.length - 1; i++) {
     const [inset0, z0] = LIP_PROFILE[i]
     const [inset1, z1] = LIP_PROFILE[i + 1]
 
     // Inner face inset from outer wall at each profile height.
-    // At bottom (inset=0): LIP_OFFSET + maxLipInset = 2.85mm (widest lip body)
-    // At top (inset=2.6): LIP_OFFSET + 0 = 0.25mm (thin "point")
+    // At bottom (inset=0): LIP_OFFSET + maxLipInset = 2.85mm (widest)
+    // At top (inset=2.6): LIP_OFFSET + 0 = 0.25mm (thin tip)
     const innerInset0 = LIP_OFFSET + maxLipInset - inset0
     const innerInset1 = LIP_OFFSET + maxLipInset - inset1
 
-    // Outer ring (constant: the outer wall)
-    const outerCS = roundedRectCS(hw, hd, OUTER_CORNER_RADIUS, CrossSection)
-    const outerDisc0 = Manifold.extrude(outerCS, epsilon).translate([0, 0, totalH + z0])
-    const outerDisc1 = Manifold.extrude(outerCS, epsilon).translate([0, 0, totalH + z1])
-    const outerHull = Manifold.hull(outerDisc0, outerDisc1)
-
-    // Inner ring (tapers with profile)
     const iHW0 = hw - innerInset0
     const iHD0 = hd - innerInset0
     const iR0 = Math.max(0.01, OUTER_CORNER_RADIUS - innerInset0)
@@ -294,17 +289,14 @@ function buildLip(params: CSGBinParams, M: ManifoldModule): Manifold | null {
     const iHD1 = hd - innerInset1
     const iR1 = Math.max(0.01, OUTER_CORNER_RADIUS - innerInset1)
 
-    const innerCS0 = roundedRectCS(iHW0, iHD0, iR0, CrossSection)
-    const innerCS1 = roundedRectCS(iHW1, iHD1, iR1, CrossSection)
-    const innerDisc0 = Manifold.extrude(innerCS0, epsilon).translate([0, 0, totalH + z0])
-    const innerDisc1 = Manifold.extrude(innerCS1, epsilon).translate([0, 0, totalH + z1])
-    const innerHull = Manifold.hull(innerDisc0, innerDisc1)
-
-    // Lip segment = outer frustum minus inner frustum = tapered annular ring
-    lipParts.push(Manifold.difference(outerHull, innerHull))
+    const cs0 = roundedRectCS(iHW0, iHD0, iR0, CrossSection)
+    const cs1 = roundedRectCS(iHW1, iHD1, iR1, CrossSection)
+    const disc0 = Manifold.extrude(cs0, epsilon).translate([0, 0, totalH + z0])
+    const disc1 = Manifold.extrude(cs1, epsilon).translate([0, 0, totalH + z1])
+    grooveParts.push(Manifold.hull(disc0, disc1))
   }
 
-  return Manifold.union(lipParts)
+  return Manifold.union(grooveParts)
 }
 
 function subtractHoles(bin: Manifold, params: CSGBinParams, M: ManifoldModule): Manifold {
@@ -373,9 +365,9 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
       cs = cs.offset(pocket.clearance)
     }
 
-    // Extend upward through the lip so edge pockets cut the stacking lip too.
-    // This also ensures items can drop into pockets that intersect the rim.
-    const lipExtension = params.hasLip ? LIP_HEIGHT : 0
+    // Extend upward through the lip (+ 1mm overshoot) so edge pockets
+    // cleanly cut the stacking lip with no residual sliver at the rim.
+    const lipExtension = params.hasLip ? LIP_HEIGHT + 1 : 0
     const cutHeight = pocket.depth + lipExtension
     const cutBase = pocket.zTop - pocket.depth
     const solid = Manifold.extrude(cs, cutHeight).translate([0, 0, cutBase])
@@ -532,13 +524,11 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
   const body = buildBody(params, M)
 
   // Step 4: Union all solid parts
-  const solidParts = [feet, bridge, body]
+  let bin = Manifold.union([feet, bridge, body])
 
-  // Step 5: Add lip rim (annular wall on top of the solid block)
-  const lip = buildLip(params, M)
-  if (lip) solidParts.push(lip)
-
-  let bin = Manifold.union(solidParts)
+  // Step 5: Subtract lip groove (body extends through lip; groove carves the profile)
+  const lipGroove = buildLipGroove(params, M)
+  if (lipGroove) bin = Manifold.difference(bin, lipGroove)
 
   // Step 6: Subtract magnet/screw holes
   bin = subtractHoles(bin, params, M)

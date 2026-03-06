@@ -23,6 +23,14 @@ import PreferencesModal from '@/components/settings/PreferencesModal'
 import { useProject } from '@/hooks/useProject'
 import { useUndo } from '@/hooks/useUndo'
 import { useAppMode } from '@/hooks/useAppMode'
+import {
+  SquareDashedIcon,
+  BoxIcon,
+  MousePointerIcon,
+  SquareIcon,
+  CircleIcon,
+  PentagonIcon
+} from 'lucide-react'
 
 const GITHUB_REPO = 'https://github.com/unstable-studios/gridfinity-studio'
 
@@ -232,8 +240,14 @@ function ViewModeToggle() {
         }
       }}
     >
-      <ToggleGroupItem value="layout">Layout</ToggleGroupItem>
-      <ToggleGroupItem value="review">Review</ToggleGroupItem>
+      <ToggleGroupItem value="layout" className="gap-1.5">
+        <SquareDashedIcon className="size-3.5" />
+        Design
+      </ToggleGroupItem>
+      <ToggleGroupItem value="review" className="gap-1.5">
+        <BoxIcon className="size-3.5" />
+        Preview
+      </ToggleGroupItem>
     </ToggleGroup>
   )
 }
@@ -244,10 +258,10 @@ function ToolBar() {
   const hidden = mode !== 'layout'
 
   const tools = [
-    { id: 'select' as const, label: 'Select' },
-    { id: 'rectangle' as const, label: 'Rect' },
-    { id: 'circle' as const, label: 'Circle' },
-    { id: 'polygon' as const, label: 'Polygon' }
+    { id: 'select' as const, label: 'Select', icon: MousePointerIcon },
+    { id: 'rectangle' as const, label: 'Rect', icon: SquareIcon },
+    { id: 'circle' as const, label: 'Circle', icon: CircleIcon },
+    { id: 'polygon' as const, label: 'Polygon', icon: PentagonIcon }
   ]
 
   return (
@@ -263,8 +277,9 @@ function ToolBar() {
         <ToggleGroupItem
           key={tool.id}
           value={tool.id}
-          className="data-[state=on]:bg-blue-600 data-[state=on]:text-white dark:data-[state=on]:bg-blue-600 dark:data-[state=on]:text-white"
+          className="gap-1.5 data-[state=on]:bg-blue-600 data-[state=on]:text-white dark:data-[state=on]:bg-blue-600 dark:data-[state=on]:text-white"
         >
+          <tool.icon className="size-3.5" />
           {tool.label}
         </ToggleGroupItem>
       ))}

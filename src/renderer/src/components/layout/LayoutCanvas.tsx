@@ -11,6 +11,8 @@ import PolygonTool from '../primitives/PolygonTool'
 import type { Entity, Bin } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
+import { useTheme } from '@unstable-studios/ui'
+import { resolveColors } from '@/lib/theme-config'
 
 interface LayoutCanvasProps {
   entities: Entity[]
@@ -119,6 +121,8 @@ function LayoutScene({
   selectedIds,
   selectionType,
   baseUnit,
+  bgColor,
+  gridColor,
   onPlace,
   onMove,
   onResize,
@@ -128,6 +132,8 @@ function LayoutScene({
   onClearSelection,
   snap
 }: {
+  bgColor: string
+  gridColor: string
   entities: Entity[]
   bins: Bin[]
   selectedIds: Set<string>
@@ -160,8 +166,8 @@ function LayoutScene({
   return (
     <>
       <ambientLight intensity={1} />
-      <color attach="background" args={['#111318']} />
-      <GridOverlay baseUnit={baseUnit} />
+      <color attach="background" args={[bgColor]} />
+      <GridOverlay baseUnit={baseUnit} gridColor={gridColor} />
 
       {/* Multi-bin footprints */}
       {bins.map((bin) => (
@@ -281,6 +287,8 @@ export default function LayoutCanvas({
   const isPanning = useRef(false)
   const lastMouse = useRef({ x: 0, y: 0 })
   const { activeTool } = useAppMode()
+  const { resolvedTheme } = useTheme()
+  const colors = resolveColors(resolvedTheme)
 
   const clampZoom = (z: number): number => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z))
 
@@ -425,6 +433,8 @@ export default function LayoutCanvas({
               selectedIds={selectedIds}
               selectionType={selectionType}
               baseUnit={baseUnit}
+              bgColor={colors.layoutBg}
+              gridColor={colors.layoutGrid}
               onPlace={onPlace}
               onMove={onMove}
               onResize={onResize}
@@ -442,18 +452,18 @@ export default function LayoutCanvas({
       <div className="absolute bottom-3 right-3 flex items-center gap-1">
         <button
           type="button"
-          className="w-7 h-7 rounded bg-zinc-800/80 text-zinc-300 text-sm font-bold hover:bg-zinc-700 backdrop-blur"
+          className="w-7 h-7 rounded bg-white/80 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-300 text-sm font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 backdrop-blur"
           onClick={handleZoomOut}
           title="Zoom out"
         >
           -
         </button>
-        <span className="text-[10px] text-zinc-400 w-10 text-center font-mono">
+        <span className="text-[10px] text-zinc-500 dark:text-zinc-400 w-10 text-center font-mono">
           {Math.round(zoom * 25)}%
         </span>
         <button
           type="button"
-          className="w-7 h-7 rounded bg-zinc-800/80 text-zinc-300 text-sm font-bold hover:bg-zinc-700 backdrop-blur"
+          className="w-7 h-7 rounded bg-white/80 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-300 text-sm font-bold hover:bg-zinc-200 dark:hover:bg-zinc-700 backdrop-blur"
           onClick={handleZoomIn}
           title="Zoom in"
         >
@@ -461,7 +471,7 @@ export default function LayoutCanvas({
         </button>
         <button
           type="button"
-          className="ml-1 h-7 px-2 rounded bg-zinc-800/80 text-zinc-400 text-[10px] hover:bg-zinc-700 hover:text-zinc-300 backdrop-blur"
+          className="ml-1 h-7 px-2 rounded bg-white/80 text-zinc-500 dark:bg-zinc-800/80 dark:text-zinc-400 text-[10px] hover:bg-zinc-200 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300 backdrop-blur"
           onClick={handleZoomToFit}
           title="Zoom to fit"
         >
