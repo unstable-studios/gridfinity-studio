@@ -167,7 +167,7 @@ export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JS
 
   return (
     <Canvas
-      shadows
+      shadows={{ type: THREE.PCFShadowMap }}
       camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: 2000 }}
       dpr={[1, 1.75]}
       style={{ width: '100%', height: '100%' }}
