@@ -14,7 +14,7 @@ import { export3MF as create3MFBlob } from '@/lib/threemf-writer'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
 import { entityToVertices } from '@/lib/entity-shapes'
 import { autoWrap } from '@/lib/auto-wrap'
-import { binOverlapsAny, findNonOverlappingPosition } from '@/lib/collision'
+import { binOverlapsAny, findNonOverlappingPosition, hasBinOverlaps } from '@/lib/collision'
 import { useGeometryWorker } from '@/hooks/useGeometryWorker'
 import type { PocketSpec, CSGBinParams } from '../../../shared/types/worker'
 import type { Entity, Bin, PocketConfig } from '../../../shared/types/project'
@@ -23,24 +23,46 @@ import { computeDefaultPocketDepth } from '../../../shared/types/project'
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
   const { project, clearAllBakeResults } = useProject()
-  const bins = project?.bins ?? []
+  const bins = useMemo(() => project?.bins ?? [], [project?.bins])
+  const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   // Clear stale bake results when all bins are removed
   useEffect(() => {
     if (bins.length === 0) clearAllBakeResults()
   }, [bins.length, clearAllBakeResults])
 
+  // Detect bin-to-bin overlap (e.g. from loaded projects with bad data)
+  const binsOverlap = useMemo(() => {
+    if (bins.length < 2) return false
+    return hasBinOverlaps(
+      bins.map((b) => ({
+        x: b.position.x,
+        y: b.position.y,
+        w: b.width * baseUnit,
+        d: b.depth * baseUnit
+      }))
+    )
+  }, [bins, baseUnit])
+
   return (
     <aside className="w-72 shrink-0 rounded-xl border border-zinc-300/80 bg-white/80 px-4 py-5 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 overflow-y-auto">
-      {bins.map((bin) => (
-        <BinBaker key={bin.id} bin={bin} />
-      ))}
-      {mode === 'layout' ? <LayoutSidebar entities={project?.entities ?? []} /> : <ReviewSidebar />}
+      {!binsOverlap && bins.map((bin) => <BinBaker key={bin.id} bin={bin} />)}
+      {mode === 'layout' ? (
+        <LayoutSidebar entities={project?.entities ?? []} binsOverlap={binsOverlap} />
+      ) : (
+        <ReviewSidebar binsOverlap={binsOverlap} />
+      )}
     </aside>
   )
 }
 
-function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element {
+function LayoutSidebar({
+  entities,
+  binsOverlap
+}: {
+  entities: Entity[]
+  binsOverlap: boolean
+}): React.JSX.Element {
   const { project, updateEntity, removeEntity, addBin, updateBin, removeBin } = useProject()
   const selection = useSharedSelection()
   const { selectedIds, selectionType, select, selectBin } = selection
@@ -124,6 +146,11 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
 
   return (
     <div className="space-y-4">
+      {binsOverlap && (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          Bins overlap — move or resize bins to resolve before models can be generated.
+        </div>
+      )}
       <SidebarSection title="Bins">
         {bins.length === 0 ? (
           <p className="text-xs text-zinc-500">No bins yet. Add one to get started.</p>
@@ -453,7 +480,7 @@ function EntityListItem({
   )
 }
 
-function ReviewSidebar(): React.JSX.Element {
+function ReviewSidebar({ binsOverlap }: { binsOverlap: boolean }): React.JSX.Element {
   const {
     project,
     bakeResults,
@@ -519,8 +546,15 @@ function ReviewSidebar(): React.JSX.Element {
 
   return (
     <div className="space-y-4">
+      {binsOverlap && (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-400">
+          Bins overlap — resolve positions in Layout mode before exporting.
+        </div>
+      )}
       <SidebarSection title="Status">
-        {bakedCount > 0 ? (
+        {binsOverlap ? (
+          <p className="text-xs text-red-400">Baking paused — bins overlap.</p>
+        ) : bakedCount > 0 ? (
           <p className="text-xs text-green-500">
             {bakedCount === 1 ? 'Model ready' : `${bakedCount}/${totalBins} bins ready`}
           </p>
@@ -553,7 +587,7 @@ function ReviewSidebar(): React.JSX.Element {
             <Button
               variant="outline"
               className="flex-1"
-              disabled={bakedCount === 0 || exporting}
+              disabled={bakedCount === 0 || exporting || binsOverlap}
               onClick={() => void handleExportSingle()}
             >
               {exporting ? '...' : 'STL'}
@@ -561,7 +595,7 @@ function ReviewSidebar(): React.JSX.Element {
             <Button
               variant="outline"
               className="flex-1"
-              disabled={bakedCount === 0 || exporting}
+              disabled={bakedCount === 0 || exporting || binsOverlap}
               onClick={() => void handleExport3MF()}
             >
               {exporting ? '...' : '3MF'}
@@ -571,7 +605,7 @@ function ReviewSidebar(): React.JSX.Element {
             <Button
               variant="outline"
               className="w-full"
-              disabled={bakedCount === 0 || exporting}
+              disabled={bakedCount === 0 || exporting || binsOverlap}
               onClick={() => void handleExportAll()}
             >
               {exporting ? 'Exporting...' : `Export All (${bakedCount} bins)`}

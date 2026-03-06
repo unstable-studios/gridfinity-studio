@@ -165,3 +165,21 @@ export function findNonOverlappingPosition(
   // Fallback: place far away
   return { x: posX, y: posY }
 }
+
+/**
+ * Check all bins for pairwise overlap. Returns true if any two bins overlap.
+ */
+export function hasBinOverlaps(
+  bins: Array<{ x: number; y: number; w: number; d: number }>
+): boolean {
+  for (let i = 0; i < bins.length; i++) {
+    for (let j = i + 1; j < bins.length; j++) {
+      const a = bins[i]
+      const b = bins[j]
+      if (a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.d && a.y + a.d > b.y) {
+        return true
+      }
+    }
+  }
+  return false
+}

@@ -127,7 +127,13 @@ function GridfinityTab(): React.JSX.Element {
     updateGridfinity(config)
   }
 
-  return <GridfinitySettings config={project.gridfinity} onChange={handleChange} />
+  return (
+    <GridfinitySettings
+      config={project.gridfinity}
+      onChange={handleChange}
+      hasBins={(project.bins?.length ?? 0) > 0}
+    />
+  )
 }
 
 const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
