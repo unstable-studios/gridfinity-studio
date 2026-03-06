@@ -39,6 +39,10 @@
 - [ ] T149b Add hint content registry mapping each tool/mode to its hint text and shortcuts in `src/renderer/src/lib/hints.ts`
 - [ ] T149c Mount HintCard in App layout, connect to `useAppMode().activeTool` to show context-specific hints in `src/renderer/src/App.tsx`
 
+## Performance
+
+- [ ] T218 Debounce CSG re-bake during entity drag — `BinBaker` in `src/renderer/src/components/Sidebar.tsx` fires a full Manifold rebuild on every `pocketKey` change (which includes entity position). Add a debounce (~300ms) so the worker bake only fires after the user stops dragging. Cancel in-flight bake requests when a new drag starts. Consider also showing a stale/dimmed mesh during drag to keep the UI responsive.
+
 ## Deferred Polish
 
 - [ ] T176 Apply unit formatting to all displayed measurements (sidebar properties, grid labels, tooltip values) — show values in selected unit with automatic conversion in `src/renderer/src/lib/unit-format.ts` and `src/renderer/src/components/Sidebar.tsx`
@@ -61,4 +65,5 @@
 4. T141-T143 (packing) — need multi-bin from 004
 5. T149a-T149c (hints) — independent, can start anytime
 6. T176 (unit formatting) — independent, can start anytime
-7. T144-T148 (final validation) — after everything else
+7. T218 (bake debounce) — independent, can start anytime, high-impact UX fix
+8. T144-T148 (final validation) — after everything else

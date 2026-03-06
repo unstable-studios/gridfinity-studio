@@ -164,62 +164,80 @@ function BinBaker({ bin }: { bin: Bin }): null {
     }))
   )
 
+  const bakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bakeSeq = useRef(0)
+
   useEffect(() => {
     if (!gridfinity || !ready) return
-    const gridCfg = gridfinity
 
-    // Bin center in canvas world coordinates — entity positions are absolute,
-    // but the bin mesh is centered at origin, so we subtract the bin center.
-    const binCenterX = bin.position.x + (bin.width * gridCfg.baseUnit) / 2
-    const binCenterY = bin.position.y + (bin.depth * gridCfg.baseUnit) / 2
+    // Cancel any pending debounced bake
+    if (bakeTimer.current) clearTimeout(bakeTimer.current)
 
-    const totalH = bin.height * gridCfg.unitHeight
+    // Bump sequence so in-flight results from stale requests are ignored
+    const seq = ++bakeSeq.current
 
-    // Convert pocket entities to PocketSpec for the CSG worker
-    const pockets: PocketSpec[] = []
-    for (const entity of pocketEntities) {
-      if (!entity.pocket || entity.pocket.depth <= 0) continue
-      const entityVerts = entityToVertices(entity)
-      if (!entityVerts) continue
+    bakeTimer.current = setTimeout(() => {
+      const gridCfg = gridfinity
 
-      const posX = entity.transform.position.x - binCenterX
-      const posY = entity.transform.position.y - binCenterY
+      // Bin center in canvas world coordinates — entity positions are absolute,
+      // but the bin mesh is centered at origin, so we subtract the bin center.
+      const binCenterX = bin.position.x + (bin.width * gridCfg.baseUnit) / 2
+      const binCenterY = bin.position.y + (bin.depth * gridCfg.baseUnit) / 2
 
-      pockets.push({
-        vertices: entityVerts,
-        depth: entity.pocket.depth,
-        clearance: entity.pocket.clearance,
-        posX,
-        posY,
-        zTop: totalH // cut downward from the top surface of the solid block
+      const totalH = bin.height * gridCfg.unitHeight
+
+      // Convert pocket entities to PocketSpec for the CSG worker
+      const pockets: PocketSpec[] = []
+      for (const entity of pocketEntities) {
+        if (!entity.pocket || entity.pocket.depth <= 0) continue
+        const entityVerts = entityToVertices(entity)
+        if (!entityVerts) continue
+
+        const posX = entity.transform.position.x - binCenterX
+        const posY = entity.transform.position.y - binCenterY
+
+        pockets.push({
+          vertices: entityVerts,
+          depth: entity.pocket.depth,
+          clearance: entity.pocket.clearance,
+          posX,
+          posY,
+          zTop: totalH // cut downward from the top surface of the solid block
+        })
+      }
+
+      const binParams: CSGBinParams = {
+        widthUnits: bin.width,
+        depthUnits: bin.depth,
+        heightUnits: bin.height,
+        baseUnit: gridCfg.baseUnit,
+        unitHeight: gridCfg.unitHeight,
+        tolerance: gridCfg.tolerance,
+        hasLip: bin.hasStackingLip,
+        magnetHoles: gridCfg.magnetHoles,
+        screwHoles: gridCfg.screwHoles,
+        pockets
+      }
+
+      void bakePockets(binParams).then((result) => {
+        // Ignore results from stale bake requests
+        if (bakeSeq.current !== seq) return
+        setBakeResult({
+          mesh: {
+            positions: result.positions,
+            colors: result.colors,
+            indices: result.indices,
+            normals: result.normals
+          },
+          timestamp: Date.now(),
+          warnings: result.warnings
+        })
       })
-    }
+    }, 300)
 
-    const binParams: CSGBinParams = {
-      widthUnits: bin.width,
-      depthUnits: bin.depth,
-      heightUnits: bin.height,
-      baseUnit: gridCfg.baseUnit,
-      unitHeight: gridCfg.unitHeight,
-      tolerance: gridCfg.tolerance,
-      hasLip: bin.hasStackingLip,
-      magnetHoles: gridCfg.magnetHoles,
-      screwHoles: gridCfg.screwHoles,
-      pockets
+    return () => {
+      if (bakeTimer.current) clearTimeout(bakeTimer.current)
     }
-
-    void bakePockets(binParams).then((result) => {
-      setBakeResult({
-        mesh: {
-          positions: result.positions,
-          colors: result.colors,
-          indices: result.indices,
-          normals: result.normals
-        },
-        timestamp: Date.now(),
-        warnings: result.warnings
-      })
-    })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pocketKey is a stable serialization of pocketEntities
   }, [
     gridfinity,

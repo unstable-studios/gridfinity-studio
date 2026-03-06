@@ -11,7 +11,7 @@
  * All dimensions in millimetres. Returns positions/indices/normals ready for Three.js.
  */
 
-import { BASE_PROFILE_HEIGHT, LIP_PROFILE, LIP_OFFSET } from './bin-generator'
+import { BASE_PROFILE_HEIGHT, LIP_PROFILE, LIP_OFFSET, LIP_HEIGHT } from './bin-generator'
 
 // ─── Gridfinity Spec Constants ───────────────────────────────────
 
@@ -373,7 +373,12 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
       cs = cs.offset(pocket.clearance)
     }
 
-    const solid = Manifold.extrude(cs, pocket.depth).translate([0, 0, pocket.zTop - pocket.depth])
+    // Extend upward through the lip so edge pockets cut the stacking lip too.
+    // This also ensures items can drop into pockets that intersect the rim.
+    const lipExtension = params.hasLip ? LIP_HEIGHT : 0
+    const cutHeight = pocket.depth + lipExtension
+    const cutBase = pocket.zTop - pocket.depth
+    const solid = Manifold.extrude(cs, cutHeight).translate([0, 0, cutBase])
     cutters.push(solid)
   }
 
