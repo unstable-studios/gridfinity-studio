@@ -187,10 +187,8 @@ function LayoutSidebar({
         </div>
       )}
 
-      {/* Project name header */}
-      <p className="text-sm font-semibold text-zinc-200 dark:text-zinc-100 mb-3 truncate">
-        {project?.settings.name ?? 'Untitled Project'}
-      </p>
+      {/* Editable project name header */}
+      <ProjectNameHeader />
 
       {/* Bin tree with nested entities */}
       <div>
@@ -685,6 +683,55 @@ const EntityListItem = forwardRef<
     </button>
   )
 })
+
+function ProjectNameHeader(): React.JSX.Element {
+  const { project, updateSettings } = useProject()
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+  const name = project?.settings.name ?? 'Untitled Project'
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  const commitName = (): void => {
+    const trimmed = editName.trim()
+    if (trimmed && trimmed !== name) {
+      updateSettings({ name: trimmed })
+    }
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <Input
+        ref={inputRef}
+        type="text"
+        className="w-full bg-transparent text-sm font-semibold border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 mb-3 focus:ring-0 text-zinc-100"
+        value={editName}
+        onChange={(e) => setEditName(e.target.value)}
+        onBlur={commitName}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commitName()
+          if (e.key === 'Escape') setEditing(false)
+        }}
+      />
+    )
+  }
+
+  return (
+    <p
+      className="text-sm font-semibold text-zinc-100 mb-3 truncate cursor-pointer hover:text-white transition"
+      onDoubleClick={() => {
+        setEditName(name)
+        setEditing(true)
+      }}
+    >
+      {name}
+    </p>
+  )
+}
 
 function ReviewSidebar({ binsOverlap }: { binsOverlap: boolean }): React.JSX.Element {
   const {
