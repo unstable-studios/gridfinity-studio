@@ -397,21 +397,25 @@ class MeshBuilder {
     const n = HOLE_SEGMENTS
     const capZ = floorZ + depth
 
-    // Walls (visible from inside the hole, looking inward)
+    // Walls (visible from inside the hole — normals point inward toward center)
     this.setColor(wallColor)
     const openRing: number[] = []
     for (let i = 0; i < n; i++) {
       const angle = (2 * Math.PI * i) / n
+      const nx = -Math.cos(angle)
+      const ny = -Math.sin(angle)
       openRing.push(
-        this.addVN(cx + r * Math.cos(angle), cy + r * Math.sin(angle), floorZ, 0, 0, -1)
+        this.addVN(cx + r * Math.cos(angle), cy + r * Math.sin(angle), floorZ, nx, ny, 0)
       )
     }
 
     const wallCapRing: number[] = []
     for (let i = 0; i < n; i++) {
       const angle = (2 * Math.PI * i) / n
+      const nx = -Math.cos(angle)
+      const ny = -Math.sin(angle)
       wallCapRing.push(
-        this.addVN(cx + r * Math.cos(angle), cy + r * Math.sin(angle), capZ, 0, 0, -1)
+        this.addVN(cx + r * Math.cos(angle), cy + r * Math.sin(angle), capZ, nx, ny, 0)
       )
     }
 

@@ -711,8 +711,12 @@ export class ProjectValidator {
         }
       }
 
-      // Validate entityIds (required)
-      if (!Array.isArray(b.entityIds)) {
+      // Validate entityIds (required for v0.3.0+, optional for older schemas
+      // where migrations will populate the field)
+      if (b.entityIds == null) {
+        // Missing entityIds is acceptable for pre-migration projects;
+        // migrations will fill it in before the data reaches runtime.
+      } else if (!Array.isArray(b.entityIds)) {
         errors.push({
           field: `bins[${index}].entityIds`,
           message: 'entityIds must be an array',
