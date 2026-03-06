@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { Input } from '@/components/ui/input'
 import { useProject } from '@/hooks/useProject'
 import { useTheme } from '@unstable-studios/ui'
 import { Button } from '@unstable-studios/ui'
+import ColorPicker from '@/components/ui/color-picker'
 import GridfinitySettings from './GridfinitySettings'
 import {
   loadThemeConfig,
@@ -28,7 +28,7 @@ export default function PreferencesModal({
 }: PreferencesModalProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Preferences</DialogTitle>
         </DialogHeader>
@@ -131,11 +131,11 @@ function GridfinityTab(): React.JSX.Element {
 }
 
 const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
-  layoutBg: 'Layout Background',
-  layoutGrid: 'Layout Grid',
-  reviewBg: 'Review Background',
-  reviewFloor: 'Review Floor',
-  reviewFog: 'Review Fog',
+  layoutBg: 'Design Background',
+  layoutGrid: 'Design Grid',
+  reviewBg: 'Preview Background',
+  reviewFloor: 'Preview Floor',
+  reviewFog: 'Preview Fog',
   meshColor: 'Mesh Color',
   emptyState: 'Empty State'
 }
@@ -155,20 +155,12 @@ function ColorSection({
         {mode === 'dark' ? 'Dark' : 'Light'}
       </h4>
       {(Object.keys(COLOR_LABELS) as Array<keyof CanvasThemeColors>).map((key) => (
-        <label key={key} className="flex items-center gap-2">
-          <input
-            type="color"
-            value={colors[key]}
-            onChange={(e) => onUpdate(mode, key, e.target.value)}
-            className="h-7 w-9 cursor-pointer rounded border border-zinc-300 dark:border-zinc-700 bg-transparent p-0.5"
-          />
-          <Input
-            value={colors[key]}
-            onChange={(e) => onUpdate(mode, key, e.target.value)}
-            className="w-24 font-mono text-xs h-7"
-          />
-          <span className="text-xs text-zinc-600 dark:text-zinc-400">{COLOR_LABELS[key]}</span>
-        </label>
+        <ColorPicker
+          key={key}
+          value={colors[key]}
+          onChange={(value) => onUpdate(mode, key, value)}
+          label={COLOR_LABELS[key]}
+        />
       ))}
     </div>
   )
