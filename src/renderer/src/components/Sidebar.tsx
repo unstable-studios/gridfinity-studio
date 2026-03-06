@@ -19,9 +19,14 @@ import { computeDefaultPocketDepth } from '../../../shared/types/project'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
-  const { project } = useProject()
+  const { project, setBakeResult } = useProject()
   const bins = project?.bins ?? []
   const bakeBin = bins[0] ?? null
+
+  // Clear stale bake result when all bins are removed
+  useEffect(() => {
+    if (bins.length === 0) setBakeResult(null)
+  }, [bins.length, setBakeResult])
 
   return (
     <aside className="w-72 shrink-0 rounded-xl border border-zinc-300/80 bg-white/80 px-4 py-5 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 overflow-y-auto">
@@ -100,6 +105,7 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
       {selectedBin && (
         <SidebarSection title="Bin Properties">
           <BinProperties
+            key={selectedBin.id}
             bin={selectedBin}
             onUpdate={(patch) => updateBin(selectedBin.id, patch)}
             onDelete={() => removeBin(selectedBin.id)}
@@ -128,6 +134,7 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
       </SidebarSection>
       {selectedEntity && (
         <EntityProperties
+          key={selectedEntity.id}
           entity={selectedEntity}
           onUpdate={updateEntity}
           onDelete={() => {
