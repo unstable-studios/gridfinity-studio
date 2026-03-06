@@ -305,7 +305,7 @@
 |------|------------|--------|--------|
 | [`002-undo-redo`](../002-undo-redo/) | US3 — Undo/Redo | #84 | Ready |
 | [`003-imports-patterns`](../003-imports-patterns/) | US2 — SVG/STL Import, Patterns, Snap, Groups, Align | #91, #94-#101, #104 | Ready |
-| [`004-multi-bin-export`](../004-multi-bin-export/) | US4 — Multi-Bin Layout & Export | #110, #113-#115, #119 | Ready |
+| [`004-multi-bin-export`](../004-multi-bin-export/) | US4 — Multi-Bin Layout & Export | #110, #113-#115, #119 | **Complete** (PR #198) |
 | [`005-polish`](../005-polish/) | Polish — Analysis, Examples, Packing, Hints | #116-#118, #120 | Ready |
 
 ---
@@ -325,7 +325,7 @@ Each spec directory contains its own dependency and execution order documentatio
 **Recommended order**:
 1. **002-undo-redo** (US3) — foundation for non-destructive editing
 2. **003-imports-patterns** (US2) — SVG/STL import, patterns, snap, groups (depends on undo for some tasks)
-3. **004-multi-bin-export** (US4) — batch export, collision, keep-out (can parallel with 003)
+3. ~~**004-multi-bin-export** (US4)~~ — **COMPLETE** (PR #198)
 4. **005-polish** — analysis, examples, packing (depends on 003 + 004)
 
 **Cross-story parallelism**: US3 and US2 can proceed in parallel. US4 can start once CSG export basics are stable (already done).
