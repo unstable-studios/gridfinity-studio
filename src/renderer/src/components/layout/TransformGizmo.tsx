@@ -25,8 +25,8 @@ export default function TransformGizmo({
   onResize,
   snap
 }: TransformGizmoProps): React.JSX.Element | null {
-  const pauseUndo = useProject((s) => s.pauseUndo)
-  const resumeUndo = useProject((s) => s.resumeUndo)
+  const startDrag = useProject((s) => s.startDrag)
+  const endDrag = useProject((s) => s.endDrag)
   const [dragging, setDragging] = useState(false)
   const [resizing, setResizing] = useState<HandlePosition | null>(null)
   const dragStart = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
@@ -101,10 +101,10 @@ export default function TransformGizmo({
       lastPos.current = { x: centroid.x, y: centroid.y }
       shiftHeld.current = event.nativeEvent.shiftKey
       axisLock.current = null
-      pauseUndo()
+      startDrag()
       setDragging(true)
     },
-    [centroid, pauseUndo]
+    [centroid, startDrag]
   )
 
   const handlePointerMove = useCallback(
@@ -155,10 +155,10 @@ export default function TransformGizmo({
       event.stopPropagation()
       setDragging(false)
       axisLock.current = null
-      resumeUndo()
+      endDrag()
       onMoveEnd?.(selectedIds)
     },
-    [dragging, resumeUndo, onMoveEnd, selectedIds]
+    [dragging, endDrag, onMoveEnd, selectedIds]
   )
 
   // Resize handle logic
@@ -168,10 +168,10 @@ export default function TransformGizmo({
       const domTarget = event.nativeEvent.target as HTMLElement | null
       domTarget?.setPointerCapture?.(event.nativeEvent.pointerId)
       lastPos.current = { x: event.point.x, y: event.point.y }
-      pauseUndo()
+      startDrag()
       setResizing(handle)
     },
-    [pauseUndo]
+    [startDrag]
   )
 
   const handleResizeMove = useCallback(
@@ -224,9 +224,9 @@ export default function TransformGizmo({
       if (!resizing) return
       event.stopPropagation()
       setResizing(null)
-      resumeUndo()
+      endDrag()
     },
-    [resizing, resumeUndo]
+    [resizing, endDrag]
   )
 
   if (!centroid || selectedEntities.length === 0) return null

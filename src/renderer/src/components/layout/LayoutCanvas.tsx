@@ -68,8 +68,8 @@ function BinDragHandler({
     [otherBins, baseUnit]
   )
 
-  const pauseUndo = useProject((s) => s.pauseUndo)
-  const resumeUndo = useProject((s) => s.resumeUndo)
+  const startDrag = useProject((s) => s.startDrag)
+  const endDrag = useProject((s) => s.endDrag)
 
   const handlePointerDown = useCallback(
     (e: ThreeEvent<PointerEvent>) => {
@@ -80,10 +80,10 @@ function BinDragHandler({
         x: e.point.x - bin.position.x,
         y: e.point.y - bin.position.y
       }
-      pauseUndo()
+      startDrag()
       setDragging(true)
     },
-    [bin.id, bin.position.x, bin.position.y, onSelectBin, pauseUndo]
+    [bin.id, bin.position.x, bin.position.y, onSelectBin, startDrag]
   )
 
   const handlePointerMove = useCallback(
@@ -120,9 +120,9 @@ function BinDragHandler({
       if (!dragging) return
       e.stopPropagation()
       setDragging(false)
-      resumeUndo()
+      endDrag()
     },
-    [dragging, resumeUndo]
+    [dragging, endDrag]
   )
 
   return (
