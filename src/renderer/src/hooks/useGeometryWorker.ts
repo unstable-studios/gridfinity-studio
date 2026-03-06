@@ -2,22 +2,24 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import type {
   WorkerRequest,
   WorkerResponse,
-  MeshDataWithNormals
+  MeshDataWithNormals,
+  CSGBinParams
 } from '../../../shared/types/worker'
 
 interface PendingRequest {
-  resolve: (value: MeshDataWithNormals) => void
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  resolve: (value: any) => void
   reject: (reason: Error) => void
+}
+
+export interface BakePocketsResult extends MeshDataWithNormals {
+  warnings: string[]
 }
 
 export interface UseGeometryWorkerResult {
   ready: boolean
-  extrude: (
-    vertices: Float32Array,
-    depth: number,
-    direction: 'up' | 'down',
-    role: 'solid' | 'cutter'
-  ) => Promise<MeshDataWithNormals>
+  extrude: (vertices: Float32Array, depth: number, zTop?: number) => Promise<MeshDataWithNormals>
+  bakePockets: (binParams: CSGBinParams) => Promise<BakePocketsResult>
 }
 
 export function useGeometryWorker(): UseGeometryWorkerResult {
@@ -59,12 +61,17 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
       const pending = pendingRef.current.get(id)
       if (pending) {
         pendingRef.current.delete(id)
-        pending.resolve({
+        const base = {
           positions: msg.positions,
           indices: msg.indices,
           normals: msg.normals,
           colors: msg.colors
-        })
+        }
+        if (msg.type === 'bake-pockets' || msg.type === 'bake') {
+          pending.resolve({ ...base, warnings: msg.warnings })
+        } else {
+          pending.resolve(base)
+        }
       }
     }
 
@@ -83,12 +90,7 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
   }, [])
 
   const extrude = useCallback(
-    (
-      vertices: Float32Array,
-      depth: number,
-      direction: 'up' | 'down',
-      role: 'solid' | 'cutter'
-    ): Promise<MeshDataWithNormals> => {
+    (vertices: Float32Array, depth: number, zTop?: number): Promise<MeshDataWithNormals> => {
       return new Promise((resolve, reject) => {
         const worker = workerRef.current
         if (!worker) {
@@ -107,8 +109,7 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
           id,
           vertices: verticesCopy,
           depth,
-          direction,
-          role
+          zTop
         }
         worker.postMessage(message, [verticesCopy.buffer] as unknown as Transferable[])
       })
@@ -116,5 +117,25 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
     []
   )
 
-  return { ready, extrude }
+  const bakePockets = useCallback((binParams: CSGBinParams): Promise<BakePocketsResult> => {
+    return new Promise((resolve, reject) => {
+      const worker = workerRef.current
+      if (!worker) {
+        reject(new Error('Worker not initialized'))
+        return
+      }
+
+      const id = crypto.randomUUID()
+      pendingRef.current.set(id, { resolve, reject })
+
+      const message: WorkerRequest = {
+        type: 'bake-pockets',
+        id,
+        binParams
+      }
+      worker.postMessage(message)
+    })
+  }, [])
+
+  return { ready, extrude, bakePockets }
 }

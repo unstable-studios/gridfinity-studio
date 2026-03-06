@@ -307,9 +307,16 @@ export class ProjectValidator {
       // Type-specific validation
       this.validateEntityTypeFields(e, index, errors)
 
-      // Extrusion validation (optional)
+      // Pocket validation (optional)
+      if (e.pocket !== undefined) {
+        this.validatePocket(e.pocket, `entities[${index}].pocket`, errors)
+      }
+
+      // Legacy extrusion field — accept with warning (migration should handle this)
       if (e.extrusion !== undefined) {
-        this.validateExtrusion(e.extrusion, `entities[${index}].extrusion`, errors)
+        console.warn(
+          `Entity ${e.id} has legacy 'extrusion' field. Run migration to convert to 'pocket'.`
+        )
       }
     })
   }
@@ -414,39 +421,31 @@ export class ProjectValidator {
     }
   }
 
-  private static validateExtrusion(
-    extrusion: unknown,
+  private static validatePocket(
+    pocket: unknown,
     fieldPath: string,
     errors: ValidationError[]
   ): void {
-    if (!extrusion || typeof extrusion !== 'object') {
-      errors.push({ field: fieldPath, message: 'Extrusion must be an object', value: extrusion })
+    if (!pocket || typeof pocket !== 'object') {
+      errors.push({ field: fieldPath, message: 'Pocket must be an object', value: pocket })
       return
     }
 
-    const ext = extrusion as Record<string, unknown>
+    const p = pocket as Record<string, unknown>
 
-    if (typeof ext.depth !== 'number' || (ext.depth as number) <= 0) {
+    if (typeof p.depth !== 'number' || (p.depth as number) <= 0) {
       errors.push({
         field: `${fieldPath}.depth`,
-        message: 'Extrusion depth must be a number greater than 0',
-        value: ext.depth
+        message: 'Pocket depth must be a number greater than 0',
+        value: p.depth
       })
     }
 
-    if (!['up', 'down'].includes(ext.direction as string)) {
+    if (typeof p.clearance !== 'number' || (p.clearance as number) < 0) {
       errors.push({
-        field: `${fieldPath}.direction`,
-        message: "Extrusion direction must be 'up' or 'down'",
-        value: ext.direction
-      })
-    }
-
-    if (!['solid', 'cutter'].includes(ext.role as string)) {
-      errors.push({
-        field: `${fieldPath}.role`,
-        message: "Extrusion role must be 'solid' or 'cutter'",
-        value: ext.role
+        field: `${fieldPath}.clearance`,
+        message: 'Pocket clearance must be a non-negative number',
+        value: p.clearance
       })
     }
   }
@@ -712,31 +711,33 @@ export class ProjectValidator {
         }
       }
 
-      // Validate entityIds (new field)
-      if (b.entityIds !== undefined) {
-        if (!Array.isArray(b.entityIds)) {
-          errors.push({
-            field: `bins[${index}].entityIds`,
-            message: 'entityIds must be an array',
-            value: b.entityIds
-          })
-        } else {
-          ;(b.entityIds as unknown[]).forEach((eid, ei) => {
-            if (typeof eid !== 'string') {
-              errors.push({
-                field: `bins[${index}].entityIds[${ei}]`,
-                message: 'Entity ID must be a string',
-                value: eid
-              })
-            } else if (entityIds.size > 0 && !entityIds.has(eid)) {
-              errors.push({
-                field: `bins[${index}].entityIds[${ei}]`,
-                message: `Entity ID '${eid}' does not exist`,
-                value: eid
-              })
-            }
-          })
-        }
+      // Validate entityIds (required for v0.3.0+, optional for older schemas
+      // where migrations will populate the field)
+      if (b.entityIds == null) {
+        // Missing entityIds is acceptable for pre-migration projects;
+        // migrations will fill it in before the data reaches runtime.
+      } else if (!Array.isArray(b.entityIds)) {
+        errors.push({
+          field: `bins[${index}].entityIds`,
+          message: 'entityIds must be an array',
+          value: b.entityIds
+        })
+      } else {
+        ;(b.entityIds as unknown[]).forEach((eid, ei) => {
+          if (typeof eid !== 'string') {
+            errors.push({
+              field: `bins[${index}].entityIds[${ei}]`,
+              message: 'Entity ID must be a string',
+              value: eid
+            })
+          } else if (entityIds.size > 0 && !entityIds.has(eid)) {
+            errors.push({
+              field: `bins[${index}].entityIds[${ei}]`,
+              message: `Entity ID '${eid}' does not exist`,
+              value: eid
+            })
+          }
+        })
       }
     })
   }

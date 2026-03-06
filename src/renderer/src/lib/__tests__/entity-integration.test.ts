@@ -7,7 +7,7 @@ import {
   type CircleEntity,
   type RectangleEntity,
   type PolygonEntity,
-  type ExtrusionConfig
+  type PocketConfig
 } from '../../../../shared/types/project'
 import { validateProject } from '../../../../shared/validation/project-validator'
 
@@ -203,13 +203,13 @@ describe('entity creation round-trip', () => {
       } as Partial<RectangleEntity> & { type: 'rectangle' })
       project = { ...project, entities: [entity] }
 
-      const extrusion: ExtrusionConfig = { depth: 5, direction: 'down', role: 'cutter' }
+      const pocket: PocketConfig = { depth: 5, clearance: 0.2 }
       const updated = {
         ...project,
-        entities: project.entities.map((e) => (e.id === entity.id ? { ...e, extrusion } : e))
+        entities: project.entities.map((e) => (e.id === entity.id ? { ...e, pocket } : e))
       }
 
-      expect(updated.entities[0].extrusion).toEqual(extrusion)
+      expect(updated.entities[0].pocket).toEqual(pocket)
       const validation = validateProject(updated)
       expect(validation.valid).toBe(true)
     })
@@ -262,7 +262,7 @@ describe('entity creation round-trip', () => {
         type: 'rectangle',
         width: 20,
         height: 10,
-        extrusion: { depth: 5, direction: 'down', role: 'cutter' }
+        pocket: { depth: 5, clearance: 0.2 }
       } as Partial<RectangleEntity> & { type: 'rectangle' })
       project = r2.project
 
@@ -274,10 +274,9 @@ describe('entity creation round-trip', () => {
       expect(deserialized.entities[0].type).toBe('circle')
       expect((deserialized.entities[0] as CircleEntity).diameter).toBe(15)
       expect(deserialized.entities[1].type).toBe('rectangle')
-      expect(deserialized.entities[1].extrusion).toEqual({
+      expect(deserialized.entities[1].pocket).toEqual({
         depth: 5,
-        direction: 'down',
-        role: 'cutter'
+        clearance: 0.2
       })
 
       const validation = validateProject(deserialized)

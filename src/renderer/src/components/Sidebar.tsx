@@ -2,32 +2,30 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import {
-  Select,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-  SelectValue
-} from '@/components/ui/select'
+import { NumericInput } from '@/components/ui/numeric-input'
+import { Switch } from '@/components/ui/switch'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useSharedSelection } from '@/hooks/useSelection'
+import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 
 import { exportSTL as createSTLBlob } from '@/lib/stl-io'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
-import { generateBinMesh } from '@/lib/bin-generator'
-import { extrudePolygon } from '@/lib/extrude'
-import type { Entity, Bin, ExtrusionConfig, Vertex2D } from '../../../shared/types/project'
-import type { AuxMesh } from '@/hooks/useProject'
-import { formatDimension, parseDimension, unitLabel } from '../../../shared/types/units'
-import type { DisplayUnit } from '../../../shared/types/units'
+import { entityToVertices } from '@/lib/entity-shapes'
+import { useGeometryWorker } from '@/hooks/useGeometryWorker'
+import type { PocketSpec, CSGBinParams } from '../../../shared/types/worker'
+import type { Entity, Bin, PocketConfig } from '../../../shared/types/project'
+import { computeDefaultPocketDepth } from '../../../shared/types/project'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
   const { project } = useProject()
+  const bins = project?.bins ?? []
+  const bakeBin = bins[0] ?? null
 
   return (
     <aside className="w-72 shrink-0 rounded-xl border border-zinc-300/80 bg-white/80 px-4 py-5 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 overflow-y-auto">
+      {bakeBin && <BinBaker bin={bakeBin} />}
       {mode === 'layout' ? <LayoutSidebar entities={project?.entities ?? []} /> : <ReviewSidebar />}
     </aside>
   )
@@ -142,6 +140,122 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
   )
 }
 
+/** Headless component that auto-bakes the bin mesh via CSG worker whenever inputs change. */
+function BinBaker({ bin }: { bin: Bin }): null {
+  const { project, setBakeResult } = useProject()
+  const { ready, bakePockets } = useGeometryWorker()
+
+  const entities = project?.entities ?? []
+  const gridfinity = project?.gridfinity
+
+  // Stable serialization of pocket entities to avoid re-triggering on every render
+  const pocketEntities = entities.filter(
+    (e) => bin.entityIds.includes(e.id) && e.pocket && e.pocket.depth > 0
+  )
+  const pocketKey = JSON.stringify(
+    pocketEntities.map((e) => ({
+      id: e.id,
+      type: e.type,
+      pocket: e.pocket,
+      pos: e.transform.position,
+      ...(e.type === 'circle' ? { diameter: e.diameter } : {}),
+      ...(e.type === 'rectangle' ? { width: e.width, height: e.height } : {}),
+      ...(e.type === 'polygon' ? { vertices: e.vertices } : {})
+    }))
+  )
+
+  const bakeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const bakeSeq = useRef(0)
+
+  useEffect(() => {
+    if (!gridfinity || !ready) return
+
+    // Cancel any pending debounced bake
+    if (bakeTimer.current) clearTimeout(bakeTimer.current)
+
+    // Bump sequence so in-flight results from stale requests are ignored
+    const seq = ++bakeSeq.current
+
+    bakeTimer.current = setTimeout(() => {
+      const gridCfg = gridfinity
+
+      // Bin center in canvas world coordinates — entity positions are absolute,
+      // but the bin mesh is centered at origin, so we subtract the bin center.
+      const binCenterX = bin.position.x + (bin.width * gridCfg.baseUnit) / 2
+      const binCenterY = bin.position.y + (bin.depth * gridCfg.baseUnit) / 2
+
+      const totalH = bin.height * gridCfg.unitHeight
+
+      // Convert pocket entities to PocketSpec for the CSG worker
+      const pockets: PocketSpec[] = []
+      for (const entity of pocketEntities) {
+        if (!entity.pocket || entity.pocket.depth <= 0) continue
+        const entityVerts = entityToVertices(entity)
+        if (!entityVerts) continue
+
+        const posX = entity.transform.position.x - binCenterX
+        const posY = entity.transform.position.y - binCenterY
+
+        pockets.push({
+          vertices: entityVerts,
+          depth: entity.pocket.depth,
+          clearance: entity.pocket.clearance,
+          posX,
+          posY,
+          zTop: totalH // cut downward from the top surface of the solid block
+        })
+      }
+
+      const binParams: CSGBinParams = {
+        widthUnits: bin.width,
+        depthUnits: bin.depth,
+        heightUnits: bin.height,
+        baseUnit: gridCfg.baseUnit,
+        unitHeight: gridCfg.unitHeight,
+        tolerance: gridCfg.tolerance,
+        hasLip: bin.hasStackingLip,
+        magnetHoles: gridCfg.magnetHoles,
+        screwHoles: gridCfg.screwHoles,
+        pockets
+      }
+
+      void bakePockets(binParams).then((result) => {
+        // Ignore results from stale bake requests
+        if (bakeSeq.current !== seq) return
+        setBakeResult({
+          mesh: {
+            positions: result.positions,
+            colors: result.colors,
+            indices: result.indices,
+            normals: result.normals
+          },
+          timestamp: Date.now(),
+          warnings: result.warnings
+        })
+      })
+    }, 300)
+
+    return () => {
+      if (bakeTimer.current) clearTimeout(bakeTimer.current)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pocketKey is a stable serialization of pocketEntities
+  }, [
+    gridfinity,
+    ready,
+    bakePockets,
+    setBakeResult,
+    bin.width,
+    bin.depth,
+    bin.height,
+    bin.hasStackingLip,
+    bin.position.x,
+    bin.position.y,
+    pocketKey
+  ])
+
+  return null
+}
+
 function BinProperties({
   bin,
   onUpdate,
@@ -151,65 +265,34 @@ function BinProperties({
   onUpdate: (patch: Partial<Bin>) => void
   onDelete: () => void
 }): React.JSX.Element {
-  const { project, setBakeResult } = useProject()
-
-  useEffect(() => {
-    if (!project) return
-    const gridCfg = project.gridfinity
-    const binMesh = generateBinMesh({
-      widthUnits: bin.width,
-      depthUnits: bin.depth,
-      heightUnits: bin.height,
-      baseUnit: gridCfg.baseUnit,
-      unitHeight: gridCfg.unitHeight,
-      tolerance: gridCfg.tolerance,
-      hasLip: bin.hasStackingLip,
-      hasDividers: bin.hasDividers,
-      magnetHoles: gridCfg.magnetHoles,
-      screwHoles: gridCfg.screwHoles
-    })
-
-    setBakeResult({
-      mesh: {
-        positions: binMesh.positions,
-        colors: binMesh.colors,
-        indices: binMesh.indices,
-        normals: binMesh.normals
-      },
-      auxMeshes: [],
-      timestamp: Date.now(),
-      dirty: false,
-      warnings: []
-    })
-  }, [
-    project,
-    setBakeResult,
-    bin.width,
-    bin.depth,
-    bin.height,
-    bin.hasStackingLip,
-    bin.hasDividers
-  ])
-
   return (
     <div className="space-y-2 text-xs">
       <div className="grid grid-cols-3 gap-1">
-        <EditableNumericField
+        <NumericInput
           label="W"
           value={bin.width}
           suffix="u"
+          step={1}
+          min={1}
+          precision={0}
           onChange={(v) => onUpdate({ width: v })}
         />
-        <EditableNumericField
+        <NumericInput
           label="D"
           value={bin.depth}
           suffix="u"
+          step={1}
+          min={1}
+          precision={0}
           onChange={(v) => onUpdate({ depth: v })}
         />
-        <EditableNumericField
+        <NumericInput
           label="H"
           value={bin.height}
           suffix="u"
+          step={1}
+          min={1}
+          precision={0}
           onChange={(v) => onUpdate({ height: v })}
         />
       </div>
@@ -301,93 +384,9 @@ function EntityListItem({
 }
 
 function ReviewSidebar(): React.JSX.Element {
-  const { bakeResult, setBakeResult, project, exportSTL: doExport } = useProject()
-  const [baking, setBaking] = useState(false)
+  const { bakeResult, exportSTL: doExport } = useProject()
+  const { debugColors, setDebugColors, wireframe, setWireframe } = useReviewPrefs()
   const [exporting, setExporting] = useState(false)
-
-  const handleBake = useCallback(async () => {
-    if (!project) return
-    setBaking(true)
-    try {
-      const binConfig = project.bins[0]
-      const gridCfg = project.gridfinity
-
-      const binMesh = generateBinMesh({
-        widthUnits: binConfig?.width ?? 1,
-        depthUnits: binConfig?.depth ?? 1,
-        heightUnits: binConfig?.height ?? 3,
-        baseUnit: gridCfg.baseUnit,
-        unitHeight: gridCfg.unitHeight,
-        tolerance: gridCfg.tolerance,
-        hasLip: binConfig?.hasStackingLip ?? true,
-        hasDividers: binConfig?.hasDividers ?? false,
-        magnetHoles: gridCfg.magnetHoles,
-        screwHoles: gridCfg.screwHoles
-      })
-
-      // Generate extrusion meshes for entities with extrusion config
-      const auxMeshes: AuxMesh[] = []
-      for (const entity of project.entities) {
-        if (!entity.extrusion || entity.extrusion.depth <= 0) continue
-
-        let vertices: Vertex2D[] = []
-        const pos = entity.transform.position
-
-        if (entity.type === 'rectangle') {
-          const hw = entity.width / 2
-          const hh = entity.height / 2
-          vertices = [
-            { x: pos.x - hw, y: pos.y - hh },
-            { x: pos.x + hw, y: pos.y - hh },
-            { x: pos.x + hw, y: pos.y + hh },
-            { x: pos.x - hw, y: pos.y + hh }
-          ]
-        } else if (entity.type === 'circle') {
-          const r = entity.diameter / 2
-          const segments = 32
-          vertices = Array.from({ length: segments }, (_, i) => {
-            const angle = (2 * Math.PI * i) / segments
-            return { x: pos.x + r * Math.cos(angle), y: pos.y + r * Math.sin(angle) }
-          })
-        } else if (entity.type === 'polygon') {
-          vertices = entity.vertices
-        }
-
-        if (vertices.length >= 3) {
-          const extruded = extrudePolygon(
-            vertices,
-            entity.extrusion.depth,
-            entity.extrusion.direction
-          )
-          auxMeshes.push({
-            mesh: {
-              positions: extruded.positions,
-              indices: extruded.indices,
-              normals: extruded.normals,
-              colors: new Float32Array(0)
-            },
-            role: entity.extrusion.role,
-            entityId: entity.id
-          })
-        }
-      }
-
-      setBakeResult({
-        mesh: {
-          positions: binMesh.positions,
-          colors: binMesh.colors,
-          indices: binMesh.indices,
-          normals: binMesh.normals
-        },
-        auxMeshes,
-        timestamp: Date.now(),
-        dirty: false,
-        warnings: []
-      })
-    } finally {
-      setBaking(false)
-    }
-  }, [project, setBakeResult])
 
   const handleExport = useCallback(async () => {
     if (!bakeResult) return
@@ -404,24 +403,30 @@ function ReviewSidebar(): React.JSX.Element {
 
   return (
     <div className="space-y-4">
-      <SidebarSection title="Bake">
-        <p className="text-xs text-zinc-500 mb-2">
-          Combine bin mesh with cutters to produce the final model.
-        </p>
-        <Button
-          variant="outline"
-          className="w-full"
-          disabled={baking}
-          onClick={() => void handleBake()}
-        >
-          {baking ? 'Baking...' : bakeResult?.dirty ? 'Re-bake Model' : 'Bake Model'}
-        </Button>
-        {bakeResult && !bakeResult.dirty && (
-          <p className="text-xs text-green-500 mt-1">Baked successfully</p>
+      <SidebarSection title="Status">
+        {bakeResult ? (
+          <p className="text-xs text-green-500">Model ready</p>
+        ) : (
+          <p className="text-xs text-zinc-500">Add a bin to generate a model.</p>
         )}
-        {bakeResult?.dirty && (
-          <p className="text-xs text-amber-500 mt-1">Design changed — re-bake needed</p>
-        )}
+        {bakeResult?.warnings.map((w, i) => (
+          <p key={i} className="text-xs text-amber-500">
+            {w}
+          </p>
+        ))}
+      </SidebarSection>
+
+      <SidebarSection title="Display">
+        <div className="space-y-2">
+          <label className="flex items-center justify-between">
+            <span className="text-xs text-zinc-400">Debug colors</span>
+            <Switch checked={debugColors} onCheckedChange={setDebugColors} />
+          </label>
+          <label className="flex items-center justify-between">
+            <span className="text-xs text-zinc-400">Wireframe</span>
+            <Switch checked={wireframe} onCheckedChange={setWireframe} />
+          </label>
+        </div>
       </SidebarSection>
 
       <SidebarSection title="Export">
@@ -464,9 +469,6 @@ function EntityProperties({
   onUpdate: (id: string, patch: Partial<Entity>) => void
   onDelete: () => void
 }): React.JSX.Element {
-  const { project } = useProject()
-  const unit = (project?.settings.units ?? 'mm') as DisplayUnit
-
   const handlePositionChange = (axis: 'x' | 'y', value: number): void => {
     onUpdate(entity.id, {
       transform: {
@@ -476,52 +478,83 @@ function EntityProperties({
     })
   }
 
-  const handleExtrusionChange = (patch: Partial<ExtrusionConfig>): void => {
-    const current = entity.extrusion ?? {
-      depth: 5,
-      direction: 'down' as const,
-      role: 'cutter' as const
-    }
-    onUpdate(entity.id, { extrusion: { ...current, ...patch } })
+  const { project } = useProject()
+  const bins = project?.bins ?? []
+  const unitHeight = project?.gridfinity.unitHeight ?? 7
+
+  // Find the bin this entity belongs to (for default pocket depth)
+  const ownerBin = bins.find((b) => b.entityIds.includes(entity.id))
+
+  const handlePocketChange = (patch: Partial<PocketConfig>): void => {
+    const defaultDepth = ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : 5
+    const current = entity.pocket ?? { depth: defaultDepth, clearance: 0.2 }
+    onUpdate(entity.id, { pocket: { ...current, ...patch } })
+  }
+
+  const handleRemovePocket = (): void => {
+    onUpdate(entity.id, { pocket: undefined })
   }
 
   return (
     <SidebarSection title="Properties">
       <div className="space-y-2 text-xs">
         <PropertyRow label="Type" value={entity.type} />
-        <EditableNumberRow
-          label={`X (${unitLabel(unit)})`}
+        <NumericInput
+          label="X"
           value={entity.transform.position.x}
-          unit={unit}
+          suffix="mm"
+          step={0.5}
+          fineStep={0.1}
+          coarseStep={5}
+          precision={1}
           onChange={(v) => handlePositionChange('x', v)}
         />
-        <EditableNumberRow
-          label={`Y (${unitLabel(unit)})`}
+        <NumericInput
+          label="Y"
           value={entity.transform.position.y}
-          unit={unit}
+          suffix="mm"
+          step={0.5}
+          fineStep={0.1}
+          coarseStep={5}
+          precision={1}
           onChange={(v) => handlePositionChange('y', v)}
         />
         {entity.type === 'circle' && (
-          <EditableNumberRow
-            label={`Diameter (${unitLabel(unit)})`}
+          <NumericInput
+            label="Diameter"
             value={entity.diameter}
-            unit={unit}
-            onChange={(v) => onUpdate(entity.id, { diameter: Math.max(0.1, v) })}
+            suffix="mm"
+            step={0.5}
+            fineStep={0.1}
+            coarseStep={5}
+            precision={1}
+            min={0.1}
+            onChange={(v) => onUpdate(entity.id, { diameter: v })}
           />
         )}
         {entity.type === 'rectangle' && (
           <>
-            <EditableNumberRow
-              label={`Width (${unitLabel(unit)})`}
+            <NumericInput
+              label="Width"
               value={entity.width}
-              unit={unit}
-              onChange={(v) => onUpdate(entity.id, { width: Math.max(0.1, v) })}
+              suffix="mm"
+              step={0.5}
+              fineStep={0.1}
+              coarseStep={5}
+              precision={1}
+              min={0.1}
+              onChange={(v) => onUpdate(entity.id, { width: v })}
             />
-            <EditableNumberRow
-              label={`Height (${unitLabel(unit)})`}
+            <NumericInput
+              label="Height"
               value={entity.height}
-              unit={unit}
-              onChange={(v) => onUpdate(entity.id, { height: Math.max(0.1, v) })}
+              suffix="mm"
+              step={0.5}
+              fineStep={0.1}
+              coarseStep={5}
+              precision={1}
+              min={0.1}
+              onChange={(v) => onUpdate(entity.id, { height: v })}
             />
           </>
         )}
@@ -529,7 +562,12 @@ function EntityProperties({
           <PropertyRow label="Vertices" value={String(entity.vertices.length)} />
         )}
 
-        <ExtrusionControls entity={entity} onExtrusionChange={handleExtrusionChange} />
+        <PocketControls
+          entity={entity}
+          onPocketChange={handlePocketChange}
+          onRemovePocket={handleRemovePocket}
+          defaultDepth={ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : 5}
+        />
         <Button
           variant="outline"
           size="sm"
@@ -543,64 +581,49 @@ function EntityProperties({
   )
 }
 
-function ExtrusionControls({
+function PocketControls({
   entity,
-  onExtrusionChange
+  onPocketChange,
+  onRemovePocket,
+  defaultDepth
 }: {
   entity: Entity
-  onExtrusionChange: (patch: Partial<ExtrusionConfig>) => void
+  onPocketChange: (patch: Partial<PocketConfig>) => void
+  onRemovePocket: () => void
+  defaultDepth: number
 }): React.JSX.Element {
-  const hasExtrusion = entity.extrusion !== undefined
+  const hasPocket = entity.pocket !== undefined
 
   return (
     <div className="mt-2 pt-2 border-t border-zinc-800">
-      <p className="text-xs font-medium text-zinc-400 mb-1">Extrusion</p>
-      {hasExtrusion ? (
+      <p className="text-xs font-medium text-zinc-400 mb-1">Pocket</p>
+      {hasPocket ? (
         <div className="space-y-1">
-          <EditableNumberRow
+          <NumericInput
             label="Depth"
-            value={entity.extrusion!.depth}
-            onChange={(v) => {
-              if (v > 0) onExtrusionChange({ depth: v })
-            }}
+            value={entity.pocket!.depth}
+            suffix="mm"
+            step={0.5}
+            fineStep={0.1}
+            coarseStep={5}
+            precision={1}
+            min={0.1}
+            onChange={(v) => onPocketChange({ depth: v })}
           />
-          <div className="flex items-center justify-between">
-            <span className="text-zinc-500">Direction</span>
-            <Select
-              value={entity.extrusion!.direction}
-              onValueChange={(v) => onExtrusionChange({ direction: v as 'up' | 'down' })}
-            >
-              <SelectTrigger className="w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="up">Up</SelectItem>
-                <SelectItem value="down">Down</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-zinc-500">Role</span>
-            <Select
-              value={entity.extrusion!.role}
-              onValueChange={(v) => onExtrusionChange({ role: v as 'solid' | 'cutter' })}
-            >
-              <SelectTrigger className="w-24">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="solid">Solid</SelectItem>
-                <SelectItem value="cutter">Cutter</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full mt-1"
-            onClick={() => onExtrusionChange({ depth: 0 })}
-          >
-            Remove Extrusion
+          <NumericInput
+            label="Clearance"
+            value={entity.pocket!.clearance}
+            suffix="mm"
+            step={0.05}
+            fineStep={0.01}
+            coarseStep={0.5}
+            precision={2}
+            min={0}
+            max={5}
+            onChange={(v) => onPocketChange({ clearance: v })}
+          />
+          <Button variant="outline" size="sm" className="w-full mt-1" onClick={onRemovePocket}>
+            Remove Pocket
           </Button>
         </div>
       ) : (
@@ -608,9 +631,9 @@ function ExtrusionControls({
           variant="outline"
           size="sm"
           className="w-full"
-          onClick={() => onExtrusionChange({ depth: 5, direction: 'down', role: 'cutter' })}
+          onClick={() => onPocketChange({ depth: defaultDepth, clearance: 0.2 })}
         >
-          Add Extrusion
+          Add Pocket
         </Button>
       )}
     </div>
@@ -622,90 +645,6 @@ function PropertyRow({ label, value }: { label: string; value: string }): React.
     <div className="flex items-center justify-between">
       <span className="text-zinc-500">{label}</span>
       <span className="text-zinc-300 font-mono">{value}</span>
-    </div>
-  )
-}
-
-function EditableNumberRow({
-  label,
-  value,
-  unit,
-  onChange
-}: {
-  label: string
-  value: number
-  unit?: DisplayUnit
-  onChange: (value: number) => void
-}): React.JSX.Element {
-  const displayUnit = unit ?? 'mm'
-  const [localValue, setLocalValue] = useState(formatDimension(value, displayUnit))
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  // Sync from external changes (e.g. gizmo drag)
-  useEffect(() => {
-    setLocalValue(formatDimension(value, displayUnit))
-  }, [value, displayUnit])
-
-  const commit = useCallback(
-    (raw: string) => {
-      const mm = parseDimension(raw, displayUnit)
-      if (!isNaN(mm)) onChange(mm)
-    },
-    [onChange, displayUnit]
-  )
-
-  const handleChange = (raw: string): void => {
-    setLocalValue(raw)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => commit(raw), 150)
-  }
-
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-zinc-500">{label}</span>
-      <Input
-        type="number"
-        className="w-20 font-mono text-xs text-right py-0.5 px-1"
-        value={localValue}
-        step={0.1}
-        onChange={(e) => handleChange(e.target.value)}
-        onBlur={() => commit(localValue)}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commit(localValue)
-        }}
-      />
-    </div>
-  )
-}
-
-function EditableNumericField({
-  label,
-  value,
-  suffix,
-  onChange
-}: {
-  label: string
-  value: number
-  suffix?: string
-  onChange: (value: number) => void
-}): React.JSX.Element {
-  return (
-    <div className="flex flex-col items-center">
-      <span className="text-zinc-500 text-[10px]">{label}</span>
-      <div className="flex items-center gap-0.5">
-        <Input
-          type="number"
-          className="w-10 font-mono text-xs text-center py-0.5 px-1"
-          value={value}
-          min={1}
-          step={1}
-          onChange={(e) => {
-            const num = parseInt(e.target.value)
-            if (!isNaN(num) && num > 0) onChange(num)
-          }}
-        />
-        {suffix && <span className="text-zinc-500 text-[10px]">{suffix}</span>}
-      </div>
     </div>
   )
 }

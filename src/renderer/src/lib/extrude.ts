@@ -20,6 +20,77 @@ interface ExtrudeResult {
   normals: Float32Array
 }
 
+// ─── Polygon offset ──────────────────────────────────────────────
+
+/**
+ * Expand (or shrink) a 2D polygon by `offset` along vertex normals.
+ * Positive offset expands outward, negative shrinks inward.
+ * Handles both CW and CCW winding automatically.
+ */
+export function offsetPolygon(vertices: Vertex2D[], offset: number): Vertex2D[] {
+  if (offset === 0 || vertices.length < 3) return vertices
+
+  const n = vertices.length
+
+  // Compute signed area to determine winding direction
+  let signedArea = 0
+  for (let i = 0; i < n; i++) {
+    const curr = vertices[i]
+    const next = vertices[(i + 1) % n]
+    signedArea += (next.x - curr.x) * (next.y + curr.y)
+  }
+  // signedArea > 0 = CW, < 0 = CCW
+  // Base outward normal formula (ey, -ex) is correct for CCW; flip for CW
+  const windingSign = signedArea > 0 ? -1 : 1
+
+  const result: Vertex2D[] = []
+
+  for (let i = 0; i < n; i++) {
+    const prev = vertices[(i - 1 + n) % n]
+    const curr = vertices[i]
+    const next = vertices[(i + 1) % n]
+
+    // Edge vectors
+    const e1x = curr.x - prev.x
+    const e1y = curr.y - prev.y
+    const e2x = next.x - curr.x
+    const e2y = next.y - curr.y
+
+    // Outward normals
+    const len1 = Math.sqrt(e1x * e1x + e1y * e1y)
+    const len2 = Math.sqrt(e2x * e2x + e2y * e2y)
+    if (len1 === 0 || len2 === 0) {
+      result.push(curr)
+      continue
+    }
+
+    // Right-hand normal = (dy, -dx) for CW, flip for CCW
+    const n1x = (e1y / len1) * windingSign
+    const n1y = (-e1x / len1) * windingSign
+    const n2x = (e2y / len2) * windingSign
+    const n2y = (-e2x / len2) * windingSign
+
+    // Average normal at vertex
+    let nx = n1x + n2x
+    let ny = n1y + n2y
+    const nLen = Math.sqrt(nx * nx + ny * ny)
+    if (nLen === 0) {
+      result.push(curr)
+      continue
+    }
+    nx /= nLen
+    ny /= nLen
+
+    // Scale by 1/cos(half-angle) to maintain offset distance at edges
+    const dot = n1x * nx + n1y * ny
+    const scale = dot > 0.1 ? offset / dot : offset
+
+    result.push({ x: curr.x + nx * scale, y: curr.y + ny * scale })
+  }
+
+  return result
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────
 
 function computeTriangleNormal(
@@ -61,13 +132,14 @@ function computeTriangleNormal(
  *
  * - `vertices` — ordered 2D points forming a closed polygon (CW or CCW)
  * - `depth` — extrusion distance (always positive)
- * - `direction` — 'up' places the top cap at z=depth, bottom at z=0;
- *                  'down' places the top cap at z=0, bottom at z=-depth
+ * - `zTop` — Z position of the top cap (default 0). Bottom cap is at zTop - depth.
+ *
+ * Pockets always extrude downward from zTop.
  */
 export function extrudePolygon(
   vertices: Vertex2D[],
   depth: number,
-  direction: 'up' | 'down'
+  zTop: number = 0
 ): ExtrudeResult {
   const n = vertices.length
   if (n < 3) {
@@ -78,8 +150,8 @@ export function extrudePolygon(
     }
   }
 
-  const topZ = direction === 'up' ? depth : 0
-  const bottomZ = direction === 'up' ? 0 : -depth
+  const topZ = zTop
+  const bottomZ = zTop - depth
 
   // ── Triangulate the cap ───────────────────────────────────────
   const flat: number[] = []

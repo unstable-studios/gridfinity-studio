@@ -3,7 +3,7 @@ export default {
   // Skip non-conventional messages typically authored by tooling or bots
   // This prevents CI from failing on auto-generated commits that don't follow the spec
   ignores: [
-    (message) => /^Merge\b/.test(message),
+    (message) => /^[Mm]erge\b/.test(message),
     (message) => /^Update\b/.test(message),
     (message) => /Co-authored-by:\s*Copilot\b/.test(message),
     (message) => /^Initial plan\b/i.test(message)

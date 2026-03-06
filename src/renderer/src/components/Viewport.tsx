@@ -27,7 +27,12 @@ export default function Viewport(): React.JSX.Element {
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   const handlePlace = (partial: Partial<Entity> & { type: Entity['type'] }): void => {
-    const entity = addEntity(partial)
+    // Auto-associate with selected bin, or first bin
+    const targetBinId =
+      selection.selectionType === 'bin' && selection.selectedIds.size > 0
+        ? [...selection.selectedIds][0]
+        : bins[0]?.id
+    const entity = addEntity(partial, targetBinId)
     selection.select(entity.id)
   }
 
@@ -75,7 +80,7 @@ export default function Viewport(): React.JSX.Element {
 
   return (
     <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-zinc-300 bg-linear-to-b from-zinc-100/50 via-white to-zinc-100 shadow-inner dark:border-zinc-800 dark:from-zinc-900/50 dark:via-zinc-900 dark:to-zinc-900/70">
-      {mode === 'layout' ? (
+      <div className={mode === 'layout' ? 'h-full' : 'hidden'}>
         <LayoutCanvas
           entities={entities}
           bins={bins}
@@ -91,9 +96,10 @@ export default function Viewport(): React.JSX.Element {
           onClearSelection={selection.clearSelection}
           snap={snapFn}
         />
-      ) : (
-        <ReviewCanvas bakedMesh={bakeResult?.mesh ?? null} auxMeshes={bakeResult?.auxMeshes} />
-      )}
+      </div>
+      <div className={mode === 'review' ? 'h-full' : 'hidden'}>
+        <ReviewCanvas bakedMesh={bakeResult?.mesh ?? null} />
+      </div>
     </div>
   )
 }

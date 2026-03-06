@@ -19,6 +19,29 @@ export interface MeshDataWithNormals extends MeshData {
 
 // ─── Request types ────────────────────────────────────────────────
 
+export interface PocketSpec {
+  vertices: Float32Array
+  depth: number
+  clearance: number
+  posX: number
+  posY: number
+  zTop: number
+}
+
+/** Full bin parameters for CSG building in the worker */
+export interface CSGBinParams {
+  widthUnits: number
+  depthUnits: number
+  heightUnits: number
+  baseUnit: number
+  unitHeight: number
+  tolerance: number
+  hasLip: boolean
+  magnetHoles: { enabled: boolean; diameter: number; depth: number }
+  screwHoles: { enabled: boolean; diameter: number; depth: number }
+  pockets: PocketSpec[]
+}
+
 export type WorkerRequest =
   | { type: 'init' }
   | {
@@ -26,8 +49,7 @@ export type WorkerRequest =
       id: string
       vertices: Float32Array
       depth: number
-      direction: 'up' | 'down'
-      role: 'solid' | 'cutter'
+      zTop?: number
     }
   | {
       type: 'boolean'
@@ -43,6 +65,11 @@ export type WorkerRequest =
       solids: MeshData[]
       cutters: MeshData[]
     }
+  | {
+      type: 'bake-pockets'
+      id: string
+      binParams: CSGBinParams
+    }
 
 // ─── Response types ───────────────────────────────────────────────
 
@@ -52,6 +79,11 @@ export type WorkerResponse =
   | ({ type: 'boolean'; id: string } & MeshDataWithNormals)
   | ({
       type: 'bake'
+      id: string
+      warnings: string[]
+    } & MeshDataWithNormals)
+  | ({
+      type: 'bake-pockets'
       id: string
       warnings: string[]
     } & MeshDataWithNormals)

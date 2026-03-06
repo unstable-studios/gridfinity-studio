@@ -8,8 +8,7 @@ describe('WorkerRequest message protocol', () => {
       id: 'req-1',
       vertices: new Float32Array([0, 0, 1, 0, 0.5, 1]),
       depth: 5,
-      direction: 'up',
-      role: 'solid'
+      zTop: 20
     }
 
     expect(request.type).toBe('extrude')
@@ -17,7 +16,7 @@ describe('WorkerRequest message protocol', () => {
     expect(request.vertices).toBeInstanceOf(Float32Array)
     expect(request.vertices.length).toBe(6)
     expect(request.depth).toBe(5)
-    expect(request.direction).toBe('up')
+    expect(request.zTop).toBe(20)
   })
 
   it('boolean request has required fields', () => {
@@ -95,9 +94,7 @@ describe('WorkerRequest/Response construction', () => {
         type: 'extrude',
         id: 'test',
         vertices: new Float32Array([]),
-        depth: 1,
-        direction: 'up',
-        role: 'solid'
+        depth: 1
       }
       void _
     }).not.toThrow()

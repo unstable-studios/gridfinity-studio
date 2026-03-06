@@ -1,5 +1,6 @@
 import type { WorkerRequest, WorkerResponse, MeshData } from '../../../shared/types/worker'
 import { extrudePolygon } from '../lib/extrude'
+import { buildBinCSG } from '../lib/bin-csg-builder'
 
 // Worker globals
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -15,8 +16,11 @@ let manifoldModule: any = null
 async function initManifold(): Promise<boolean> {
   try {
     const Module = (await import('manifold-3d')).default
-    manifoldModule = await Module()
+    manifoldModule = await Module({
+      locateFile: () => new URL('/manifold.wasm', self.location.origin).href
+    })
     manifoldModule.setup()
+    console.log('[geometry.worker] Manifold WASM initialized successfully')
     return true
   } catch (err) {
     console.error('[geometry.worker] Failed to initialize manifold WASM:', err)
@@ -24,7 +28,7 @@ async function initManifold(): Promise<boolean> {
   }
 }
 
-// ─── Manifold helpers ────────────────────────────────────────────
+// ─── Helpers ────────────────────────────────────────────────────
 
 function meshDataToManifold(data: MeshData): {
   vertProperties: Float32Array
@@ -123,7 +127,7 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
         vertices.push({ x: msg.vertices[i * 2], y: msg.vertices[i * 2 + 1] })
       }
 
-      const result = extrudePolygon(vertices, msg.depth, msg.direction)
+      const result = extrudePolygon(vertices, msg.depth, msg.zTop ?? 0)
       const colors = new Float32Array(0)
       const response: WorkerResponse = {
         type: 'extrude',
@@ -238,6 +242,53 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
           type: 'error',
           id: msg.id,
           error: `Bake failed: ${err instanceof Error ? err.message : String(err)}`
+        } satisfies WorkerResponse)
+      }
+      break
+    }
+
+    case 'bake-pockets': {
+      if (!manifoldModule) {
+        ctx.postMessage({
+          type: 'error',
+          id: msg.id,
+          error: 'Manifold WASM not initialized'
+        } satisfies WorkerResponse)
+        break
+      }
+
+      try {
+        const warnings: string[] = []
+        const t0 = performance.now()
+
+        console.log('[worker] Building full CSG bin...')
+        const csgResult = buildBinCSG(msg.binParams, manifoldModule)
+        const totalMs = (performance.now() - t0).toFixed(1)
+        const verts = csgResult.positions.length / 3
+        const tris = csgResult.indices.length / 3
+        console.log(
+          `[worker] CSG bake complete: ${verts} verts, ${tris} tris, ${msg.binParams.pockets.length} pockets (${totalMs}ms)`
+        )
+
+        const colors = new Float32Array(0)
+        const response: WorkerResponse = {
+          type: 'bake-pockets',
+          id: msg.id,
+          warnings,
+          positions: csgResult.positions,
+          indices: csgResult.indices,
+          normals: csgResult.normals,
+          colors
+        }
+        ctx.postMessage(response, {
+          transfer: [csgResult.positions.buffer, csgResult.indices.buffer, csgResult.normals.buffer]
+        })
+      } catch (err) {
+        console.error('[worker] Bake-pockets failed:', err)
+        ctx.postMessage({
+          type: 'error',
+          id: msg.id,
+          error: `Bake-pockets failed: ${err instanceof Error ? err.message : String(err)}`
         } satisfies WorkerResponse)
       }
       break

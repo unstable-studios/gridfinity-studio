@@ -6,7 +6,11 @@
  */
 
 import { useState, useCallback, useEffect, useContext, createContext } from 'react'
-import { createEmptyProject, createDefaultTransform } from '../../../shared/types/project'
+import {
+  createEmptyProject,
+  createDefaultTransform,
+  computeDefaultPocketDepth
+} from '../../../shared/types/project'
 import type {
   ProjectData,
   Entity,
@@ -16,17 +20,9 @@ import type {
 } from '../../../shared/types/project'
 import type { MeshDataWithNormals } from '../../../shared/types/worker'
 
-export interface AuxMesh {
-  mesh: MeshDataWithNormals
-  role: 'solid' | 'cutter'
-  entityId: string
-}
-
 export interface BakeResult {
   mesh: MeshDataWithNormals
-  auxMeshes: AuxMesh[]
   timestamp: number
-  dirty: boolean
   warnings: string[]
 }
 
@@ -37,8 +33,7 @@ export interface UseProjectResult {
   recentProjects: string[]
   bakeResult: BakeResult | null
   setBakeResult: (result: BakeResult | null) => void
-  markBakeDirty: () => void
-  addEntity: (partial: Partial<Entity> & { type: Entity['type'] }) => Entity
+  addEntity: (partial: Partial<Entity> & { type: Entity['type'] }, binId?: string) => Entity
   updateEntity: (id: string, patch: Partial<Entity>) => void
   moveEntity: (id: string, dx: number, dy: number) => void
   removeEntity: (id: string) => void
@@ -104,12 +99,8 @@ function useProjectState(): UseProjectResult {
     sessionStorage.setItem(SESSION_KEY, JSON.stringify({ project, filePath, isModified }))
   }, [project, filePath, isModified])
 
-  const markBakeDirty = useCallback(() => {
-    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
-  }, [])
-
   const addEntity = useCallback(
-    (partial: Partial<Entity> & { type: Entity['type'] }): Entity => {
+    (partial: Partial<Entity> & { type: Entity['type'] }, binId?: string): Entity => {
       let resolvedName = partial.name
       if (!resolvedName) {
         // Count existing entities of the same type for sequential naming
@@ -118,6 +109,20 @@ function useProjectState(): UseProjectResult {
         resolvedName = `${label} ${existingCount + 1}`
       }
 
+      // Auto-assign pocket config if not explicitly provided
+      const pocket =
+        partial.pocket ??
+        (() => {
+          const bins = project?.bins ?? []
+          const targetBin = binId ? bins.find((b) => b.id === binId) : bins[0]
+          if (!targetBin) return { depth: 5, clearance: 0.2 }
+          const unitHeight = project?.gridfinity.unitHeight ?? 7
+          return {
+            depth: computeDefaultPocketDepth(targetBin.height, unitHeight),
+            clearance: 0.2
+          }
+        })()
+
       const entity = {
         id: crypto.randomUUID(),
         name: resolvedName,
@@ -125,18 +130,26 @@ function useProjectState(): UseProjectResult {
         visible: partial.visible ?? true,
         locked: partial.locked ?? false,
         properties: partial.properties ?? {},
-        ...partial
+        ...partial,
+        pocket
       } as Entity
 
       setProject((prev) => {
         if (!prev) return prev
-        return { ...prev, entities: [...prev.entities, entity] }
+        // Add entity and associate with target bin
+        const targetId = binId ?? prev.bins[0]?.id
+        const updatedBins = targetId
+          ? prev.bins.map((b) =>
+              b.id === targetId ? { ...b, entityIds: [...b.entityIds, entity.id] } : b
+            )
+          : prev.bins
+        return { ...prev, entities: [...prev.entities, entity], bins: updatedBins }
       })
       setIsModified(true)
-      setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+
       return entity
     },
-    [project?.entities]
+    [project?.entities, project?.bins, project?.gridfinity]
   )
 
   const updateEntity = useCallback((id: string, patch: Partial<Entity>) => {
@@ -148,7 +161,6 @@ function useProjectState(): UseProjectResult {
       }
     })
     setIsModified(true)
-    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
   }, [])
 
   const moveEntity = useCallback((id: string, dx: number, dy: number) => {
@@ -173,16 +185,21 @@ function useProjectState(): UseProjectResult {
       }
     })
     setIsModified(true)
-    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
   }, [])
 
   const removeEntity = useCallback((id: string) => {
     setProject((prev) => {
       if (!prev) return prev
-      return { ...prev, entities: prev.entities.filter((e) => e.id !== id) }
+      return {
+        ...prev,
+        entities: prev.entities.filter((e) => e.id !== id),
+        bins: prev.bins.map((b) => ({
+          ...b,
+          entityIds: b.entityIds.filter((eid) => eid !== id)
+        }))
+      }
     })
     setIsModified(true)
-    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
   }, [])
 
   const updateSettings = useCallback((patch: Partial<GlobalSettings>) => {
@@ -199,7 +216,6 @@ function useProjectState(): UseProjectResult {
       return { ...prev, gridfinity: config }
     })
     setIsModified(true)
-    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
   }, [])
 
   const addBin = useCallback(
@@ -215,6 +231,7 @@ function useProjectState(): UseProjectResult {
         hasDividers: false,
         hasLabel: false,
         hasStackingLip: true,
+        entityIds: [],
         properties: {},
         ...patch
       }
@@ -223,7 +240,7 @@ function useProjectState(): UseProjectResult {
         return { ...prev, bins: [...prev.bins, bin] }
       })
       setIsModified(true)
-      setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
+
       return bin
     },
     [project?.bins.length]
@@ -238,7 +255,6 @@ function useProjectState(): UseProjectResult {
       }
     })
     setIsModified(true)
-    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
   }, [])
 
   const removeBin = useCallback((id: string) => {
@@ -247,7 +263,6 @@ function useProjectState(): UseProjectResult {
       return { ...prev, bins: prev.bins.filter((b) => b.id !== id) }
     })
     setIsModified(true)
-    setBakeResult((prev) => (prev ? { ...prev, dirty: true } : null))
   }, [])
 
   const exportSTL = useCallback(async (stlData: ArrayBuffer): Promise<boolean> => {
@@ -369,7 +384,6 @@ function useProjectState(): UseProjectResult {
     recentProjects,
     bakeResult,
     setBakeResult,
-    markBakeDirty,
     addEntity,
     updateEntity,
     moveEntity,

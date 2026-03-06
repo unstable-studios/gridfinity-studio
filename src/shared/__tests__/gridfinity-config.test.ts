@@ -4,7 +4,8 @@ import {
   TOLERANCE_PRESETS,
   GRIDFINITY_PRESETS,
   DEFAULT_GRIDFINITY_CONFIG,
-  createEmptyProject
+  createEmptyProject,
+  computeDefaultPocketDepth
 } from '../types/project'
 
 describe('TOLERANCE_PRESETS', () => {
@@ -100,5 +101,29 @@ describe('createEmptyProject', () => {
   it('creates a shallow copy of the config (not the same reference)', () => {
     const project = createEmptyProject()
     expect(project.gridfinity).not.toBe(DEFAULT_GRIDFINITY_CONFIG)
+  })
+})
+
+describe('computeDefaultPocketDepth', () => {
+  // Standard gridfinity: unitHeight=7, baseProfile=4.95, floor=1.0
+  // 3u bin: 3*7 = 21, interior = 21 - 1.0 - 4.95 = 15.05 → rounded to 15.1
+
+  it('computes interior depth for standard 3u bin', () => {
+    expect(computeDefaultPocketDepth(3, 7)).toBe(15.1)
+  })
+
+  it('computes interior depth for 1u bin', () => {
+    // 1*7 = 7, 7 - 1.0 - 4.95 = 1.05 → rounds to 1.0 (IEEE 754)
+    expect(computeDefaultPocketDepth(1, 7)).toBe(1)
+  })
+
+  it('clamps to minimum 0.1 for very short bins', () => {
+    // 0.5 * 7 = 3.5, 3.5 - 5.95 = -2.45 → clamped to 0.1
+    expect(computeDefaultPocketDepth(0.5, 7)).toBe(0.1)
+  })
+
+  it('works with non-standard unit height', () => {
+    // 3 * 10 = 30, 30 - 5.95 = 24.05 → 24.1
+    expect(computeDefaultPocketDepth(3, 10)).toBe(24.1)
   })
 })
