@@ -45,7 +45,23 @@ export default defineConfig({
     resolve: {
       alias: {
         '@renderer': resolve('src/renderer/src'),
-        '@': resolve(__dirname, 'src/renderer/src')
+        '@': resolve(__dirname, 'src/renderer/src'),
+        // manifold-3d conditionally imports Node's "module" builtin (guarded by
+        // ENVIRONMENT_IS_NODE) — stub it out so Vite doesn't externalize + warn
+        module: resolve(__dirname, 'src/renderer/src/lib/empty-module.ts')
+      }
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id): string | undefined {
+            if (id.includes('node_modules/three/')) return 'three'
+            if (id.includes('node_modules/react-dom/')) return 'react-dom'
+            if (id.includes('node_modules/@react-three/')) return 'r3f'
+            if (id.includes('node_modules/@radix-ui/')) return 'radix'
+            return undefined
+          }
+        }
       }
     },
     worker: {
