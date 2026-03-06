@@ -1,4 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import type { DisplayUnit } from '../../../../shared/types/units'
+import { formatDimension, parseDimension, unitLabel } from '../../../../shared/types/units'
 
 export interface NumericInputProps {
   value: number
@@ -11,6 +13,8 @@ export interface NumericInputProps {
   suffix?: string
   precision?: number
   label?: string
+  /** When set, value is treated as mm internally and displayed in this unit. */
+  displayUnit?: DisplayUnit
 }
 
 function clamp(v: number, min: number | undefined, max: number | undefined): number {
@@ -43,12 +47,17 @@ export function NumericInput({
   step = 1,
   fineStep: fineStepProp,
   coarseStep: coarseStepProp,
-  suffix,
-  precision = 1,
-  label
+  suffix: suffixProp,
+  precision: precisionProp = 1,
+  label,
+  displayUnit
 }: NumericInputProps): React.JSX.Element {
   const fineStep = fineStepProp ?? step / 10
   const coarseStep = coarseStepProp ?? step * 10
+
+  // When displayUnit is set, override suffix and precision
+  const suffix = displayUnit ? unitLabel(displayUnit) : suffixProp
+  const precision = displayUnit && displayUnit === 'in' ? 3 : precisionProp
 
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
@@ -111,9 +120,10 @@ export function NumericInput({
   // ── Click to edit ────────────────────────────────────────────
 
   const startEditing = useCallback(() => {
-    setEditText(value.toFixed(precision))
+    const display = displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)
+    setEditText(display)
     setEditing(true)
-  }, [value, precision])
+  }, [value, precision, displayUnit])
 
   useEffect(() => {
     if (editing) {
@@ -124,9 +134,9 @@ export function NumericInput({
 
   const commitEdit = useCallback(() => {
     setEditing(false)
-    const parsed = parseFloat(editText)
+    const parsed = displayUnit ? parseDimension(editText, displayUnit) : parseFloat(editText)
     if (!isNaN(parsed)) apply(parsed)
-  }, [editText, apply])
+  }, [editText, apply, displayUnit])
 
   // ── Wheel ────────────────────────────────────────────────────
 
@@ -186,7 +196,7 @@ export function NumericInput({
     [step, fineStep, coarseStep, value, apply]
   )
 
-  const displayValue = value.toFixed(precision)
+  const displayValue = displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)
 
   return (
     <div className="flex items-center gap-1 text-xs" onWheel={onWheel}>

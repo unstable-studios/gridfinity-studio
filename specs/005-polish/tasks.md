@@ -41,11 +41,11 @@
 
 ## Performance
 
-- [ ] T218 Debounce CSG re-bake during entity drag — `BinBaker` in `src/renderer/src/components/Sidebar.tsx` fires a full Manifold rebuild on every `pocketKey` change (which includes entity position). Add a debounce (~300ms) so the worker bake only fires after the user stops dragging. Cancel in-flight bake requests when a new drag starts. Consider also showing a stale/dimmed mesh during drag to keep the UI responsive.
+- [x] T218 Debounce CSG re-bake during entity drag — `BinBaker` in `src/renderer/src/components/Sidebar.tsx` fires a full Manifold rebuild on every `pocketKey` change (which includes entity position). Add a debounce (~300ms) so the worker bake only fires after the user stops dragging. Cancel in-flight bake requests when a new drag starts. Consider also showing a stale/dimmed mesh during drag to keep the UI responsive.
 
 ## Interaction Fixes
 
-- [ ] T219 Disable entity selection/dragging when a drawing tool is active — currently clicking inside a bin while using circle/rectangle/polygon tool grabs and drags the bin instead of placing the shape. Only the Select tool should allow click-to-select and drag-to-move. Drawing tools should pass clicks through to the tool handler. Affects `src/renderer/src/components/layout/LayoutCanvas.tsx` and entity hit-testing logic.
+- [x] T219 Disable entity selection/dragging when a drawing tool is active — currently clicking inside a bin while using circle/rectangle/polygon tool grabs and drags the bin instead of placing the shape. Only the Select tool should allow click-to-select and drag-to-move. Drawing tools should pass clicks through to the tool handler. Affects `src/renderer/src/components/layout/LayoutCanvas.tsx` and entity hit-testing logic.
 
 ## Deferred Polish
 
