@@ -692,7 +692,10 @@ function ProjectNameHeader(): React.JSX.Element {
   const name = project?.settings.name ?? 'Untitled Project'
 
   useEffect(() => {
-    if (editing) inputRef.current?.focus()
+    if (editing) {
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
   }, [editing])
 
   const commitName = (): void => {
@@ -708,7 +711,7 @@ function ProjectNameHeader(): React.JSX.Element {
       <Input
         ref={inputRef}
         type="text"
-        className="w-full bg-transparent text-sm font-semibold border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 mb-3 focus:ring-0 text-zinc-100"
+        className="w-full bg-transparent text-sm font-semibold border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 mb-3 focus:ring-0 text-zinc-900 dark:text-zinc-100"
         value={editName}
         onChange={(e) => setEditName(e.target.value)}
         onBlur={commitName}
@@ -722,7 +725,7 @@ function ProjectNameHeader(): React.JSX.Element {
 
   return (
     <p
-      className="text-sm font-semibold text-zinc-100 mb-3 truncate cursor-pointer hover:text-white transition"
+      className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate cursor-pointer hover:text-zinc-600 dark:hover:text-white transition"
       onDoubleClick={() => {
         setEditName(name)
         setEditing(true)
