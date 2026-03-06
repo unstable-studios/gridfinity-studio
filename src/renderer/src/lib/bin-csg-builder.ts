@@ -373,9 +373,9 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
       cs = cs.offset(pocket.clearance)
     }
 
-    // Extend upward through the lip so edge pockets cut the stacking lip too.
-    // This also ensures items can drop into pockets that intersect the rim.
-    const lipExtension = params.hasLip ? LIP_HEIGHT : 0
+    // Extend upward through the lip (+ 1mm overshoot) so edge pockets
+    // cleanly cut the stacking lip with no residual sliver at the rim.
+    const lipExtension = params.hasLip ? LIP_HEIGHT + 1 : 0
     const cutHeight = pocket.depth + lipExtension
     const cutBase = pocket.zTop - pocket.depth
     const solid = Manifold.extrude(cs, cutHeight).translate([0, 0, cutBase])
