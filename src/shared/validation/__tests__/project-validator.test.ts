@@ -290,24 +290,24 @@ describe('ProjectValidator', () => {
     })
   })
 
-  // ── 6. Extrusion config ─────────────────────────────────────────
+  // ── 6. Pocket config ───────────────────────────────────────────
 
-  describe('extrusion config', () => {
-    it('accepts a valid extrusion', () => {
+  describe('pocket config', () => {
+    it('accepts a valid pocket', () => {
       const entity = makeBaseEntity({
         type: 'circle',
         diameter: 10,
-        extrusion: { depth: 5, direction: 'up', role: 'solid' }
+        pocket: { depth: 5, clearance: 0.2 }
       })
       const result = ProjectValidator.validate(projectWithEntity(entity))
       expect(result.valid).toBe(true)
     })
 
-    it('accepts direction "down" and role "cutter"', () => {
+    it('accepts zero clearance', () => {
       const entity = makeBaseEntity({
         type: 'circle',
         diameter: 10,
-        extrusion: { depth: 3, direction: 'down', role: 'cutter' }
+        pocket: { depth: 3, clearance: 0 }
       })
       const result = ProjectValidator.validate(projectWithEntity(entity))
       expect(result.valid).toBe(true)
@@ -317,14 +317,14 @@ describe('ProjectValidator', () => {
       const entity = makeBaseEntity({
         type: 'circle',
         diameter: 10,
-        extrusion: { depth: 0, direction: 'up', role: 'solid' }
+        pocket: { depth: 0, clearance: 0.2 }
       })
       const result = ProjectValidator.validate(projectWithEntity(entity))
       expect(result.valid).toBe(false)
       expect(result.errors).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            field: 'entities[0].extrusion.depth',
+            field: 'entities[0].pocket.depth',
             message: expect.stringContaining('greater than 0')
           })
         ])
@@ -335,50 +335,32 @@ describe('ProjectValidator', () => {
       const entity = makeBaseEntity({
         type: 'circle',
         diameter: 10,
-        extrusion: { depth: -2, direction: 'up', role: 'solid' }
+        pocket: { depth: -2, clearance: 0.2 }
       })
       const result = ProjectValidator.validate(projectWithEntity(entity))
       expect(result.valid).toBe(false)
-      expect(result.errors.some((e) => e.field === 'entities[0].extrusion.depth')).toBe(true)
+      expect(result.errors.some((e) => e.field === 'entities[0].pocket.depth')).toBe(true)
     })
 
-    it('rejects invalid direction', () => {
+    it('rejects negative clearance', () => {
       const entity = makeBaseEntity({
         type: 'circle',
         diameter: 10,
-        extrusion: { depth: 5, direction: 'left', role: 'solid' }
+        pocket: { depth: 5, clearance: -0.1 }
       })
       const result = ProjectValidator.validate(projectWithEntity(entity))
       expect(result.valid).toBe(false)
       expect(result.errors).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            field: 'entities[0].extrusion.direction',
-            message: expect.stringContaining("'up' or 'down'")
+            field: 'entities[0].pocket.clearance',
+            message: expect.stringContaining('non-negative')
           })
         ])
       )
     })
 
-    it('rejects invalid role', () => {
-      const entity = makeBaseEntity({
-        type: 'circle',
-        diameter: 10,
-        extrusion: { depth: 5, direction: 'up', role: 'hollow' }
-      })
-      const result = ProjectValidator.validate(projectWithEntity(entity))
-      expect(result.valid).toBe(false)
-      expect(result.errors).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            field: 'entities[0].extrusion.role',
-            message: expect.stringContaining("'solid' or 'cutter'")
-          })
-        ])
-      )
-    })
-
-    it('entity without extrusion is still valid', () => {
+    it('entity without pocket is still valid', () => {
       const entity = makeBaseEntity({ type: 'circle', diameter: 10 })
       const result = ProjectValidator.validate(projectWithEntity(entity))
       expect(result.valid).toBe(true)

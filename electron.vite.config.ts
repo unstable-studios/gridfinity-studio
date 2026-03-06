@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, copyFileSync, existsSync } from 'node:fs'
 import { resolve } from 'path'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
@@ -51,6 +51,20 @@ export default defineConfig({
     worker: {
       format: 'es'
     },
-    plugins: [react(), svgr(), tailwindcss()]
+    plugins: [
+      react(),
+      svgr(),
+      tailwindcss(),
+      {
+        name: 'copy-manifold-wasm',
+        buildStart() {
+          const src = resolve(__dirname, 'node_modules/manifold-3d/manifold.wasm')
+          const dest = resolve(__dirname, 'src/renderer/public/manifold.wasm')
+          if (existsSync(src)) {
+            copyFileSync(src, dest)
+          }
+        }
+      }
+    ]
   }
 })

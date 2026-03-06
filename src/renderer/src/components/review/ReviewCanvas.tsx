@@ -1,8 +1,11 @@
 import { Canvas } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { Suspense, useMemo } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import type { AuxMesh } from '@/hooks/useProject'
+import { useReviewPrefs } from '@/hooks/useReviewPrefs'
+import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+
+const CAMERA_KEY = 'gfstudio:reviewCamera'
 
 interface BakedMeshData {
   positions: Float32Array
@@ -13,10 +16,48 @@ interface BakedMeshData {
 
 interface ReviewCanvasProps {
   bakedMesh?: BakedMeshData | null
-  auxMeshes?: AuxMesh[]
 }
 
-function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Element {
+interface SceneProps {
+  bakedMesh?: BakedMeshData | null
+  debugColors: boolean
+  wireframe: boolean
+}
+
+function ReviewScene({ bakedMesh, debugColors, wireframe }: SceneProps): React.JSX.Element {
+  const controlsRef = useRef<OrbitControlsImpl>(null)
+
+  const saveCamera = (): void => {
+    if (!controlsRef.current) return
+    const cam = controlsRef.current.object
+    const target = controlsRef.current.target
+    sessionStorage.setItem(
+      CAMERA_KEY,
+      JSON.stringify({
+        pos: [cam.position.x, cam.position.y, cam.position.z],
+        target: [target.x, target.y, target.z]
+      })
+    )
+  }
+
+  // Restore orbit target after controls mount
+  useEffect(() => {
+    const raw = sessionStorage.getItem(CAMERA_KEY)
+    if (!raw || !controlsRef.current) return
+    try {
+      const saved = JSON.parse(raw) as {
+        pos: [number, number, number]
+        target: [number, number, number]
+      }
+      controlsRef.current.object.position.set(...saved.pos)
+      controlsRef.current.target.set(...saved.target)
+      controlsRef.current.update()
+      console.log('[ReviewCanvas] camera restored from session')
+    } catch {
+      console.warn('[ReviewCanvas] failed to restore camera state')
+    }
+  }, [])
+
   return (
     <>
       <ambientLight intensity={0.8} />
@@ -32,13 +73,13 @@ function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Ele
       <pointLight position={[-6, -4, -6]} intensity={0.6} />
       <pointLight position={[6, 2, -6]} intensity={0.4} />
       <pointLight position={[0, -6, 4]} intensity={0.4} />
-      <OrbitControls enableDamping makeDefault />
+      <OrbitControls ref={controlsRef} enableDamping makeDefault onEnd={saveCamera} />
 
-      {bakedMesh ? <BakedMeshPreview mesh={bakedMesh} /> : <EmptyState />}
-
-      {auxMeshes?.map((aux) => (
-        <AuxMeshPreview key={aux.entityId} aux={aux} />
-      ))}
+      {bakedMesh ? (
+        <BakedMeshPreview mesh={bakedMesh} debugColors={debugColors} wireframe={wireframe} />
+      ) : (
+        <EmptyState />
+      )}
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
         <planeGeometry args={[200, 200]} />
@@ -48,55 +89,47 @@ function ReviewScene({ bakedMesh, auxMeshes }: ReviewCanvasProps): React.JSX.Ele
   )
 }
 
-function BakedMeshPreview({ mesh }: { mesh: BakedMeshData }): React.JSX.Element {
+function BakedMeshPreview({
+  mesh,
+  debugColors,
+  wireframe
+}: {
+  mesh: BakedMeshData
+  debugColors: boolean
+  wireframe: boolean
+}): React.JSX.Element {
   const hasColors = mesh.colors && mesh.colors.length > 0
+  const useColors = hasColors && debugColors
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
     geo.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3))
     geo.setIndex(new THREE.BufferAttribute(mesh.indices, 1))
-    // Let Three.js compute correct normals from triangle winding
-    geo.computeVertexNormals()
+    geo.setAttribute('normal', new THREE.BufferAttribute(mesh.normals, 3))
     if (hasColors) {
       geo.setAttribute('color', new THREE.BufferAttribute(mesh.colors, 3))
     }
     return geo
-  }, [mesh.positions, mesh.indices, mesh.colors, hasColors])
+  }, [mesh.positions, mesh.indices, mesh.normals, mesh.colors, hasColors])
 
   return (
-    <mesh geometry={geometry} castShadow rotation={[-Math.PI / 2, 0, 0]}>
-      <meshStandardMaterial
-        vertexColors={hasColors}
-        color={hasColors ? undefined : '#4f9ef8'}
-        metalness={0.15}
-        roughness={0.35}
-        side={THREE.DoubleSide}
-      />
-    </mesh>
-  )
-}
-
-function AuxMeshPreview({ aux }: { aux: AuxMesh }): React.JSX.Element {
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry()
-    geo.setAttribute('position', new THREE.BufferAttribute(aux.mesh.positions, 3))
-    geo.setIndex(new THREE.BufferAttribute(aux.mesh.indices, 1))
-    geo.setAttribute('normal', new THREE.BufferAttribute(aux.mesh.normals, 3))
-    return geo
-  }, [aux.mesh.positions, aux.mesh.indices, aux.mesh.normals])
-
-  const color = aux.role === 'cutter' ? '#ef4444' : '#22c55e'
-
-  return (
-    <mesh geometry={geometry} castShadow rotation={[-Math.PI / 2, 0, 0]}>
-      <meshStandardMaterial
-        color={color}
-        metalness={0.1}
-        roughness={0.5}
-        transparent
-        opacity={0.7}
-      />
-    </mesh>
+    <group rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh geometry={geometry} castShadow>
+        <meshStandardMaterial
+          key={useColors ? 'vc' : 'solid'}
+          vertexColors={useColors}
+          color={useColors ? undefined : '#4f9ef8'}
+          metalness={0.15}
+          roughness={0.35}
+          side={THREE.FrontSide}
+        />
+      </mesh>
+      {wireframe && (
+        <mesh geometry={geometry}>
+          <meshBasicMaterial wireframe color="#000000" opacity={0.08} transparent depthTest />
+        </mesh>
+      )}
+    </group>
   )
 }
 
@@ -109,10 +142,9 @@ function EmptyState(): React.JSX.Element {
   )
 }
 
-export default function ReviewCanvas({
-  bakedMesh,
-  auxMeshes
-}: ReviewCanvasProps): React.JSX.Element {
+export default function ReviewCanvas({ bakedMesh }: ReviewCanvasProps): React.JSX.Element {
+  const { debugColors, wireframe } = useReviewPrefs()
+
   return (
     <Canvas
       shadows
@@ -124,7 +156,7 @@ export default function ReviewCanvas({
       <Suspense fallback={null}>
         <color attach="background" args={['#0a0c12']} />
         <fog attach="fog" args={['#0a0c12', 500, 900]} />
-        <ReviewScene bakedMesh={bakedMesh} auxMeshes={auxMeshes} />
+        <ReviewScene bakedMesh={bakedMesh} debugColors={debugColors} wireframe={wireframe} />
       </Suspense>
     </Canvas>
   )

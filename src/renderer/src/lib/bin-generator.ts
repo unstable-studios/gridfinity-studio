@@ -32,19 +32,20 @@ const BASE_PROFILE = [
 ] as const
 
 /** Stacking lip cross-section (inset from outer wall, height from bin top) */
-const LIP_PROFILE = [
+export const LIP_PROFILE = [
   [0, 0],
   [0.7, 0.7], // 45° chamfer
   [0.7, 2.5], // vertical wall (1.8mm tall)
   [2.6, 4.4] // 45° chamfer
 ] as const
 
-const BASE_PROFILE_HEIGHT = 4.95
-const LIP_HEIGHT = 4.4
+export const BASE_PROFILE_HEIGHT = 4.95
+export const LIP_HEIGHT = 4.4
 
-const WALL_THICKNESS = 0.95 // exterior wall per spec
+export const WALL_THICKNESS = 0.95 // exterior wall per spec
+export const LIP_OFFSET = 0.25 // gap between outer wall and groove at the top (spec: 0.25mm)
 const DIVIDER_WIDTH = 1.2
-const FLOOR_THICKNESS = 1.0
+export const FLOOR_THICKNESS = 1.0
 
 const HOLE_SEGMENTS = 24
 const MAGNET_HOLE_OFFSET = 8 // mm from unit cell edge to hole center
@@ -69,10 +70,21 @@ const COLORS = {
   lipCap: [1.0, 0.6, 0.8], // pale pink — lip top cap
   lipStep: [0.6, 0.2, 0.4], // dark pink — lip horizontal step
   rim: [0.5, 0.8, 0.8], // cyan — top rim (no lip)
-  holes: [0.9, 0.9, 0.2] // yellow — magnet/screw recesses
+  holeWalls: [0.9, 0.9, 0.2], // yellow — magnet/screw recess walls
+  holeCaps: [0.7, 0.7, 0.1], // dark yellow — magnet/screw recess caps
+  pocketWalls: [0.2, 0.8, 0.6], // teal — pocket side walls
+  pocketFloor: [0.1, 0.6, 0.5] // dark teal — pocket floor
 } as const
 
 // ─── Types ────────────────────────────────────────────────────────
+
+/** A pocket to cut into the bin floor */
+export interface PocketGeometry {
+  /** 2D vertices in bin-local coordinates (centered at bin origin) */
+  vertices: Array<[number, number]>
+  /** How deep below the floor surface the pocket goes (mm) */
+  depth: number
+}
 
 export interface BinParams {
   widthUnits: number
@@ -93,6 +105,8 @@ export interface BinParams {
     diameter: number
     depth: number
   }
+  /** Pockets to cut into the bin floor */
+  pockets?: PocketGeometry[]
 }
 
 export interface MeshResult {
@@ -113,7 +127,7 @@ export interface MeshResult {
  * Always returns exactly `4 × CORNER_SEGMENTS` points so that any two
  * rings produced by this function can be connected with quads.
  */
-function roundedRectPoints(hw: number, hd: number, inset: number): Array<[number, number]> {
+export function roundedRectPoints(hw: number, hd: number, inset: number): Array<[number, number]> {
   const x = hw - inset
   const y = hd - inset
   const r = Math.min(Math.max(0, OUTER_CORNER_RADIUS - inset), x, y)
@@ -169,8 +183,8 @@ class MeshBuilder {
   }
 
   pushQuad(a: number, b: number, c: number, d: number): void {
-    this.idx.push(a, c, b)
-    this.idx.push(a, d, c)
+    this.idx.push(a, b, c)
+    this.idx.push(a, c, d)
   }
 
   /** Add a vertex with normal in one call */
@@ -375,13 +389,16 @@ class MeshBuilder {
     cy: number,
     diameter: number,
     depth: number,
-    floorZ: number
+    floorZ: number,
+    wallColor: readonly number[],
+    capColor: readonly number[]
   ): void {
     const r = diameter / 2
     const n = HOLE_SEGMENTS
     const capZ = floorZ + depth
 
-    // Opening ring at floorZ (visible from below)
+    // Walls (visible from inside the hole, looking inward)
+    this.setColor(wallColor)
     const openRing: number[] = []
     for (let i = 0; i < n; i++) {
       const angle = (2 * Math.PI * i) / n
@@ -390,7 +407,22 @@ class MeshBuilder {
       )
     }
 
-    // Blind end cap at capZ (visible from below, facing -Z)
+    const wallCapRing: number[] = []
+    for (let i = 0; i < n; i++) {
+      const angle = (2 * Math.PI * i) / n
+      wallCapRing.push(
+        this.addVN(cx + r * Math.cos(angle), cy + r * Math.sin(angle), capZ, 0, 0, -1)
+      )
+    }
+
+    for (let i = 0; i < n; i++) {
+      const next = (i + 1) % n
+      this.idx.push(openRing[i], wallCapRing[i], wallCapRing[next])
+      this.idx.push(openRing[i], wallCapRing[next], openRing[next])
+    }
+
+    // Blind end cap at capZ (facing down, visible from below — CW from +Z)
+    this.setColor(capColor)
     const capCenter = this.addVN(cx, cy, capZ, 0, 0, -1)
     const capRing: number[] = []
     for (let i = 0; i < n; i++) {
@@ -398,17 +430,9 @@ class MeshBuilder {
       capRing.push(this.addVN(cx + r * Math.cos(angle), cy + r * Math.sin(angle), capZ, 0, 0, -1))
     }
 
-    // Cap fan (facing down, visible from below)
     for (let i = 0; i < n; i++) {
       const next = (i + 1) % n
-      this.idx.push(capCenter, capRing[i], capRing[next])
-    }
-
-    // Walls (visible from inside the hole, looking up from below)
-    for (let i = 0; i < n; i++) {
-      const next = (i + 1) % n
-      this.idx.push(openRing[i], capRing[i], capRing[next])
-      this.idx.push(openRing[i], capRing[next], openRing[next])
+      this.idx.push(capCenter, capRing[next], capRing[i])
     }
   }
 
@@ -500,7 +524,12 @@ export function generateBinMesh(params: BinParams): MeshResult {
 
   // ── Precompute rings ──────────────────────────────────────────
   const outerRing = roundedRectPoints(hw, hd, 0)
-  const innerRing = roundedRectPoints(hw, hd, WALL_THICKNESS)
+  // When the bin has a lip, the cavity wall aligns with the groove bottom
+  // (the lip body is solid between the outer wall and the groove).
+  // Without a lip, the wall is just WALL_THICKNESS.
+  const maxLipInset = LIP_PROFILE[LIP_PROFILE.length - 1][0] // 2.6
+  const cavityInset = hasLip ? LIP_OFFSET + maxLipInset : WALL_THICKNESS
+  const innerRing = roundedRectPoints(hw, hd, cavityInset)
 
   // Maximum inset in the base profile — used to invert the profile
   // so that the bottom is narrowest and the top meets the outer wall.
@@ -573,10 +602,17 @@ export function generateBinMesh(params: BinParams): MeshResult {
 
       // Magnet / screw recesses for this cell
       if (cellHoles.length > 0) {
-        m.setColor(COLORS.holes)
         for (const hp of cellHoles) {
           for (const hole of holeConfigs) {
-            m.addOctagonalRecess(hp.cx, hp.cy, hole.diameter, hole.depth, 0)
+            m.addOctagonalRecess(
+              hp.cx,
+              hp.cy,
+              hole.diameter,
+              hole.depth,
+              0,
+              COLORS.holeWalls,
+              COLORS.holeCaps
+            )
           }
         }
       }
@@ -585,8 +621,10 @@ export function generateBinMesh(params: BinParams): MeshResult {
 
   // Transition: fill the top of the base platform at BASE_PROFILE_HEIGHT.
   // The per-unit feet end at their cell edges; the outer wall is one ring.
+  // Both faces needed: up (visible from above) and down (visible from below).
   m.setColor(COLORS.baseTransition)
   m.addFlatFan(outerRing, BASE_PROFILE_HEIGHT, 1)
+  m.addFlatFan(outerRing, BASE_PROFILE_HEIGHT, -1)
 
   // ── 2. Main outer walls ───────────────────────────────────────
   m.setColor(COLORS.outerWalls)
@@ -599,17 +637,59 @@ export function generateBinMesh(params: BinParams): MeshResult {
   m.setColor(COLORS.innerWalls)
   m.connectRoundedRings(innerRing, innerFloorZ, innerRing, totalH, true)
 
-  // Floor
+  // Floor (with pocket cutouts if any)
+  const pockets = params.pockets ?? []
   m.setColor(COLORS.floor)
-  m.addFlatFan(innerRing, innerFloorZ, 1)
+  if (pockets.length > 0) {
+    // Floor with holes cut for each pocket outline
+    const pocketHoles = pockets.map((p) => p.vertices)
+    m.addFlatFaceWithHoles(innerRing, pocketHoles, innerFloorZ, 1)
+
+    // Each pocket: walls going down from floor + floor cap at the bottom
+    for (const pocket of pockets) {
+      const pocketBottomZ = innerFloorZ - pocket.depth
+      const n = pocket.vertices.length
+
+      // Pocket walls (inward-facing, visible from inside the pocket)
+      m.setColor(COLORS.pocketWalls)
+      for (let i = 0; i < n; i++) {
+        const j = (i + 1) % n
+        const [ax, ay] = pocket.vertices[i]
+        const [bx, by] = pocket.vertices[j]
+        // Winding: looking from inside the pocket, we see j→i order (inward)
+        m.quadAuto(
+          bx,
+          by,
+          pocketBottomZ,
+          ax,
+          ay,
+          pocketBottomZ,
+          ax,
+          ay,
+          innerFloorZ,
+          bx,
+          by,
+          innerFloorZ
+        )
+      }
+
+      // Pocket floor cap (upward-facing, visible from above)
+      m.setColor(COLORS.pocketFloor)
+      const cx = pocket.vertices.reduce((s, v) => s + v[0], 0) / n
+      const cy = pocket.vertices.reduce((s, v) => s + v[1], 0) / n
+      m.addFlatFan(pocket.vertices, pocketBottomZ, 1, cx, cy)
+    }
+  } else {
+    m.addFlatFan(innerRing, innerFloorZ, 1)
+  }
 
   // ── 4. Internal grid dividers (optional) ──────────────────────
   if (hasDividers) {
     m.setColor(COLORS.dividers)
     const halfDiv = DIVIDER_WIDTH / 2
-    // Use the straight-line inner extent for divider walls
-    const innerHW = hw - WALL_THICKNESS
-    const innerHD = hd - WALL_THICKNESS
+    // Use the cavity inset for divider wall extent
+    const innerHW = hw - cavityInset
+    const innerHD = hd - cavityInset
 
     for (let gx = 1; gx < widthUnits; gx++) {
       const x = -hw + gx * baseUnit
@@ -727,43 +807,43 @@ export function generateBinMesh(params: BinParams): MeshResult {
     // The stacking lip is a GROOVE (female) at the top of the bin that
     // receives the base profile (male) of the next bin stacked on top.
     //
-    // The outer wall already extends to totalH + LIP_HEIGHT (section 2).
-    // The groove inner wall follows LIP_PROFILE, stepping inward going up.
-    // The groove is the channel between the outer wall and the inner wall.
+    // Per spec, the groove is offset 0.25mm inward from the outer wall,
+    // creating a thin "point" at the top where the lip meets the outer wall.
     //
-    // Cross-section (right side):
-    //   outer wall │          │ groove inner wall
-    //              │  groove  ╱  ← chamfer (inset 0.7→2.6)
-    //              │          │   ← vertical (inset 0.7)
-    //              │       ╱──    ← chamfer (inset 0→0.7)
-    //   totalH     └──────┘       ← groove bottom (zero width, both at inset 0)
+    // Cross-section (right side, dimensions from outer edge):
+    //
+    //   outer │0.25│                      cavity
+    //   wall  │gap │  groove inner wall   inner wall
+    //         │    │╲ 1.9mm 45°           │
+    //         │    │ │ 1.8mm vert         │
+    //         │    │╱ 0.7mm 45°           │
+    //   totalH└────└────────────┐─────────┤
+    //              groove floor  lip body  │
+    //
+    // The groove inner wall (lipProfile) IS the inner surface of the lip
+    // as seen from inside the bin cavity. No separate inner lip wall needed.
 
     const lipBase = totalH
     const lipTopZ = lipBase + LIP_HEIGHT
-    const maxLipInset = LIP_PROFILE[LIP_PROFILE.length - 1][0] // 2.6
-    // Groove bottom ring (widest groove, at totalH)
-    const grooveBottomRing = roundedRectPoints(hw, hd, maxLipInset)
+    // Groove top ring at lipTopZ (narrowest: LIP_OFFSET from outer = the "point")
+    const grooveTopRing = roundedRectPoints(hw, hd, LIP_OFFSET)
 
-    // Groove inner wall: INVERTED lip profile (wide at bottom, closed at top)
-    // At totalH the groove is widest (inset 2.6), at lipTopZ it closes (inset 0)
+    // Groove inner wall: follows LIP_PROFILE with 0.25mm offset from outer wall.
+    // At totalH the groove is widest (= innerRing = cavityInset from outer).
+    // At lipTopZ the groove narrows to just 0.25mm from outer (the thin point).
+    // The groove inner wall IS the cavity inner surface above totalH.
     m.setColor(COLORS.lipProfile)
     for (let i = 0; i < LIP_PROFILE.length - 1; i++) {
       const [inset0, z0] = LIP_PROFILE[i]
       const [inset1, z1] = LIP_PROFILE[i + 1]
-      const lower = roundedRectPoints(hw, hd, maxLipInset - inset0)
-      const upper = roundedRectPoints(hw, hd, maxLipInset - inset1)
-      m.connectRoundedRings(lower, lipBase + z0, upper, lipBase + z1)
+      const lower = roundedRectPoints(hw, hd, LIP_OFFSET + maxLipInset - inset0)
+      const upper = roundedRectPoints(hw, hd, LIP_OFFSET + maxLipInset - inset1)
+      m.connectRoundedRings(lower, lipBase + z0, upper, lipBase + z1, true)
     }
 
-    // Groove floor at totalH: flat ring from outer wall to groove inner edge
-    m.setColor(COLORS.lipStep)
-    m.addFlatRing(outerRing, grooveBottomRing, totalH, 1)
-
-    // Inner lip wall: visible from inside the bin cavity, faces inward
-    // Goes from inner cavity wall (inset 0.95 at totalH) up to where
-    // the groove inner wall closes (inset 0 at lipTopZ)
-    m.setColor(COLORS.lipInner)
-    m.connectRoundedRings(innerRing, totalH, outerRing, lipTopZ, true)
+    // Lip cap at lipTopZ: thin 0.25mm ring from outer wall to groove top (the "point")
+    m.setColor(COLORS.lipCap)
+    m.addFlatRing(outerRing, grooveTopRing, lipTopZ, 1)
   } else {
     // No lip — flat top rim connecting outer to inner
     m.setColor(COLORS.rim)

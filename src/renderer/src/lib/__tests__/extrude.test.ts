@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { extrudePolygon } from '../extrude'
+import { extrudePolygon, offsetPolygon } from '../extrude'
 
 describe('extrudePolygon', () => {
   it('extruding a triangle produces valid mesh data', () => {
@@ -9,7 +9,7 @@ describe('extrudePolygon', () => {
       { x: 0.5, y: 1 }
     ]
 
-    const result = extrudePolygon(triangle, 5, 'up')
+    const result = extrudePolygon(triangle, 5)
 
     expect(result.positions).toBeDefined()
     expect(result.indices).toBeDefined()
@@ -19,7 +19,7 @@ describe('extrudePolygon', () => {
     expect(result.normals.length).toBeGreaterThan(0)
   })
 
-  it('extruding a rectangle produces correct vertex count (8 = 4 top + 4 bottom)', () => {
+  it('extruding a rectangle produces correct vertex count', () => {
     const rectangle = [
       { x: 0, y: 0 },
       { x: 2, y: 0 },
@@ -27,16 +27,13 @@ describe('extrudePolygon', () => {
       { x: 0, y: 1 }
     ]
 
-    const result = extrudePolygon(rectangle, 3, 'up')
+    const result = extrudePolygon(rectangle, 3)
 
-    // 4 top + 4 bottom = 8 vertices, each with 3 components (x, y, z)
-    // Side faces may add additional vertices depending on implementation
-    // At minimum we expect 8 unique positions
     const vertexCount = result.positions.length / 3
     expect(vertexCount).toBeGreaterThanOrEqual(8)
   })
 
-  it('direction "up" places bottom face at z=0 and top at z=depth', () => {
+  it('default zTop=0 places top at 0 and bottom at -depth', () => {
     const square = [
       { x: 0, y: 0 },
       { x: 1, y: 0 },
@@ -45,29 +42,7 @@ describe('extrudePolygon', () => {
     ]
     const depth = 10
 
-    const result = extrudePolygon(square, depth, 'up')
-    const zValues: number[] = []
-    for (let i = 2; i < result.positions.length; i += 3) {
-      zValues.push(result.positions[i])
-    }
-
-    const minZ = Math.min(...zValues)
-    const maxZ = Math.max(...zValues)
-
-    expect(minZ).toBeCloseTo(0)
-    expect(maxZ).toBeCloseTo(depth)
-  })
-
-  it('direction "down" places top at z=0 and bottom at z=-depth', () => {
-    const square = [
-      { x: 0, y: 0 },
-      { x: 1, y: 0 },
-      { x: 1, y: 1 },
-      { x: 0, y: 1 }
-    ]
-    const depth = 10
-
-    const result = extrudePolygon(square, depth, 'down')
+    const result = extrudePolygon(square, depth)
     const zValues: number[] = []
     for (let i = 2; i < result.positions.length; i += 3) {
       zValues.push(result.positions[i])
@@ -80,6 +55,26 @@ describe('extrudePolygon', () => {
     expect(minZ).toBeCloseTo(-depth)
   })
 
+  it('zTop positions the extrusion at the specified height', () => {
+    const square = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 }
+    ]
+    const depth = 5
+    const zTop = 20
+
+    const result = extrudePolygon(square, depth, zTop)
+    const zValues: number[] = []
+    for (let i = 2; i < result.positions.length; i += 3) {
+      zValues.push(result.positions[i])
+    }
+
+    expect(Math.max(...zValues)).toBeCloseTo(zTop)
+    expect(Math.min(...zValues)).toBeCloseTo(zTop - depth)
+  })
+
   it('depth is reflected in vertex positions', () => {
     const square = [
       { x: 0, y: 0 },
@@ -88,8 +83,8 @@ describe('extrudePolygon', () => {
       { x: 0, y: 1 }
     ]
 
-    const result5 = extrudePolygon(square, 5, 'up')
-    const result20 = extrudePolygon(square, 20, 'up')
+    const result5 = extrudePolygon(square, 5)
+    const result20 = extrudePolygon(square, 20)
 
     const zValues5: number[] = []
     for (let i = 2; i < result5.positions.length; i += 3) {
@@ -114,7 +109,7 @@ describe('extrudePolygon', () => {
       { x: 0.5, y: 1 }
     ]
 
-    const result = extrudePolygon(triangle, 5, 'up')
+    const result = extrudePolygon(triangle, 5)
 
     for (let i = 0; i < result.normals.length; i += 3) {
       const nx = result.normals[i]
@@ -125,14 +120,14 @@ describe('extrudePolygon', () => {
     }
   })
 
-  it('all indices are valid (values < position count / 3)', () => {
+  it('all indices are valid', () => {
     const triangle = [
       { x: 0, y: 0 },
       { x: 1, y: 0 },
       { x: 0.5, y: 1 }
     ]
 
-    const result = extrudePolygon(triangle, 5, 'up')
+    const result = extrudePolygon(triangle, 5)
     const vertexCount = result.positions.length / 3
 
     for (const index of result.indices) {
@@ -141,41 +136,85 @@ describe('extrudePolygon', () => {
     }
   })
 
-  it('empty vertices array throws or returns empty', () => {
-    expect(() => {
-      const result = extrudePolygon([], 5, 'up')
-      // If it doesn't throw, it should return empty arrays
-      if (result) {
-        expect(result.positions.length).toBe(0)
-        expect(result.indices.length).toBe(0)
-      }
-    }).not.toThrow() // Adjust if implementation throws
+  it('empty vertices returns empty', () => {
+    const result = extrudePolygon([], 5)
+    expect(result.positions.length).toBe(0)
+    expect(result.indices.length).toBe(0)
   })
 
-  it('single vertex throws or returns empty', () => {
-    expect(() => {
-      const result = extrudePolygon([{ x: 0, y: 0 }], 5, 'up')
-      if (result) {
-        expect(result.positions.length).toBe(0)
-        expect(result.indices.length).toBe(0)
-      }
-    }).not.toThrow()
+  it('single vertex returns empty', () => {
+    const result = extrudePolygon([{ x: 0, y: 0 }], 5)
+    expect(result.positions.length).toBe(0)
+    expect(result.indices.length).toBe(0)
   })
 
-  it('two vertices throws or returns empty', () => {
-    expect(() => {
-      const result = extrudePolygon(
-        [
-          { x: 0, y: 0 },
-          { x: 1, y: 0 }
-        ],
-        5,
-        'up'
-      )
-      if (result) {
-        expect(result.positions.length).toBe(0)
-        expect(result.indices.length).toBe(0)
-      }
-    }).not.toThrow()
+  it('two vertices returns empty', () => {
+    const result = extrudePolygon(
+      [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 }
+      ],
+      5
+    )
+    expect(result.positions.length).toBe(0)
+    expect(result.indices.length).toBe(0)
+  })
+})
+
+describe('offsetPolygon', () => {
+  it('zero offset returns original vertices', () => {
+    const square = [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+      { x: 1, y: 1 },
+      { x: 0, y: 1 }
+    ]
+    const result = offsetPolygon(square, 0)
+    expect(result).toBe(square)
+  })
+
+  it('positive offset expands polygon outward', () => {
+    const square = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 }
+    ]
+    const result = offsetPolygon(square, 1)
+
+    // Each vertex should move outward — bounding box should be larger
+    const xs = result.map((v) => v.x)
+    const ys = result.map((v) => v.y)
+    expect(Math.min(...xs)).toBeLessThan(0)
+    expect(Math.max(...xs)).toBeGreaterThan(10)
+    expect(Math.min(...ys)).toBeLessThan(0)
+    expect(Math.max(...ys)).toBeGreaterThan(10)
+  })
+
+  it('negative offset shrinks polygon inward', () => {
+    const square = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 }
+    ]
+    const result = offsetPolygon(square, -1)
+
+    const xs = result.map((v) => v.x)
+    const ys = result.map((v) => v.y)
+    expect(Math.min(...xs)).toBeGreaterThan(0)
+    expect(Math.max(...xs)).toBeLessThan(10)
+    expect(Math.min(...ys)).toBeGreaterThan(0)
+    expect(Math.max(...ys)).toBeLessThan(10)
+  })
+
+  it('preserves vertex count', () => {
+    const triangle = [
+      { x: 0, y: 0 },
+      { x: 5, y: 0 },
+      { x: 2.5, y: 4 }
+    ]
+    const result = offsetPolygon(triangle, 0.5)
+    expect(result.length).toBe(3)
   })
 })

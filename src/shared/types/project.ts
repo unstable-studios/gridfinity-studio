@@ -1,17 +1,17 @@
 /**
- * Canonical Project Data Model (v0.2.0)
+ * Canonical Project Data Model (v0.3.0)
  * Single source of truth for Gridfinity Studio projects
  */
 
 /**
  * Schema version for project file format
  */
-export const CURRENT_SCHEMA_VERSION = '0.2.0'
+export const CURRENT_SCHEMA_VERSION = '0.3.0'
 
 /**
  * Supported schema versions for backward compatibility
  */
-export const SUPPORTED_SCHEMA_VERSIONS = ['0.1.0', '0.2.0']
+export const SUPPORTED_SCHEMA_VERSIONS = ['0.1.0', '0.2.0', '0.3.0']
 
 /**
  * Global settings for the project
@@ -114,7 +114,14 @@ export interface Vertex2D {
   y: number
 }
 
-// ─── Extrusion ─────────────────────────────────────────────────────
+// ─── Pocket ───────────────────────────────────────────────────────
+
+export interface PocketConfig {
+  depth: number
+  clearance: number
+}
+
+// ─── Extrusion (legacy, kept for migration) ───────────────────────
 
 export interface ExtrusionConfig {
   depth: number
@@ -131,7 +138,7 @@ interface BaseEntity {
   visible: boolean
   locked: boolean
   groupId?: string
-  extrusion?: ExtrusionConfig
+  pocket?: PocketConfig
   properties: Record<string, unknown>
 }
 
@@ -238,7 +245,7 @@ export interface Bin {
   hasLabel: boolean
   labelText?: string
   hasStackingLip: boolean
-  entityIds?: string[]
+  entityIds: string[]
   properties: Record<string, unknown>
 }
 
@@ -255,6 +262,21 @@ export interface ProjectData {
 }
 
 // ─── Defaults & factories ──────────────────────────────────────────
+
+/** Base profile height from Gridfinity spec (mm) */
+const BASE_PROFILE_HEIGHT = 4.95
+/** Internal floor thickness (mm) */
+const FLOOR_THICKNESS = 1.0
+
+/**
+ * Compute the default pocket depth for a bin: the full interior cavity height.
+ * totalH = heightUnits * unitHeight, interior = totalH - floor - baseProfile
+ */
+export function computeDefaultPocketDepth(heightUnits: number, unitHeight: number): number {
+  const totalH = heightUnits * unitHeight
+  const depth = totalH - FLOOR_THICKNESS - BASE_PROFILE_HEIGHT
+  return Math.max(0.1, Math.round(depth * 10) / 10)
+}
 
 export const DEFAULT_GRIDFINITY_CONFIG: GridfinityConfig = GRIDFINITY_PRESETS.standard
 

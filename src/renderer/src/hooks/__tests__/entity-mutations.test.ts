@@ -284,13 +284,12 @@ describe('entity mutation logic', () => {
       project = { ...project, entities: [entity] }
 
       const updated = updateEntityInProject(project, 'd', {
-        extrusion: { depth: 5, direction: 'down', role: 'cutter' }
+        pocket: { depth: 5, clearance: 0.2 }
       })
 
-      expect(updated.entities[0].extrusion).toEqual({
+      expect(updated.entities[0].pocket).toEqual({
         depth: 5,
-        direction: 'down',
-        role: 'cutter'
+        clearance: 0.2
       })
     })
 
