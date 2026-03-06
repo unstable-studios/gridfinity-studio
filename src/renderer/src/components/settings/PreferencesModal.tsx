@@ -140,13 +140,48 @@ const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
   emptyState: 'Empty State'
 }
 
+function ColorSection({
+  mode,
+  colors,
+  onUpdate
+}: {
+  mode: 'dark' | 'light'
+  colors: CanvasThemeColors
+  onUpdate: (mode: 'dark' | 'light', key: keyof CanvasThemeColors, value: string) => void
+}): React.JSX.Element {
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+        {mode === 'dark' ? 'Dark' : 'Light'}
+      </h4>
+      {(Object.keys(COLOR_LABELS) as Array<keyof CanvasThemeColors>).map((key) => (
+        <label key={key} className="flex items-center gap-2">
+          <input
+            type="color"
+            value={colors[key]}
+            onChange={(e) => onUpdate(mode, key, e.target.value)}
+            className="h-7 w-9 cursor-pointer rounded border border-zinc-300 dark:border-zinc-700 bg-transparent p-0.5"
+          />
+          <Input
+            value={colors[key]}
+            onChange={(e) => onUpdate(mode, key, e.target.value)}
+            className="w-24 font-mono text-xs h-7"
+          />
+          <span className="text-xs text-zinc-600 dark:text-zinc-400">{COLOR_LABELS[key]}</span>
+        </label>
+      ))}
+    </div>
+  )
+}
+
 function ColorsTab(): React.JSX.Element {
   const [config, setConfig] = useState<ThemeConfig>(loadThemeConfig)
-  const { resolvedTheme } = useTheme()
-  const mode = resolvedTheme === 'light' ? 'light' : 'dark'
-  const colors = config[mode]
 
-  const updateColor = (key: keyof CanvasThemeColors, value: string): void => {
+  const updateColor = (
+    mode: 'dark' | 'light',
+    key: keyof CanvasThemeColors,
+    value: string
+  ): void => {
     const updated = {
       ...config,
       [mode]: { ...config[mode], [key]: value }
@@ -161,28 +196,12 @@ function ColorsTab(): React.JSX.Element {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Canvas colors for <span className="font-semibold">{mode}</span> mode. Refresh to apply.
+        Canvas colors for each theme mode. Refresh to apply.
       </p>
-      <div className="grid grid-cols-[1fr_auto_1fr] gap-x-3 gap-y-2 items-center">
-        {(Object.keys(COLOR_LABELS) as Array<keyof CanvasThemeColors>).map((key) => (
-          <label key={key} className="flex items-center gap-2 col-span-3">
-            <input
-              type="color"
-              value={colors[key]}
-              onChange={(e) => updateColor(key, e.target.value)}
-              className="h-7 w-9 cursor-pointer rounded border border-zinc-300 dark:border-zinc-700 bg-transparent p-0.5"
-            />
-            <Input
-              value={colors[key]}
-              onChange={(e) => updateColor(key, e.target.value)}
-              className="w-24 font-mono text-xs h-7"
-            />
-            <span className="text-xs text-zinc-600 dark:text-zinc-400">{COLOR_LABELS[key]}</span>
-          </label>
-        ))}
-      </div>
+      <ColorSection mode="dark" colors={config.dark} onUpdate={updateColor} />
+      <ColorSection mode="light" colors={config.light} onUpdate={updateColor} />
       <Button variant="outline" size="sm" onClick={resetToDefaults}>
         Reset to Defaults
       </Button>
