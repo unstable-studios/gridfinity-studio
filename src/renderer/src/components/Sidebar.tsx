@@ -9,6 +9,7 @@ import { useAppMode } from '@/hooks/useAppMode'
 import { useSharedSelection } from '@/hooks/useSelection'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 
+import type { DisplayUnit } from '../../../shared/types/units'
 import { exportSTL as createSTLBlob } from '@/lib/stl-io'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
 import { entityToVertices } from '@/lib/entity-shapes'
@@ -134,6 +135,7 @@ function LayoutSidebar({ entities }: { entities: Entity[] }): React.JSX.Element 
             removeEntity(selectedEntity.id)
             selection.clearSelection()
           }}
+          displayUnit={(project?.settings.units ?? 'mm') as DisplayUnit}
         />
       )}
     </div>
@@ -463,11 +465,13 @@ function SidebarSection({
 function EntityProperties({
   entity,
   onUpdate,
-  onDelete
+  onDelete,
+  displayUnit
 }: {
   entity: Entity
   onUpdate: (id: string, patch: Partial<Entity>) => void
   onDelete: () => void
+  displayUnit: DisplayUnit
 }): React.JSX.Element {
   const handlePositionChange = (axis: 'x' | 'y', value: number): void => {
     onUpdate(entity.id, {
@@ -502,7 +506,7 @@ function EntityProperties({
         <NumericInput
           label="X"
           value={entity.transform.position.x}
-          suffix="mm"
+          displayUnit={displayUnit}
           step={0.5}
           fineStep={0.1}
           coarseStep={5}
@@ -512,7 +516,7 @@ function EntityProperties({
         <NumericInput
           label="Y"
           value={entity.transform.position.y}
-          suffix="mm"
+          displayUnit={displayUnit}
           step={0.5}
           fineStep={0.1}
           coarseStep={5}
@@ -523,7 +527,7 @@ function EntityProperties({
           <NumericInput
             label="Diameter"
             value={entity.diameter}
-            suffix="mm"
+            displayUnit={displayUnit}
             step={0.5}
             fineStep={0.1}
             coarseStep={5}
@@ -537,7 +541,7 @@ function EntityProperties({
             <NumericInput
               label="Width"
               value={entity.width}
-              suffix="mm"
+              displayUnit={displayUnit}
               step={0.5}
               fineStep={0.1}
               coarseStep={5}
@@ -548,7 +552,7 @@ function EntityProperties({
             <NumericInput
               label="Height"
               value={entity.height}
-              suffix="mm"
+              displayUnit={displayUnit}
               step={0.5}
               fineStep={0.1}
               coarseStep={5}
@@ -567,6 +571,7 @@ function EntityProperties({
           onPocketChange={handlePocketChange}
           onRemovePocket={handleRemovePocket}
           defaultDepth={ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : 5}
+          displayUnit={displayUnit}
         />
         <Button
           variant="outline"
@@ -585,12 +590,14 @@ function PocketControls({
   entity,
   onPocketChange,
   onRemovePocket,
-  defaultDepth
+  defaultDepth,
+  displayUnit
 }: {
   entity: Entity
   onPocketChange: (patch: Partial<PocketConfig>) => void
   onRemovePocket: () => void
   defaultDepth: number
+  displayUnit: DisplayUnit
 }): React.JSX.Element {
   const hasPocket = entity.pocket !== undefined
 
@@ -602,7 +609,7 @@ function PocketControls({
           <NumericInput
             label="Depth"
             value={entity.pocket!.depth}
-            suffix="mm"
+            displayUnit={displayUnit}
             step={0.5}
             fineStep={0.1}
             coarseStep={5}
@@ -613,7 +620,7 @@ function PocketControls({
           <NumericInput
             label="Clearance"
             value={entity.pocket!.clearance}
-            suffix="mm"
+            displayUnit={displayUnit}
             step={0.05}
             fineStep={0.01}
             coarseStep={0.5}
