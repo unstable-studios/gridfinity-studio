@@ -7,6 +7,7 @@ import LayoutCanvas from './layout/LayoutCanvas'
 import ReviewCanvas from './review/ReviewCanvas'
 import HintCard from './HintCard'
 import type { Entity, Bin } from '../../../shared/types/project'
+import { entityCenter } from '../../../shared/geometry/entity-geometry'
 
 export default function Viewport(): React.JSX.Element {
   const { mode } = useAppMode()
@@ -29,7 +30,7 @@ export default function Viewport(): React.JSX.Element {
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   const handlePlace = (partial: Partial<Entity> & { type: Entity['type'] }): void => {
-    // Find which bin contains the entity's position
+    // Entity center is always transform.position (polygons are now normalized)
     const cx = partial.transform?.position?.x ?? 0
     const cy = partial.transform?.position?.y ?? 0
     let targetBinId: string | undefined
@@ -59,8 +60,7 @@ export default function Viewport(): React.JSX.Element {
       for (const entityId of movedIds) {
         const entity = entities.find((e) => e.id === entityId)
         if (!entity) continue
-        const cx = entity.transform.position.x
-        const cy = entity.transform.position.y
+        const { x: cx, y: cy } = entityCenter(entity)
 
         // Find the bin whose footprint contains the entity center
         let targetBin: Bin | undefined

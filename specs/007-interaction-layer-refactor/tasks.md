@@ -56,23 +56,23 @@
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T009 [P] [US1] Unit tests for polygon normalization in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test `normalizePolygonVertices()`: given world-space vertices, returns `{ position: centroid, vertices: centroid-relative }`. Test idempotency (already-normalized polygon returns unchanged). Test degenerate cases.
-- [ ] T010 [P] [US1] Unit tests for project migration in `src/shared/validation/__tests__/migration.test.ts` — test `migrateProject()`: v0.3.0 project with world-space polygon vertices migrates to v0.4.0 with local-space vertices. Test idempotency. Test project with no polygons passes through unchanged. Test schema version is bumped.
+- [x] T009 [P] [US1] Unit tests for polygon normalization in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test `normalizePolygonVertices()`: given world-space vertices, returns `{ position: centroid, vertices: centroid-relative }`. Test idempotency (already-normalized polygon returns unchanged). Test degenerate cases.
+- [x] T010 [P] [US1] Unit tests for project migration in `src/shared/validation/__tests__/migration.test.ts` — test `migrateProject()`: v0.3.0 project with world-space polygon vertices migrates to v0.4.0 with local-space vertices. Test idempotency. Test project with no polygons passes through unchanged. Test schema version is bumped.
 
 ### Implementation for User Story 1
 
-- [ ] T011 [US1] Add `normalizePolygonVertices()` to `src/shared/geometry/entity-geometry.ts` — computes centroid from vertices, returns new position and offset vertices
-- [ ] T012 [US1] Bump schema version to `0.4.0` in `src/shared/types/project.ts` — add to `SUPPORTED_VERSIONS` array
-- [ ] T013 [US1] Add migration function in `src/shared/validation/project-validator.ts` — detect v0.3.0 projects, normalize all polygon entities, bump version
-- [ ] T014 [US1] Wire migration into project load path in `src/renderer/src/hooks/useProject.ts` — call migration before setting project state
-- [ ] T015 [US1] Update `PolygonTool.tsx` in `src/renderer/src/components/primitives/PolygonTool.tsx` — normalize vertices on create (compute centroid, set transform.position, offset vertices)
-- [ ] T016 [US1] Replace inline `entityCenter()` in `src/renderer/src/components/Viewport.tsx` — import from shared geometry, remove local helper function, update `handlePlace()` and `handleMoveEnd()`
-- [ ] T017 [US1] Replace inline geometry in `src/renderer/src/lib/collision.ts` — replace `getEntityBounds()` body with call to shared `entityBounds()`, keep function signature for backward compatibility
-- [ ] T018 [P] [US1] Replace inline geometry in `src/renderer/src/lib/snap.ts` — replace `entityCenterTargets()` to use shared `entityCenter()`, fix polygon snap (was returning (0,0))
-- [ ] T019 [P] [US1] Replace inline geometry in `src/renderer/src/lib/auto-wrap.ts` — remove local `entityHalfExtents()` and `polygonHalfExtents()`, import from shared module
-- [ ] T020 [P] [US1] Replace inline geometry in `src/renderer/src/lib/entity-shapes.ts` — use shared `entityHalfExtents()` where applicable
-- [ ] T021 [US1] Fix marquee selection in `src/renderer/src/components/layout/LayoutCanvas.tsx` — replace center-point containment test with AABB overlap using shared `entityBounds()`, so polygons are correctly captured by marquee
-- [ ] T022 [US1] Replace inline centroid/bounds in `src/renderer/src/components/layout/TransformGizmo.tsx` — use shared `entityCenter()` for centroid computation and `entityBounds()` for drag area, remove inline polygon special-case code
+- [x] T011 [US1] Add `normalizePolygonVertices()` to `src/shared/geometry/entity-geometry.ts` — computes centroid from vertices, returns new position and offset vertices
+- [x] T012 [US1] Bump schema version to `0.4.0` in `src/shared/types/project.ts` — add to `SUPPORTED_VERSIONS` array
+- [x] T013 [US1] Add migration function in `src/shared/validation/project-validator.ts` — detect v0.3.0 projects, normalize all polygon entities, bump version
+- [x] T014 [US1] Wire migration into project load path in `src/renderer/src/hooks/useProject.ts` — call migration before setting project state
+- [x] T015 [US1] Update `PolygonTool.tsx` in `src/renderer/src/components/primitives/PolygonTool.tsx` — normalize vertices on create (compute centroid, set transform.position, offset vertices)
+- [x] T016 [US1] Replace inline `entityCenter()` in `src/renderer/src/components/Viewport.tsx` — import from shared geometry, remove local helper function, update `handlePlace()` and `handleMoveEnd()`
+- [x] T017 [US1] Replace inline geometry in `src/renderer/src/lib/collision.ts` — replace `getEntityBounds()` body with call to shared `entityBounds()`, keep function signature for backward compatibility
+- [x] T018 [P] [US1] Replace inline geometry in `src/renderer/src/lib/snap.ts` — replace `entityCenterTargets()` to use shared `entityCenter()`, fix polygon snap (was returning (0,0))
+- [x] T019 [P] [US1] Replace inline geometry in `src/renderer/src/lib/auto-wrap.ts` — remove local `entityHalfExtents()` and `polygonHalfExtents()`, import from shared module
+- [x] T020 [P] [US1] Replace inline geometry in `src/renderer/src/lib/entity-shapes.ts` — no changes needed; `entityToVertices()` generates local-space vertex loops, not center/bounds computations. Already correct post-normalization.
+- [x] T021 [US1] Fix marquee selection in `src/renderer/src/components/layout/LayoutCanvas.tsx` — replaced center-point containment test with AABB overlap using shared `entityBounds()` + `boundsOverlap()`, so polygons are correctly captured by marquee. Also replaced inline half-extent computations in `MultiSelectionBounds` and `handleZoomToFit` with shared `entityBounds()`.
+- [x] T022 [US1] Replace inline centroid/bounds in `src/renderer/src/components/layout/TransformGizmo.tsx` — uses shared `entityCenter()` for centroid computation. No inline bounds computation existed to replace.
 
 **Checkpoint**: Create polygon → drag → snap → marquee-select → bin ownership all work. `pnpm vitest run` — all tests pass. `pnpm typecheck` clean.
 

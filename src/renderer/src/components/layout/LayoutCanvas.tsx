@@ -12,6 +12,7 @@ import CircleTool from '../primitives/CircleTool'
 import RectangleTool from '../primitives/RectangleTool'
 import PolygonTool from '../primitives/PolygonTool'
 import { detectCollisions, binOverlapsAny } from '@/lib/collision'
+import { entityBounds, boundsOverlap } from '../../../../shared/geometry/entity-geometry'
 import type { Entity, Bin, GridfinityConfig } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
@@ -359,18 +360,12 @@ function MultiSelectionBounds({
     if (selectionType === 'entity') {
       for (const e of entities) {
         if (!selectedIds.has(e.id)) continue
-        const { x, y } = e.transform.position
-        let halfW = 3
-        let halfH = 3
-        if (e.type === 'circle') halfW = halfH = e.diameter / 2
-        else if (e.type === 'rectangle') {
-          halfW = e.width / 2
-          halfH = e.height / 2
-        }
-        minX = Math.min(minX, x - halfW)
-        maxX = Math.max(maxX, x + halfW)
-        minY = Math.min(minY, y - halfH)
-        maxY = Math.max(maxY, y + halfH)
+        const bounds = entityBounds(e)
+        if (!bounds) continue
+        minX = Math.min(minX, bounds.minX)
+        maxX = Math.max(maxX, bounds.maxX)
+        minY = Math.min(minY, bounds.minY)
+        maxY = Math.max(maxY, bounds.maxY)
       }
     } else {
       for (const b of bins) {
@@ -582,11 +577,12 @@ function LayoutScene({
                 const maxY = Math.max(marqueeStart.y, marqueeEnd.y)
                 // Only trigger if the marquee has meaningful size
                 if (maxX - minX > 0.5 || maxY - minY > 0.5) {
+                  const marqueeBounds = { minX, maxX, minY, maxY }
                   const hit = entities
                     .filter((e) => e.visible)
                     .filter((e) => {
-                      const { x, y } = e.transform.position
-                      return x >= minX && x <= maxX && y >= minY && y <= maxY
+                      const bounds = entityBounds(e)
+                      return bounds !== null && boundsOverlap(marqueeBounds, bounds)
                     })
                     .map((e) => e.id)
                   if (hit.length > 0) onMarqueeSelect(hit)
@@ -723,26 +719,12 @@ export default function LayoutCanvas({
 
     // Also include entities
     for (const entity of entities) {
-      const { x, y } = entity.transform.position
-      let halfW = 5
-      let halfH = 5
-
-      if (entity.type === 'circle') {
-        halfW = halfH = entity.diameter / 2
-      } else if (entity.type === 'rectangle') {
-        halfW = entity.width / 2
-        halfH = entity.height / 2
-      } else if (entity.type === 'polygon') {
-        for (const v of entity.vertices) {
-          halfW = Math.max(halfW, Math.abs(v.x - x))
-          halfH = Math.max(halfH, Math.abs(v.y - y))
-        }
-      }
-
-      minX = Math.min(minX, x - halfW)
-      maxX = Math.max(maxX, x + halfW)
-      minY = Math.min(minY, y - halfH)
-      maxY = Math.max(maxY, y + halfH)
+      const bounds = entityBounds(entity)
+      if (!bounds) continue
+      minX = Math.min(minX, bounds.minX)
+      maxX = Math.max(maxX, bounds.maxX)
+      minY = Math.min(minY, bounds.minY)
+      maxY = Math.max(maxY, bounds.maxY)
     }
 
     // Fallback if no bins and no entities

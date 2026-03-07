@@ -3,6 +3,7 @@ import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useProject } from '@/hooks/useProject'
 import type { Entity } from '../../../../shared/types/project'
+import { entityCenter } from '../../../../shared/geometry/entity-geometry'
 
 interface TransformGizmoProps {
   selectedIds: Set<string>
@@ -41,13 +42,12 @@ export default function TransformGizmo({
 
   const centroid = useMemo(() => {
     if (selectedEntities.length === 0) return null
-    const sum = selectedEntities.reduce(
-      (acc, e) => ({
-        x: acc.x + e.transform.position.x,
-        y: acc.y + e.transform.position.y
-      }),
-      { x: 0, y: 0 }
-    )
+    const sum = { x: 0, y: 0 }
+    for (const e of selectedEntities) {
+      const c = entityCenter(e)
+      sum.x += c.x
+      sum.y += c.y
+    }
     return {
       x: sum.x / selectedEntities.length,
       y: sum.y / selectedEntities.length

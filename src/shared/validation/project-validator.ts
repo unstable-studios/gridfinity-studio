@@ -1,5 +1,6 @@
 import type { ProjectData } from '../types/project'
-import { SUPPORTED_SCHEMA_VERSIONS, ENTITY_TYPES } from '../types/project'
+import { SUPPORTED_SCHEMA_VERSIONS, ENTITY_TYPES, CURRENT_SCHEMA_VERSION } from '../types/project'
+import { normalizePolygonVertices } from '../geometry/entity-geometry'
 
 export interface ValidationError {
   field: string
@@ -745,6 +746,43 @@ export class ProjectValidator {
 
 export function validateProject(data: unknown): ValidationResult {
   return ProjectValidator.validate(data)
+}
+
+/**
+ * Migrate a project from v0.3.0 (or earlier) to v0.4.0.
+ * Normalizes polygon vertices from world-space to local-space (centroid-relative).
+ * Idempotent: running on already-migrated data is a no-op.
+ */
+export function migrateProject(project: ProjectData): ProjectData {
+  if (project.schemaVersion === CURRENT_SCHEMA_VERSION) return project
+
+  const migrated = { ...project, entities: [...project.entities] }
+
+  for (let i = 0; i < migrated.entities.length; i++) {
+    const entity = migrated.entities[i]
+    if (entity.type !== 'polygon' || entity.vertices.length < 3) continue
+
+    const { centroid, localVertices } = normalizePolygonVertices(entity.vertices)
+
+    // Skip if centroid is effectively zero (already normalized)
+    if (Math.abs(centroid.x) < 1e-9 && Math.abs(centroid.y) < 1e-9) continue
+
+    migrated.entities[i] = {
+      ...entity,
+      vertices: localVertices,
+      transform: {
+        ...entity.transform,
+        position: {
+          x: entity.transform.position.x + centroid.x,
+          y: entity.transform.position.y + centroid.y,
+          z: entity.transform.position.z
+        }
+      }
+    }
+  }
+
+  migrated.schemaVersion = CURRENT_SCHEMA_VERSION
+  return migrated
 }
 
 export function formatValidationErrors(errors: ValidationError[]): string {

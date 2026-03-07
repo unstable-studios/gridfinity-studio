@@ -1,6 +1,25 @@
 import { describe, it, expect } from 'vitest'
 import { resolveSnapTargets, snapToNearest } from '../snap'
 import type { SnapTarget } from '../snap'
+import type { RectangleEntity } from '../../../../shared/types/project'
+
+function makeRect(x: number, y: number, w = 42, h = 42): RectangleEntity {
+  return {
+    id: `r-${x}-${y}`,
+    type: 'rectangle',
+    name: 'test',
+    visible: true,
+    locked: false,
+    transform: {
+      position: { x, y, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 }
+    },
+    properties: {},
+    width: w,
+    height: h
+  }
+}
 
 describe('resolveSnapTargets', () => {
   it('grid snap: cursor near grid intersection returns grid target', () => {
@@ -35,14 +54,7 @@ describe('resolveSnapTargets', () => {
   })
 
   it('entity center snap: cursor near entity position returns entity-center target', () => {
-    const entities = [
-      {
-        type: 'rectangle',
-        transform: { position: { x: 100, y: 100 } },
-        width: 42,
-        height: 42
-      }
-    ]
+    const entities = [makeRect(100, 100)]
 
     const targets = resolveSnapTargets({ x: 98, y: 102 }, 42, entities, 10)
 
@@ -53,14 +65,7 @@ describe('resolveSnapTargets', () => {
   })
 
   it('entity edge snap: cursor near rectangle edge midpoint returns entity-edge target', () => {
-    const entities = [
-      {
-        type: 'rectangle',
-        transform: { position: { x: 0, y: 0 } },
-        width: 42,
-        height: 42
-      }
-    ]
+    const entities = [makeRect(0, 0)]
 
     // Near the right edge midpoint (21, 0)
     const targets = resolveSnapTargets({ x: 20, y: 0 }, 42, entities, 10)
@@ -79,20 +84,7 @@ describe('resolveSnapTargets', () => {
   })
 
   it('results are sorted by distance (nearest first)', () => {
-    const entities = [
-      {
-        type: 'rectangle',
-        transform: { position: { x: 5, y: 5 } },
-        width: 42,
-        height: 42
-      },
-      {
-        type: 'rectangle',
-        transform: { position: { x: 50, y: 50 } },
-        width: 42,
-        height: 42
-      }
-    ]
+    const entities = [makeRect(5, 5), makeRect(50, 50)]
 
     const cursor = { x: 3, y: 3 }
     const targets = resolveSnapTargets(cursor, 42, entities, 100)

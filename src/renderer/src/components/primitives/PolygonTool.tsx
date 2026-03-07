@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, useEffect } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { PolygonEntity, Vertex2D } from '../../../../shared/types/project'
+import { normalizePolygonVertices } from '../../../../shared/geometry/entity-geometry'
 
 const MIN_VERTICES = 3
 const VERTEX_DOT_SIZE = 0.5
@@ -21,11 +22,12 @@ export default function PolygonTool({ onPlace }: PolygonToolProps): React.JSX.El
 
   const closePolygon = useCallback(() => {
     if (vertices.length >= MIN_VERTICES) {
+      const { centroid, localVertices } = normalizePolygonVertices(vertices)
       onPlace({
         type: 'polygon',
-        vertices: [...vertices],
+        vertices: localVertices,
         transform: {
-          position: { x: 0, y: 0, z: 0 },
+          position: { x: centroid.x, y: centroid.y, z: 0 },
           rotation: { x: 0, y: 0, z: 0 },
           scale: { x: 1, y: 1, z: 1 }
         }

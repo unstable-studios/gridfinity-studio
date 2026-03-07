@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { resolveSnapTargets, snapToNearest } from '@/lib/snap'
 import type { SnapTarget } from '@/lib/snap'
+import type { Entity } from '../../../shared/types/project'
 
 const DEFAULT_THRESHOLD = 5
 
@@ -10,14 +11,11 @@ export interface UseSnappingResult {
   snap: (
     cursor: { x: number; y: number },
     gridSize: number,
-    entities: Array<{
-      type: string
-      transform: { position: { x: number; y: number } }
-      diameter?: number
-      width?: number
-      height?: number
-    }>
-  ) => { x: number; y: number }
+    entities: Entity[]
+  ) => {
+    x: number
+    y: number
+  }
   snapTargets: SnapTarget[]
 }
 
@@ -30,14 +28,11 @@ export function useSnapping(): UseSnappingResult {
     (
       cursor: { x: number; y: number },
       gridSize: number,
-      entities: Array<{
-        type: string
-        transform: { position: { x: number; y: number } }
-        diameter?: number
-        width?: number
-        height?: number
-      }>
-    ): { x: number; y: number } => {
+      entities: Entity[]
+    ): {
+      x: number
+      y: number
+    } => {
       if (!enabled) {
         return cursor
       }

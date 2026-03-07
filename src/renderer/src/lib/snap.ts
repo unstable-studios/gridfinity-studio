@@ -5,6 +5,9 @@
  * entity edges) and returns the closest match within a threshold.
  */
 
+import type { Entity, RectangleEntity, CircleEntity } from '../../../shared/types/project'
+import { entityCenter } from '../../../shared/geometry/entity-geometry'
+
 // ─── Types ────────────────────────────────────────────────────────
 
 export interface SnapTarget {
@@ -15,14 +18,6 @@ export interface SnapTarget {
 interface Cursor {
   x: number
   y: number
-}
-
-interface SnapEntity {
-  type: string
-  transform: { position: { x: number; y: number } }
-  diameter?: number
-  width?: number
-  height?: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────
@@ -51,19 +46,19 @@ function gridSnapTarget(cursor: Cursor, gridSize: number): SnapTarget {
 
 // ─── Entity center snap ──────────────────────────────────────────
 
-function entityCenterTargets(entities: SnapEntity[]): SnapTarget[] {
+function entityCenterTargets(entities: Entity[]): SnapTarget[] {
   return entities.map((e) => ({
-    point: { x: e.transform.position.x, y: e.transform.position.y },
+    point: entityCenter(e),
     type: 'entity-center' as const
   }))
 }
 
 // ─── Entity edge snap ─────────────────────────────────────────────
 
-function rectangleEdgeMidpoints(entity: SnapEntity): SnapTarget[] {
+function rectangleEdgeMidpoints(entity: RectangleEntity): SnapTarget[] {
   const { x, y } = entity.transform.position
-  const w = entity.width ?? 0
-  const h = entity.height ?? 0
+  const w = entity.width
+  const h = entity.height
   const hw = w / 2
   const hh = h / 2
 
@@ -75,9 +70,9 @@ function rectangleEdgeMidpoints(entity: SnapEntity): SnapTarget[] {
   ]
 }
 
-function circleCardinalPoints(entity: SnapEntity): SnapTarget[] {
+function circleCardinalPoints(entity: CircleEntity): SnapTarget[] {
   const { x, y } = entity.transform.position
-  const r = (entity.diameter ?? 0) / 2
+  const r = entity.diameter / 2
 
   return [
     { point: { x: x - r, y }, type: 'entity-edge' },
@@ -87,7 +82,7 @@ function circleCardinalPoints(entity: SnapEntity): SnapTarget[] {
   ]
 }
 
-function entityEdgeTargets(entities: SnapEntity[]): SnapTarget[] {
+function entityEdgeTargets(entities: Entity[]): SnapTarget[] {
   const targets: SnapTarget[] = []
 
   for (const entity of entities) {
@@ -110,7 +105,7 @@ function entityEdgeTargets(entities: SnapEntity[]): SnapTarget[] {
 export function resolveSnapTargets(
   cursor: Cursor,
   gridSize: number,
-  entities: SnapEntity[],
+  entities: Entity[],
   threshold: number
 ): SnapTarget[] {
   const candidates: SnapTarget[] = [
