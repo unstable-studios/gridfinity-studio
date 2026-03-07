@@ -33,8 +33,29 @@ import {
 
 const GITHUB_REPO = 'https://github.com/unstable-studios/gridfinity-studio'
 
+function useProjectName(): string {
+  const filePath = useProject((s) => s.filePath)
+  if (!filePath) return 'Untitled Project'
+  const fileName = filePath.split(/[\\/]/).pop() ?? filePath
+  return fileName.replace(/\.gfstudio$/i, '')
+}
+
+function useWindowTitle(): void {
+  const projectName = useProjectName()
+  const isModified = useProject((s) => s.isModified)
+
+  useEffect(() => {
+    const suffix = isModified ? ' *' : ''
+    document.title = `Gridfinity Studio — ${projectName}${suffix}`
+  }, [projectName, isModified])
+}
+
 export default function Navbar(): React.JSX.Element {
   const [prefsOpen, setPrefsOpen] = useState(false)
+  const isModified = useProject((s) => s.isModified)
+  const { saveProject } = useProject()
+
+  useWindowTitle()
 
   // Cmd+, shortcut for preferences
   useEffect(() => {
@@ -53,6 +74,16 @@ export default function Navbar(): React.JSX.Element {
       <NavbarRoot brand={<Logo />} className="relative z-50 max-w-none [&>div]:max-w-none py-2">
         <NavbarContent className="gap-1">
           <AppMenubar onOpenPreferences={() => setPrefsOpen(true)} />
+          {isModified && (
+            <button
+              type="button"
+              onClick={() => void saveProject()}
+              className="ml-2 px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition"
+              title="Save changes (Cmd+S)"
+            >
+              Unsaved
+            </button>
+          )}
         </NavbarContent>
         <NavbarActions className="ml-auto gap-2">
           <ViewModeToggle />

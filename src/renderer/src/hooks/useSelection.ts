@@ -13,7 +13,7 @@ export interface UseSelectionResult {
   toggleSelect: (id: string) => void
   isSelected: (id: string) => boolean
   marqueeSelect: (ids: string[]) => void
-  selectBin: (id: string) => void
+  selectBin: (id: string, additive?: boolean) => void
 }
 
 const SelectionCtx = createContext<UseSelectionResult | null>(null)
@@ -33,14 +33,24 @@ export function useSelection(): UseSelectionResult {
   const [selectionType, setSelectionType] = useState<SelectionType>('entity')
 
   const select = useCallback((id: string, additive?: boolean) => {
-    setSelectionType('entity')
-    setSelectedIds((prev) => {
-      if (additive) {
-        const next = new Set(prev)
-        next.add(id)
-        return next
+    setSelectionType((prevType) => {
+      if (prevType !== 'entity') {
+        // Switching types — start fresh even if additive
+        setSelectedIds(new Set([id]))
+      } else if (additive) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          if (next.has(id)) {
+            next.delete(id)
+          } else {
+            next.add(id)
+          }
+          return next
+        })
+      } else {
+        setSelectedIds(new Set([id]))
       }
-      return new Set([id])
+      return 'entity'
     })
   }, [])
 
@@ -80,9 +90,26 @@ export function useSelection(): UseSelectionResult {
     setSelectedIds(new Set(ids))
   }, [])
 
-  const selectBin = useCallback((id: string) => {
-    setSelectionType('bin')
-    setSelectedIds(new Set([id]))
+  const selectBin = useCallback((id: string, additive?: boolean) => {
+    setSelectionType((prevType) => {
+      if (prevType !== 'bin') {
+        // Switching types — start fresh even if additive
+        setSelectedIds(new Set([id]))
+      } else if (additive) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          if (next.has(id)) {
+            next.delete(id)
+          } else {
+            next.add(id)
+          }
+          return next
+        })
+      } else {
+        setSelectedIds(new Set([id]))
+      }
+      return 'bin'
+    })
   }, [])
 
   return {

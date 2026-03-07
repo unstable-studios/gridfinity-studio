@@ -40,8 +40,8 @@ export const DEFAULT_THEME_CONFIG: ThemeConfig = {
     emptyState: '#2a2d3a'
   },
   light: {
-    layoutBg: '#e0e2e6',
-    layoutGrid: '#b0b4c0',
+    layoutBg: '#f0f1f3',
+    layoutGrid: '#c8ccd6',
     reviewBg: '#e8eaed',
     reviewFloor: '#d4d7dd',
     reviewFog: '#e8eaed',
