@@ -69,7 +69,7 @@ interface ProjectState {
   saveProject: (targetPath?: string) => Promise<boolean>
   saveProjectAs: () => Promise<boolean>
   loadProject: (targetPath?: string) => Promise<boolean>
-  createNewProject: (name?: string) => void
+  createNewProject: (config?: { name?: string; baseUnit?: number; tolerance?: number }) => void
   loadRecentProjects: () => Promise<void>
 
   // Export operations (not undoable)
@@ -508,9 +508,17 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       }
     },
 
-    createNewProject: (name) => {
+    createNewProject: (config) => {
+      const project = createEmptyProject(config?.name ?? 'Untitled Project')
+      if (config?.baseUnit) {
+        project.gridfinity.baseUnit = config.baseUnit
+        project.gridfinity.gridSpacing = config.baseUnit
+      }
+      if (config?.tolerance !== undefined) {
+        project.gridfinity.tolerance = config.tolerance
+      }
       set({
-        project: createEmptyProject(name ?? 'Untitled Project'),
+        project,
         filePath: null,
         isModified: true,
         error: null,

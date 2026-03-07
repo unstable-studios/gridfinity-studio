@@ -3,6 +3,7 @@ import { Button } from '@unstable-studios/ui'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { NumericInput } from '@/components/ui/numeric-input'
+import { GridPicker } from '@/components/ui/grid-picker'
 import { Switch } from '@/components/ui/switch'
 import {
   ContextMenu,
@@ -513,6 +514,11 @@ function BinProperties({
 }): React.JSX.Element {
   return (
     <div className="space-y-2 text-xs">
+      <GridPicker
+        width={bin.width}
+        depth={bin.depth}
+        onChange={(w, d) => onUpdate({ width: w, depth: d })}
+      />
       <div className="grid grid-cols-3 gap-1">
         <NumericInput
           label="W"
