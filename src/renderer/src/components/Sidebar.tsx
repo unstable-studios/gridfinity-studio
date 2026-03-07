@@ -187,7 +187,7 @@ function LayoutSidebar({
         </div>
       )}
 
-      {/* Editable project name header */}
+      {/* Project name header (read-only) */}
       <ProjectNameHeader />
 
       {/* Bin tree with nested entities */}
@@ -223,7 +223,14 @@ function LayoutSidebar({
                         Rename
                       </ContextMenuItem>
                       <ContextMenuSeparator />
-                      <ContextMenuItem variant="destructive" onSelect={() => removeBin(bin.id)}>
+                      <ContextMenuItem
+                        variant="destructive"
+                        onSelect={() => {
+                          const wasSelected = selectionType === 'bin' && selectedIds.has(bin.id)
+                          removeBin(bin.id)
+                          if (wasSelected) selection.clearSelection()
+                        }}
+                      >
                         Delete
                       </ContextMenuItem>
                     </ContextMenuContent>
@@ -525,7 +532,7 @@ function BinProperties({
 }
 
 const BinListItem = forwardRef<
-  HTMLButtonElement,
+  HTMLElement,
   {
     bin: Bin
     selected: boolean
@@ -562,21 +569,13 @@ const BinListItem = forwardRef<
     setEditing(false)
   }
 
-  return (
-    <button
-      ref={ref}
-      type="button"
-      className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-        selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
-      }`}
-      onClick={onSelect}
-      onDoubleClick={() => {
-        setEditName(bin.name)
-        setEditing(true)
-      }}
-      {...props}
-    >
-      {editing ? (
+  const className = `w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
+    selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
+  }`
+
+  if (editing) {
+    return (
+      <div ref={ref as React.Ref<HTMLDivElement>} className={className} {...(props as object)}>
         <Input
           ref={inputRef}
           type="text"
@@ -591,22 +590,33 @@ const BinListItem = forwardRef<
               setEditing(false)
             }
           }}
-          onClick={(e) => e.stopPropagation()}
         />
-      ) : (
-        <>
-          <span className="font-medium">{bin.name}</span>
-          <span className="ml-2 text-zinc-600">
-            {bin.width}×{bin.depth}×{bin.height}u
-          </span>
-        </>
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      ref={ref as React.Ref<HTMLButtonElement>}
+      type="button"
+      className={className}
+      onClick={onSelect}
+      onDoubleClick={() => {
+        setEditName(bin.name)
+        setEditing(true)
+      }}
+      {...props}
+    >
+      <span className="font-medium">{bin.name}</span>
+      <span className="ml-2 text-zinc-600">
+        {bin.width}×{bin.depth}×{bin.height}u
+      </span>
     </button>
   )
 })
 
 const EntityListItem = forwardRef<
-  HTMLButtonElement,
+  HTMLElement,
   {
     entity: Entity
     selected: boolean
@@ -643,21 +653,13 @@ const EntityListItem = forwardRef<
     setEditing(false)
   }
 
-  return (
-    <button
-      ref={ref}
-      type="button"
-      className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-        selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
-      }`}
-      onClick={() => onSelect(entity.id)}
-      onDoubleClick={() => {
-        setEditName(entity.name)
-        setEditing(true)
-      }}
-      {...props}
-    >
-      {editing ? (
+  const className = `w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
+    selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
+  }`
+
+  if (editing) {
+    return (
+      <div ref={ref as React.Ref<HTMLDivElement>} className={className} {...(props as object)}>
         <Input
           ref={inputRef}
           type="text"
@@ -672,14 +674,25 @@ const EntityListItem = forwardRef<
               setEditing(false)
             }
           }}
-          onClick={(e) => e.stopPropagation()}
         />
-      ) : (
-        <>
-          <span className="font-medium">{entity.name}</span>
-          <span className="ml-2 text-zinc-600">{entity.type}</span>
-        </>
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      ref={ref as React.Ref<HTMLButtonElement>}
+      type="button"
+      className={className}
+      onClick={() => onSelect(entity.id)}
+      onDoubleClick={() => {
+        setEditName(entity.name)
+        setEditing(true)
+      }}
+      {...props}
+    >
+      <span className="font-medium">{entity.name}</span>
+      <span className="ml-2 text-zinc-600">{entity.type}</span>
     </button>
   )
 })
@@ -688,7 +701,7 @@ function ProjectNameHeader(): React.JSX.Element {
   const filePath = useProject((s) => s.filePath)
   const name = filePath
     ? filePath
-        .split('/')
+        .split(/[\\/]/)
         .pop()!
         .replace(/\.gfstudio$/, '')
     : 'Untitled Project'

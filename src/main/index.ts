@@ -149,7 +149,7 @@ app.whenReady().then(() => {
     return newProject()
   })
 
-  ipcMain.handle('project:get-recent', () => {
+  ipcMain.handle('project:get-recent', async () => {
     return getRecentProjects()
   })
 
