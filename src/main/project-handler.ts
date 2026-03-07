@@ -1,5 +1,6 @@
-import { dialog } from 'electron'
+import { app, dialog } from 'electron'
 import { readFile, writeFile } from 'fs/promises'
+import { readFileSync, writeFileSync } from 'fs'
 import { createEmptyProject } from '../shared/types/project'
 import type { ProjectData } from '../shared/types/project'
 import { validateProject, formatValidationErrors } from '../shared/validation/project-validator'
@@ -19,9 +20,34 @@ interface OperationResult<T = void> {
 const MAX_RECENT_PROJECTS = 10
 
 /**
- * In-memory list of recently opened/saved project file paths
+ * Persist recent project paths to a JSON file in the app's userData directory.
  */
-let recentProjectPaths: string[] = []
+import { join } from 'path'
+
+const recentFilePath = join(app.getPath('userData'), 'recent-projects.json')
+
+function loadRecentFromDisk(): string[] {
+  try {
+    const data = readFileSync(recentFilePath, 'utf-8')
+    const parsed: unknown = JSON.parse(data)
+    if (Array.isArray(parsed) && parsed.every((p) => typeof p === 'string')) {
+      return parsed as string[]
+    }
+  } catch {
+    // File doesn't exist yet or is corrupt — start fresh
+  }
+  return []
+}
+
+function saveRecentToDisk(paths: string[]): void {
+  try {
+    writeFileSync(recentFilePath, JSON.stringify(paths), 'utf-8')
+  } catch {
+    // Best-effort — don't crash if userData is unwritable
+  }
+}
+
+let recentProjectPaths: string[] = loadRecentFromDisk()
 
 /**
  * Add a file path to the recent projects list
@@ -32,6 +58,7 @@ function addToRecentProjects(filePath: string): void {
     0,
     MAX_RECENT_PROJECTS
   )
+  saveRecentToDisk(recentProjectPaths)
 }
 
 /**
