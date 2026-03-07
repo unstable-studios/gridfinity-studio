@@ -685,54 +685,16 @@ const EntityListItem = forwardRef<
 })
 
 function ProjectNameHeader(): React.JSX.Element {
-  const { project, updateSettings } = useProject()
-  const [editing, setEditing] = useState(false)
-  const [editName, setEditName] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-  const name = project?.settings.name ?? 'Untitled Project'
-
-  useEffect(() => {
-    if (editing) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
-    }
-  }, [editing])
-
-  const commitName = (): void => {
-    const trimmed = editName.trim()
-    if (trimmed && trimmed !== name) {
-      updateSettings({ name: trimmed })
-    }
-    setEditing(false)
-  }
-
-  if (editing) {
-    return (
-      <Input
-        ref={inputRef}
-        type="text"
-        className="w-full bg-transparent text-sm font-semibold border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 mb-3 focus:ring-0 text-zinc-900 dark:text-zinc-100"
-        value={editName}
-        onChange={(e) => setEditName(e.target.value)}
-        onBlur={commitName}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') commitName()
-          if (e.key === 'Escape') setEditing(false)
-        }}
-      />
-    )
-  }
+  const filePath = useProject((s) => s.filePath)
+  const name = filePath
+    ? filePath
+        .split('/')
+        .pop()!
+        .replace(/\.gfstudio$/, '')
+    : 'Untitled Project'
 
   return (
-    <p
-      className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate cursor-pointer hover:text-zinc-600 dark:hover:text-white transition"
-      onDoubleClick={() => {
-        setEditName(name)
-        setEditing(true)
-      }}
-    >
-      {name}
-    </p>
+    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate">{name}</p>
   )
 }
 
