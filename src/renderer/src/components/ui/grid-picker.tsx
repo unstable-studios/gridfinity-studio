@@ -57,6 +57,7 @@ export function GridPicker({
                   setHoverW(col)
                   setHoverD(row)
                 }}
+                aria-label={`${col}×${row}`}
                 onClick={() => onChange(col, row)}
               />
             )

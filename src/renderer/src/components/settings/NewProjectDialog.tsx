@@ -41,7 +41,17 @@ export default function NewProjectDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) {
+          setName('Untitled Project')
+          setBaseUnit(42)
+          setPreset('standard')
+        }
+        onOpenChange(isOpen)
+      }}
+    >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>New Project</DialogTitle>

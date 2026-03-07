@@ -45,8 +45,8 @@ function selectBin(state: SelectionState, id: string, additive?: boolean): Selec
   }
 }
 
-function marqueeSelect(ids: string[], type: SelectionType = 'entity'): SelectionState {
-  return { type, ids: new Set(ids) }
+function marqueeSelect(ids: string[]): SelectionState {
+  return { type: 'entity', ids: new Set(ids) }
 }
 
 function clearSelection(state: SelectionState): SelectionState {
@@ -163,15 +163,15 @@ describe('selection: marquee', () => {
     expect(s.ids.size).toBe(3)
   })
 
-  it('marquee selects bins when type is bin', () => {
-    const s = marqueeSelect(['b1', 'b2'], 'bin')
-    expect(s.type).toBe('bin')
+  it('marquee always selects as entity type', () => {
+    const s = marqueeSelect(['e1', 'e2'])
+    expect(s.type).toBe('entity')
     expect(s.ids.size).toBe(2)
   })
 
-  it('additive bin select works after marquee bin select', () => {
-    let s = marqueeSelect(['b1', 'b2'], 'bin')
-    s = selectBin(s, 'b3', true)
+  it('additive entity select works after marquee select', () => {
+    let s = marqueeSelect(['e1', 'e2'])
+    s = select(s, 'e3', true)
     expect(s.ids.size).toBe(3)
   })
 })
