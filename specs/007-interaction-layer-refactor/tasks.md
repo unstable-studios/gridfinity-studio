@@ -17,8 +17,8 @@
 
 **Purpose**: Create new files and modules that other tasks depend on
 
-- [ ] T001 Create shared geometry module `src/shared/geometry/entity-geometry.ts` with exported stubs for `entityCenter()`, `entityBounds()`, `entityHalfExtents()` (return placeholder values, typed correctly against Entity discriminated union)
-- [ ] T002 [P] Create z-layer constants module `src/renderer/src/lib/z-layers.ts` with all named constants from data-model.md z-layer table
+- [x] T001 Create shared geometry module `src/shared/geometry/entity-geometry.ts` with exported stubs for `entityCenter()`, `entityBounds()`, `entityHalfExtents()` (return placeholder values, typed correctly against Entity discriminated union)
+- [x] T002 [P] Create z-layer constants module `src/renderer/src/lib/z-layers.ts` with all named constants from data-model.md z-layer table
 
 ---
 
@@ -32,15 +32,15 @@
 
 > **Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T003 [P] Unit tests for `entityCenter()` in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test circle (returns transform.position), rectangle (returns transform.position), polygon with local-space vertices (returns transform.position), degenerate polygon (<3 vertices)
-- [ ] T004 [P] Unit tests for `entityBounds()` in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test circle (position ± radius), rectangle (position ± half-extents), polygon (position + vertex min/max), entity at non-origin position
-- [ ] T005 [P] Unit tests for `entityHalfExtents()` in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test circle (radius, radius), rectangle (width/2, height/2), polygon (vertex bounding box half-extents)
+- [x] T003 [P] Unit tests for `entityCenter()` in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test circle (returns transform.position), rectangle (returns transform.position), polygon with local-space vertices (returns transform.position), degenerate polygon (<3 vertices)
+- [x] T004 [P] Unit tests for `entityBounds()` in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test circle (position ± radius), rectangle (position ± half-extents), polygon (position + vertex min/max), entity at non-origin position
+- [x] T005 [P] Unit tests for `entityHalfExtents()` in `src/shared/geometry/__tests__/entity-geometry.test.ts` — test circle (radius, radius), rectangle (width/2, height/2), polygon (vertex bounding box half-extents)
 
 ### Implementation for Foundation
 
-- [ ] T006 Implement `entityCenter()` in `src/shared/geometry/entity-geometry.ts` — for all entity types, return `transform.position` (after polygon normalization, this is always the center)
-- [ ] T007 Implement `entityBounds()` in `src/shared/geometry/entity-geometry.ts` — compute AABB from entity center + type-specific extents, handle discriminated union exhaustively
-- [ ] T008 Implement `entityHalfExtents()` in `src/shared/geometry/entity-geometry.ts` — circle: `{ hw: diameter/2, hh: diameter/2 }`, rectangle: `{ hw: width/2, hh: height/2 }`, polygon: compute from vertex min/max
+- [x] T006 Implement `entityCenter()` in `src/shared/geometry/entity-geometry.ts` — for all entity types, return `transform.position` (after polygon normalization, this is always the center)
+- [x] T007 Implement `entityBounds()` in `src/shared/geometry/entity-geometry.ts` — compute AABB from entity center + type-specific extents, handle discriminated union exhaustively
+- [x] T008 Implement `entityHalfExtents()` in `src/shared/geometry/entity-geometry.ts` — circle: `{ hw: diameter/2, hh: diameter/2 }`, rectangle: `{ hw: width/2, hh: height/2 }`, polygon: compute from vertex min/max
 
 **Checkpoint**: `pnpm vitest run src/shared/geometry` — all geometry tests pass
 
