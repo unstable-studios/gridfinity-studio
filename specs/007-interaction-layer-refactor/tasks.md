@@ -139,9 +139,9 @@
 
 ### Implementation for User Story 5
 
-- [ ] T037 [US5] Add shape-filling hit areas to `src/renderer/src/components/layout/EntityRenderer.tsx` — for each entity type, render a filled mesh matching the shape (circleGeometry for circles, planeGeometry for rectangles, ShapeGeometry for polygons) with transparent material
-- [ ] T038 [US5] Add fill opacity by interaction state in `src/renderer/src/components/layout/EntityRenderer.tsx` — default 2.5% opacity, hovered 5%, selected 8%. Use entity color for fill.
-- [ ] T039 [US5] Add hover outline color change in `src/renderer/src/components/layout/EntityRenderer.tsx` — default color (slate), hovered color (blue), selected color (bright blue), colliding color (red). Apply to both outline and fill.
+- [x] T037 [US5] Add shape-filling hit areas to `src/renderer/src/components/layout/EntityRenderer.tsx` — added circleGeometry for circles, planeGeometry for rectangles, ShapeGeometry for polygons at Z.ENTITY_FILL. Removed old tiny invisible hit area from LineShape.
+- [x] T038 [US5] Add fill opacity by interaction state in `src/renderer/src/components/layout/EntityRenderer.tsx` — default 2.5% opacity, hovered 5%, selected 8%. Fill color matches outline color.
+- [x] T039 [US5] Add hover outline color change in `src/renderer/src/components/layout/EntityRenderer.tsx` — outline and fill share same color: default (slate), hovered (blue), selected (bright blue), colliding (red). Pointer events moved to parent group wrapping both outline and fill.
 
 **Checkpoint**: Hover → fill changes. Click inside shape → selects. Selected → distinct visual. All entity types (circle, rectangle, polygon) behave consistently.
 
@@ -169,9 +169,9 @@
 
 **Purpose**: Final verification and cleanup
 
-- [ ] T045 Run full test suite `pnpm vitest run` — all tests pass including new geometry, migration, and selection tests
-- [ ] T046 Run `pnpm typecheck` — zero errors across both node and web configs
-- [ ] T047 Run `pnpm lint` — zero errors (warnings in threemf-writer.test.ts are pre-existing)
+- [x] T045 Run full test suite `pnpm vitest run` — 300 tests pass across 16 files
+- [x] T046 Run `pnpm typecheck` — zero errors across both node and web configs
+- [x] T047 Run `pnpm lint` — zero errors (2 pre-existing warnings in threemf-writer.test.ts)
 - [ ] T048 Manual smoke test: create project with circle, rectangle, polygon → drag each → snap each → marquee-select all → assign to bins → save → reload → verify all positions preserved
 - [ ] T049 Manual smoke test: open a v0.3.0 project file with polygon entities → verify migration runs silently → verify polygons render at correct positions → save → reopen → verify v0.4.0 schema
 
