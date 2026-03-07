@@ -407,8 +407,11 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         const pathToUse = targetPath ?? state.filePath ?? undefined
         const result = await window.api.project.save(state.project, pathToUse)
         if (result.success) {
-          if (result.data) set({ filePath: result.data })
-          set({ isModified: false, error: null })
+          set({
+            filePath: result.data ?? state.filePath,
+            isModified: false,
+            error: null
+          })
           return true
         } else {
           set({ error: result.error ?? 'Failed to save project' })
@@ -433,8 +436,11 @@ const useProjectStore = create<ProjectState>()((set, get) => {
           state.filePath ?? undefined
         )
         if (result.success) {
-          if (result.data) set({ filePath: result.data })
-          set({ isModified: false, error: null })
+          set({
+            filePath: result.data ?? state.filePath,
+            isModified: false,
+            error: null
+          })
           return true
         } else {
           set({ error: result.error ?? 'Failed to save project' })
