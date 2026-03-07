@@ -3,7 +3,7 @@ import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useProject } from '@/hooks/useProject'
 import type { Entity } from '../../../../shared/types/project'
-import { entityCenter } from '../../../../shared/geometry/entity-geometry'
+import { entityCenter, entityBounds } from '../../../../shared/geometry/entity-geometry'
 import { Z } from '@/lib/z-layers'
 
 interface TransformGizmoProps {
@@ -52,6 +52,30 @@ export default function TransformGizmo({
     return {
       x: sum.x / selectedEntities.length,
       y: sum.y / selectedEntities.length
+    }
+  }, [selectedEntities])
+
+  // Bounding box of all selected entities — used for drag hit area
+  const selectionBounds = useMemo(() => {
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+    for (const e of selectedEntities) {
+      const b = entityBounds(e)
+      if (!b) continue
+      if (b.minX < minX) minX = b.minX
+      if (b.maxX > maxX) maxX = b.maxX
+      if (b.minY < minY) minY = b.minY
+      if (b.maxY > maxY) maxY = b.maxY
+    }
+    if (!isFinite(minX)) return null
+    const PAD = 2
+    return {
+      cx: (minX + maxX) / 2,
+      cy: (minY + maxY) / 2,
+      width: maxX - minX + PAD * 2,
+      height: maxY - minY + PAD * 2
     }
   }, [selectedEntities])
 
@@ -269,16 +293,18 @@ export default function TransformGizmo({
       {/* Cross indicator at centroid */}
       <primitive object={crossLine} position={[centroid.x, centroid.y, Z.GIZMO_CROSS]} />
 
-      {/* Invisible drag handle */}
-      <mesh
-        position={[centroid.x, centroid.y, Z.GIZMO_DRAG_HANDLE]}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-      >
-        <circleGeometry args={[5, 32]} />
-        <meshBasicMaterial transparent opacity={dragging ? 0.1 : 0} color="#f59e0b" />
-      </mesh>
+      {/* Invisible drag handle covering all selected entity bounds */}
+      {selectionBounds && (
+        <mesh
+          position={[selectionBounds.cx, selectionBounds.cy, Z.GIZMO_DRAG_HANDLE]}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          <planeGeometry args={[selectionBounds.width, selectionBounds.height]} />
+          <meshBasicMaterial transparent opacity={dragging ? 0.05 : 0} color="#f59e0b" />
+        </mesh>
+      )}
 
       {/* Resize handles */}
       {handles.map((h) => (
