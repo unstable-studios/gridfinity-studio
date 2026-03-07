@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { CircleEntity } from '../../../../shared/types/project'
+import { Z } from '@/lib/z-layers'
 
 type ToolState = 'idle' | 'placing'
 
@@ -95,7 +96,7 @@ export default function CircleTool({ onPlace }: CircleToolProps): React.JSX.Elem
     <group>
       {/* Invisible plane to capture pointer events */}
       <mesh
-        position={[0, 0, 0]}
+        position={[0, 0, Z.GRID]}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         visible={false}
@@ -106,7 +107,7 @@ export default function CircleTool({ onPlace }: CircleToolProps): React.JSX.Elem
 
       {/* Preview circle */}
       {previewLine && center && (
-        <primitive object={previewLine} position={[center.x, center.y, 0.02]} />
+        <primitive object={previewLine} position={[center.x, center.y, Z.TOOL_PREVIEW]} />
       )}
     </group>
   )

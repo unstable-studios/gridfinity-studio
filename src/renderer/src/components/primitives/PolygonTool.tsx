@@ -3,6 +3,7 @@ import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { PolygonEntity, Vertex2D } from '../../../../shared/types/project'
 import { normalizePolygonVertices } from '../../../../shared/geometry/entity-geometry'
+import { Z } from '@/lib/z-layers'
 
 const MIN_VERTICES = 3
 const VERTEX_DOT_SIZE = 0.5
@@ -113,7 +114,7 @@ export default function PolygonTool({ onPlace }: PolygonToolProps): React.JSX.El
     <group>
       {/* Invisible plane to capture pointer events */}
       <mesh
-        position={[0, 0, 0]}
+        position={[0, 0, Z.GRID]}
         onPointerDown={handlePointerDown}
         onDoubleClick={handleDoubleClick}
         onPointerMove={handlePointerMove}
@@ -125,7 +126,7 @@ export default function PolygonTool({ onPlace }: PolygonToolProps): React.JSX.El
 
       {/* Vertex dots */}
       {vertices.map((v, i) => (
-        <mesh key={i} position={[v.x, v.y, 0.02]}>
+        <mesh key={i} position={[v.x, v.y, Z.TOOL_PREVIEW]}>
           <circleGeometry args={[VERTEX_DOT_SIZE, 16]} />
           <meshBasicMaterial color="#60a5fa" />
         </mesh>
@@ -133,14 +134,14 @@ export default function PolygonTool({ onPlace }: PolygonToolProps): React.JSX.El
 
       {/* Snap-to-close indicator on start vertex */}
       {isNearStart && vertices.length > 0 && (
-        <mesh position={[vertices[0].x, vertices[0].y, 0.01]}>
+        <mesh position={[vertices[0].x, vertices[0].y, Z.TOOL_SNAP]}>
           <ringGeometry args={[CLOSE_SNAP_RADIUS * 0.6, CLOSE_SNAP_RADIUS * 0.8, 32]} />
           <meshBasicMaterial color="#34d399" transparent opacity={0.6} />
         </mesh>
       )}
 
       {/* Connecting lines + preview line to cursor */}
-      {linesObject && <primitive object={linesObject} position={[0, 0, 0.02]} />}
+      {linesObject && <primitive object={linesObject} position={[0, 0, Z.TOOL_PREVIEW]} />}
     </group>
   )
 }

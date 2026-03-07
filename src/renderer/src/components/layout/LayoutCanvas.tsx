@@ -13,6 +13,7 @@ import RectangleTool from '../primitives/RectangleTool'
 import PolygonTool from '../primitives/PolygonTool'
 import { detectCollisions, binOverlapsAny } from '@/lib/collision'
 import { entityBounds, boundsOverlap } from '../../../../shared/geometry/entity-geometry'
+import { Z } from '@/lib/z-layers'
 import type { Entity, Bin, GridfinityConfig } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
@@ -288,7 +289,7 @@ function BinDragHandler({
     <>
       {/* Hit area over the bin footprint */}
       <mesh
-        position={[cx, cy, 0.001]}
+        position={[cx, cy, Z.BIN_HIT_AREA]}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -303,7 +304,7 @@ function BinDragHandler({
       {handles.map((h) => (
         <mesh
           key={h.edge}
-          position={[h.x, h.y, 0.007]}
+          position={[h.x, h.y, Z.BIN_RESIZE_HANDLE]}
           onPointerDown={(e) => handleResizeDown(e, h.edge)}
           onPointerMove={handleResizeMove}
           onPointerUp={handleResizeUp}
@@ -324,7 +325,7 @@ function BinDragHandler({
       {/* Full-screen capture plane while dragging or resizing */}
       {(dragging || resizingEdge) && (
         <mesh
-          position={[0, 0, 0.002]}
+          position={[0, 0, Z.BIN_CAPTURE_PLANE]}
           onPointerMove={resizingEdge ? handleResizeMove : handlePointerMove}
           onPointerUp={resizingEdge ? handleResizeUp : handlePointerUp}
         >
@@ -402,7 +403,7 @@ function MultiSelectionBounds({
 
   if (!lineObj) return null
 
-  return <primitive object={lineObj} position={[0, 0, 0.02]} />
+  return <primitive object={lineObj} position={[0, 0, Z.TOOL_PREVIEW]} />
 }
 
 function LayoutScene({
@@ -553,7 +554,7 @@ function LayoutScene({
           <SelectionBox start={marqueeStart} end={marqueeEnd} visible={marqueeActive} />
           {/* Click-away deselect plane */}
           <mesh
-            position={[0, 0, -0.01]}
+            position={[0, 0, Z.BACKGROUND_PLANE]}
             onPointerDown={(e) => {
               if (e.nativeEvent.button !== 0) return
               const additive =

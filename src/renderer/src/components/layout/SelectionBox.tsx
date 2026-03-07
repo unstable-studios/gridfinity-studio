@@ -1,3 +1,5 @@
+import { Z } from '@/lib/z-layers'
+
 interface SelectionBoxProps {
   start: { x: number; y: number } | null
   end: { x: number; y: number } | null
@@ -19,7 +21,7 @@ export default function SelectionBox({
   if (width === 0 && height === 0) return null
 
   return (
-    <mesh position={[cx, cy, 0.03]}>
+    <mesh position={[cx, cy, Z.SELECTION_BOX]}>
       <planeGeometry args={[width, height]} />
       <meshBasicMaterial color="#3b82f6" transparent opacity={0.15} depthWrite={false} />
     </mesh>

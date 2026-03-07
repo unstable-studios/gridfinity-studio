@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import * as THREE from 'three'
+import { Z } from '@/lib/z-layers'
 
 // Gridfinity spec corner radius (top edge)
 const CORNER_RADIUS = 3.75
@@ -92,7 +93,7 @@ export default function BinFootprint({
         </group>
       )}
       {(selected || hovered) && (
-        <mesh position={[widthMm / 2, depthMm / 2, -0.005]}>
+        <mesh position={[widthMm / 2, depthMm / 2, Z.BIN_FILL]}>
           <planeGeometry args={[widthMm, depthMm]} />
           <meshBasicMaterial
             transparent

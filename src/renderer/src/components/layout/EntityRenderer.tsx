@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Entity } from '../../../../shared/types/project'
+import { Z } from '@/lib/z-layers'
 
 interface EntityRendererProps {
   entities: Entity[]
@@ -187,7 +188,7 @@ function CircleOutline({
     <LineShape
       geometry={geometry}
       color={color}
-      position={[x, y, 0.01]}
+      position={[x, y, Z.ENTITY_OUTLINE]}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onPointerOut={onPointerOut}
@@ -231,7 +232,7 @@ function RectangleOutline({
     <LineShape
       geometry={geometry}
       color={color}
-      position={[x, y, 0.01]}
+      position={[x, y, Z.ENTITY_OUTLINE]}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onPointerOut={onPointerOut}
@@ -268,7 +269,7 @@ function PolygonOutline({
     <LineShape
       geometry={geometry}
       color={color}
-      position={[x, y, 0.01]}
+      position={[x, y, Z.ENTITY_OUTLINE]}
       onPointerDown={onPointerDown}
       onPointerOver={onPointerOver}
       onPointerOut={onPointerOut}

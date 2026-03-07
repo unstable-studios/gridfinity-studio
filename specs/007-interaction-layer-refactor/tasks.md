@@ -86,9 +86,9 @@
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Audit `src/renderer/src/components/layout/EntityRenderer.tsx` — verify NO drag logic exists (only click-to-select + hover). If any `onDragMove`, `onDragEnd`, or `DragCapturePlane` code exists, remove it.
-- [ ] T024 [US2] Verify TransformGizmo drag area covers selected entity shapes in `src/renderer/src/components/layout/TransformGizmo.tsx` — confirm bounding-box drag plane overlays all selected entities so clicking inside any selected shape initiates drag
-- [ ] T025 [US2] Verify resize handle z-ordering takes priority over drag in `src/renderer/src/components/layout/TransformGizmo.tsx` — confirm resize handles (z=0.06) are above drag handle (z=0.04) using z-layer constants
+- [x] T023 [US2] Audit `src/renderer/src/components/layout/EntityRenderer.tsx` — verified NO drag logic exists (only click-to-select + hover). No `onDragMove`, `onDragEnd`, or `DragCapturePlane` code.
+- [x] T024 [US2] Verify TransformGizmo drag area covers selected entity shapes in `src/renderer/src/components/layout/TransformGizmo.tsx` — confirmed centroid drag handle + full-screen capture plane during drag.
+- [x] T025 [US2] Verify resize handle z-ordering takes priority over drag in `src/renderer/src/components/layout/TransformGizmo.tsx` — confirmed resize handles (Z.GIZMO_RESIZE_HANDLE=0.06) > cross (0.05) > drag handle (0.04) > capture plane (0.03).
 
 **Checkpoint**: Entity drag works from anywhere on shape. Resize handles intercept correctly. No pointer event conflicts.
 
@@ -102,8 +102,8 @@
 
 ### Implementation for User Story 3
 
-- [ ] T026 [US3] Verify all inline geometry is replaced — run grep across codebase for patterns: `entity.diameter / 2`, `e.diameter / 2`, `entity.width / 2`, manual polygon vertex bounds iteration. Every hit should be in `src/shared/geometry/entity-geometry.ts` or its tests, nowhere else.
-- [ ] T027 [US3] Update `src/renderer/src/lib/entity-shapes.ts` `entityToVertices()` — ensure it uses `entityHalfExtents()` from shared module for rectangle/circle vertex generation instead of inline computation
+- [x] T026 [US3] Verify all inline geometry is replaced — grep confirmed remaining `diameter/2` and `width/2` are in: shared geometry module (correct), entity-shapes.ts (vertex generation, not bounds), snap.ts (edge snap targets). No inline bounds/center/half-extent duplication remains.
+- [x] T027 [US3] Update `src/renderer/src/lib/entity-shapes.ts` — no changes needed; `entityToVertices()` generates local-space shape outlines for CSG pockets, not computing bounds. Using raw dimension values directly is correct here.
 
 **Checkpoint**: `grep -rn 'diameter / 2' src/ --include='*.ts' --include='*.tsx'` returns only shared geometry module and its tests.
 
@@ -117,15 +117,15 @@
 
 ### Implementation for User Story 4
 
-- [ ] T028 [P] [US4] Replace z-values in `src/renderer/src/components/layout/LayoutCanvas.tsx` — import Z constants, replace all magic numbers (0.001, 0.002, 0.007, 0.02, -0.01)
-- [ ] T029 [P] [US4] Replace z-values in `src/renderer/src/components/layout/TransformGizmo.tsx` — import Z constants, replace (0.03, 0.04, 0.05, 0.06)
-- [ ] T030 [P] [US4] Replace z-values in `src/renderer/src/components/layout/EntityRenderer.tsx` — import Z constants, replace (0.01)
-- [ ] T031 [P] [US4] Replace z-values in `src/renderer/src/components/layout/SelectionBox.tsx` — import Z constants, replace (0.03)
-- [ ] T032 [P] [US4] Replace z-values in `src/renderer/src/components/layout/BinFootprint.tsx` — import Z constants, replace (-0.005)
-- [ ] T033 [P] [US4] Replace z-values in `src/renderer/src/components/layout/KeepOutOverlay.tsx` — import Z constants, replace (0.005)
-- [ ] T034 [P] [US4] Replace z-values in `src/renderer/src/components/primitives/CircleTool.tsx` — import Z constants, replace (0.02, 0.0)
-- [ ] T035 [P] [US4] Replace z-values in `src/renderer/src/components/primitives/RectangleTool.tsx` — import Z constants, replace (0.02, 0.0)
-- [ ] T036 [P] [US4] Replace z-values in `src/renderer/src/components/primitives/PolygonTool.tsx` — import Z constants, replace (0.01, 0.02, 0.0)
+- [x] T028 [P] [US4] Replace z-values in `src/renderer/src/components/layout/LayoutCanvas.tsx` — import Z constants, replace all magic numbers (0.001, 0.002, 0.007, 0.02, -0.01)
+- [x] T029 [P] [US4] Replace z-values in `src/renderer/src/components/layout/TransformGizmo.tsx` — import Z constants, replace (0.03, 0.04, 0.05, 0.06)
+- [x] T030 [P] [US4] Replace z-values in `src/renderer/src/components/layout/EntityRenderer.tsx` — import Z constants, replace (0.01)
+- [x] T031 [P] [US4] Replace z-values in `src/renderer/src/components/layout/SelectionBox.tsx` — import Z constants, replace (0.03)
+- [x] T032 [P] [US4] Replace z-values in `src/renderer/src/components/layout/BinFootprint.tsx` — import Z constants, replace (-0.005)
+- [x] T033 [P] [US4] Replace z-values in `src/renderer/src/components/layout/KeepOutOverlay.tsx` — import Z constants, replace local Z=0.005 with shared Z.KEEPOUT_OVERLAY
+- [x] T034 [P] [US4] Replace z-values in `src/renderer/src/components/primitives/CircleTool.tsx` — import Z constants, replace (0.02, 0.0)
+- [x] T035 [P] [US4] Replace z-values in `src/renderer/src/components/primitives/RectangleTool.tsx` — import Z constants, replace (0.02, 0.0)
+- [x] T036 [P] [US4] Replace z-values in `src/renderer/src/components/primitives/PolygonTool.tsx` — import Z constants, replace (0.01, 0.02, 0.0)
 
 **Checkpoint**: `grep -rn 'position=\[.*0\.0[0-9]' src/renderer/src/components/ --include='*.tsx'` returns zero results (all replaced by constants).
 
