@@ -216,7 +216,7 @@ function LayoutSidebar({
                         ? 'bg-blue-600/20 text-blue-400'
                         : 'text-zinc-400 hover:bg-zinc-800'
                     }`}
-                    onClick={() => selectBin(bin.id)}
+                    onClick={(e) => selectBin(bin.id, e.shiftKey || e.metaKey || e.ctrlKey)}
                   >
                     <span className="font-medium">{bin.name}</span>
                     <span className="ml-2 text-zinc-600">
@@ -493,7 +493,7 @@ function EntityListItem({
 }: {
   entity: Entity
   selected: boolean
-  onSelect: (id: string) => void
+  onSelect: (id: string, additive?: boolean) => void
   onRename: (name: string) => void
 }): React.JSX.Element {
   const [editing, setEditing] = useState(false)
@@ -520,7 +520,7 @@ function EntityListItem({
       className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
         selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
       }`}
-      onClick={() => onSelect(entity.id)}
+      onClick={(e) => onSelect(entity.id, e.shiftKey || e.metaKey || e.ctrlKey)}
       onDoubleClick={() => {
         setEditName(entity.name)
         setEditing(true)

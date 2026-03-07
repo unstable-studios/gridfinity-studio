@@ -433,7 +433,9 @@ function LayoutScene({
             position={[0, 0, -0.01]}
             onPointerDown={(e) => {
               if (e.nativeEvent.button !== 0) return
-              onClearSelection()
+              const additive =
+                e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey
+              if (!additive) onClearSelection()
               const pos = { x: e.point.x, y: e.point.y }
               setMarqueeStart(pos)
               setMarqueeEnd(pos)

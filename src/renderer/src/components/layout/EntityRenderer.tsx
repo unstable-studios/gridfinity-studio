@@ -47,7 +47,8 @@ function EntityShape({
   const color = colliding ? '#f87171' : selected ? '#60a5fa' : '#94a3b8'
   const { x, y } = entity.transform.position
 
-  const handleClick = (e: ThreeEvent<MouseEvent>): void => {
+  const handlePointerDown = (e: ThreeEvent<PointerEvent>): void => {
+    if (e.nativeEvent.button !== 0) return
     e.stopPropagation()
     onClick?.(entity.id, e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey)
   }
@@ -55,7 +56,13 @@ function EntityShape({
   switch (entity.type) {
     case 'circle':
       return (
-        <CircleOutline x={x} y={y} diameter={entity.diameter} color={color} onClick={handleClick} />
+        <CircleOutline
+          x={x}
+          y={y}
+          diameter={entity.diameter}
+          color={color}
+          onPointerDown={handlePointerDown}
+        />
       )
     case 'rectangle':
       return (
@@ -65,7 +72,7 @@ function EntityShape({
           width={entity.width}
           height={entity.height}
           color={color}
-          onClick={handleClick}
+          onPointerDown={handlePointerDown}
         />
       )
     case 'polygon':
@@ -75,7 +82,7 @@ function EntityShape({
           y={y}
           vertices={entity.vertices}
           color={color}
-          onClick={handleClick}
+          onPointerDown={handlePointerDown}
         />
       )
     default:
@@ -87,12 +94,12 @@ function LineShape({
   geometry,
   color,
   position,
-  onClick
+  onPointerDown
 }: {
   geometry: THREE.BufferGeometry
   color: string
   position: [number, number, number]
-  onClick?: (e: ThreeEvent<MouseEvent>) => void
+  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
 }): React.JSX.Element {
   const lineObj = useMemo(() => {
     const material = new THREE.LineBasicMaterial({ color })
@@ -100,10 +107,10 @@ function LineShape({
   }, [geometry, color])
 
   return (
-    <group onClick={onClick}>
+    <group onPointerDown={onPointerDown}>
       <primitive object={lineObj} position={position} />
       {/* Invisible hit area for click detection */}
-      {onClick && (
+      {onPointerDown && (
         <mesh position={position} visible={false}>
           <circleGeometry args={[3, 8]} />
           <meshBasicMaterial transparent opacity={0} />
@@ -118,13 +125,13 @@ function CircleOutline({
   y,
   diameter,
   color,
-  onClick
+  onPointerDown
 }: {
   x: number
   y: number
   diameter: number
   color: string
-  onClick?: (e: ThreeEvent<MouseEvent>) => void
+  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
 }): React.JSX.Element {
   const geometry = useMemo(() => {
     const segments = 64
@@ -137,7 +144,14 @@ function CircleOutline({
     return new THREE.BufferGeometry().setFromPoints(points)
   }, [diameter])
 
-  return <LineShape geometry={geometry} color={color} position={[x, y, 0.01]} onClick={onClick} />
+  return (
+    <LineShape
+      geometry={geometry}
+      color={color}
+      position={[x, y, 0.01]}
+      onPointerDown={onPointerDown}
+    />
+  )
 }
 
 function RectangleOutline({
@@ -146,14 +160,14 @@ function RectangleOutline({
   width,
   height,
   color,
-  onClick
+  onPointerDown
 }: {
   x: number
   y: number
   width: number
   height: number
   color: string
-  onClick?: (e: ThreeEvent<MouseEvent>) => void
+  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
 }): React.JSX.Element {
   const geometry = useMemo(() => {
     const hw = width / 2
@@ -168,7 +182,14 @@ function RectangleOutline({
     return new THREE.BufferGeometry().setFromPoints(points)
   }, [width, height])
 
-  return <LineShape geometry={geometry} color={color} position={[x, y, 0.01]} onClick={onClick} />
+  return (
+    <LineShape
+      geometry={geometry}
+      color={color}
+      position={[x, y, 0.01]}
+      onPointerDown={onPointerDown}
+    />
+  )
 }
 
 function PolygonOutline({
@@ -176,13 +197,13 @@ function PolygonOutline({
   y,
   vertices,
   color,
-  onClick
+  onPointerDown
 }: {
   x: number
   y: number
   vertices: Array<{ x: number; y: number }>
   color: string
-  onClick?: (e: ThreeEvent<MouseEvent>) => void
+  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
 }): React.JSX.Element | null {
   const geometry = useMemo(() => {
     if (vertices.length < 3) return null
@@ -192,5 +213,12 @@ function PolygonOutline({
 
   if (!geometry) return null
 
-  return <LineShape geometry={geometry} color={color} position={[x, y, 0.01]} onClick={onClick} />
+  return (
+    <LineShape
+      geometry={geometry}
+      color={color}
+      position={[x, y, 0.01]}
+      onPointerDown={onPointerDown}
+    />
+  )
 }
