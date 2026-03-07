@@ -29,26 +29,34 @@ interface LayoutCanvasProps {
   onMoveEnd?: (ids: Set<string>) => void
   onResize?: (id: string, patch: Partial<Entity>) => void
   onBinMove: (id: string, position: { x: number; y: number }) => void
+  onBinResize?: (id: string, patch: Partial<Bin>) => void
   onSelect: (id: string, additive?: boolean) => void
-  onSelectBin: (id: string) => void
+  onSelectBin: (id: string, additive?: boolean) => void
   onClearSelection: () => void
   snap: (pos: { x: number; y: number }) => { x: number; y: number }
 }
 
+type BinResizeEdge = 'e' | 'w' | 'n' | 's'
+
 function BinDragHandler({
   bin,
   baseUnit,
+  selected,
   otherBins,
   onSelectBin,
-  onBinMove
+  onBinMove,
+  onBinResize
 }: {
   bin: Bin
   baseUnit: number
+  selected: boolean
   otherBins: Bin[]
-  onSelectBin: (id: string) => void
+  onSelectBin: (id: string, additive?: boolean) => void
   onBinMove: (id: string, position: { x: number; y: number }) => void
+  onBinResize?: (id: string, patch: Partial<Bin>) => void
 }): React.JSX.Element {
   const [dragging, setDragging] = useState(false)
+  const [resizingEdge, setResizingEdge] = useState<BinResizeEdge | null>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
 
   const widthMm = bin.width * baseUnit
@@ -75,7 +83,7 @@ function BinDragHandler({
     (e: ThreeEvent<PointerEvent>) => {
       if (e.nativeEvent.button !== 0) return
       e.stopPropagation()
-      onSelectBin(bin.id)
+      onSelectBin(bin.id, e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey)
       offsetRef.current = {
         x: e.point.x - bin.position.x,
         y: e.point.y - bin.position.y
@@ -125,6 +133,126 @@ function BinDragHandler({
     [dragging, endDrag]
   )
 
+  // ── Resize handles ──
+
+  const handleResizeDown = useCallback(
+    (e: ThreeEvent<PointerEvent>, edge: BinResizeEdge) => {
+      if (e.nativeEvent.button !== 0) return
+      e.stopPropagation()
+      const domTarget = e.nativeEvent.target as HTMLElement | null
+      domTarget?.setPointerCapture?.(e.nativeEvent.pointerId)
+      startDrag()
+      setResizingEdge(edge)
+    },
+    [startDrag]
+  )
+
+  const handleResizeMove = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      if (!resizingEdge || !onBinResize) return
+      e.stopPropagation()
+
+      const px = e.point.x
+      const py = e.point.y
+
+      let newX = bin.position.x
+      let newY = bin.position.y
+      let newW = bin.width
+      let newD = bin.depth
+
+      if (resizingEdge === 'e') {
+        newW = Math.max(1, Math.round((px - bin.position.x) / baseUnit))
+      } else if (resizingEdge === 'w') {
+        const snappedX = Math.round(px / baseUnit) * baseUnit
+        const rightEdge = bin.position.x + widthMm
+        newW = Math.max(1, Math.round((rightEdge - snappedX) / baseUnit))
+        newX = rightEdge - newW * baseUnit
+      } else if (resizingEdge === 'n') {
+        newD = Math.max(1, Math.round((py - bin.position.y) / baseUnit))
+      } else if (resizingEdge === 's') {
+        const snappedY = Math.round(py / baseUnit) * baseUnit
+        const topEdge = bin.position.y + depthMm
+        newD = Math.max(1, Math.round((topEdge - snappedY) / baseUnit))
+        newY = topEdge - newD * baseUnit
+      }
+
+      if (
+        newW === bin.width &&
+        newD === bin.depth &&
+        newX === bin.position.x &&
+        newY === bin.position.y
+      )
+        return
+
+      // Collision check
+      const candidate = { x: newX, y: newY, w: newW * baseUnit, d: newD * baseUnit }
+      if (binOverlapsAny(candidate, otherRects)) return
+
+      const patch: Partial<Bin> = {}
+      if (newW !== bin.width) patch.width = newW
+      if (newD !== bin.depth) patch.depth = newD
+      if (newX !== bin.position.x || newY !== bin.position.y) patch.position = { x: newX, y: newY }
+      onBinResize(bin.id, patch)
+    },
+    [resizingEdge, onBinResize, bin, baseUnit, widthMm, depthMm, otherRects]
+  )
+
+  const handleResizeUp = useCallback(
+    (e: ThreeEvent<PointerEvent>) => {
+      if (!resizingEdge) return
+      e.stopPropagation()
+      setResizingEdge(null)
+      endDrag()
+    },
+    [resizingEdge, endDrag]
+  )
+
+  const HANDLE_THICKNESS = 3
+  const handles: Array<{
+    edge: BinResizeEdge
+    x: number
+    y: number
+    w: number
+    h: number
+    cursor: string
+  }> =
+    selected && onBinResize
+      ? [
+          {
+            edge: 'e',
+            x: bin.position.x + widthMm,
+            y: cy,
+            w: HANDLE_THICKNESS,
+            h: depthMm,
+            cursor: 'ew-resize'
+          },
+          {
+            edge: 'w',
+            x: bin.position.x,
+            y: cy,
+            w: HANDLE_THICKNESS,
+            h: depthMm,
+            cursor: 'ew-resize'
+          },
+          {
+            edge: 'n',
+            x: cx,
+            y: bin.position.y + depthMm,
+            w: widthMm,
+            h: HANDLE_THICKNESS,
+            cursor: 'ns-resize'
+          },
+          {
+            edge: 's',
+            x: cx,
+            y: bin.position.y,
+            w: widthMm,
+            h: HANDLE_THICKNESS,
+            cursor: 'ns-resize'
+          }
+        ]
+      : []
+
   return (
     <>
       {/* Hit area over the bin footprint */}
@@ -138,12 +266,34 @@ function BinDragHandler({
         <meshBasicMaterial transparent opacity={0} />
       </mesh>
 
-      {/* Full-screen capture plane while dragging */}
-      {dragging && (
+      {/* Resize handles on selected bin edges */}
+      {handles.map((h) => (
+        <mesh
+          key={h.edge}
+          position={[h.x, h.y, 0.007]}
+          onPointerDown={(e) => handleResizeDown(e, h.edge)}
+          onPointerMove={handleResizeMove}
+          onPointerUp={handleResizeUp}
+          onPointerOver={(e) => {
+            const el = (e.nativeEvent.target as HTMLElement | null)?.closest?.('div')
+            if (el) el.style.cursor = h.cursor
+          }}
+          onPointerOut={(e) => {
+            const el = (e.nativeEvent.target as HTMLElement | null)?.closest?.('div')
+            if (el) el.style.cursor = ''
+          }}
+        >
+          <planeGeometry args={[h.w, h.h]} />
+          <meshBasicMaterial color="#3b82f6" transparent opacity={0.3} />
+        </mesh>
+      ))}
+
+      {/* Full-screen capture plane while dragging or resizing */}
+      {(dragging || resizingEdge) && (
         <mesh
           position={[0, 0, 0.002]}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
+          onPointerMove={resizingEdge ? handleResizeMove : handlePointerMove}
+          onPointerUp={resizingEdge ? handleResizeUp : handlePointerUp}
         >
           <planeGeometry args={[10000, 10000]} />
           <meshBasicMaterial transparent opacity={0} />
@@ -167,6 +317,7 @@ function LayoutScene({
   onMoveEnd,
   onResize,
   onBinMove,
+  onBinResize,
   onSelect,
   onSelectBin,
   onClearSelection,
@@ -185,6 +336,7 @@ function LayoutScene({
   onMoveEnd: LayoutCanvasProps['onMoveEnd']
   onResize: LayoutCanvasProps['onResize']
   onBinMove: LayoutCanvasProps['onBinMove']
+  onBinResize: LayoutCanvasProps['onBinResize']
   onSelect: LayoutCanvasProps['onSelect']
   onSelectBin: LayoutCanvasProps['onSelectBin']
   onClearSelection: LayoutCanvasProps['onClearSelection']
@@ -212,8 +364,8 @@ function LayoutScene({
     setActiveTool('select')
   }
 
-  const handleEntityClick = (id: string, shiftKey: boolean): void => {
-    onSelect(id, shiftKey)
+  const handleEntityClick = (id: string, additive: boolean): void => {
+    onSelect(id, additive)
   }
 
   return (
@@ -242,9 +394,11 @@ function LayoutScene({
             key={`drag-${bin.id}`}
             bin={bin}
             baseUnit={baseUnit}
+            selected={selectionType === 'bin' && selectedIds.has(bin.id)}
             otherBins={bins.filter((b) => b.id !== bin.id)}
             onSelectBin={onSelectBin}
             onBinMove={onBinMove}
+            onBinResize={onBinResize}
           />
         ))}
 
@@ -336,6 +490,7 @@ export default function LayoutCanvas({
   onMoveEnd,
   onResize,
   onBinMove,
+  onBinResize,
   onSelect,
   onSelectBin,
   onClearSelection,
@@ -502,6 +657,7 @@ export default function LayoutCanvas({
               onMoveEnd={onMoveEnd}
               onResize={onResize}
               onBinMove={onBinMove}
+              onBinResize={onBinResize}
               onSelect={onSelect}
               onSelectBin={onSelectBin}
               onClearSelection={onClearSelection}

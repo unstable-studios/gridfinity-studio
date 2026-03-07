@@ -118,8 +118,15 @@ function LayoutSidebar({
   }
 
   const handleAutoWrap = (): void => {
-    if (unassignedEntities.length === 0) return
-    const result = autoWrap(unassignedEntities, baseUnit)
+    // Use selected entities if any are selected, otherwise fall back to unassigned
+    const selectedEntities =
+      selectionType === 'entity' && selectedIds.size > 0
+        ? entities.filter((e) => selectedIds.has(e.id))
+        : null
+    const wrapTargets = selectedEntities ?? unassignedEntities
+    if (wrapTargets.length === 0) return
+
+    const result = autoWrap(wrapTargets, baseUnit)
     const w = result.width * baseUnit
     const d = result.depth * baseUnit
     const existing = otherBinRects()
@@ -134,8 +141,19 @@ function LayoutSidebar({
     const unitHeight = project?.gridfinity.unitHeight ?? 7
     const defaultDepth = computeDefaultPocketDepth(heightUnits, unitHeight)
 
+    // Remove selected entities from any existing bin they're in
+    if (selectedEntities) {
+      const targetIds = new Set(selectedEntities.map((e) => e.id))
+      for (const bin of bins) {
+        const remaining = bin.entityIds.filter((eid) => !targetIds.has(eid))
+        if (remaining.length !== bin.entityIds.length) {
+          updateBin(bin.id, { entityIds: remaining })
+        }
+      }
+    }
+
     // Assign default pockets to entities that don't already have one
-    for (const entity of unassignedEntities) {
+    for (const entity of wrapTargets) {
       if (!entity.pocket) {
         updateEntity(entity.id, { pocket: { depth: defaultDepth, clearance: 0.2 } })
       }
@@ -146,7 +164,7 @@ function LayoutSidebar({
       depth: result.depth,
       height: heightUnits,
       position: pos,
-      entityIds: unassignedEntities.map((e) => e.id)
+      entityIds: wrapTargets.map((e) => e.id)
     })
     selectBin(bin.id)
   }
@@ -251,10 +269,15 @@ function LayoutSidebar({
             variant="outline"
             size="sm"
             className="flex-1"
-            disabled={unassignedEntities.length === 0}
+            disabled={
+              unassignedEntities.length === 0 &&
+              !(selectionType === 'entity' && selectedIds.size > 0)
+            }
             onClick={handleAutoWrap}
           >
-            Auto-wrap
+            {selectionType === 'entity' && selectedIds.size > 0
+              ? `Wrap (${selectedIds.size})`
+              : 'Auto-wrap'}
           </Button>
         </div>
       </SidebarSection>

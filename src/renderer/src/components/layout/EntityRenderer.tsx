@@ -7,7 +7,7 @@ interface EntityRendererProps {
   entities: Entity[]
   selectedIds?: Set<string>
   collidingIds?: Set<string>
-  onEntityClick?: (id: string, shiftKey: boolean) => void
+  onEntityClick?: (id: string, additive: boolean) => void
 }
 
 export default function EntityRenderer({
@@ -42,14 +42,14 @@ function EntityShape({
   entity: Entity
   selected: boolean
   colliding: boolean
-  onClick?: (id: string, shiftKey: boolean) => void
+  onClick?: (id: string, additive: boolean) => void
 }): React.JSX.Element | null {
   const color = colliding ? '#f87171' : selected ? '#60a5fa' : '#94a3b8'
   const { x, y } = entity.transform.position
 
   const handleClick = (e: ThreeEvent<MouseEvent>): void => {
     e.stopPropagation()
-    onClick?.(entity.id, e.nativeEvent.shiftKey)
+    onClick?.(entity.id, e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey)
   }
 
   switch (entity.type) {

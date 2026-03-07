@@ -92,6 +92,10 @@ export default function Viewport(): React.JSX.Element {
     updateBin(id, { position })
   }
 
+  const handleBinResize = (id: string, patch: Partial<Bin>): void => {
+    updateBin(id, patch)
+  }
+
   const snapFn = (pos: { x: number; y: number }): { x: number; y: number } => {
     const others = entities.filter((e) => !selection.selectedIds.has(e.id))
     return snapping.snap(pos, baseUnit, others)
@@ -137,6 +141,7 @@ export default function Viewport(): React.JSX.Element {
           onMoveEnd={handleMoveEnd}
           onResize={handleResize}
           onBinMove={handleBinMove}
+          onBinResize={handleBinResize}
           onSelect={selection.select}
           onSelectBin={selection.selectBin}
           onClearSelection={selection.clearSelection}

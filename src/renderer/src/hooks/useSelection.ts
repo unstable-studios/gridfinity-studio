@@ -13,7 +13,7 @@ export interface UseSelectionResult {
   toggleSelect: (id: string) => void
   isSelected: (id: string) => boolean
   marqueeSelect: (ids: string[]) => void
-  selectBin: (id: string) => void
+  selectBin: (id: string, additive?: boolean) => void
 }
 
 const SelectionCtx = createContext<UseSelectionResult | null>(null)
@@ -37,7 +37,11 @@ export function useSelection(): UseSelectionResult {
     setSelectedIds((prev) => {
       if (additive) {
         const next = new Set(prev)
-        next.add(id)
+        if (next.has(id)) {
+          next.delete(id)
+        } else {
+          next.add(id)
+        }
         return next
       }
       return new Set([id])
@@ -80,9 +84,20 @@ export function useSelection(): UseSelectionResult {
     setSelectedIds(new Set(ids))
   }, [])
 
-  const selectBin = useCallback((id: string) => {
+  const selectBin = useCallback((id: string, additive?: boolean) => {
     setSelectionType('bin')
-    setSelectedIds(new Set([id]))
+    setSelectedIds((prev) => {
+      if (additive) {
+        const next = new Set(prev)
+        if (next.has(id)) {
+          next.delete(id)
+        } else {
+          next.add(id)
+        }
+        return next
+      }
+      return new Set([id])
+    })
   }, [])
 
   return {
