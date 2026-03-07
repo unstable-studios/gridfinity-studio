@@ -103,10 +103,13 @@ export class KonvaEngine implements LayoutEngine {
     gridOrigin: DEFAULT_GRID_ORIGIN
   }
   private bgRect: Konva.Rect | null = null
+  private container: HTMLDivElement | null = null
 
-  // Pan state
+  // Pan state — isPanning is set from a DOM capture listener so it's
+  // guaranteed to be true before Konva's internal drag tracking fires.
   private isPanning = false
   private lastPointer = { x: 0, y: 0 }
+  private panCaptureHandler: ((e: MouseEvent) => void) | null = null
 
   // Rubber-band selection state
   private selectionRect: Konva.Rect | null = null
@@ -115,6 +118,7 @@ export class KonvaEngine implements LayoutEngine {
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
   mount(container: HTMLDivElement): void {
+    this.container = container
     const width = container.clientWidth || 800
     const height = container.clientHeight || 600
 
@@ -179,6 +183,12 @@ export class KonvaEngine implements LayoutEngine {
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
 
+    if (this.panCaptureHandler && this.container) {
+      this.container.removeEventListener('mousedown', this.panCaptureHandler, true)
+      this.panCaptureHandler = null
+    }
+    this.container = null
+
     if (this.stage) {
       this.stage.destroy()
       this.stage = null
@@ -208,7 +218,6 @@ export class KonvaEngine implements LayoutEngine {
     this.shapeMap.set(shape.id, { ...shape })
     this.konvaMap.set(shape.id, node)
 
-    // Wire drag events
     node.on('dragmove', () => {
       if (this.gridConfig.enabled) {
         const size = this.gridConfig.size
@@ -895,16 +904,24 @@ export class KonvaEngine implements LayoutEngine {
   // ─── Private: Pan & Zoom ────────────────────────────────────────────────────
 
   private setupPanZoom(): void {
-    if (!this.stage) return
+    if (!this.stage || !this.container) return
 
-    this.stage.on('mousedown', (e) => {
-      const nativeEvt = e.evt
-      if (nativeEvt.altKey || nativeEvt.button === 1) {
+    // TODO(#226): Replace this hack with a proper input manager that owns
+    // the event lifecycle. Currently we toggle draggable on every shape to
+    // prevent Konva's internal drag system from stealing pan gestures.
+    // The input decoupling refactor (#226) will make this unnecessary.
+    this.panCaptureHandler = (e: MouseEvent) => {
+      if (e.altKey || e.button === 1) {
         this.isPanning = true
-        this.lastPointer = { x: nativeEvt.clientX, y: nativeEvt.clientY }
-        e.evt.preventDefault()
+        this.lastPointer = { x: e.clientX, y: e.clientY }
+        for (const node of this.konvaMap.values()) {
+          node.draggable(false)
+        }
+        e.preventDefault()
       }
-    })
+    }
+    // Capture phase: fires before Konva's internal handlers
+    this.container.addEventListener('mousedown', this.panCaptureHandler, true)
 
     this.stage.on('mousemove', (e) => {
       if (!this.isPanning || !this.stage) return
@@ -922,6 +939,10 @@ export class KonvaEngine implements LayoutEngine {
     this.stage.on('mouseup', () => {
       if (this.isPanning && this.stage) {
         this.isPanning = false
+        // Restore draggable on all shapes
+        for (const node of this.konvaMap.values()) {
+          node.draggable(true)
+        }
         const vp = this.getViewport()
         this.emitter.emit('viewportChanged', vp)
       }

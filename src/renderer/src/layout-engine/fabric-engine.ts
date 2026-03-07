@@ -792,6 +792,7 @@ export class FabricEngine implements LayoutEngine {
   }
 
   // ─── Private: Pan & Zoom ────────────────────────────────────────────────────
+  // TODO(#226): Extract pan/zoom/drag into a shared input manager
 
   private setupPanZoom(): void {
     if (!this.canvas) return
@@ -819,7 +820,7 @@ export class FabricEngine implements LayoutEngine {
       vpt[5] += e.clientY - lastY
       lastX = e.clientX
       lastY = e.clientY
-      this.canvas.requestRenderAll()
+      this.canvas.setViewportTransform(vpt)
     })
 
     this.canvas.on('mouse:up', () => {
