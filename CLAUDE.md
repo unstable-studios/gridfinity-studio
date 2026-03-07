@@ -79,6 +79,8 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 ## Active Technologies
 - TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep) (001-full-roadmap)
 - `.gfstudio` files (JSON, project schema v0.2.0+) (001-full-roadmap)
+- TypeScript 5.9 (strict mode, no `any`) + React 19, Three.js via @react-three/fiber, @react-three/drei, Electron 39 (007-interaction-layer-refactor)
+- `.gfstudio` JSON files, schema version 0.3.0 → 0.4.0 (007-interaction-layer-refactor)
 
 ## Development Principles
 
@@ -93,4 +95,5 @@ Concretely:
 - **Never mark a task done without verifying integration.** A component that compiles but isn't wired into the app is dead code, not a feature.
 
 ## Recent Changes
+- 007-interaction-layer-refactor: Added TypeScript 5.9 (strict mode, no `any`) + React 19, Three.js via @react-three/fiber, @react-three/drei, Electron 39
 - 001-full-roadmap: Added TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep)

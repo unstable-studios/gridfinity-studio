@@ -3,6 +3,8 @@ import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import { useProject } from '@/hooks/useProject'
 import type { Entity } from '../../../../shared/types/project'
+import { entityCenter } from '../../../../shared/geometry/entity-geometry'
+import { Z } from '@/lib/z-layers'
 
 interface TransformGizmoProps {
   selectedIds: Set<string>
@@ -41,13 +43,12 @@ export default function TransformGizmo({
 
   const centroid = useMemo(() => {
     if (selectedEntities.length === 0) return null
-    const sum = selectedEntities.reduce(
-      (acc, e) => ({
-        x: acc.x + e.transform.position.x,
-        y: acc.y + e.transform.position.y
-      }),
-      { x: 0, y: 0 }
-    )
+    const sum = { x: 0, y: 0 }
+    for (const e of selectedEntities) {
+      const c = entityCenter(e)
+      sum.x += c.x
+      sum.y += c.y
+    }
     return {
       x: sum.x / selectedEntities.length,
       y: sum.y / selectedEntities.length
@@ -266,11 +267,11 @@ export default function TransformGizmo({
   return (
     <group>
       {/* Cross indicator at centroid */}
-      <primitive object={crossLine} position={[centroid.x, centroid.y, 0.05]} />
+      <primitive object={crossLine} position={[centroid.x, centroid.y, Z.GIZMO_CROSS]} />
 
       {/* Invisible drag handle */}
       <mesh
-        position={[centroid.x, centroid.y, 0.04]}
+        position={[centroid.x, centroid.y, Z.GIZMO_DRAG_HANDLE]}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -283,7 +284,7 @@ export default function TransformGizmo({
       {handles.map((h) => (
         <mesh
           key={h.pos}
-          position={[h.x, h.y, 0.06]}
+          position={[h.x, h.y, Z.GIZMO_RESIZE_HANDLE]}
           onPointerDown={(e) => handleResizeDown(e, h.pos)}
           onPointerMove={handleResizeMove}
           onPointerUp={handleResizeUp}
@@ -314,7 +315,7 @@ export default function TransformGizmo({
       {/* Full-screen capture plane while dragging or resizing */}
       {(dragging || resizing) && (
         <mesh
-          position={[0, 0, 0.03]}
+          position={[0, 0, Z.GIZMO_CAPTURE_PLANE]}
           onPointerMove={resizing ? handleResizeMove : handlePointerMove}
           onPointerUp={resizing ? handleResizeUp : handlePointerUp}
         >

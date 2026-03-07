@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import * as THREE from 'three'
 import { computeKeepOut } from '@/lib/keep-out'
 import type { Bin, GridfinityConfig } from '../../../../shared/types/project'
+import { Z } from '@/lib/z-layers'
 
 interface KeepOutOverlayProps {
   bin: Bin
@@ -12,7 +13,6 @@ const KEEP_OUT_COLOR = '#f87171'
 const KEEP_OUT_OPACITY = 0.15
 const LIP_COLOR = '#fbbf24'
 const LIP_OPACITY = 0.08
-const Z = 0.005
 
 export default function KeepOutOverlay({ bin, config }: KeepOutOverlayProps): React.JSX.Element {
   const baseUnit = config.baseUnit
@@ -56,7 +56,10 @@ export default function KeepOutOverlay({ bin, config }: KeepOutOverlayProps): Re
     <group>
       {/* Magnet/screw hole keep-out circles */}
       {keepOut.circles.map((circle, i) => (
-        <mesh key={i} position={[binCenterX + circle.cx, binCenterY + circle.cy, Z]}>
+        <mesh
+          key={i}
+          position={[binCenterX + circle.cx, binCenterY + circle.cy, Z.KEEPOUT_OVERLAY]}
+        >
           <circleGeometry args={[circle.radius, 24]} />
           <meshBasicMaterial color={KEEP_OUT_COLOR} transparent opacity={KEEP_OUT_OPACITY} />
         </mesh>
@@ -64,7 +67,7 @@ export default function KeepOutOverlay({ bin, config }: KeepOutOverlayProps): Re
 
       {/* Lip inset band */}
       {lipGeometry && (
-        <mesh position={[binCenterX, binCenterY, Z]} geometry={lipGeometry}>
+        <mesh position={[binCenterX, binCenterY, Z.KEEPOUT_OVERLAY]} geometry={lipGeometry}>
           <meshBasicMaterial color={LIP_COLOR} transparent opacity={LIP_OPACITY} />
         </mesh>
       )}

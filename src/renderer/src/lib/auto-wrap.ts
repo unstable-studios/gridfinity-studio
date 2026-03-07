@@ -4,7 +4,8 @@
  * T130 implementation.
  */
 
-import type { Entity, PolygonEntity } from '../../../shared/types/project'
+import type { Entity } from '../../../shared/types/project'
+import { entityHalfExtents as sharedEntityHalfExtents } from '../../../shared/geometry/entity-geometry'
 
 export interface AutoWrapResult {
   width: number // grid units
@@ -14,49 +15,6 @@ export interface AutoWrapResult {
 
 /** Default margin added on each side of the entity AABB before snapping to grid */
 const DEFAULT_MARGIN = 1
-
-/**
- * Compute the 2D AABB half-extents for an entity, in local space.
- * Returns { hw, hh } — half-width and half-height.
- */
-function entityHalfExtents(entity: Entity): { hw: number; hh: number } {
-  switch (entity.type) {
-    case 'circle': {
-      const r = entity.diameter / 2
-      return { hw: r, hh: r }
-    }
-    case 'rectangle': {
-      return { hw: entity.width / 2, hh: entity.height / 2 }
-    }
-    case 'polygon': {
-      return polygonHalfExtents(entity)
-    }
-    // svg-region, mesh, and legacy entities: treat as zero-size point
-    default:
-      return { hw: 0, hh: 0 }
-  }
-}
-
-function polygonHalfExtents(entity: PolygonEntity): { hw: number; hh: number } {
-  if (entity.vertices.length === 0) return { hw: 0, hh: 0 }
-
-  let minX = entity.vertices[0].x
-  let maxX = entity.vertices[0].x
-  let minY = entity.vertices[0].y
-  let maxY = entity.vertices[0].y
-
-  for (const v of entity.vertices) {
-    if (v.x < minX) minX = v.x
-    if (v.x > maxX) maxX = v.x
-    if (v.y < minY) minY = v.y
-    if (v.y > maxY) maxY = v.y
-  }
-
-  return {
-    hw: (maxX - minX) / 2,
-    hh: (maxY - minY) / 2
-  }
-}
 
 /**
  * Snap a value down to the nearest multiple of `unit`.
@@ -90,7 +48,7 @@ export function autoWrap(
   for (const entity of entities) {
     const cx = entity.transform.position.x
     const cy = entity.transform.position.y
-    const { hw, hh } = entityHalfExtents(entity)
+    const { hw, hh } = sharedEntityHalfExtents(entity) ?? { hw: 0, hh: 0 }
 
     if (cx - hw < minX) minX = cx - hw
     if (cy - hh < minY) minY = cy - hh

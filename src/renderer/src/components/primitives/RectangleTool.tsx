@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo } from 'react'
 import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { RectangleEntity } from '../../../../shared/types/project'
+import { Z } from '@/lib/z-layers'
 
 type ToolState = 'idle' | 'placing'
 
@@ -103,7 +104,7 @@ export default function RectangleTool({ onPlace }: RectangleToolProps): React.JS
     <group>
       {/* Invisible plane to capture pointer events */}
       <mesh
-        position={[0, 0, 0]}
+        position={[0, 0, Z.GRID]}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         visible={false}
@@ -114,7 +115,7 @@ export default function RectangleTool({ onPlace }: RectangleToolProps): React.JS
 
       {/* Preview rectangle */}
       {previewLine && corner1 && (
-        <primitive object={previewLine} position={[dimensions.cx, dimensions.cy, 0.02]} />
+        <primitive object={previewLine} position={[dimensions.cx, dimensions.cy, Z.TOOL_PREVIEW]} />
       )}
     </group>
   )

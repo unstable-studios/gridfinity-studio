@@ -1,25 +1,25 @@
 import { useMemo } from 'react'
-import type { ThreeEvent } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Entity } from '../../../../shared/types/project'
+import { Z } from '@/lib/z-layers'
 
 interface EntityRendererProps {
   entities: Entity[]
   selectedIds?: Set<string>
   collidingIds?: Set<string>
   hoveredId?: string | null
-  onEntityClick?: (id: string, additive: boolean) => void
-  onEntityHover?: (id: string | null) => void
   lightMode?: boolean
 }
 
+/**
+ * Pure visual renderer for entities — outlines and fills.
+ * Contains zero pointer-event logic; see EntityInteractionManager for that.
+ */
 export default function EntityRenderer({
   entities,
   selectedIds,
   collidingIds,
   hoveredId,
-  onEntityClick,
-  onEntityHover,
   lightMode
 }: EntityRendererProps): React.JSX.Element {
   return (
@@ -33,8 +33,6 @@ export default function EntityRenderer({
             selected={selectedIds?.has(entity.id) ?? false}
             colliding={collidingIds?.has(entity.id) ?? false}
             hovered={hoveredId === entity.id}
-            onClick={onEntityClick}
-            onHover={onEntityHover}
             lightMode={lightMode}
           />
         ))}
@@ -47,36 +45,19 @@ function EntityShape({
   selected,
   colliding,
   hovered,
-  onClick,
-  onHover,
   lightMode
 }: {
   entity: Entity
   selected: boolean
   colliding: boolean
   hovered: boolean
-  onClick?: (id: string, additive: boolean) => void
-  onHover?: (id: string | null) => void
   lightMode?: boolean
 }): React.JSX.Element | null {
   const defaultColor = lightMode ? '#475569' : '#94a3b8'
   const hoverColor = lightMode ? '#1e40af' : '#93c5fd'
   const color = colliding ? '#f87171' : selected ? '#60a5fa' : hovered ? hoverColor : defaultColor
   const { x, y } = entity.transform.position
-
-  const handlePointerDown = (e: ThreeEvent<PointerEvent>): void => {
-    if (e.nativeEvent.button !== 0) return
-    e.stopPropagation()
-    onClick?.(entity.id, e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey)
-  }
-
-  const handlePointerOver = (): void => {
-    onHover?.(entity.id)
-  }
-
-  const handlePointerOut = (): void => {
-    onHover?.(null)
-  }
+  const fillOpacity = selected ? 0.08 : hovered ? 0.05 : 0.025
 
   switch (entity.type) {
     case 'circle':
@@ -86,9 +67,7 @@ function EntityShape({
           y={y}
           diameter={entity.diameter}
           color={color}
-          onPointerDown={handlePointerDown}
-          onPointerOver={handlePointerOver}
-          onPointerOut={handlePointerOut}
+          fillOpacity={fillOpacity}
         />
       )
     case 'rectangle':
@@ -99,9 +78,7 @@ function EntityShape({
           width={entity.width}
           height={entity.height}
           color={color}
-          onPointerDown={handlePointerDown}
-          onPointerOver={handlePointerOver}
-          onPointerOut={handlePointerOut}
+          fillOpacity={fillOpacity}
         />
       )
     case 'polygon':
@@ -111,9 +88,7 @@ function EntityShape({
           y={y}
           vertices={entity.vertices}
           color={color}
-          onPointerDown={handlePointerDown}
-          onPointerOver={handlePointerOver}
-          onPointerOut={handlePointerOut}
+          fillOpacity={fillOpacity}
         />
       )
     default:
@@ -124,35 +99,18 @@ function EntityShape({
 function LineShape({
   geometry,
   color,
-  position,
-  onPointerDown,
-  onPointerOver,
-  onPointerOut
+  position
 }: {
   geometry: THREE.BufferGeometry
   color: string
   position: [number, number, number]
-  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
-  onPointerOver?: () => void
-  onPointerOut?: () => void
 }): React.JSX.Element {
   const lineObj = useMemo(() => {
     const material = new THREE.LineBasicMaterial({ color })
     return new THREE.Line(geometry, material)
   }, [geometry, color])
 
-  return (
-    <group onPointerDown={onPointerDown} onPointerOver={onPointerOver} onPointerOut={onPointerOut}>
-      <primitive object={lineObj} position={position} />
-      {/* Invisible hit area for click detection */}
-      {onPointerDown && (
-        <mesh position={position} visible={false}>
-          <circleGeometry args={[3, 8]} />
-          <meshBasicMaterial transparent opacity={0} />
-        </mesh>
-      )}
-    </group>
-  )
+  return <primitive object={lineObj} position={position} />
 }
 
 function CircleOutline({
@@ -160,17 +118,13 @@ function CircleOutline({
   y,
   diameter,
   color,
-  onPointerDown,
-  onPointerOver,
-  onPointerOut
+  fillOpacity
 }: {
   x: number
   y: number
   diameter: number
   color: string
-  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
-  onPointerOver?: () => void
-  onPointerOut?: () => void
+  fillOpacity: number
 }): React.JSX.Element {
   const geometry = useMemo(() => {
     const segments = 64
@@ -184,14 +138,13 @@ function CircleOutline({
   }, [diameter])
 
   return (
-    <LineShape
-      geometry={geometry}
-      color={color}
-      position={[x, y, 0.01]}
-      onPointerDown={onPointerDown}
-      onPointerOver={onPointerOver}
-      onPointerOut={onPointerOut}
-    />
+    <group>
+      <LineShape geometry={geometry} color={color} position={[x, y, Z.ENTITY_OUTLINE]} />
+      <mesh position={[x, y, Z.ENTITY_FILL]}>
+        <circleGeometry args={[diameter / 2, 64]} />
+        <meshBasicMaterial color={color} transparent opacity={fillOpacity} />
+      </mesh>
+    </group>
   )
 }
 
@@ -201,18 +154,14 @@ function RectangleOutline({
   width,
   height,
   color,
-  onPointerDown,
-  onPointerOver,
-  onPointerOut
+  fillOpacity
 }: {
   x: number
   y: number
   width: number
   height: number
   color: string
-  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
-  onPointerOver?: () => void
-  onPointerOut?: () => void
+  fillOpacity: number
 }): React.JSX.Element {
   const geometry = useMemo(() => {
     const hw = width / 2
@@ -228,14 +177,13 @@ function RectangleOutline({
   }, [width, height])
 
   return (
-    <LineShape
-      geometry={geometry}
-      color={color}
-      position={[x, y, 0.01]}
-      onPointerDown={onPointerDown}
-      onPointerOver={onPointerOver}
-      onPointerOut={onPointerOut}
-    />
+    <group>
+      <LineShape geometry={geometry} color={color} position={[x, y, Z.ENTITY_OUTLINE]} />
+      <mesh position={[x, y, Z.ENTITY_FILL]}>
+        <planeGeometry args={[width, height]} />
+        <meshBasicMaterial color={color} transparent opacity={fillOpacity} />
+      </mesh>
+    </group>
   )
 }
 
@@ -244,34 +192,36 @@ function PolygonOutline({
   y,
   vertices,
   color,
-  onPointerDown,
-  onPointerOver,
-  onPointerOut
+  fillOpacity
 }: {
   x: number
   y: number
   vertices: Array<{ x: number; y: number }>
   color: string
-  onPointerDown?: (e: ThreeEvent<PointerEvent>) => void
-  onPointerOver?: () => void
-  onPointerOut?: () => void
+  fillOpacity: number
 }): React.JSX.Element | null {
-  const geometry = useMemo(() => {
+  const outlineGeometry = useMemo(() => {
     if (vertices.length < 3) return null
     const points = [...vertices, vertices[0]].map((v) => new THREE.Vector3(v.x, v.y, 0))
     return new THREE.BufferGeometry().setFromPoints(points)
   }, [vertices])
 
-  if (!geometry) return null
+  const fillGeometry = useMemo(() => {
+    if (vertices.length < 3) return null
+    const shape = new THREE.Shape(vertices.map((v) => new THREE.Vector2(v.x, v.y)))
+    return new THREE.ShapeGeometry(shape)
+  }, [vertices])
+
+  if (!outlineGeometry) return null
 
   return (
-    <LineShape
-      geometry={geometry}
-      color={color}
-      position={[x, y, 0.01]}
-      onPointerDown={onPointerDown}
-      onPointerOver={onPointerOver}
-      onPointerOut={onPointerOut}
-    />
+    <group>
+      <LineShape geometry={outlineGeometry} color={color} position={[x, y, Z.ENTITY_OUTLINE]} />
+      {fillGeometry && (
+        <mesh position={[x, y, Z.ENTITY_FILL]} geometry={fillGeometry}>
+          <meshBasicMaterial color={color} transparent opacity={fillOpacity} />
+        </mesh>
+      )}
+    </group>
   )
 }

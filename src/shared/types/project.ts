@@ -6,12 +6,12 @@
 /**
  * Schema version for project file format
  */
-export const CURRENT_SCHEMA_VERSION = '0.3.0'
+export const CURRENT_SCHEMA_VERSION = '0.4.0'
 
 /**
  * Supported schema versions for backward compatibility
  */
-export const SUPPORTED_SCHEMA_VERSIONS = ['0.1.0', '0.2.0', '0.3.0']
+export const SUPPORTED_SCHEMA_VERSIONS = ['0.1.0', '0.2.0', '0.3.0', '0.4.0']
 
 /**
  * Global settings for the project

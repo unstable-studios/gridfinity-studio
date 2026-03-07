@@ -7,59 +7,24 @@
  */
 
 import type { Entity, CircleEntity } from '../../../shared/types/project'
+import {
+  entityBounds as sharedEntityBounds,
+  type EntityBounds
+} from '../../../shared/geometry/entity-geometry'
+
+export type { EntityBounds }
 
 export interface CollisionPair {
   a: string
   b: string
 }
 
-export interface EntityBounds {
-  minX: number
-  minY: number
-  maxX: number
-  maxY: number
-}
-
 /**
  * Compute the axis-aligned bounding box for an entity in world coordinates.
- * For circles, polygon vertices, and rectangles, bounds are derived from
- * the entity's geometry, then offset by transform.position (x, y).
- *
- * Returns null for entity types that have no meaningful 2D footprint.
+ * Delegates to shared geometry utility.
  */
 export function getEntityBounds(entity: Entity): EntityBounds | null {
-  const cx = entity.transform.position.x
-  const cy = entity.transform.position.y
-
-  switch (entity.type) {
-    case 'circle': {
-      const r = entity.diameter / 2
-      return { minX: cx - r, minY: cy - r, maxX: cx + r, maxY: cy + r }
-    }
-    case 'rectangle': {
-      const hw = entity.width / 2
-      const hh = entity.height / 2
-      return { minX: cx - hw, minY: cy - hh, maxX: cx + hw, maxY: cy + hh }
-    }
-    case 'polygon': {
-      if (entity.vertices.length < 3) return null
-      let minX = Infinity
-      let minY = Infinity
-      let maxX = -Infinity
-      let maxY = -Infinity
-      for (const v of entity.vertices) {
-        const wx = cx + v.x
-        const wy = cy + v.y
-        if (wx < minX) minX = wx
-        if (wy < minY) minY = wy
-        if (wx > maxX) maxX = wx
-        if (wy > maxY) maxY = wy
-      }
-      return { minX, minY, maxX, maxY }
-    }
-    default:
-      return null
-  }
+  return sharedEntityBounds(entity)
 }
 
 function aabbOverlaps(a: EntityBounds, b: EntityBounds): boolean {

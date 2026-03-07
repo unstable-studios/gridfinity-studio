@@ -1,9 +1,10 @@
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { Suspense, useRef, useCallback, useState, useEffect, useMemo } from 'react'
 import * as THREE from 'three'
-import { useProject } from '@/hooks/useProject'
 import GridOverlay from './GridOverlay'
 import EntityRenderer from './EntityRenderer'
+import EntityInteractionManager from './EntityInteractionManager'
+import BinInteractionManager from './BinInteractionManager'
 import TransformGizmo from './TransformGizmo'
 import SelectionBox from './SelectionBox'
 import BinFootprint from './BinFootprint'
@@ -11,7 +12,9 @@ import KeepOutOverlay from './KeepOutOverlay'
 import CircleTool from '../primitives/CircleTool'
 import RectangleTool from '../primitives/RectangleTool'
 import PolygonTool from '../primitives/PolygonTool'
-import { detectCollisions, binOverlapsAny } from '@/lib/collision'
+import { detectCollisions } from '@/lib/collision'
+import { entityBounds, boundsOverlap } from '../../../../shared/geometry/entity-geometry'
+import { Z } from '@/lib/z-layers'
 import type { Entity, Bin, GridfinityConfig } from '../../../../shared/types/project'
 import type { SelectionType } from '@/hooks/useSelection'
 import { useAppMode } from '@/hooks/useAppMode'
@@ -38,303 +41,6 @@ interface LayoutCanvasProps {
   snap: (pos: { x: number; y: number }) => { x: number; y: number }
 }
 
-type BinResizeEdge = 'e' | 'w' | 'n' | 's'
-
-function BinDragHandler({
-  bin,
-  baseUnit,
-  selected,
-  selectedBinIds,
-  allBins,
-  otherBins,
-  onSelectBin,
-  onBinMove,
-  onBinResize,
-  onBinHover
-}: {
-  bin: Bin
-  baseUnit: number
-  selected: boolean
-  selectedBinIds: Set<string>
-  allBins: Bin[]
-  otherBins: Bin[]
-  onSelectBin: (id: string, additive?: boolean) => void
-  onBinMove: (id: string, dx: number, dy: number) => void
-  onBinResize?: (id: string, patch: Partial<Bin>) => void
-  onBinHover?: (id: string | null) => void
-}): React.JSX.Element {
-  const [dragging, setDragging] = useState(false)
-  const [resizingEdge, setResizingEdge] = useState<BinResizeEdge | null>(null)
-  const offsetRef = useRef({ x: 0, y: 0 })
-  const lastSnappedRef = useRef({ x: 0, y: 0 })
-
-  const widthMm = bin.width * baseUnit
-  const depthMm = bin.depth * baseUnit
-  const cx = bin.position.x + widthMm / 2
-  const cy = bin.position.y + depthMm / 2
-
-  // Pre-compute other bin rects for collision checks
-  const otherRects = useMemo(
-    () =>
-      otherBins.map((b) => ({
-        x: b.position.x,
-        y: b.position.y,
-        w: b.width * baseUnit,
-        d: b.depth * baseUnit
-      })),
-    [otherBins, baseUnit]
-  )
-
-  const startDrag = useProject((s) => s.startDrag)
-  const endDrag = useProject((s) => s.endDrag)
-
-  const handlePointerDown = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      if (e.nativeEvent.button !== 0) return
-      e.stopPropagation()
-      const additive = e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey
-      if (!selected && !additive) {
-        onSelectBin(bin.id, false)
-      } else if (additive) {
-        onSelectBin(bin.id, true)
-      }
-      offsetRef.current = {
-        x: e.point.x - bin.position.x,
-        y: e.point.y - bin.position.y
-      }
-      lastSnappedRef.current = { x: bin.position.x, y: bin.position.y }
-      startDrag()
-      setDragging(true)
-    },
-    [bin.id, bin.position.x, bin.position.y, selected, onSelectBin, startDrag]
-  )
-
-  const handlePointerMove = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      if (!dragging) return
-      e.stopPropagation()
-      const rawX = e.point.x - offsetRef.current.x
-      const rawY = e.point.y - offsetRef.current.y
-      const snappedX = Math.round(rawX / baseUnit) * baseUnit
-      const snappedY = Math.round(rawY / baseUnit) * baseUnit
-      const dx = snappedX - lastSnappedRef.current.x
-      const dy = snappedY - lastSnappedRef.current.y
-      if (dx === 0 && dy === 0) return
-
-      // Move all selected bins together
-      const binsToMove = selected ? allBins.filter((b) => selectedBinIds.has(b.id)) : [bin]
-
-      // Collision check: ensure none of the moving bins overlap non-moving bins
-      const movingIds = new Set(binsToMove.map((b) => b.id))
-      const staticRects = allBins
-        .filter((b) => !movingIds.has(b.id))
-        .map((b) => ({
-          x: b.position.x,
-          y: b.position.y,
-          w: b.width * baseUnit,
-          d: b.depth * baseUnit
-        }))
-
-      for (const b of binsToMove) {
-        const candidate = {
-          x: b.position.x + dx,
-          y: b.position.y + dy,
-          w: b.width * baseUnit,
-          d: b.depth * baseUnit
-        }
-        if (binOverlapsAny(candidate, staticRects)) return
-      }
-
-      lastSnappedRef.current = { x: snappedX, y: snappedY }
-      for (const b of binsToMove) {
-        onBinMove(b.id, dx, dy)
-      }
-    },
-    [dragging, baseUnit, bin, selected, selectedBinIds, allBins, onBinMove]
-  )
-
-  const handlePointerUp = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      if (!dragging) return
-      e.stopPropagation()
-      setDragging(false)
-      endDrag()
-    },
-    [dragging, endDrag]
-  )
-
-  // ── Resize handles ──
-
-  const handleResizeDown = useCallback(
-    (e: ThreeEvent<PointerEvent>, edge: BinResizeEdge) => {
-      if (e.nativeEvent.button !== 0) return
-      e.stopPropagation()
-      const domTarget = e.nativeEvent.target as HTMLElement | null
-      domTarget?.setPointerCapture?.(e.nativeEvent.pointerId)
-      startDrag()
-      setResizingEdge(edge)
-    },
-    [startDrag]
-  )
-
-  const handleResizeMove = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      if (!resizingEdge || !onBinResize) return
-      e.stopPropagation()
-
-      const px = e.point.x
-      const py = e.point.y
-
-      let newX = bin.position.x
-      let newY = bin.position.y
-      let newW = bin.width
-      let newD = bin.depth
-
-      if (resizingEdge === 'e') {
-        newW = Math.max(1, Math.round((px - bin.position.x) / baseUnit))
-      } else if (resizingEdge === 'w') {
-        const snappedX = Math.round(px / baseUnit) * baseUnit
-        const rightEdge = bin.position.x + widthMm
-        newW = Math.max(1, Math.round((rightEdge - snappedX) / baseUnit))
-        newX = rightEdge - newW * baseUnit
-      } else if (resizingEdge === 'n') {
-        newD = Math.max(1, Math.round((py - bin.position.y) / baseUnit))
-      } else if (resizingEdge === 's') {
-        const snappedY = Math.round(py / baseUnit) * baseUnit
-        const topEdge = bin.position.y + depthMm
-        newD = Math.max(1, Math.round((topEdge - snappedY) / baseUnit))
-        newY = topEdge - newD * baseUnit
-      }
-
-      if (
-        newW === bin.width &&
-        newD === bin.depth &&
-        newX === bin.position.x &&
-        newY === bin.position.y
-      )
-        return
-
-      // Collision check
-      const candidate = { x: newX, y: newY, w: newW * baseUnit, d: newD * baseUnit }
-      if (binOverlapsAny(candidate, otherRects)) return
-
-      const patch: Partial<Bin> = {}
-      if (newW !== bin.width) patch.width = newW
-      if (newD !== bin.depth) patch.depth = newD
-      if (newX !== bin.position.x || newY !== bin.position.y) patch.position = { x: newX, y: newY }
-      onBinResize(bin.id, patch)
-    },
-    [resizingEdge, onBinResize, bin, baseUnit, widthMm, depthMm, otherRects]
-  )
-
-  const handleResizeUp = useCallback(
-    (e: ThreeEvent<PointerEvent>) => {
-      if (!resizingEdge) return
-      e.stopPropagation()
-      setResizingEdge(null)
-      endDrag()
-    },
-    [resizingEdge, endDrag]
-  )
-
-  const HANDLE_THICKNESS = 3
-  const handles: Array<{
-    edge: BinResizeEdge
-    x: number
-    y: number
-    w: number
-    h: number
-    cursor: string
-  }> =
-    selected && onBinResize
-      ? [
-          {
-            edge: 'e',
-            x: bin.position.x + widthMm,
-            y: cy,
-            w: HANDLE_THICKNESS,
-            h: depthMm,
-            cursor: 'ew-resize'
-          },
-          {
-            edge: 'w',
-            x: bin.position.x,
-            y: cy,
-            w: HANDLE_THICKNESS,
-            h: depthMm,
-            cursor: 'ew-resize'
-          },
-          {
-            edge: 'n',
-            x: cx,
-            y: bin.position.y + depthMm,
-            w: widthMm,
-            h: HANDLE_THICKNESS,
-            cursor: 'ns-resize'
-          },
-          {
-            edge: 's',
-            x: cx,
-            y: bin.position.y,
-            w: widthMm,
-            h: HANDLE_THICKNESS,
-            cursor: 'ns-resize'
-          }
-        ]
-      : []
-
-  return (
-    <>
-      {/* Hit area over the bin footprint */}
-      <mesh
-        position={[cx, cy, 0.001]}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerOver={() => onBinHover?.(bin.id)}
-        onPointerOut={() => onBinHover?.(null)}
-      >
-        <planeGeometry args={[widthMm, depthMm]} />
-        <meshBasicMaterial transparent opacity={0} />
-      </mesh>
-
-      {/* Resize handles on selected bin edges */}
-      {handles.map((h) => (
-        <mesh
-          key={h.edge}
-          position={[h.x, h.y, 0.007]}
-          onPointerDown={(e) => handleResizeDown(e, h.edge)}
-          onPointerMove={handleResizeMove}
-          onPointerUp={handleResizeUp}
-          onPointerOver={(e) => {
-            const el = (e.nativeEvent.target as HTMLElement | null)?.closest?.('div')
-            if (el) el.style.cursor = h.cursor
-          }}
-          onPointerOut={(e) => {
-            const el = (e.nativeEvent.target as HTMLElement | null)?.closest?.('div')
-            if (el) el.style.cursor = ''
-          }}
-        >
-          <planeGeometry args={[h.w, h.h]} />
-          <meshBasicMaterial color="#3b82f6" transparent opacity={0.3} />
-        </mesh>
-      ))}
-
-      {/* Full-screen capture plane while dragging or resizing */}
-      {(dragging || resizingEdge) && (
-        <mesh
-          position={[0, 0, 0.002]}
-          onPointerMove={resizingEdge ? handleResizeMove : handlePointerMove}
-          onPointerUp={resizingEdge ? handleResizeUp : handlePointerUp}
-        >
-          <planeGeometry args={[10000, 10000]} />
-          <meshBasicMaterial transparent opacity={0} />
-        </mesh>
-      )}
-    </>
-  )
-}
-
 function MultiSelectionBounds({
   selectedIds,
   selectionType,
@@ -359,18 +65,12 @@ function MultiSelectionBounds({
     if (selectionType === 'entity') {
       for (const e of entities) {
         if (!selectedIds.has(e.id)) continue
-        const { x, y } = e.transform.position
-        let halfW = 3
-        let halfH = 3
-        if (e.type === 'circle') halfW = halfH = e.diameter / 2
-        else if (e.type === 'rectangle') {
-          halfW = e.width / 2
-          halfH = e.height / 2
-        }
-        minX = Math.min(minX, x - halfW)
-        maxX = Math.max(maxX, x + halfW)
-        minY = Math.min(minY, y - halfH)
-        maxY = Math.max(maxY, y + halfH)
+        const bounds = entityBounds(e)
+        if (!bounds) continue
+        minX = Math.min(minX, bounds.minX)
+        maxX = Math.max(maxX, bounds.maxX)
+        minY = Math.min(minY, bounds.minY)
+        maxY = Math.max(maxY, bounds.maxY)
       }
     } else {
       for (const b of bins) {
@@ -407,7 +107,7 @@ function MultiSelectionBounds({
 
   if (!lineObj) return null
 
-  return <primitive object={lineObj} position={[0, 0, 0.02]} />
+  return <primitive object={lineObj} position={[0, 0, Z.TOOL_PREVIEW]} />
 }
 
 function LayoutScene({
@@ -502,10 +202,10 @@ function LayoutScene({
         </group>
       ))}
 
-      {/* Bin drag handlers (only in select mode) */}
+      {/* Bin interaction managers (only in select mode) */}
       {activeTool === 'select' &&
         bins.map((bin) => (
-          <BinDragHandler
+          <BinInteractionManager
             key={`drag-${bin.id}`}
             bin={bin}
             baseUnit={baseUnit}
@@ -525,10 +225,17 @@ function LayoutScene({
         selectedIds={selectionType === 'entity' ? selectedIds : new Set()}
         collidingIds={collidingIds}
         hoveredId={hoveredEntityId}
-        onEntityClick={activeTool === 'select' ? handleEntityClick : undefined}
-        onEntityHover={activeTool === 'select' ? setHoveredEntityId : undefined}
         lightMode={lightMode}
       />
+
+      {/* Entity interaction manager (only in select mode) */}
+      {activeTool === 'select' && (
+        <EntityInteractionManager
+          entities={entities}
+          onEntityClick={handleEntityClick}
+          onEntityHover={setHoveredEntityId}
+        />
+      )}
 
       {/* Active tool */}
       {activeTool === 'circle' && <CircleTool onPlace={handleToolPlace} />}
@@ -558,7 +265,7 @@ function LayoutScene({
           <SelectionBox start={marqueeStart} end={marqueeEnd} visible={marqueeActive} />
           {/* Click-away deselect plane */}
           <mesh
-            position={[0, 0, -0.01]}
+            position={[0, 0, Z.BACKGROUND_PLANE]}
             onPointerDown={(e) => {
               if (e.nativeEvent.button !== 0) return
               const additive =
@@ -582,11 +289,12 @@ function LayoutScene({
                 const maxY = Math.max(marqueeStart.y, marqueeEnd.y)
                 // Only trigger if the marquee has meaningful size
                 if (maxX - minX > 0.5 || maxY - minY > 0.5) {
+                  const marqueeBounds = { minX, maxX, minY, maxY }
                   const hit = entities
                     .filter((e) => e.visible)
                     .filter((e) => {
-                      const { x, y } = e.transform.position
-                      return x >= minX && x <= maxX && y >= minY && y <= maxY
+                      const bounds = entityBounds(e)
+                      return bounds !== null && boundsOverlap(marqueeBounds, bounds)
                     })
                     .map((e) => e.id)
                   if (hit.length > 0) onMarqueeSelect(hit)
@@ -723,26 +431,12 @@ export default function LayoutCanvas({
 
     // Also include entities
     for (const entity of entities) {
-      const { x, y } = entity.transform.position
-      let halfW = 5
-      let halfH = 5
-
-      if (entity.type === 'circle') {
-        halfW = halfH = entity.diameter / 2
-      } else if (entity.type === 'rectangle') {
-        halfW = entity.width / 2
-        halfH = entity.height / 2
-      } else if (entity.type === 'polygon') {
-        for (const v of entity.vertices) {
-          halfW = Math.max(halfW, Math.abs(v.x - x))
-          halfH = Math.max(halfH, Math.abs(v.y - y))
-        }
-      }
-
-      minX = Math.min(minX, x - halfW)
-      maxX = Math.max(maxX, x + halfW)
-      minY = Math.min(minY, y - halfH)
-      maxY = Math.max(maxY, y + halfH)
+      const bounds = entityBounds(entity)
+      if (!bounds) continue
+      minX = Math.min(minX, bounds.minX)
+      maxX = Math.max(maxX, bounds.maxX)
+      minY = Math.min(minY, bounds.minY)
+      maxY = Math.max(maxY, bounds.maxY)
     }
 
     // Fallback if no bins and no entities

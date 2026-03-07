@@ -13,6 +13,7 @@ import {
   createDefaultTransform,
   computeDefaultPocketDepth
 } from '../../../shared/types/project'
+import { migrateProject } from '../../../shared/validation/project-validator'
 import type {
   ProjectData,
   Entity,
@@ -488,8 +489,9 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       try {
         const result = await window.api.project.load(targetPath)
         if (result.success && result.data) {
+          const project = migrateProject(result.data.project)
           set({
-            project: result.data.project,
+            project,
             filePath: result.data.filePath,
             isModified: false,
             error: null,
