@@ -53,16 +53,16 @@ describe('project-handler', () => {
   })
 
   describe('getRecentProjects', () => {
-    it('returns success with an array', () => {
-      const result = getRecentProjects()
+    it('returns success with an array', async () => {
+      const result = await getRecentProjects()
 
       expect(result.success).toBe(true)
       expect(Array.isArray(result.data)).toBe(true)
     })
 
-    it('returns a copy of the recent projects list', () => {
-      const result1 = getRecentProjects()
-      const result2 = getRecentProjects()
+    it('returns a copy of the recent projects list', async () => {
+      const result1 = await getRecentProjects()
+      const result2 = await getRecentProjects()
 
       expect(result1.data).not.toBe(result2.data)
       expect(result1.data).toEqual(result2.data)

@@ -4,7 +4,8 @@ import type { ProjectData } from '../shared/types/project'
 interface ProjectAPI {
   save: (
     projectData: ProjectData,
-    filePath?: string
+    filePath?: string,
+    suggestedPath?: string
   ) => Promise<{ success: boolean; data?: string; error?: string }>
   load: (filePath?: string) => Promise<{
     success: boolean

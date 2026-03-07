@@ -5,8 +5,8 @@ import type { ProjectData } from '../shared/types/project'
 // Custom APIs for renderer
 const api = {
   project: {
-    save: (projectData: ProjectData, filePath?: string) =>
-      ipcRenderer.invoke('project:save', projectData, filePath),
+    save: (projectData: ProjectData, filePath?: string, suggestedPath?: string) =>
+      ipcRenderer.invoke('project:save', projectData, filePath, suggestedPath),
     load: (filePath?: string) => ipcRenderer.invoke('project:load', filePath),
     validate: (projectData: unknown) => ipcRenderer.invoke('project:validate', projectData),
     new: () => ipcRenderer.invoke('project:new'),

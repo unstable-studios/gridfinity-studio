@@ -33,18 +33,24 @@ export function useSelection(): UseSelectionResult {
   const [selectionType, setSelectionType] = useState<SelectionType>('entity')
 
   const select = useCallback((id: string, additive?: boolean) => {
-    setSelectionType('entity')
-    setSelectedIds((prev) => {
-      if (additive) {
-        const next = new Set(prev)
-        if (next.has(id)) {
-          next.delete(id)
-        } else {
-          next.add(id)
-        }
-        return next
+    setSelectionType((prevType) => {
+      if (prevType !== 'entity') {
+        // Switching types — start fresh even if additive
+        setSelectedIds(new Set([id]))
+      } else if (additive) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          if (next.has(id)) {
+            next.delete(id)
+          } else {
+            next.add(id)
+          }
+          return next
+        })
+      } else {
+        setSelectedIds(new Set([id]))
       }
-      return new Set([id])
+      return 'entity'
     })
   }, [])
 
@@ -85,18 +91,24 @@ export function useSelection(): UseSelectionResult {
   }, [])
 
   const selectBin = useCallback((id: string, additive?: boolean) => {
-    setSelectionType('bin')
-    setSelectedIds((prev) => {
-      if (additive) {
-        const next = new Set(prev)
-        if (next.has(id)) {
-          next.delete(id)
-        } else {
-          next.add(id)
-        }
-        return next
+    setSelectionType((prevType) => {
+      if (prevType !== 'bin') {
+        // Switching types — start fresh even if additive
+        setSelectedIds(new Set([id]))
+      } else if (additive) {
+        setSelectedIds((prev) => {
+          const next = new Set(prev)
+          if (next.has(id)) {
+            next.delete(id)
+          } else {
+            next.add(id)
+          }
+          return next
+        })
+      } else {
+        setSelectedIds(new Set([id]))
       }
-      return new Set([id])
+      return 'bin'
     })
   }, [])
 

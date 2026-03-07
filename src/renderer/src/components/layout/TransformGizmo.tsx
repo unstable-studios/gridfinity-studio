@@ -94,9 +94,8 @@ export default function TransformGizmo({
   const handlePointerDown = useCallback(
     (event: ThreeEvent<PointerEvent>) => {
       if (!centroid) return
-      // Let shift/cmd/ctrl clicks pass through for multi-select
-      const additive =
-        event.nativeEvent.shiftKey || event.nativeEvent.metaKey || event.nativeEvent.ctrlKey
+      // Let cmd/ctrl clicks pass through for multi-select (not shift — used for axis-locking)
+      const additive = event.nativeEvent.metaKey || event.nativeEvent.ctrlKey
       if (additive) return
       event.stopPropagation()
       const domTarget = event.nativeEvent.target as HTMLElement | null

@@ -1,5 +1,6 @@
-import { dialog } from 'electron'
+import { app, dialog } from 'electron'
 import { readFile, writeFile } from 'fs/promises'
+import { join } from 'path'
 import { createEmptyProject } from '../shared/types/project'
 import type { ProjectData } from '../shared/types/project'
 import { validateProject, formatValidationErrors } from '../shared/validation/project-validator'
@@ -19,19 +20,62 @@ interface OperationResult<T = void> {
 const MAX_RECENT_PROJECTS = 10
 
 /**
- * In-memory list of recently opened/saved project file paths
+ * Persist recent project paths to a JSON file in the app's userData directory.
+ * Path is lazily resolved to avoid calling app.getPath() before app is ready.
  */
+let _recentFilePath: string | null = null
+function getRecentFilePath(): string {
+  if (!_recentFilePath) {
+    _recentFilePath = join(app.getPath('userData'), 'recent-projects.json')
+  }
+  return _recentFilePath
+}
+
+async function loadRecentFromDisk(): Promise<string[]> {
+  try {
+    const data = await readFile(getRecentFilePath(), 'utf-8')
+    const parsed: unknown = JSON.parse(data)
+    if (Array.isArray(parsed) && parsed.every((p) => typeof p === 'string')) {
+      return parsed as string[]
+    }
+  } catch {
+    // File doesn't exist yet or is corrupt — start fresh
+  }
+  return []
+}
+
+async function saveRecentToDisk(paths: string[]): Promise<void> {
+  try {
+    await writeFile(getRecentFilePath(), JSON.stringify(paths), 'utf-8')
+  } catch {
+    // Best-effort — don't crash if userData is unwritable
+  }
+}
+
 let recentProjectPaths: string[] = []
+let recentLoaded = false
+
+/**
+ * Ensure recent projects are loaded from disk (once).
+ */
+async function ensureRecentLoaded(): Promise<void> {
+  if (!recentLoaded) {
+    recentProjectPaths = await loadRecentFromDisk()
+    recentLoaded = true
+  }
+}
 
 /**
  * Add a file path to the recent projects list
  * Deduplicates and caps at MAX_RECENT_PROJECTS
  */
-function addToRecentProjects(filePath: string): void {
+async function addToRecentProjects(filePath: string): Promise<void> {
+  await ensureRecentLoaded()
   recentProjectPaths = [filePath, ...recentProjectPaths.filter((p) => p !== filePath)].slice(
     0,
     MAX_RECENT_PROJECTS
   )
+  await saveRecentToDisk(recentProjectPaths)
 }
 
 /**
@@ -47,7 +91,8 @@ export function newProject(): OperationResult<ProjectData> {
 /**
  * Get the list of recently opened/saved project file paths
  */
-export function getRecentProjects(): OperationResult<string[]> {
+export async function getRecentProjects(): Promise<OperationResult<string[]>> {
+  await ensureRecentLoaded()
   return {
     success: true,
     data: [...recentProjectPaths]
@@ -59,7 +104,8 @@ export function getRecentProjects(): OperationResult<string[]> {
  */
 export async function saveProject(
   projectData: ProjectData,
-  filePath?: string
+  filePath?: string,
+  suggestedPath?: string
 ): Promise<OperationResult<string>> {
   try {
     // Validate project data before saving
@@ -76,7 +122,7 @@ export async function saveProject(
     if (!targetPath) {
       const result = await dialog.showSaveDialog({
         title: 'Save Project',
-        defaultPath: `${projectData.settings.name}.gfstudio`,
+        defaultPath: suggestedPath ?? `${projectData.settings.name}.gfstudio`,
         filters: [
           { name: 'Gridfinity Studio Project', extensions: ['gfstudio'] },
           { name: 'JSON Files', extensions: ['json'] },
@@ -106,7 +152,7 @@ export async function saveProject(
     // Write to file
     await writeFile(targetPath, JSON.stringify(dataToSave, null, 2), 'utf-8')
 
-    addToRecentProjects(targetPath)
+    await addToRecentProjects(targetPath)
 
     return {
       success: true,
@@ -173,7 +219,7 @@ export async function loadProject(
       }
     }
 
-    addToRecentProjects(targetPath)
+    await addToRecentProjects(targetPath)
 
     return {
       success: true,
