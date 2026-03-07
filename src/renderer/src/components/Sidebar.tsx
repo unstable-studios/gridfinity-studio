@@ -1,9 +1,16 @@
-import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo, forwardRef } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { Switch } from '@/components/ui/switch'
+import {
+  ContextMenu,
+  ContextMenuTrigger,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator
+} from '@/components/ui/context-menu'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useSharedSelection } from '@/hooks/useSelection'
@@ -180,8 +187,11 @@ function LayoutSidebar({
         </div>
       )}
 
+      {/* Project name header (read-only) */}
+      <ProjectNameHeader />
+
       {/* Bin tree with nested entities */}
-      <SidebarSection title="Bins">
+      <div>
         {bins.length === 0 && entities.length === 0 ? (
           <p className="text-xs text-zinc-500">No bins or entities yet.</p>
         ) : (
@@ -191,30 +201,75 @@ function LayoutSidebar({
               const isBinSelected = selectionType === 'bin' && selectedIds.has(bin.id)
               return (
                 <div key={bin.id}>
-                  <button
-                    type="button"
-                    className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-                      isBinSelected
-                        ? 'bg-blue-600/20 text-blue-400'
-                        : 'text-zinc-400 hover:bg-zinc-800'
-                    }`}
-                    onClick={() => selectBin(bin.id)}
-                  >
-                    <span className="font-medium">{bin.name}</span>
-                    <span className="ml-2 text-zinc-600">
-                      {bin.width}×{bin.depth}×{bin.height}u
-                    </span>
-                  </button>
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <BinListItem
+                        bin={bin}
+                        selected={isBinSelected}
+                        onSelect={() => selectBin(bin.id)}
+                        onRename={(name) => updateBin(bin.id, { name })}
+                      />
+                    </ContextMenuTrigger>
+                    <ContextMenuContent>
+                      <ContextMenuItem
+                        onSelect={() => {
+                          selectBin(bin.id)
+                          // Trigger rename via a custom event the BinListItem listens for
+                          window.dispatchEvent(
+                            new CustomEvent('sidebar:rename', { detail: bin.id })
+                          )
+                        }}
+                      >
+                        Rename
+                      </ContextMenuItem>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem
+                        variant="destructive"
+                        onSelect={() => {
+                          const wasSelected = selectionType === 'bin' && selectedIds.has(bin.id)
+                          removeBin(bin.id)
+                          if (wasSelected) selection.clearSelection()
+                        }}
+                      >
+                        Delete
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
                   {binEntities.length > 0 && (
                     <div className="ml-3 border-l border-zinc-800 pl-2 space-y-0.5">
                       {binEntities.map((entity) => (
-                        <EntityListItem
-                          key={entity.id}
-                          entity={entity}
-                          selected={selectionType === 'entity' && selectedIds.has(entity.id)}
-                          onSelect={select}
-                          onRename={(name) => updateEntity(entity.id, { name })}
-                        />
+                        <ContextMenu key={entity.id}>
+                          <ContextMenuTrigger asChild>
+                            <EntityListItem
+                              entity={entity}
+                              selected={selectionType === 'entity' && selectedIds.has(entity.id)}
+                              onSelect={select}
+                              onRename={(name) => updateEntity(entity.id, { name })}
+                            />
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <ContextMenuItem
+                              onSelect={() => {
+                                select(entity.id)
+                                window.dispatchEvent(
+                                  new CustomEvent('sidebar:rename', { detail: entity.id })
+                                )
+                              }}
+                            >
+                              Rename
+                            </ContextMenuItem>
+                            <ContextMenuSeparator />
+                            <ContextMenuItem
+                              variant="destructive"
+                              onSelect={() => {
+                                removeEntity(entity.id)
+                                selection.clearSelection()
+                              }}
+                            >
+                              Delete
+                            </ContextMenuItem>
+                          </ContextMenuContent>
+                        </ContextMenu>
                       ))}
                     </div>
                   )}
@@ -230,34 +285,63 @@ function LayoutSidebar({
                 </p>
                 <div className="space-y-0.5">
                   {unassignedEntities.map((entity) => (
-                    <EntityListItem
-                      key={entity.id}
-                      entity={entity}
-                      selected={selectionType === 'entity' && selectedIds.has(entity.id)}
-                      onSelect={select}
-                      onRename={(name) => updateEntity(entity.id, { name })}
-                    />
+                    <ContextMenu key={entity.id}>
+                      <ContextMenuTrigger asChild>
+                        <EntityListItem
+                          entity={entity}
+                          selected={selectionType === 'entity' && selectedIds.has(entity.id)}
+                          onSelect={select}
+                          onRename={(name) => updateEntity(entity.id, { name })}
+                        />
+                      </ContextMenuTrigger>
+                      <ContextMenuContent>
+                        <ContextMenuItem
+                          onSelect={() => {
+                            select(entity.id)
+                            window.dispatchEvent(
+                              new CustomEvent('sidebar:rename', { detail: entity.id })
+                            )
+                          }}
+                        >
+                          Rename
+                        </ContextMenuItem>
+                        <ContextMenuSeparator />
+                        <ContextMenuItem
+                          variant="destructive"
+                          onSelect={() => {
+                            removeEntity(entity.id)
+                            selection.clearSelection()
+                          }}
+                        >
+                          Delete
+                        </ContextMenuItem>
+                      </ContextMenuContent>
+                    </ContextMenu>
                   ))}
                 </div>
               </div>
             )}
           </div>
         )}
-        <div className="flex gap-1.5 mt-2">
-          <Button variant="outline" size="sm" className="flex-1" onClick={handleAddBin}>
-            Add Bin
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex-1"
-            disabled={unassignedEntities.length === 0}
-            onClick={handleAutoWrap}
+        <div className="flex items-center gap-3 mt-2">
+          <button
+            type="button"
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition"
+            onClick={handleAddBin}
           >
-            Auto-wrap
-          </Button>
+            + Add Bin
+          </button>
+          {unassignedEntities.length > 0 && (
+            <button
+              type="button"
+              className="text-xs text-zinc-500 hover:text-zinc-300 transition"
+              onClick={handleAutoWrap}
+            >
+              Auto-wrap
+            </button>
+          )}
         </div>
-      </SidebarSection>
+      </div>
 
       {selectedBin && (
         <SidebarSection title="Bin Properties">
@@ -265,7 +349,6 @@ function LayoutSidebar({
             key={selectedBin.id}
             bin={selectedBin}
             onUpdate={(patch) => handleBinUpdate(selectedBin.id, patch)}
-            onDelete={() => removeBin(selectedBin.id)}
           />
         </SidebarSection>
       )}
@@ -275,10 +358,6 @@ function LayoutSidebar({
           key={selectedEntity.id}
           entity={selectedEntity}
           onUpdate={updateEntity}
-          onDelete={() => {
-            removeEntity(selectedEntity.id)
-            selection.clearSelection()
-          }}
           displayUnit={(project?.settings.units ?? 'mm') as DisplayUnit}
         />
       )}
@@ -405,12 +484,10 @@ function BinBaker({ bin }: { bin: Bin }): null {
 
 function BinProperties({
   bin,
-  onUpdate,
-  onDelete
+  onUpdate
 }: {
   bin: Bin
   onUpdate: (patch: Partial<Bin>) => void
-  onDelete: () => void
 }): React.JSX.Element {
   return (
     <div className="space-y-2 text-xs">
@@ -450,29 +527,103 @@ function BinProperties({
         />
         <span className="text-xs">Lip</span>
       </label>
-      <Button
-        variant="outline"
-        size="sm"
-        className="w-full text-red-400 hover:text-red-300"
-        onClick={onDelete}
-      >
-        Delete Bin
-      </Button>
     </div>
   )
 }
 
-function EntityListItem({
-  entity,
-  selected,
-  onSelect,
-  onRename
-}: {
-  entity: Entity
-  selected: boolean
-  onSelect: (id: string) => void
-  onRename: (name: string) => void
-}): React.JSX.Element {
+const BinListItem = forwardRef<
+  HTMLElement,
+  {
+    bin: Bin
+    selected: boolean
+    onSelect: () => void
+    onRename: (name: string) => void
+  } & React.ComponentPropsWithoutRef<'button'>
+>(function BinListItem({ bin, selected, onSelect, onRename, ...props }, ref) {
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState(bin.name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus()
+  }, [editing])
+
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      if ((e as CustomEvent).detail === bin.id) {
+        setEditName(bin.name)
+        setEditing(true)
+      }
+    }
+    window.addEventListener('sidebar:rename', handler)
+    return () => window.removeEventListener('sidebar:rename', handler)
+  }, [bin.id, bin.name])
+
+  const commitName = (): void => {
+    const trimmed = editName.trim()
+    if (trimmed && trimmed !== bin.name) {
+      onRename(trimmed)
+    } else {
+      setEditName(bin.name)
+    }
+    setEditing(false)
+  }
+
+  const className = `w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
+    selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
+  }`
+
+  if (editing) {
+    return (
+      <div ref={ref as React.Ref<HTMLDivElement>} className={className} {...(props as object)}>
+        <Input
+          ref={inputRef}
+          type="text"
+          className="w-full bg-transparent text-xs font-medium border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 focus:ring-0"
+          value={editName}
+          onChange={(e) => setEditName(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commitName()
+            if (e.key === 'Escape') {
+              setEditName(bin.name)
+              setEditing(false)
+            }
+          }}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <button
+      ref={ref as React.Ref<HTMLButtonElement>}
+      type="button"
+      className={className}
+      onClick={onSelect}
+      onDoubleClick={() => {
+        setEditName(bin.name)
+        setEditing(true)
+      }}
+      {...props}
+    >
+      <span className="font-medium">{bin.name}</span>
+      <span className="ml-2 text-zinc-600">
+        {bin.width}×{bin.depth}×{bin.height}u
+      </span>
+    </button>
+  )
+})
+
+const EntityListItem = forwardRef<
+  HTMLElement,
+  {
+    entity: Entity
+    selected: boolean
+    onSelect: (id: string) => void
+    onRename: (name: string) => void
+  } & Omit<React.ComponentPropsWithoutRef<'button'>, 'onSelect'>
+>(function EntityListItem({ entity, selected, onSelect, onRename, ...props }, ref) {
   const [editing, setEditing] = useState(false)
   const [editName, setEditName] = useState(entity.name)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -480,6 +631,17 @@ function EntityListItem({
   useEffect(() => {
     if (editing) inputRef.current?.focus()
   }, [editing])
+
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      if ((e as CustomEvent).detail === entity.id) {
+        setEditName(entity.name)
+        setEditing(true)
+      }
+    }
+    window.addEventListener('sidebar:rename', handler)
+    return () => window.removeEventListener('sidebar:rename', handler)
+  }, [entity.id, entity.name])
 
   const commitName = (): void => {
     const trimmed = editName.trim()
@@ -491,19 +653,13 @@ function EntityListItem({
     setEditing(false)
   }
 
-  return (
-    <button
-      type="button"
-      className={`w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-        selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
-      }`}
-      onClick={() => onSelect(entity.id)}
-      onDoubleClick={() => {
-        setEditName(entity.name)
-        setEditing(true)
-      }}
-    >
-      {editing ? (
+  const className = `w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
+    selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
+  }`
+
+  if (editing) {
+    return (
+      <div ref={ref as React.Ref<HTMLDivElement>} className={className} {...(props as object)}>
         <Input
           ref={inputRef}
           type="text"
@@ -518,15 +674,40 @@ function EntityListItem({
               setEditing(false)
             }
           }}
-          onClick={(e) => e.stopPropagation()}
         />
-      ) : (
-        <>
-          <span className="font-medium">{entity.name}</span>
-          <span className="ml-2 text-zinc-600">{entity.type}</span>
-        </>
-      )}
+      </div>
+    )
+  }
+
+  return (
+    <button
+      ref={ref as React.Ref<HTMLButtonElement>}
+      type="button"
+      className={className}
+      onClick={() => onSelect(entity.id)}
+      onDoubleClick={() => {
+        setEditName(entity.name)
+        setEditing(true)
+      }}
+      {...props}
+    >
+      <span className="font-medium">{entity.name}</span>
+      <span className="ml-2 text-zinc-600">{entity.type}</span>
     </button>
+  )
+})
+
+function ProjectNameHeader(): React.JSX.Element {
+  const filePath = useProject((s) => s.filePath)
+  const name = filePath
+    ? filePath
+        .split(/[\\/]/)
+        .pop()!
+        .replace(/\.gfstudio$/, '')
+    : 'Untitled Project'
+
+  return (
+    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate">{name}</p>
   )
 }
 
@@ -687,12 +868,10 @@ function SidebarSection({
 function EntityProperties({
   entity,
   onUpdate,
-  onDelete,
   displayUnit
 }: {
   entity: Entity
   onUpdate: (id: string, patch: Partial<Entity>) => void
-  onDelete: () => void
   displayUnit: DisplayUnit
 }): React.JSX.Element {
   const handlePositionChange = (axis: 'x' | 'y', value: number): void => {
@@ -717,9 +896,7 @@ function EntityProperties({
     onUpdate(entity.id, { pocket: { ...current, ...patch } })
   }
 
-  const handleRemovePocket = (): void => {
-    onUpdate(entity.id, { pocket: undefined })
-  }
+  const maxDepth = ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : null
 
   return (
     <SidebarSection title="Properties">
@@ -791,18 +968,10 @@ function EntityProperties({
         <PocketControls
           entity={entity}
           onPocketChange={handlePocketChange}
-          onRemovePocket={handleRemovePocket}
           defaultDepth={ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : 5}
+          maxDepth={maxDepth}
           displayUnit={displayUnit}
         />
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full mt-2 text-red-400 hover:text-red-300"
-          onClick={onDelete}
-        >
-          Delete Entity
-        </Button>
       </div>
     </SidebarSection>
   )
@@ -811,17 +980,18 @@ function EntityProperties({
 function PocketControls({
   entity,
   onPocketChange,
-  onRemovePocket,
   defaultDepth,
+  maxDepth,
   displayUnit
 }: {
   entity: Entity
   onPocketChange: (patch: Partial<PocketConfig>) => void
-  onRemovePocket: () => void
   defaultDepth: number
+  maxDepth: number | null
   displayUnit: DisplayUnit
 }): React.JSX.Element {
   const hasPocket = entity.pocket !== undefined
+  const depthExceeded = hasPocket && maxDepth !== null && entity.pocket!.depth > maxDepth
 
   return (
     <div className="mt-2 pt-2 border-t border-zinc-800">
@@ -839,6 +1009,11 @@ function PocketControls({
             min={0.1}
             onChange={(v) => onPocketChange({ depth: v })}
           />
+          {depthExceeded && (
+            <p className="text-[11px] text-amber-500">
+              Depth exceeds cavity ({maxDepth!.toFixed(1)} mm) — pocket will be clipped.
+            </p>
+          )}
           <NumericInput
             label="Clearance"
             value={entity.pocket!.clearance}
@@ -851,9 +1026,6 @@ function PocketControls({
             max={5}
             onChange={(v) => onPocketChange({ clearance: v })}
           />
-          <Button variant="outline" size="sm" className="w-full mt-1" onClick={onRemovePocket}>
-            Remove Pocket
-          </Button>
         </div>
       ) : (
         <Button
