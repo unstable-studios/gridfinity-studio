@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react'
+import type { EngineType } from '@/layout-engine'
 
-export type AppMode = 'layout' | 'review'
+export type AppMode = 'layout' | 'review' | 'sandbox'
 export type ActiveTool = 'select' | 'circle' | 'rectangle' | 'polygon' | null
 
 export interface AppModeContext {
@@ -8,13 +9,17 @@ export interface AppModeContext {
   setMode: (mode: AppMode) => void
   activeTool: ActiveTool
   setActiveTool: (tool: ActiveTool) => void
+  engineType: EngineType
+  setEngineType: (type: EngineType) => void
 }
 
 export const AppModeCtx = createContext<AppModeContext>({
   mode: 'layout',
   setMode: () => {},
   activeTool: 'select',
-  setActiveTool: () => {}
+  setActiveTool: () => {},
+  engineType: 'fabric',
+  setEngineType: () => {}
 })
 
 export function useAppMode(): AppModeContext {

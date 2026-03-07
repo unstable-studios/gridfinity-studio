@@ -249,6 +249,19 @@ export interface Bin {
   properties: Record<string, unknown>
 }
 
+// ─── Layout Snapshot (engine-agnostic 2D canvas state) ────────────
+
+export interface LayoutSnapshotData {
+  version: string
+  shapes: Record<string, unknown>[]
+  groups: Record<string, unknown>[]
+  gridConfig: {
+    size: number
+    enabled: boolean
+    visible: boolean
+  }
+}
+
 // ─── Project ───────────────────────────────────────────────────────
 
 export interface ProjectData {
@@ -259,6 +272,7 @@ export interface ProjectData {
   groups: Group[]
   generators: Generator[]
   bins: Bin[]
+  layoutSnapshot?: LayoutSnapshotData
 }
 
 // ─── Defaults & factories ──────────────────────────────────────────
