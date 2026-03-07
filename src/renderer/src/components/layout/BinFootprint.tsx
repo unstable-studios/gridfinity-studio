@@ -4,6 +4,8 @@ import { Z } from '@/lib/z-layers'
 
 // Gridfinity spec corner radius (top edge)
 const CORNER_RADIUS = 3.75
+// Lip wall thickness (inset for inner line)
+const LIP_INSET = 1.2
 
 interface BinFootprintProps {
   widthMm: number
@@ -67,13 +69,12 @@ export default function BinFootprint({
   // Second inner line for lip-enabled bins (inset by ~1.2mm, the lip wall thickness)
   const lipInnerObj = useMemo(() => {
     if (!hasLip || selected) return null
-    const inset = 1.2
-    if (widthMm <= inset * 2 || depthMm <= inset * 2) return null
+    if (widthMm <= LIP_INSET * 2 || depthMm <= LIP_INSET * 2) return null
 
     const points = roundedRectPoints(
-      widthMm - inset * 2,
-      depthMm - inset * 2,
-      CORNER_RADIUS - inset
+      widthMm - LIP_INSET * 2,
+      depthMm - LIP_INSET * 2,
+      CORNER_RADIUS - LIP_INSET
     )
     const geometry = new THREE.BufferGeometry().setFromPoints(points)
     const material = new THREE.LineBasicMaterial({
@@ -88,7 +89,7 @@ export default function BinFootprint({
     <group position={[position.x, position.y, 0]}>
       <primitive object={outlineObj} />
       {lipInnerObj && (
-        <group position={[1.2, 1.2, 0]}>
+        <group position={[LIP_INSET, LIP_INSET, 0]}>
           <primitive object={lipInnerObj} />
         </group>
       )}
