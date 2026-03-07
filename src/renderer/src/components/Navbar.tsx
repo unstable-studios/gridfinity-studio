@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/menubar'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import PreferencesModal from '@/components/settings/PreferencesModal'
+import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject, useUndo } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
@@ -52,8 +53,9 @@ function useWindowTitle(): void {
 
 export default function Navbar(): React.JSX.Element {
   const [prefsOpen, setPrefsOpen] = useState(false)
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
   const isModified = useProject((s) => s.isModified)
-  const { saveProject } = useProject()
+  const { saveProject, createNewProject } = useProject()
 
   useWindowTitle()
 
@@ -73,7 +75,10 @@ export default function Navbar(): React.JSX.Element {
     <>
       <NavbarRoot brand={<Logo />} className="relative z-50 max-w-none [&>div]:max-w-none py-2">
         <NavbarContent className="gap-1">
-          <AppMenubar onOpenPreferences={() => setPrefsOpen(true)} />
+          <AppMenubar
+            onOpenPreferences={() => setPrefsOpen(true)}
+            onNewProject={() => setNewProjectOpen(true)}
+          />
           {isModified && (
             <button
               type="button"
@@ -92,20 +97,24 @@ export default function Navbar(): React.JSX.Element {
         </NavbarActions>
       </NavbarRoot>
       <PreferencesModal open={prefsOpen} onOpenChange={setPrefsOpen} />
+      <NewProjectDialog
+        open={newProjectOpen}
+        onOpenChange={setNewProjectOpen}
+        onCreate={(config) => createNewProject(config)}
+      />
     </>
   )
 }
 
-function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
-  const {
-    project,
-    saveProject,
-    saveProjectAs,
-    loadProject,
-    createNewProject,
-    recentProjects,
-    loadRecentProjects
-  } = useProject()
+function AppMenubar({
+  onOpenPreferences,
+  onNewProject
+}: {
+  onOpenPreferences: () => void
+  onNewProject: () => void
+}) {
+  const { project, saveProject, saveProjectAs, loadProject, recentProjects, loadRecentProjects } =
+    useProject()
   const { undo, redo, canUndo, canRedo } = useUndo()
 
   useEffect(() => {
@@ -119,7 +128,7 @@ function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
       if (!mod) return
       if (e.code === 'KeyN' && !e.shiftKey) {
         e.preventDefault()
-        createNewProject()
+        onNewProject()
       } else if (e.code === 'KeyO' && !e.shiftKey) {
         e.preventDefault()
         void loadProject()
@@ -131,7 +140,7 @@ function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
         void saveProjectAs()
       }
     },
-    [createNewProject, loadProject, saveProject, saveProjectAs]
+    [onNewProject, loadProject, saveProject, saveProjectAs]
   )
 
   // Edit keyboard shortcuts
@@ -169,7 +178,7 @@ function AppMenubar({ onOpenPreferences }: { onOpenPreferences: () => void }) {
       <MenubarMenu>
         <MenubarTrigger>File</MenubarTrigger>
         <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <MenubarItem onSelect={() => createNewProject()}>
+          <MenubarItem onSelect={onNewProject}>
             New Project
             <MenubarShortcut>Cmd+N</MenubarShortcut>
           </MenubarItem>
