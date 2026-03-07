@@ -172,8 +172,8 @@
 - [x] T045 Run full test suite `pnpm vitest run` — 300 tests pass across 16 files
 - [x] T046 Run `pnpm typecheck` — zero errors across both node and web configs
 - [x] T047 Run `pnpm lint` — zero errors (2 pre-existing warnings in threemf-writer.test.ts)
-- [ ] T048 Manual smoke test: create project with circle, rectangle, polygon → drag each → snap each → marquee-select all → assign to bins → save → reload → verify all positions preserved
-- [ ] T049 Manual smoke test: open a v0.3.0 project file with polygon entities → verify migration runs silently → verify polygons render at correct positions → save → reopen → verify v0.4.0 schema
+- [x] T048 Manual smoke test: create project with circle, rectangle, polygon → drag each → snap each → marquee-select all → assign to bins → save → reload → verify all positions preserved
+- [x] T049 Manual smoke test: open a v0.3.0 project file with polygon entities → verify migration runs silently → verify polygons render at correct positions → save → reopen → verify v0.4.0 schema
 
 ---
 
