@@ -17,6 +17,7 @@ export default function Viewport(): React.JSX.Element {
     moveEntity,
     removeEntity,
     updateBin,
+    moveBin,
     removeBin,
     bakeResults
   } = useProject()
@@ -28,11 +29,22 @@ export default function Viewport(): React.JSX.Element {
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   const handlePlace = (partial: Partial<Entity> & { type: Entity['type'] }): void => {
-    // Auto-associate with selected bin, or first bin
-    const targetBinId =
-      selection.selectionType === 'bin' && selection.selectedIds.size > 0
-        ? [...selection.selectedIds][0]
-        : bins[0]?.id
+    // Find which bin contains the entity's position
+    const cx = partial.transform?.position?.x ?? 0
+    const cy = partial.transform?.position?.y ?? 0
+    let targetBinId: string | undefined
+
+    for (const bin of bins) {
+      const bx = bin.position.x
+      const by = bin.position.y
+      const bw = bin.width * baseUnit
+      const bd = bin.depth * baseUnit
+      if (cx >= bx && cx <= bx + bw && cy >= by && cy <= by + bd) {
+        targetBinId = bin.id
+        break
+      }
+    }
+
     const entity = addEntity(partial, targetBinId)
     selection.select(entity.id)
   }
@@ -88,8 +100,8 @@ export default function Viewport(): React.JSX.Element {
     updateEntity(id, patch)
   }
 
-  const handleBinMove = (id: string, position: { x: number; y: number }): void => {
-    updateBin(id, { position })
+  const handleBinMove = (id: string, dx: number, dy: number): void => {
+    moveBin(id, dx, dy)
   }
 
   const handleBinResize = (id: string, patch: Partial<Bin>): void => {
@@ -144,6 +156,7 @@ export default function Viewport(): React.JSX.Element {
           onBinResize={handleBinResize}
           onSelect={selection.select}
           onSelectBin={selection.selectBin}
+          onMarqueeSelect={selection.marqueeSelect}
           onClearSelection={selection.clearSelection}
           snap={snapFn}
         />

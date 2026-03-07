@@ -219,7 +219,7 @@ export function NumericInput({
             ref={inputRef}
             type="text"
             inputMode="decimal"
-            className="w-16 bg-zinc-800 text-zinc-200 font-mono text-xs text-right rounded px-1 py-0.5 outline-none ring-1 ring-blue-500"
+            className="w-16 bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-mono text-xs text-right rounded px-1 py-0.5 outline-none ring-1 ring-blue-500"
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             onBlur={commitEdit}
@@ -228,7 +228,7 @@ export function NumericInput({
         ) : (
           <button
             type="button"
-            className="w-16 bg-zinc-800/50 text-zinc-300 font-mono text-xs text-right rounded px-1 py-0.5 hover:bg-zinc-700/60 transition cursor-text"
+            className="w-16 bg-zinc-200/60 text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 font-mono text-xs text-right rounded px-1 py-0.5 hover:bg-zinc-300/60 dark:hover:bg-zinc-700/60 transition cursor-text"
             onClick={startEditing}
           >
             {displayValue}
@@ -241,7 +241,7 @@ export function NumericInput({
           <div className="flex flex-col ml-0.5">
             <button
               type="button"
-              className="text-zinc-500 hover:text-zinc-300 leading-none px-0.5"
+              className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 leading-none px-0.5"
               onClick={increment}
               tabIndex={-1}
               aria-label="Increment"
@@ -252,7 +252,7 @@ export function NumericInput({
             </button>
             <button
               type="button"
-              className="text-zinc-500 hover:text-zinc-300 leading-none px-0.5"
+              className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 leading-none px-0.5"
               onClick={decrement}
               tabIndex={-1}
               aria-label="Decrement"

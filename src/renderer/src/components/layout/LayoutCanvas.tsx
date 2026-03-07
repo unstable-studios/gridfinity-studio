@@ -1,5 +1,6 @@
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber'
 import { Suspense, useRef, useCallback, useState, useEffect, useMemo } from 'react'
+import * as THREE from 'three'
 import { useProject } from '@/hooks/useProject'
 import GridOverlay from './GridOverlay'
 import EntityRenderer from './EntityRenderer'
@@ -28,10 +29,11 @@ interface LayoutCanvasProps {
   onMove: (id: string, dx: number, dy: number) => void
   onMoveEnd?: (ids: Set<string>) => void
   onResize?: (id: string, patch: Partial<Entity>) => void
-  onBinMove: (id: string, position: { x: number; y: number }) => void
+  onBinMove: (id: string, dx: number, dy: number) => void
   onBinResize?: (id: string, patch: Partial<Bin>) => void
   onSelect: (id: string, additive?: boolean) => void
   onSelectBin: (id: string, additive?: boolean) => void
+  onMarqueeSelect: (ids: string[]) => void
   onClearSelection: () => void
   snap: (pos: { x: number; y: number }) => { x: number; y: number }
 }
@@ -42,22 +44,29 @@ function BinDragHandler({
   bin,
   baseUnit,
   selected,
+  selectedBinIds,
+  allBins,
   otherBins,
   onSelectBin,
   onBinMove,
-  onBinResize
+  onBinResize,
+  onBinHover
 }: {
   bin: Bin
   baseUnit: number
   selected: boolean
+  selectedBinIds: Set<string>
+  allBins: Bin[]
   otherBins: Bin[]
   onSelectBin: (id: string, additive?: boolean) => void
-  onBinMove: (id: string, position: { x: number; y: number }) => void
+  onBinMove: (id: string, dx: number, dy: number) => void
   onBinResize?: (id: string, patch: Partial<Bin>) => void
+  onBinHover?: (id: string | null) => void
 }): React.JSX.Element {
   const [dragging, setDragging] = useState(false)
   const [resizingEdge, setResizingEdge] = useState<BinResizeEdge | null>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
+  const lastSnappedRef = useRef({ x: 0, y: 0 })
 
   const widthMm = bin.width * baseUnit
   const depthMm = bin.depth * baseUnit
@@ -83,15 +92,21 @@ function BinDragHandler({
     (e: ThreeEvent<PointerEvent>) => {
       if (e.nativeEvent.button !== 0) return
       e.stopPropagation()
-      onSelectBin(bin.id, e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey)
+      const additive = e.nativeEvent.shiftKey || e.nativeEvent.metaKey || e.nativeEvent.ctrlKey
+      if (!selected && !additive) {
+        onSelectBin(bin.id, false)
+      } else if (additive) {
+        onSelectBin(bin.id, true)
+      }
       offsetRef.current = {
         x: e.point.x - bin.position.x,
         y: e.point.y - bin.position.y
       }
+      lastSnappedRef.current = { x: bin.position.x, y: bin.position.y }
       startDrag()
       setDragging(true)
     },
-    [bin.id, bin.position.x, bin.position.y, onSelectBin, startDrag]
+    [bin.id, bin.position.x, bin.position.y, selected, onSelectBin, startDrag]
   )
 
   const handlePointerMove = useCallback(
@@ -102,25 +117,40 @@ function BinDragHandler({
       const rawY = e.point.y - offsetRef.current.y
       const snappedX = Math.round(rawX / baseUnit) * baseUnit
       const snappedY = Math.round(rawY / baseUnit) * baseUnit
-      if (snappedX === bin.position.x && snappedY === bin.position.y) return
+      const dx = snappedX - lastSnappedRef.current.x
+      const dy = snappedY - lastSnappedRef.current.y
+      if (dx === 0 && dy === 0) return
 
-      // Reject move if it would overlap another bin
-      const candidate = { x: snappedX, y: snappedY, w: widthMm, d: depthMm }
-      if (binOverlapsAny(candidate, otherRects)) return
+      // Move all selected bins together
+      const binsToMove = selected ? allBins.filter((b) => selectedBinIds.has(b.id)) : [bin]
 
-      onBinMove(bin.id, { x: snappedX, y: snappedY })
+      // Collision check: ensure none of the moving bins overlap non-moving bins
+      const movingIds = new Set(binsToMove.map((b) => b.id))
+      const staticRects = allBins
+        .filter((b) => !movingIds.has(b.id))
+        .map((b) => ({
+          x: b.position.x,
+          y: b.position.y,
+          w: b.width * baseUnit,
+          d: b.depth * baseUnit
+        }))
+
+      for (const b of binsToMove) {
+        const candidate = {
+          x: b.position.x + dx,
+          y: b.position.y + dy,
+          w: b.width * baseUnit,
+          d: b.depth * baseUnit
+        }
+        if (binOverlapsAny(candidate, staticRects)) return
+      }
+
+      lastSnappedRef.current = { x: snappedX, y: snappedY }
+      for (const b of binsToMove) {
+        onBinMove(b.id, dx, dy)
+      }
     },
-    [
-      dragging,
-      baseUnit,
-      bin.id,
-      bin.position.x,
-      bin.position.y,
-      widthMm,
-      depthMm,
-      otherRects,
-      onBinMove
-    ]
+    [dragging, baseUnit, bin, selected, selectedBinIds, allBins, onBinMove]
   )
 
   const handlePointerUp = useCallback(
@@ -261,6 +291,8 @@ function BinDragHandler({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
+        onPointerOver={() => onBinHover?.(bin.id)}
+        onPointerOut={() => onBinHover?.(null)}
       >
         <planeGeometry args={[widthMm, depthMm]} />
         <meshBasicMaterial transparent opacity={0} />
@@ -303,6 +335,81 @@ function BinDragHandler({
   )
 }
 
+function MultiSelectionBounds({
+  selectedIds,
+  selectionType,
+  entities,
+  bins,
+  baseUnit
+}: {
+  selectedIds: Set<string>
+  selectionType: SelectionType
+  entities: Entity[]
+  bins: Bin[]
+  baseUnit: number
+}): React.JSX.Element | null {
+  const lineObj = useMemo(() => {
+    if (selectedIds.size < 2) return null
+
+    let minX = Infinity
+    let maxX = -Infinity
+    let minY = Infinity
+    let maxY = -Infinity
+
+    if (selectionType === 'entity') {
+      for (const e of entities) {
+        if (!selectedIds.has(e.id)) continue
+        const { x, y } = e.transform.position
+        let halfW = 3
+        let halfH = 3
+        if (e.type === 'circle') halfW = halfH = e.diameter / 2
+        else if (e.type === 'rectangle') {
+          halfW = e.width / 2
+          halfH = e.height / 2
+        }
+        minX = Math.min(minX, x - halfW)
+        maxX = Math.max(maxX, x + halfW)
+        minY = Math.min(minY, y - halfH)
+        maxY = Math.max(maxY, y + halfH)
+      }
+    } else {
+      for (const b of bins) {
+        if (!selectedIds.has(b.id)) continue
+        minX = Math.min(minX, b.position.x)
+        maxX = Math.max(maxX, b.position.x + b.width * baseUnit)
+        minY = Math.min(minY, b.position.y)
+        maxY = Math.max(maxY, b.position.y + b.depth * baseUnit)
+      }
+    }
+
+    if (!isFinite(minX)) return null
+
+    const pad = 2
+    const points = [
+      new THREE.Vector3(minX - pad, minY - pad, 0),
+      new THREE.Vector3(maxX + pad, minY - pad, 0),
+      new THREE.Vector3(maxX + pad, maxY + pad, 0),
+      new THREE.Vector3(minX - pad, maxY + pad, 0),
+      new THREE.Vector3(minX - pad, minY - pad, 0)
+    ]
+    const geometry = new THREE.BufferGeometry().setFromPoints(points)
+    const material = new THREE.LineDashedMaterial({
+      color: '#3b82f6',
+      dashSize: 3,
+      gapSize: 2,
+      opacity: 0.5,
+      transparent: true
+    })
+    const line = new THREE.Line(geometry, material)
+    line.computeLineDistances()
+    return line
+  }, [selectedIds, selectionType, entities, bins, baseUnit])
+
+  if (!lineObj) return null
+
+  return <primitive object={lineObj} position={[0, 0, 0.02]} />
+}
+
 function LayoutScene({
   entities,
   bins,
@@ -312,6 +419,7 @@ function LayoutScene({
   gridfinityConfig,
   bgColor,
   gridColor,
+  lightMode,
   onPlace,
   onMove,
   onMoveEnd,
@@ -320,11 +428,13 @@ function LayoutScene({
   onBinResize,
   onSelect,
   onSelectBin,
+  onMarqueeSelect,
   onClearSelection,
   snap
 }: {
   bgColor: string
   gridColor: string
+  lightMode: boolean
   entities: Entity[]
   bins: Bin[]
   selectedIds: Set<string>
@@ -339,6 +449,7 @@ function LayoutScene({
   onBinResize: LayoutCanvasProps['onBinResize']
   onSelect: LayoutCanvasProps['onSelect']
   onSelectBin: LayoutCanvasProps['onSelectBin']
+  onMarqueeSelect: LayoutCanvasProps['onMarqueeSelect']
   onClearSelection: LayoutCanvasProps['onClearSelection']
   snap: LayoutCanvasProps['snap']
 }): React.JSX.Element {
@@ -346,6 +457,8 @@ function LayoutScene({
   const [marqueeStart, setMarqueeStart] = useState<{ x: number; y: number } | null>(null)
   const [marqueeEnd, setMarqueeEnd] = useState<{ x: number; y: number } | null>(null)
   const [marqueeActive, setMarqueeActive] = useState(false)
+  const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null)
+  const [hoveredBinId, setHoveredBinId] = useState<string | null>(null)
 
   // Compute colliding entity IDs for visual warning
   const collidingIds = useMemo(() => {
@@ -382,6 +495,7 @@ function LayoutScene({
             depthMm={bin.depth * baseUnit}
             position={bin.position}
             selected={selectionType === 'bin' && selectedIds.has(bin.id)}
+            hovered={hoveredBinId === bin.id}
           />
           {gridfinityConfig && <KeepOutOverlay bin={bin} config={gridfinityConfig} />}
         </group>
@@ -395,10 +509,13 @@ function LayoutScene({
             bin={bin}
             baseUnit={baseUnit}
             selected={selectionType === 'bin' && selectedIds.has(bin.id)}
+            selectedBinIds={selectionType === 'bin' ? selectedIds : new Set()}
+            allBins={bins}
             otherBins={bins.filter((b) => b.id !== bin.id)}
             onSelectBin={onSelectBin}
             onBinMove={onBinMove}
             onBinResize={onBinResize}
+            onBinHover={setHoveredBinId}
           />
         ))}
 
@@ -406,7 +523,10 @@ function LayoutScene({
         entities={entities}
         selectedIds={selectionType === 'entity' ? selectedIds : new Set()}
         collidingIds={collidingIds}
+        hoveredId={hoveredEntityId}
         onEntityClick={activeTool === 'select' ? handleEntityClick : undefined}
+        onEntityHover={activeTool === 'select' ? setHoveredEntityId : undefined}
+        lightMode={lightMode}
       />
 
       {/* Active tool */}
@@ -427,6 +547,13 @@ function LayoutScene({
               snap={snap}
             />
           )}
+          <MultiSelectionBounds
+            selectedIds={selectedIds}
+            selectionType={selectionType}
+            entities={entities}
+            bins={bins}
+            baseUnit={baseUnit}
+          />
           <SelectionBox start={marqueeStart} end={marqueeEnd} visible={marqueeActive} />
           {/* Click-away deselect plane */}
           <mesh
@@ -447,6 +574,23 @@ function LayoutScene({
               }
             }}
             onPointerUp={() => {
+              if (marqueeActive && marqueeStart && marqueeEnd) {
+                const minX = Math.min(marqueeStart.x, marqueeEnd.x)
+                const maxX = Math.max(marqueeStart.x, marqueeEnd.x)
+                const minY = Math.min(marqueeStart.y, marqueeEnd.y)
+                const maxY = Math.max(marqueeStart.y, marqueeEnd.y)
+                // Only trigger if the marquee has meaningful size
+                if (maxX - minX > 0.5 || maxY - minY > 0.5) {
+                  const hit = entities
+                    .filter((e) => e.visible)
+                    .filter((e) => {
+                      const { x, y } = e.transform.position
+                      return x >= minX && x <= maxX && y >= minY && y <= maxY
+                    })
+                    .map((e) => e.id)
+                  if (hit.length > 0) onMarqueeSelect(hit)
+                }
+              }
               setMarqueeActive(false)
               setMarqueeStart(null)
               setMarqueeEnd(null)
@@ -495,6 +639,7 @@ export default function LayoutCanvas({
   onBinResize,
   onSelect,
   onSelectBin,
+  onMarqueeSelect,
   onClearSelection,
   snap
 }: LayoutCanvasProps): React.JSX.Element {
@@ -654,6 +799,7 @@ export default function LayoutCanvas({
               gridfinityConfig={gridfinityConfig}
               bgColor={colors.layoutBg}
               gridColor={colors.layoutGrid}
+              lightMode={resolvedTheme === 'light'}
               onPlace={onPlace}
               onMove={onMove}
               onMoveEnd={onMoveEnd}
@@ -662,6 +808,7 @@ export default function LayoutCanvas({
               onBinResize={onBinResize}
               onSelect={onSelect}
               onSelectBin={onSelectBin}
+              onMarqueeSelect={onMarqueeSelect}
               onClearSelection={onClearSelection}
               snap={snap}
             />

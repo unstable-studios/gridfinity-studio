@@ -54,6 +54,7 @@ interface ProjectState {
   updateGridfinity: (config: GridfinityConfig) => void
   addBin: (patch?: Partial<Bin>) => Bin
   updateBin: (id: string, patch: Partial<Bin>) => void
+  moveBin: (id: string, dx: number, dy: number) => void
   removeBin: (id: string) => void
 
   // Drag batching
@@ -328,6 +329,37 @@ const useProjectStore = create<ProjectState>()((set, get) => {
           project: {
             ...state.project,
             bins: state.project.bins.map((b) => (b.id === id ? { ...b, ...patch } : b))
+          },
+          isModified: true
+        }
+      })
+    },
+
+    moveBin: (id, dx, dy) => {
+      pushUndo()
+      set((state) => {
+        if (!state.project) return state
+        return {
+          project: {
+            ...state.project,
+            bins: state.project.bins.map((b) =>
+              b.id === id ? { ...b, position: { x: b.position.x + dx, y: b.position.y + dy } } : b
+            ),
+            entities: state.project.entities.map((e) => {
+              const bin = state.project!.bins.find((b) => b.id === id)
+              if (!bin?.entityIds.includes(e.id)) return e
+              return {
+                ...e,
+                transform: {
+                  ...e.transform,
+                  position: {
+                    ...e.transform.position,
+                    x: e.transform.position.x + dx,
+                    y: e.transform.position.y + dy
+                  }
+                }
+              }
+            })
           },
           isModified: true
         }
