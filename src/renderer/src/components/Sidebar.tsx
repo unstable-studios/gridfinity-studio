@@ -125,8 +125,15 @@ function LayoutSidebar({
   }
 
   const handleAutoWrap = (): void => {
-    if (unassignedEntities.length === 0) return
-    const result = autoWrap(unassignedEntities, baseUnit)
+    // Use selected entities if any are selected, otherwise fall back to unassigned
+    const selectedEntities =
+      selectionType === 'entity' && selectedIds.size > 0
+        ? entities.filter((e) => selectedIds.has(e.id))
+        : null
+    const wrapTargets = selectedEntities ?? unassignedEntities
+    if (wrapTargets.length === 0) return
+
+    const result = autoWrap(wrapTargets, baseUnit)
     const w = result.width * baseUnit
     const d = result.depth * baseUnit
     const existing = otherBinRects()
@@ -141,8 +148,19 @@ function LayoutSidebar({
     const unitHeight = project?.gridfinity.unitHeight ?? 7
     const defaultDepth = computeDefaultPocketDepth(heightUnits, unitHeight)
 
+    // Remove selected entities from any existing bin they're in
+    if (selectedEntities) {
+      const targetIds = new Set(selectedEntities.map((e) => e.id))
+      for (const bin of bins) {
+        const remaining = bin.entityIds.filter((eid) => !targetIds.has(eid))
+        if (remaining.length !== bin.entityIds.length) {
+          updateBin(bin.id, { entityIds: remaining })
+        }
+      }
+    }
+
     // Assign default pockets to entities that don't already have one
-    for (const entity of unassignedEntities) {
+    for (const entity of wrapTargets) {
       if (!entity.pocket) {
         updateEntity(entity.id, { pocket: { depth: defaultDepth, clearance: 0.2 } })
       }
@@ -153,7 +171,7 @@ function LayoutSidebar({
       depth: result.depth,
       height: heightUnits,
       position: pos,
-      entityIds: unassignedEntities.map((e) => e.id)
+      entityIds: wrapTargets.map((e) => e.id)
     })
     selectBin(bin.id)
   }
@@ -206,7 +224,7 @@ function LayoutSidebar({
                       <BinListItem
                         bin={bin}
                         selected={isBinSelected}
-                        onSelect={() => selectBin(bin.id)}
+                        onSelect={(additive) => selectBin(bin.id, additive)}
                         onRename={(name) => updateBin(bin.id, { name })}
                       />
                     </ContextMenuTrigger>
@@ -331,15 +349,19 @@ function LayoutSidebar({
           >
             + Add Bin
           </button>
-          {unassignedEntities.length > 0 && (
-            <button
-              type="button"
-              className="text-xs text-zinc-500 hover:text-zinc-300 transition"
-              onClick={handleAutoWrap}
-            >
-              Auto-wrap
-            </button>
-          )}
+          <button
+            type="button"
+            className="text-xs text-zinc-500 hover:text-zinc-300 transition disabled:opacity-40 disabled:cursor-default"
+            disabled={
+              unassignedEntities.length === 0 &&
+              !(selectionType === 'entity' && selectedIds.size > 0)
+            }
+            onClick={handleAutoWrap}
+          >
+            {selectionType === 'entity' && selectedIds.size > 0
+              ? `Wrap (${selectedIds.size})`
+              : 'Auto-wrap'}
+          </button>
         </div>
       </div>
 
@@ -536,7 +558,7 @@ const BinListItem = forwardRef<
   {
     bin: Bin
     selected: boolean
-    onSelect: () => void
+    onSelect: (additive?: boolean) => void
     onRename: (name: string) => void
   } & React.ComponentPropsWithoutRef<'button'>
 >(function BinListItem({ bin, selected, onSelect, onRename, ...props }, ref) {
@@ -600,7 +622,7 @@ const BinListItem = forwardRef<
       ref={ref as React.Ref<HTMLButtonElement>}
       type="button"
       className={className}
-      onClick={onSelect}
+      onClick={(e) => onSelect(e.shiftKey || e.metaKey || e.ctrlKey)}
       onDoubleClick={() => {
         setEditName(bin.name)
         setEditing(true)
@@ -620,7 +642,7 @@ const EntityListItem = forwardRef<
   {
     entity: Entity
     selected: boolean
-    onSelect: (id: string) => void
+    onSelect: (id: string, additive?: boolean) => void
     onRename: (name: string) => void
   } & Omit<React.ComponentPropsWithoutRef<'button'>, 'onSelect'>
 >(function EntityListItem({ entity, selected, onSelect, onRename, ...props }, ref) {
@@ -684,7 +706,7 @@ const EntityListItem = forwardRef<
       ref={ref as React.Ref<HTMLButtonElement>}
       type="button"
       className={className}
-      onClick={() => onSelect(entity.id)}
+      onClick={(e) => onSelect(entity.id, e.shiftKey || e.metaKey || e.ctrlKey)}
       onDoubleClick={() => {
         setEditName(entity.name)
         setEditing(true)
