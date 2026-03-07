@@ -155,11 +155,11 @@
 
 ### Implementation for User Story 6
 
-- [ ] T040 [US6] Create `EntityInteractionManager` component in `src/renderer/src/components/layout/EntityInteractionManager.tsx` — extract all pointer event handlers (click, hover) from EntityRenderer into a dedicated manager component that renders invisible hit meshes and delegates to callbacks
-- [ ] T041 [US6] Strip pointer handlers from `src/renderer/src/components/layout/EntityRenderer.tsx` — remove onPointerDown, onPointerOver, onPointerOut from shape components. EntityRenderer becomes pure visual renderer receiving only display props (color, fill, position).
-- [ ] T042 [US6] Create `BinInteractionManager` component in `src/renderer/src/components/layout/BinInteractionManager.tsx` — extract all bin pointer event handlers (click, drag, resize, hover) from the inline BinDragHandler in LayoutCanvas into a dedicated manager component
-- [ ] T043 [US6] Strip pointer handlers from bin rendering in `src/renderer/src/components/layout/LayoutCanvas.tsx` — remove inline BinDragHandler pointer logic, wire BinInteractionManager instead. BinFootprint becomes pure visual renderer.
-- [ ] T044 [US6] Verify separation — grep EntityRenderer.tsx and BinFootprint.tsx for `onPointer*` props: zero results. All pointer logic lives in *InteractionManager components.
+- [x] T040 [US6] Create `EntityInteractionManager` component in `src/renderer/src/components/layout/EntityInteractionManager.tsx` — extract all pointer event handlers (click, hover) from EntityRenderer into a dedicated manager component that renders invisible hit meshes and delegates to callbacks
+- [x] T041 [US6] Strip pointer handlers from `src/renderer/src/components/layout/EntityRenderer.tsx` — remove onPointerDown, onPointerOver, onPointerOut from shape components. EntityRenderer becomes pure visual renderer receiving only display props (color, fill, position).
+- [x] T042 [US6] Create `BinInteractionManager` component in `src/renderer/src/components/layout/BinInteractionManager.tsx` — extract all bin pointer event handlers (click, drag, resize, hover) from the inline BinDragHandler in LayoutCanvas into a dedicated manager component
+- [x] T043 [US6] Strip pointer handlers from bin rendering in `src/renderer/src/components/layout/LayoutCanvas.tsx` — remove inline BinDragHandler pointer logic, wire BinInteractionManager instead. BinFootprint becomes pure visual renderer.
+- [x] T044 [US6] Verify separation — grep EntityRenderer.tsx and BinFootprint.tsx for `onPointer*` props: zero results. All pointer logic lives in *InteractionManager components.
 
 **Checkpoint**: Entity and bin rendering components have zero pointer callbacks. All interaction logic centralized. Full app interaction still works end-to-end.
 
