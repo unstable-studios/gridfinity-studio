@@ -130,9 +130,12 @@ app.whenReady().then(() => {
   ipcMain.on('ping', () => console.log('pong'))
 
   // Project IPC handlers
-  ipcMain.handle('project:save', async (_, projectData: ProjectData, filePath?: string) => {
-    return await saveProject(projectData, filePath)
-  })
+  ipcMain.handle(
+    'project:save',
+    async (_, projectData: ProjectData, filePath?: string, suggestedPath?: string) => {
+      return await saveProject(projectData, filePath, suggestedPath)
+    }
+  )
 
   ipcMain.handle('project:load', async (_, filePath?: string) => {
     return await loadProject(filePath)

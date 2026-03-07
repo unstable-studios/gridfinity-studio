@@ -59,7 +59,8 @@ export function getRecentProjects(): OperationResult<string[]> {
  */
 export async function saveProject(
   projectData: ProjectData,
-  filePath?: string
+  filePath?: string,
+  suggestedPath?: string
 ): Promise<OperationResult<string>> {
   try {
     // Validate project data before saving
@@ -76,7 +77,7 @@ export async function saveProject(
     if (!targetPath) {
       const result = await dialog.showSaveDialog({
         title: 'Save Project',
-        defaultPath: `${projectData.settings.name}.gfstudio`,
+        defaultPath: suggestedPath ?? `${projectData.settings.name}.gfstudio`,
         filters: [
           { name: 'Gridfinity Studio Project', extensions: ['gfstudio'] },
           { name: 'JSON Files', extensions: ['json'] },
