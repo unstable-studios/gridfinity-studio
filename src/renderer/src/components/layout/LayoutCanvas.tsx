@@ -496,6 +496,7 @@ function LayoutScene({
             position={bin.position}
             selected={selectionType === 'bin' && selectedIds.has(bin.id)}
             hovered={hoveredBinId === bin.id}
+            hasLip={bin.hasStackingLip}
           />
           {gridfinityConfig && <KeepOutOverlay bin={bin} config={gridfinityConfig} />}
         </group>
