@@ -10,8 +10,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useLayoutEngineContext, useEngineState } from '@/layout-engine'
 import type { LayoutEngine } from '@/layout-engine'
-import type { LayoutShape, BinMetadata } from '@/layout-engine/types'
+import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/types'
 import { isBinGroup } from '@/layout-engine/types'
+import { computeDefaultPocketDepth } from '../../../shared/types/project'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
 
@@ -98,46 +99,38 @@ function nextShapeName(engine: LayoutEngine, type: string): string {
 
 // ─── Bin hit testing ────────────────────────────────────────────────────────
 
-function pocketMetadata(
+/** Find the bin group containing a world-space point, if any. */
+function findContainingBinGroup(
   engine: LayoutEngine,
   worldX: number,
   worldY: number
-): Record<string, unknown> | undefined {
+): (LayoutGroup & { metadata: BinMetadata }) | null {
   const groups = engine.getAllGroups()
   for (const group of groups) {
     if (!isBinGroup(group)) continue
+    // Lower-left corner convention: group extends rightward (+x) and upward (-y)
     if (
       worldX >= group.x &&
       worldX <= group.x + group.width &&
       worldY <= group.y &&
       worldY >= group.y - group.height
     ) {
-      const meta = group.metadata as BinMetadata
-      return {
-        pocket: {
-          depth: meta.heightUnits * 7,
-          clearance: 0.25
-        }
-      }
-    }
-  }
-  return undefined
-}
-
-function findContainingGroup(engine: LayoutEngine, worldX: number, worldY: number): string | null {
-  const groups = engine.getAllGroups()
-  for (const group of groups) {
-    if (!isBinGroup(group)) continue
-    if (
-      worldX >= group.x &&
-      worldX <= group.x + group.width &&
-      worldY <= group.y &&
-      worldY >= group.y - group.height
-    ) {
-      return group.id
+      return group
     }
   }
   return null
+}
+
+function pocketMetadata(
+  bin: (LayoutGroup & { metadata: BinMetadata }) | null
+): Record<string, unknown> | undefined {
+  if (!bin) return undefined
+  return {
+    pocket: {
+      depth: computeDefaultPocketDepth(bin.metadata.heightUnits, 7),
+      clearance: 0.25
+    }
+  }
 }
 
 // ─── Drawing state (shared across tools) ────────────────────────────────────
@@ -216,7 +209,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length
       const relativePoints = pts.map((p) => ({ x: p.x - cx, y: p.y - cy }))
 
-      const groupId = findContainingGroup(engine, cx, cy)
+      const bin = findContainingBinGroup(engine, cx, cy)
       const id = crypto.randomUUID()
       const name = nextShapeName(engine, 'polygon')
 
@@ -227,8 +220,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         y: cy,
         points: relativePoints,
         ...baseShapeProps(),
-        groupId,
-        metadata: { ...pocketMetadata(engine, cx, cy), name }
+        groupId: bin?.id ?? null,
+        metadata: { ...pocketMetadata(bin), name }
       })
       engine.select([id])
       setState(INITIAL_STATE)
@@ -359,8 +352,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             height: h
           } as Partial<LayoutShape>)
         } else {
-          const dx = world.x - start.x
-          const dy = world.y - start.y
+          const dx = snapped.x - start.x
+          const dy = snapped.y - start.y
           const radius = Math.sqrt(dx * dx + dy * dy)
           engine.updateShape(previewIdRef.current, {
             radiusX: radius,
@@ -411,7 +404,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           const y = Math.min(start.y, snapped.y)
           const cx = x + w / 2
           const cy = y + h / 2
-          const groupId = findContainingGroup(engine, cx, cy)
+          const bin = findContainingBinGroup(engine, cx, cy)
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'rect')
           engine.addShape({
@@ -422,18 +415,18 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             width: w,
             height: h,
             ...baseShapeProps(),
-            groupId,
-            metadata: { ...pocketMetadata(engine, cx, cy), name }
+            groupId: bin?.id ?? null,
+            metadata: { ...pocketMetadata(bin), name }
           })
           engine.select([id])
           setActiveTool('select')
         }
       } else {
-        const dx = world.x - start.x
-        const dy = world.y - start.y
+        const dx = snapped.x - start.x
+        const dy = snapped.y - start.y
         const radius = Math.sqrt(dx * dx + dy * dy)
         if (radius > 2) {
-          const groupId = findContainingGroup(engine, start.x, start.y)
+          const bin = findContainingBinGroup(engine, start.x, start.y)
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'circle')
           engine.addShape({
@@ -444,8 +437,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             radiusX: radius,
             radiusY: radius,
             ...baseShapeProps(),
-            groupId,
-            metadata: { ...pocketMetadata(engine, start.x, start.y), name }
+            groupId: bin?.id ?? null,
+            metadata: { ...pocketMetadata(bin), name }
           })
           engine.select([id])
           setActiveTool('select')
