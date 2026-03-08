@@ -99,8 +99,6 @@ export class KonvaEngine implements LayoutEngine {
   private groupMap = new Map<string, LayoutGroup>()
   private konvaGroupMap = new Map<string, Konva.Group>()
   private gridConfig: GridConfig = { size: 42, enabled: true, visible: true }
-  /** Per-frame guard: prevents multiple dragmove handlers from double-snapping */
-  private snapAppliedThisFrame = false
   private themeColors = {
     background: DEFAULT_BG,
     grid: DEFAULT_GRID_COLOR,
@@ -242,23 +240,7 @@ export class KonvaEngine implements LayoutEngine {
     node.on('dragmove', () => {
       if (!this.gridConfig.enabled) return
       const selectedNodes = this.transformer?.nodes() ?? []
-
-      if (selectedNodes.length > 1) {
-        // Per-frame guard for multi-select snap
-        if (this.snapAppliedThisFrame) return
-        this.snapAppliedThisFrame = true
-        requestAnimationFrame(() => {
-          this.snapAppliedThisFrame = false
-        })
-        const size = this.gridConfig.size
-        const dx = Math.round(node.x() / size) * size - node.x()
-        const dy = Math.round(node.y() / size) * size - node.y()
-        for (const n of selectedNodes) {
-          n.position({ x: n.x() + dx, y: n.y() + dy })
-        }
-        this.transformer?.forceUpdate()
-        return
-      }
+      if (selectedNodes.length > 1) return // defer to dragend
 
       const size = this.gridConfig.size
       node.position({
@@ -498,40 +480,13 @@ export class KonvaEngine implements LayoutEngine {
     konvaGroup.add(bgRect)
 
     // Snap group lower-left corner to grid during drag.
-    // Multi-select: use per-frame guard so only ONE handler applies snap,
-    // preventing double-snap drift from multiple dragmove events.
+    // Multi-select: skip live snap — Konva's Transformer fights per-node
+    // corrections causing drift. Each bin snaps on dragend instead.
     konvaGroup.on('dragmove', () => {
       if (!this.gridConfig.enabled) return
-
       const selectedNodes = this.transformer?.nodes() ?? []
-      if (selectedNodes.length > 1) {
-        // Per-frame guard: first handler to run computes snap for all
-        if (this.snapAppliedThisFrame) return
-        this.snapAppliedThisFrame = true
-        requestAnimationFrame(() => {
-          this.snapAppliedThisFrame = false
-        })
+      if (selectedNodes.length > 1) return
 
-        // Compute snap delta from THIS group's lower-left corner
-        const size = this.gridConfig.size
-        const g = this.groupMap.get(group.id)
-        if (!g) return
-        const halfW = g.width / 2
-        const halfH = g.height / 2
-        const lowerLeftX = konvaGroup.x() - halfW
-        const lowerLeftY = konvaGroup.y() + halfH
-        const dx = Math.round(lowerLeftX / size) * size - lowerLeftX
-        const dy = Math.round(lowerLeftY / size) * size - lowerLeftY
-
-        // Apply uniform delta to all selected nodes
-        for (const n of selectedNodes) {
-          n.position({ x: n.x() + dx, y: n.y() + dy })
-        }
-        this.transformer?.forceUpdate()
-        return
-      }
-
-      // Single select: snap directly
       const size = this.gridConfig.size
       const g = this.groupMap.get(group.id)
       if (!g) return
