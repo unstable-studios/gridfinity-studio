@@ -28,14 +28,13 @@ describe('project-handler', () => {
       expect(project.settings.modifiedAt).toBeTruthy()
     })
 
-    it('returns project with empty collections', () => {
+    it('returns project with layout snapshot', () => {
       const result = newProject()
       const project = result.data!
 
-      expect(project.entities).toEqual([])
-      expect(project.groups).toEqual([])
-      expect(project.generators).toEqual([])
-      expect(project.bins).toEqual([])
+      expect(project.layoutSnapshot).toBeDefined()
+      expect(project.layoutSnapshot.shapes).toEqual([])
+      expect(project.layoutSnapshot.groups).toEqual([])
     })
 
     it('returns project with default gridfinity config', () => {
@@ -100,13 +99,8 @@ describe('project-handler', () => {
       expect(result.success).toBe(false)
     })
 
-    it('returns failure for invalid entity', () => {
-      const project = createEmptyProject()
-      const invalid = {
-        ...project,
-        entities: [{ type: 'circle', id: 'test', name: 'bad circle' }]
-      }
-      const result = validateProjectData(invalid)
+    it('returns failure for missing settings', () => {
+      const result = validateProjectData({ schemaVersion: '0.5.0' })
 
       expect(result.success).toBe(false)
     })

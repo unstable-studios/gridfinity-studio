@@ -6,7 +6,6 @@ import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 import { useTheme } from '@unstable-studios/ui'
 import { resolveColors, type CanvasThemeColors } from '@/lib/theme-config'
 import type { BakeResult } from '@/hooks/useProject'
-import type { Bin } from '../../../../shared/types/project'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
@@ -20,13 +19,11 @@ interface BakedMeshData {
 
 interface ReviewCanvasProps {
   bakeResults: Map<string, BakeResult>
-  bins: Bin[]
   baseUnit: number
 }
 
 interface SceneProps {
   bakeResults: Map<string, BakeResult>
-  bins: Bin[]
   baseUnit: number
   debugColors: boolean
   wireframe: boolean
@@ -35,8 +32,6 @@ interface SceneProps {
 
 function ReviewScene({
   bakeResults,
-  bins,
-  baseUnit,
   debugColors,
   wireframe,
   colors
@@ -100,24 +95,15 @@ function ReviewScene({
       />
 
       {bakeResults.size > 0 ? (
-        bins.map((bin) => {
-          const result = bakeResults.get(bin.id)
-          if (!result) return null
-          // Position each bin mesh at its canvas position
-          // CSG mesh is centered at origin, so offset by bin center
-          const cx = bin.position.x + (bin.width * baseUnit) / 2
-          const cy = bin.position.y + (bin.depth * baseUnit) / 2
-          return (
-            <BakedMeshPreview
-              key={bin.id}
-              mesh={result.mesh}
-              debugColors={debugColors}
-              wireframe={wireframe}
-              meshColor={colors.meshColor}
-              position={[cx, 0, -cy]}
-            />
-          )
-        })
+        [...bakeResults.values()].map((result, i) => (
+          <BakedMeshPreview
+            key={i}
+            mesh={result.mesh}
+            debugColors={debugColors}
+            wireframe={wireframe}
+            meshColor={colors.meshColor}
+          />
+        ))
       ) : (
         <EmptyState color={colors.emptyState} />
       )}
@@ -189,7 +175,6 @@ function EmptyState({ color }: { color: string }): React.JSX.Element {
 
 export default function ReviewCanvas({
   bakeResults,
-  bins,
   baseUnit
 }: ReviewCanvasProps): React.JSX.Element {
   const { debugColors, wireframe } = useReviewPrefs()
@@ -209,7 +194,6 @@ export default function ReviewCanvas({
         <fog attach="fog" args={[colors.reviewFog, 500, 900]} />
         <ReviewScene
           bakeResults={bakeResults}
-          bins={bins}
           baseUnit={baseUnit}
           debugColors={debugColors}
           wireframe={wireframe}

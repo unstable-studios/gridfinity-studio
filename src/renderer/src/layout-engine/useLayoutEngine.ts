@@ -18,14 +18,18 @@ export function useLayoutEngine(): LayoutEngine | null {
 interface EngineState {
   selectedIds: string[]
   viewport: ViewportState
+  /** Monotonic tick that increments on any engine mutation (group/shape change) */
+  tick: number
 }
 
 export function useEngineState(): EngineState {
   const { engine } = useLayoutEngineContext()
   const stateRef = useRef<EngineState>({
     selectedIds: [],
-    viewport: { panX: 0, panY: 0, zoom: 1 }
+    viewport: { panX: 0, panY: 0, zoom: 1 },
+    tick: 0
   })
+  const tickRef = useRef(0)
 
   const subscribe = useCallback(
     (onStoreChange: () => void) => {
@@ -33,17 +37,30 @@ export function useEngineState(): EngineState {
 
       const unsubs: (() => void)[] = []
 
-      const events: (keyof EngineEventMap)[] = [
-        'selectionChanged',
-        'viewportChanged',
+      // Events that change selection/viewport — checked in getSnapshot
+      const stateEvents: (keyof EngineEventMap)[] = ['selectionChanged', 'viewportChanged']
+
+      // Mutation events — always bump tick so dependents re-read engine data
+      const mutationEvents: (keyof EngineEventMap)[] = [
         'shapeMoved',
         'shapeResized',
         'shapeCreated',
-        'shapeDeleted'
+        'shapeDeleted',
+        'groupChanged',
+        'groupMoved'
       ]
 
-      for (const event of events) {
+      for (const event of stateEvents) {
         unsubs.push(engine.on(event, onStoreChange))
+      }
+
+      for (const event of mutationEvents) {
+        unsubs.push(
+          engine.on(event, () => {
+            tickRef.current++
+            onStoreChange()
+          })
+        )
       }
 
       return () => {
@@ -58,12 +75,14 @@ export function useEngineState(): EngineState {
 
     const newState: EngineState = {
       selectedIds: engine.getSelectedIds(),
-      viewport: engine.getViewport()
+      viewport: engine.getViewport(),
+      tick: tickRef.current
     }
 
     // Only return a new object if something actually changed
     const prev = stateRef.current
     if (
+      prev.tick === newState.tick &&
       prev.selectedIds.length === newState.selectedIds.length &&
       prev.selectedIds.every((id, i) => id === newState.selectedIds[i]) &&
       prev.viewport.panX === newState.viewport.panX &&

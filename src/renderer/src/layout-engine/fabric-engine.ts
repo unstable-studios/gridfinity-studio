@@ -186,6 +186,12 @@ export class FabricEngine implements LayoutEngine {
     this.setupPanZoom()
     this.setupSnapToGrid()
 
+    // Center origin in viewport
+    const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
+    vpt[4] = width / 2
+    vpt[5] = height / 2
+    this.canvas.setViewportTransform(vpt)
+
     this.resizeObserver = new ResizeObserver((entries) => {
       if (this.disposed || !this.canvas) return
       for (const entry of entries) {
@@ -331,8 +337,24 @@ export class FabricEngine implements LayoutEngine {
     if (this.disposed) return
     this.groupMap.set(group.id, { ...group })
 
+    // Background rect for the group (makes it visible even when empty)
+    const bgRect = new fabric.Rect({
+      left: -group.width / 2,
+      top: -group.height / 2,
+      width: group.width,
+      height: group.height,
+      fill: group.style.fill,
+      stroke: group.style.stroke,
+      strokeWidth: group.style.strokeWidth,
+      rx: group.style.cornerRadius ?? 0,
+      ry: group.style.cornerRadius ?? 0,
+      selectable: false,
+      evented: false
+    })
+    ;(bgRect as unknown as Record<string, unknown>).__groupBg = true
+
     // Collect fabric objects for children
-    const children: fabric.FabricObject[] = []
+    const children: fabric.FabricObject[] = [bgRect]
     for (const childId of group.childIds) {
       const obj = this.fabricMap.get(childId)
       if (obj) {
@@ -346,17 +368,35 @@ export class FabricEngine implements LayoutEngine {
       }
     }
 
+    // Data x,y = lower-left corner; Fabric uses centroid (originX/Y: 'center')
+    const centroidX = group.x + group.width / 2
+    const centroidY = group.y - group.height / 2
+
     const fabricGroup = new fabric.Group(children, {
-      left: group.x,
-      top: group.y,
+      left: centroidX,
+      top: centroidY,
+      width: group.width,
+      height: group.height,
       subTargetCheck: true,
-      interactive: true
+      interactive: true,
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      hasBorders: true,
+      hasControls: false,
+      borderColor: '#60a5fa',
+      borderDashArray: [4, 3],
+      borderScaleFactor: 1.5,
+      padding: 2,
+      originX: 'center',
+      originY: 'center'
     })
     ;(fabricGroup as unknown as Record<string, unknown>)[GROUP_DATA_KEY] = group.id
 
     this.fabricGroupMap.set(group.id, fabricGroup)
     this.canvas?.add(fabricGroup)
     this.canvas?.requestRenderAll()
+    this.emitter.emit('groupChanged', { groupId: group.id, childIds: [...group.childIds] })
   }
 
   updateGroup(id: string, patch: Partial<LayoutGroup>): void {
@@ -369,12 +409,49 @@ export class FabricEngine implements LayoutEngine {
     const fabricGroup = this.fabricGroupMap.get(id)
     if (!fabricGroup) return
 
-    if (patch.x !== undefined) fabricGroup.set('left', patch.x)
-    if (patch.y !== undefined) fabricGroup.set('top', patch.y)
     if (patch.rotation !== undefined) fabricGroup.set('angle', patch.rotation)
+
+    // Update background rect if width/height/style changed
+    if (patch.width !== undefined || patch.height !== undefined || patch.style !== undefined) {
+      const bgRect = fabricGroup
+        .getObjects()
+        .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+      if (bgRect) {
+        if (patch.width !== undefined) {
+          bgRect.set('width', group.width)
+          bgRect.set('left', -group.width / 2)
+        }
+        if (patch.height !== undefined) {
+          bgRect.set('height', group.height)
+          bgRect.set('top', -group.height / 2)
+        }
+        if (patch.style) {
+          bgRect.set('fill', group.style.fill)
+          bgRect.set('stroke', group.style.stroke)
+          bgRect.set('strokeWidth', group.style.strokeWidth)
+          bgRect.set('rx', group.style.cornerRadius ?? 0)
+          bgRect.set('ry', group.style.cornerRadius ?? 0)
+        }
+      }
+      // Force Fabric to recalculate group bounding box from children
+      fabricGroup.triggerLayout()
+    }
+
+    // Set centroid position AFTER triggerLayout so it doesn't get overridden
+    // Data x,y = lower-left corner → Fabric left/top = centroid
+    if (
+      patch.x !== undefined ||
+      patch.y !== undefined ||
+      patch.width !== undefined ||
+      patch.height !== undefined
+    ) {
+      fabricGroup.set('left', group.x + group.width / 2)
+      fabricGroup.set('top', group.y - group.height / 2)
+    }
 
     fabricGroup.setCoords()
     this.canvas?.requestRenderAll()
+    this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
   }
 
   removeGroup(id: string): void {
@@ -384,9 +461,10 @@ export class FabricEngine implements LayoutEngine {
 
     const fabricGroup = this.fabricGroupMap.get(id)
     if (fabricGroup && this.canvas) {
-      // Ungroup: move children back to canvas at world-space positions
+      // Ungroup: move child shapes back to canvas, skip internal bg rect
       const items = [...fabricGroup.getObjects()]
       for (const item of items) {
+        if ((item as unknown as Record<string, unknown>).__groupBg) continue
         const matrix = item.calcTransformMatrix()
         const point = new fabric.Point(matrix[4], matrix[5])
         fabricGroup.remove(item)
@@ -406,6 +484,7 @@ export class FabricEngine implements LayoutEngine {
     this.groupMap.delete(id)
     this.fabricGroupMap.delete(id)
     this.canvas?.requestRenderAll()
+    this.emitter.emit('groupChanged', { groupId: id, childIds: [] })
   }
 
   addToGroup(shapeId: string, groupId: string): void {
@@ -454,11 +533,24 @@ export class FabricEngine implements LayoutEngine {
 
   getGroup(id: string): LayoutGroup | undefined {
     const group = this.groupMap.get(id)
-    return group ? { ...group } : undefined
+    if (!group) return undefined
+    const fabricGroup = this.fabricGroupMap.get(id)
+    if (fabricGroup) {
+      // Fabric centroid → data lower-left corner
+      const centroidX = fabricGroup.left ?? 0
+      const centroidY = fabricGroup.top ?? 0
+      return {
+        ...group,
+        x: centroidX - group.width / 2,
+        y: centroidY + group.height / 2,
+        rotation: fabricGroup.angle ?? group.rotation
+      }
+    }
+    return { ...group }
   }
 
   getAllGroups(): LayoutGroup[] {
-    return Array.from(this.groupMap.values()).map((g) => ({ ...g }))
+    return Array.from(this.groupMap.keys()).map((id) => this.getGroup(id)!)
   }
 
   // ─── Selection ──────────────────────────────────────────────────────────────
@@ -468,7 +560,7 @@ export class FabricEngine implements LayoutEngine {
     this.canvas.discardActiveObject()
 
     const objects = ids
-      .map((id) => this.fabricMap.get(id))
+      .map((id) => this.fabricMap.get(id) ?? this.fabricGroupMap.get(id))
       .filter((o): o is fabric.FabricObject => o !== undefined)
 
     if (objects.length === 1) {
@@ -504,11 +596,15 @@ export class FabricEngine implements LayoutEngine {
     if (active instanceof fabric.ActiveSelection) {
       return active
         .getObjects()
-        .map((o) => (o as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string)
+        .map((o) => {
+          const rec = o as unknown as Record<string, unknown>
+          return (rec[SHAPE_DATA_KEY] as string) || (rec[GROUP_DATA_KEY] as string)
+        })
         .filter(Boolean)
     }
 
-    const id = (active as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
+    const rec = active as unknown as Record<string, unknown>
+    const id = (rec[SHAPE_DATA_KEY] as string) || (rec[GROUP_DATA_KEY] as string)
     return id ? [id] : []
   }
 
@@ -542,9 +638,11 @@ export class FabricEngine implements LayoutEngine {
 
   resetView(): void {
     if (this.disposed || !this.canvas) return
-    this.canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
+    const w = this.canvas.getWidth()
+    const h = this.canvas.getHeight()
+    this.canvas.setViewportTransform([1, 0, 0, 1, w / 2, h / 2])
     this.canvas.requestRenderAll()
-    this.emitter.emit('viewportChanged', { panX: 0, panY: 0, zoom: 1 })
+    this.emitter.emit('viewportChanged', { panX: -w / 2, panY: -h / 2, zoom: 1 })
   }
 
   getViewport(): ViewportState {
@@ -665,6 +763,8 @@ export class FabricEngine implements LayoutEngine {
     const size = this.gridConfig.size
     const sub = size / 4
     const { grid, gridOrigin } = this.themeColors
+    const startMajor = Math.ceil(-GRID_EXTENT / size) * size
+    const startSub = Math.ceil(-GRID_EXTENT / sub) * sub
 
     const addLine = (
       coords: [number, number, number, number],
@@ -684,27 +784,27 @@ export class FabricEngine implements LayoutEngine {
       this.canvas!.sendObjectToBack(line)
     }
 
-    // Subdivision lines
-    for (let x = -GRID_EXTENT; x <= GRID_EXTENT; x += sub) {
-      if (x % size === 0) continue
+    // Subdivision lines — start from aligned position
+    for (let x = startSub; x <= GRID_EXTENT; x += sub) {
+      if (Math.abs(x % size) < 0.001) continue
       addLine([x, -GRID_EXTENT, x, GRID_EXTENT], grid, 0.25)
     }
-    for (let y = -GRID_EXTENT; y <= GRID_EXTENT; y += sub) {
-      if (y % size === 0) continue
+    for (let y = startSub; y <= GRID_EXTENT; y += sub) {
+      if (Math.abs(y % size) < 0.001) continue
       addLine([-GRID_EXTENT, y, GRID_EXTENT, y], grid, 0.25)
     }
 
-    // Major grid lines
-    for (let x = -GRID_EXTENT; x <= GRID_EXTENT; x += size) {
+    // Major grid lines — start from aligned position
+    for (let x = startMajor; x <= GRID_EXTENT; x += size) {
       if (x === 0) continue
       addLine([x, -GRID_EXTENT, x, GRID_EXTENT], grid, 0.5)
     }
-    for (let y = -GRID_EXTENT; y <= GRID_EXTENT; y += size) {
+    for (let y = startMajor; y <= GRID_EXTENT; y += size) {
       if (y === 0) continue
       addLine([-GRID_EXTENT, y, GRID_EXTENT, y], grid, 0.5)
     }
 
-    // Origin crosshair
+    // Origin crosshair stays at exact 0,0
     addLine([0, -GRID_EXTENT, 0, GRID_EXTENT], gridOrigin, 1.5)
     addLine([-GRID_EXTENT, 0, GRID_EXTENT, 0], gridOrigin, 1.5)
   }
@@ -720,16 +820,33 @@ export class FabricEngine implements LayoutEngine {
 
   // ─── Private: Event handlers ────────────────────────────────────────────────
 
+  /** Disable scaling/rotation on Fabric's ActiveSelection (multi-select frame) */
+  private lockActiveSelection(): void {
+    if (!this.canvas) return
+    const active = this.canvas.getActiveObject()
+    if (!active || !(active instanceof fabric.ActiveSelection)) return
+
+    // Lock the multi-select frame — it shouldn't scale/rotate individual objects
+    active.set({
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      hasControls: false
+    })
+  }
+
   private setupEventHandlers(): void {
     if (!this.canvas) return
 
     this.canvas.on('selection:created', () => {
       if (this.disposed) return
+      this.lockActiveSelection()
       this.emitter.emit('selectionChanged', { ids: this.getSelectedIds() })
     })
 
     this.canvas.on('selection:updated', () => {
       if (this.disposed) return
+      this.lockActiveSelection()
       this.emitter.emit('selectionChanged', { ids: this.getSelectedIds() })
     })
 
@@ -766,21 +883,37 @@ export class FabricEngine implements LayoutEngine {
       if (this.disposed) return
       const obj = e.target
       if (!obj) return
-      const id = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
-      if (!id) return
 
-      this.emitter.emit('shapeMoved', { id, x: obj.left ?? 0, y: obj.top ?? 0 })
+      const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
+      if (shapeId) {
+        this.emitter.emit('shapeMoved', { id: shapeId, x: obj.left ?? 0, y: obj.top ?? 0 })
 
-      // Emit shapeResized with current dimensions
-      const data = this.shapeMap.get(id)
-      if (data) {
-        const shape = fabricObjToLayoutShape(obj, data)
-        const resizePayload: EngineEventMap['shapeResized'] = { id }
-        if ('width' in shape) resizePayload.width = shape.width
-        if ('height' in shape) resizePayload.height = shape.height
-        if ('radiusX' in shape) resizePayload.radiusX = shape.radiusX
-        if ('radiusY' in shape) resizePayload.radiusY = shape.radiusY
-        this.emitter.emit('shapeResized', resizePayload)
+        // Emit shapeResized with current dimensions
+        const data = this.shapeMap.get(shapeId)
+        if (data) {
+          const shape = fabricObjToLayoutShape(obj, data)
+          const resizePayload: EngineEventMap['shapeResized'] = { id: shapeId }
+          if ('width' in shape) resizePayload.width = shape.width
+          if ('height' in shape) resizePayload.height = shape.height
+          if ('radiusX' in shape) resizePayload.radiusX = shape.radiusX
+          if ('radiusY' in shape) resizePayload.radiusY = shape.radiusY
+          this.emitter.emit('shapeResized', resizePayload)
+        }
+      }
+
+      const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (groupId) {
+        const group = this.groupMap.get(groupId)
+        if (group) {
+          // Fabric centroid → data lower-left corner
+          group.x = (obj.left ?? 0) - group.width / 2
+          group.y = (obj.top ?? 0) + group.height / 2
+        }
+        this.emitter.emit('groupMoved', {
+          id: groupId,
+          x: group?.x ?? 0,
+          y: group?.y ?? 0
+        })
       }
     })
 
@@ -802,9 +935,63 @@ export class FabricEngine implements LayoutEngine {
       const obj = e.target
       if (!obj) return
       const size = this.gridConfig.size
-      const left = Math.round((obj.left ?? 0) / size) * size
-      const top = Math.round((obj.top ?? 0) / size) * size
-      obj.set({ left, top })
+
+      // Multi-select (ActiveSelection): snap based on first group's lower-left corner.
+      // Using the frame center would cause half-grid snapping when the combined
+      // frame width is an odd number of grid units.
+      if (obj instanceof fabric.ActiveSelection) {
+        const children = obj.getObjects()
+        const firstGroupObj = children.find(
+          (o) => (o as unknown as Record<string, unknown>)[GROUP_DATA_KEY]
+        )
+        if (firstGroupObj) {
+          const gid = (firstGroupObj as unknown as Record<string, unknown>)[
+            GROUP_DATA_KEY
+          ] as string
+          const group = this.groupMap.get(gid)
+          if (group) {
+            // Child left/top is relative to ActiveSelection center.
+            // World centroid = selectionCenter + childOffset
+            const worldCentroidX = (obj.left ?? 0) + (firstGroupObj.left ?? 0)
+            const worldCentroidY = (obj.top ?? 0) + (firstGroupObj.top ?? 0)
+            const lowerLeftX = worldCentroidX - group.width / 2
+            const lowerLeftY = worldCentroidY + group.height / 2
+            const dx = Math.round(lowerLeftX / size) * size - lowerLeftX
+            const dy = Math.round(lowerLeftY / size) * size - lowerLeftY
+            obj.set({ left: (obj.left ?? 0) + dx, top: (obj.top ?? 0) + dy })
+          }
+        } else {
+          // No groups — snap frame center
+          obj.set({
+            left: Math.round((obj.left ?? 0) / size) * size,
+            top: Math.round((obj.top ?? 0) / size) * size
+          })
+        }
+        obj.setCoords()
+        return
+      }
+
+      const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (groupId) {
+        // Snap group lower-left corner to grid.
+        // obj.left/top is the centroid (Fabric center origin).
+        // Lower-left = (centroidX - halfW, centroidY + halfH).
+        const group = this.groupMap.get(groupId)
+        if (group) {
+          const halfW = group.width / 2
+          const halfH = group.height / 2
+          const lowerLeftX = (obj.left ?? 0) - halfW
+          const lowerLeftY = (obj.top ?? 0) + halfH
+          const snappedX = Math.round(lowerLeftX / size) * size
+          const snappedY = Math.round(lowerLeftY / size) * size
+          obj.set({ left: snappedX + halfW, top: snappedY - halfH })
+        }
+      } else {
+        // Snap shape center to grid
+        const left = Math.round((obj.left ?? 0) / size) * size
+        const top = Math.round((obj.top ?? 0) / size) * size
+        obj.set({ left, top })
+      }
       obj.setCoords()
     })
   }

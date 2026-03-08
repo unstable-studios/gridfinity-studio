@@ -56,15 +56,51 @@ export interface GroupStyle {
   cornerRadius?: number
 }
 
+/**
+ * Layout group (bin container).
+ *
+ * **Coordinate convention**: `x, y` is the **lower-left corner** in screen
+ * space (smallest x, largest y). The bin extends rightward (+x) by `width`
+ * and upward (−y) by `height`.
+ *
+ * Centroid (when needed): `(x + width/2, y − height/2)`.
+ */
 export interface LayoutGroup {
   id: string
+  /** X of lower-left corner */
   x: number
+  /** Y of lower-left corner (largest y — bottom in screen coords) */
   y: number
   width: number
   height: number
   rotation: number
   childIds: string[]
   style: GroupStyle
+  metadata?: Record<string, unknown>
+}
+
+// ─── Bin Metadata (stored in LayoutGroup.metadata) ──────────────────────────
+
+export interface BinMetadata extends Record<string, unknown> {
+  widthUnits: number
+  depthUnits: number
+  heightUnits: number
+  hasLip: boolean
+  name?: string
+}
+
+/**
+ * Type guard: checks if a group's metadata contains BinMetadata fields.
+ */
+export function isBinGroup(group: LayoutGroup): group is LayoutGroup & { metadata: BinMetadata } {
+  const m = group.metadata as Record<string, unknown> | undefined
+  return (
+    m !== undefined &&
+    typeof m.widthUnits === 'number' &&
+    typeof m.depthUnits === 'number' &&
+    typeof m.heightUnits === 'number' &&
+    typeof m.hasLip === 'boolean'
+  )
 }
 
 // ─── Grid ───────────────────────────────────────────────────────────────────
@@ -114,5 +150,6 @@ export type EngineEventMap = {
   shapeCreated: { shape: LayoutShape }
   shapeDeleted: { id: string }
   groupChanged: { groupId: string; childIds: string[] }
+  groupMoved: { id: string; x: number; y: number }
   viewportChanged: { panX: number; panY: number; zoom: number }
 }

@@ -157,8 +157,10 @@ describe('export3MF — vertex and triangle counts', () => {
     // For non-indexed input the writer must emit sequential indices because
     // vertices are stored one-per-triangle-corner.
     const geo = makeGeometry([
-      0, 0, 0, 1, 0, 0, 0, 1, 0, // triangle 0
-      2, 0, 0, 3, 0, 0, 2, 1, 0, // triangle 1
+      // triangle 0
+      0, 0, 0, 1, 0, 0, 0, 1, 0,
+      // triangle 1
+      2, 0, 0, 3, 0, 0, 2, 1, 0
     ])
     const zip = await unzip(await export3MF(geo))
     const xml = await readEntry(zip, '3D/3dmodel.model')
