@@ -238,14 +238,23 @@ export class KonvaEngine implements LayoutEngine {
     this.konvaMap.set(shape.id, node)
 
     node.on('dragmove', () => {
-      if (this.gridConfig.enabled) {
-        const size = this.gridConfig.size
-        node.position({
-          x: Math.round(node.x() / size) * size,
-          y: Math.round(node.y() / size) * size
-        })
-        this.transformer?.forceUpdate()
+      if (!this.gridConfig.enabled) return
+      const size = this.gridConfig.size
+      const snappedX = Math.round(node.x() / size) * size
+      const snappedY = Math.round(node.y() / size) * size
+      const dx = snappedX - node.x()
+      const dy = snappedY - node.y()
+
+      // If multi-selected, apply the same snap delta to all selected nodes
+      const selectedNodes = this.transformer?.nodes() ?? []
+      if (selectedNodes.length > 1) {
+        for (const n of selectedNodes) {
+          n.position({ x: n.x() + dx, y: n.y() + dy })
+        }
+      } else {
+        node.position({ x: snappedX, y: snappedY })
       }
+      this.transformer?.forceUpdate()
     })
 
     node.on('dragend', () => {
@@ -465,24 +474,30 @@ export class KonvaEngine implements LayoutEngine {
     })
     konvaGroup.add(bgRect)
 
-    // Snap group to grid during drag
+    // Snap group to grid during drag (edge-based snap)
     konvaGroup.on('dragmove', () => {
-      if (this.gridConfig.enabled) {
-        const size = this.gridConfig.size
-        const g = this.groupMap.get(group.id)
-        if (g) {
-          const halfW = g.width / 2
-          const halfH = g.height / 2
-          konvaGroup.position({
-            x: Math.round((konvaGroup.x() - halfW) / size) * size + halfW,
-            y: Math.round((konvaGroup.y() - halfH) / size) * size + halfH
-          })
-          // Force transformer to follow the snapped position
-          if (this.transformer) {
-            this.transformer.forceUpdate()
-          }
+      if (!this.gridConfig.enabled) return
+      const size = this.gridConfig.size
+      const g = this.groupMap.get(group.id)
+      if (!g) return
+
+      const halfW = g.width / 2
+      const halfH = g.height / 2
+      const snappedX = Math.round((konvaGroup.x() - halfW) / size) * size + halfW
+      const snappedY = Math.round((konvaGroup.y() - halfH) / size) * size + halfH
+      const dx = snappedX - konvaGroup.x()
+      const dy = snappedY - konvaGroup.y()
+
+      // If multi-selected, apply the same snap delta to all selected nodes
+      const selectedNodes = this.transformer?.nodes() ?? []
+      if (selectedNodes.length > 1) {
+        for (const n of selectedNodes) {
+          n.position({ x: n.x() + dx, y: n.y() + dy })
         }
+      } else {
+        konvaGroup.position({ x: snappedX, y: snappedY })
       }
+      this.transformer?.forceUpdate()
     })
 
     // Emit event when group drag ends
