@@ -7,12 +7,15 @@ import {
   LayoutEngineProvider,
   LayoutEngineCanvas,
   useLayoutEngineContext,
+  useEngineUndoRedo,
   useEngineState,
   useProjectEngineSync,
   useBinArtwork
 } from '@/layout-engine'
 import DrawingToolLayer from './DrawingToolLayer'
 import HintCard from './HintCard'
+
+const MOD_KEY = navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'
 
 // ─── Sandbox helpers (only used in sandbox mode) ────────────────────────────
 
@@ -39,7 +42,9 @@ const STAR_PATH =
 
 function LayoutViewport(): React.JSX.Element {
   const { engine } = useLayoutEngineContext()
-  const { canUndo, canRedo } = useUndoRedo()
+  useEngineUndoRedo(engine) // syncs canUndo/canRedo to useUndoRedo store
+  const canUndo = useUndoRedo((s) => s.canUndo)
+  const canRedo = useUndoRedo((s) => s.canRedo)
   const { tick } = useEngineState()
   useProjectEngineSync()
 
@@ -85,7 +90,7 @@ function LayoutViewport(): React.JSX.Element {
   return (
     <>
       <div className={statusClass}>
-        {canUndo ? 'Ctrl+Z undo' : ''} {canRedo ? '| Ctrl+Shift+Z redo' : ''}
+        {canUndo ? `${MOD_KEY}+Z undo` : ''} {canRedo ? `| ${MOD_KEY}+Shift+Z redo` : ''}
       </div>
     </>
   )

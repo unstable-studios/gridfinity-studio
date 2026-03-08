@@ -1,21 +1,17 @@
-import { createContext, useContext } from 'react'
+import { create } from 'zustand'
 
-export interface UndoRedoState {
-  undo: () => void
-  redo: () => void
+interface UndoRedoStore {
   canUndo: boolean
   canRedo: boolean
+  undo: () => void
+  redo: () => void
 }
 
 const noop = (): void => {}
 
-export const UndoRedoCtx = createContext<UndoRedoState>({
-  undo: noop,
-  redo: noop,
+export const useUndoRedo = create<UndoRedoStore>()(() => ({
   canUndo: false,
-  canRedo: false
-})
-
-export function useUndoRedo(): UndoRedoState {
-  return useContext(UndoRedoCtx)
-}
+  canRedo: false,
+  undo: noop,
+  redo: noop
+}))

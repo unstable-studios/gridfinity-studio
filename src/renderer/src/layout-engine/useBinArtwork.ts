@@ -92,6 +92,19 @@ export function useBinArtwork(
   const prevKeysRef = useRef<Map<string, string>>(new Map())
   const prevEngineRef = useRef<LayoutEngine | null>(null)
 
+  // Clear cache when groups are removed (e.g. during loadSnapshot/undo).
+  // loadSnapshot removes all groups then recreates them — without this,
+  // the cache sees identical keys and skips re-applying decorations to
+  // the new canvas objects.
+  useEffect(() => {
+    if (!engine) return
+    return engine.on('groupChanged', ({ childIds }) => {
+      if (childIds.length === 0) {
+        prevKeysRef.current = new Map()
+      }
+    })
+  }, [engine])
+
   useEffect(() => {
     // Reset cache when engine instance changes (e.g., engine switch)
     if (engine !== prevEngineRef.current) {

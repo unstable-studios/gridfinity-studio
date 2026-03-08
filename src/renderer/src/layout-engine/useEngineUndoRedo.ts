@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useUndoRedo } from '@/hooks/useUndoRedo'
 import type { LayoutEngine } from './interface'
 
 const MAX_UNDO = 50
@@ -8,6 +9,9 @@ const MAX_UNDO = 50
  *
  * Maintains an undo stack of JSON-serialized snapshots, debounce-pushes
  * on shape events, and provides undo/redo callbacks + keyboard shortcuts.
+ *
+ * Also syncs canUndo/canRedo/undo/redo to the useUndoRedo zustand store
+ * so the Navbar and other distant consumers can read undo/redo state.
  */
 export function useEngineUndoRedo(engine: LayoutEngine | null): {
   undo: () => void
@@ -57,6 +61,11 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     syncCounts()
     isUndoingRef.current = false
   }, [engine, syncCounts])
+
+  // Sync state to zustand store so Navbar can read it
+  useEffect(() => {
+    useUndoRedo.setState({ canUndo, canRedo, undo, redo })
+  }, [canUndo, canRedo, undo, redo])
 
   // Initialize baseline snapshot when engine mounts
   useEffect(() => {
