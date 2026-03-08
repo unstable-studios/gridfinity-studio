@@ -29,21 +29,25 @@ function screenToWorld(
   }
 }
 
-// ─── Grid snap helper ───────────────────────────────────────────────────────
+// ─── Shape snap grid ────────────────────────────────────────────────────────
+// Shapes snap to a finer grid than bins. Default: no snap (free draw).
+// Hold Shift for fine snap (1mm). This is separate from the engine's bin grid.
 
-function snapToGrid(value: number, gridSize: number, enabled: boolean): number {
-  if (!enabled) return value
-  return Math.round(value / gridSize) * gridSize
+const FINE_SNAP = 1 // mm
+
+function snapShape(value: number, shiftHeld: boolean): number {
+  if (!shiftHeld) return value
+  const size = FINE_SNAP
+  return Math.round(value / size) * size
 }
 
-function snapPoint(
+function snapShapePoint(
   world: { x: number; y: number },
-  engine: LayoutEngine
+  shiftHeld: boolean
 ): { x: number; y: number } {
-  const grid = engine.getGridConfig()
   return {
-    x: snapToGrid(world.x, grid.size, grid.enabled),
-    y: snapToGrid(world.y, grid.size, grid.enabled)
+    x: snapShape(world.x, shiftHeld),
+    y: snapShape(world.y, shiftHeld)
   }
 }
 
@@ -68,6 +72,28 @@ function baseShapeProps(): Pick<
     strokeWidth: SHAPE_STROKE_WIDTH,
     groupId: null
   }
+}
+
+// ─── Shape naming ───────────────────────────────────────────────────────────
+
+const SHAPE_TYPE_LABELS: Record<string, string> = {
+  rect: 'Rectangle',
+  circle: 'Ellipse',
+  polygon: 'Polygon'
+}
+
+function nextShapeName(engine: LayoutEngine, type: string): string {
+  const label = SHAPE_TYPE_LABELS[type] ?? type
+  const shapes = engine.getAllShapes()
+  let max = 0
+  for (const s of shapes) {
+    const name = s.metadata?.name as string | undefined
+    if (name?.startsWith(label + ' ')) {
+      const num = parseInt(name.slice(label.length + 1), 10)
+      if (!isNaN(num) && num > max) max = num
+    }
+  }
+  return `${label} ${max + 1}`
 }
 
 // ─── Bin hit testing ────────────────────────────────────────────────────────
@@ -117,11 +143,8 @@ function findContainingGroup(engine: LayoutEngine, worldX: number, worldY: numbe
 // ─── Drawing state (shared across tools) ────────────────────────────────────
 
 interface DrawingState {
-  /** Polygon vertices (absolute world coords) */
   polygonVertices: { x: number; y: number }[]
-  /** Current cursor position for polygon preview */
   polygonCursor: { x: number; y: number } | null
-  /** Whether cursor is near first polygon vertex */
   polygonNearClose: boolean
 }
 
@@ -141,7 +164,6 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   const { viewport } = useEngineState()
 
   // Reset polygon state when switching away from polygon tool.
-  // This is the React-recommended "adjusting state during render" pattern.
   const prevToolRef = useRef(activeTool)
   const [state, setState] = useState<DrawingState>(INITIAL_STATE)
   // eslint-disable-next-line react-hooks/refs -- prevToolRef tracks prop transitions during render (React docs pattern)
@@ -157,6 +179,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
   const previewIdRef = useRef<string | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
+  // Guard against double finishPolygon calls (StrictMode)
+  const finishingRef = useRef(false)
 
   // ─── Cleanup on tool switch ─────────────────────────────────────────────
 
@@ -169,20 +193,24 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   }, [engine])
 
   useEffect(() => {
-    // When tool changes away from a drawing tool, clean up
     return () => {
       cleanupPreview()
     }
   }, [activeTool, cleanupPreview])
 
-  // ─── Escape / Enter for polygon ──────────────────────────────────────────
+  // ─── Finish polygon ───────────────────────────────────────────────────────
 
   const finishPolygon = useCallback(
     (pts: { x: number; y: number }[]) => {
       if (!engine || pts.length < 3) {
         setState(INITIAL_STATE)
+        finishingRef.current = false
         return
       }
+
+      // Guard against StrictMode double-fire
+      if (finishingRef.current) return
+      finishingRef.current = true
 
       const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length
       const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length
@@ -190,6 +218,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
       const groupId = findContainingGroup(engine, cx, cy)
       const id = crypto.randomUUID()
+      const name = nextShapeName(engine, 'polygon')
 
       engine.addShape({
         id,
@@ -199,14 +228,21 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         points: relativePoints,
         ...baseShapeProps(),
         groupId,
-        metadata: pocketMetadata(engine, cx, cy)
+        metadata: { ...pocketMetadata(engine, cx, cy), name }
       })
       engine.select([id])
       setState(INITIAL_STATE)
       setActiveTool('select')
+
+      // Reset guard after microtask
+      queueMicrotask(() => {
+        finishingRef.current = false
+      })
     },
     [engine, setActiveTool]
   )
+
+  // ─── Escape / Enter for polygon ──────────────────────────────────────────
 
   useEffect(() => {
     if (activeTool !== 'polygon') return
@@ -216,7 +252,6 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       } else if (e.key === 'Enter') {
         setState((prev) => {
           if (prev.polygonVertices.length >= 3) {
-            // Schedule finishPolygon outside setState
             queueMicrotask(() => finishPolygon(prev.polygonVertices))
           }
           return prev
@@ -234,7 +269,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const overlay = overlayRef.current
       if (!engine || !overlay || e.button !== 0) return
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
-      const snapped = snapPoint(world, engine)
+      const snapped = snapShapePoint(world, e.shiftKey)
 
       if (activeTool === 'rectangle' || activeTool === 'circle') {
         dragStartRef.current = snapped
@@ -309,7 +344,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         dragStartRef.current &&
         previewIdRef.current
       ) {
-        const snapped = snapPoint(world, engine)
+        const snapped = snapShapePoint(world, e.shiftKey)
         const start = dragStartRef.current
 
         if (activeTool === 'rectangle') {
@@ -333,7 +368,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           } as Partial<LayoutShape>)
         }
       } else if (activeTool === 'polygon') {
-        const snapped = snapPoint(world, engine)
+        const snapped = snapShapePoint(world, e.shiftKey)
         setState((prev) => {
           if (prev.polygonVertices.length === 0) return prev
           let nearClose = false
@@ -361,7 +396,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       if (!dragStartRef.current || !previewIdRef.current) return
 
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
-      const snapped = snapPoint(world, engine)
+      const snapped = snapShapePoint(world, e.shiftKey)
       const start = dragStartRef.current
 
       // Remove preview
@@ -378,6 +413,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           const cy = y + h / 2
           const groupId = findContainingGroup(engine, cx, cy)
           const id = crypto.randomUUID()
+          const name = nextShapeName(engine, 'rect')
           engine.addShape({
             id,
             type: 'rect',
@@ -387,7 +423,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             height: h,
             ...baseShapeProps(),
             groupId,
-            metadata: pocketMetadata(engine, cx, cy)
+            metadata: { ...pocketMetadata(engine, cx, cy), name }
           })
           engine.select([id])
           setActiveTool('select')
@@ -399,6 +435,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         if (radius > 2) {
           const groupId = findContainingGroup(engine, start.x, start.y)
           const id = crypto.randomUUID()
+          const name = nextShapeName(engine, 'circle')
           engine.addShape({
             id,
             type: 'circle',
@@ -408,7 +445,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             radiusY: radius,
             ...baseShapeProps(),
             groupId,
-            metadata: pocketMetadata(engine, start.x, start.y)
+            metadata: { ...pocketMetadata(engine, start.x, start.y), name }
           })
           engine.select([id])
           setActiveTool('select')

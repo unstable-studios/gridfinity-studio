@@ -241,28 +241,9 @@ export class KonvaEngine implements LayoutEngine {
     this.shapeMap.set(shape.id, { ...shape })
     this.konvaMap.set(shape.id, node)
 
-    node.on('dragmove', () => {
-      if (!this.gridConfig.enabled) return
-      const selectedNodes = this.transformer?.nodes() ?? []
-      if (selectedNodes.length > 1) return // defer to dragend
-
-      const size = this.gridConfig.size
-      node.position({
-        x: Math.round(node.x() / size) * size,
-        y: Math.round(node.y() / size) * size
-      })
-      this.transformer?.forceUpdate()
-    })
+    // Shapes move freely — no grid snap (only bins snap to the bin grid).
 
     node.on('dragend', () => {
-      if (this.gridConfig.enabled) {
-        const size = this.gridConfig.size
-        node.position({
-          x: Math.round(node.x() / size) * size,
-          y: Math.round(node.y() / size) * size
-        })
-        this.transformer?.forceUpdate()
-      }
       const data = this.shapeMap.get(shape.id)
       if (data) {
         data.x = node.x()
