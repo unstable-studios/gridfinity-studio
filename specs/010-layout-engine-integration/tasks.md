@@ -23,8 +23,8 @@
 - [x] T014: Bin visual rendering — groups render as rounded rectangles with background fill/stroke via engine adapters.
 - [x] T016: Bin selection — clicking a group selects the bin. Sidebar shows bin properties when a group is selected, shape properties when a shape is selected.
 - [ ] T015: Keep-out zone rendering — render magnet/screw hole circles and lip-inset annular ring as non-interactive shapes within the group.
-- [ ] T017: Bin drag with grid snap — groups should snap to grid positions.
-- [ ] T018: Bin resize — drag bin edges to change `widthUnits`/`depthUnits`. Grid-unit-quantized resize.
+- [x] T017: Bin drag with grid snap — groups snap to grid via lower-left corner. Single-select snaps live in both engines. Fabric multi-select snaps live via ActiveSelection; Konva multi-select snaps on dragend (Transformer limitation).
+- [ ] T018: Bin resize — drag bin edges to change `widthUnits`/`depthUnits`. Grid-unit-quantized resize. (Sidebar resize works; drag-to-resize not yet implemented.)
 - [ ] T019: Bin collision detection — prevent bin overlaps during drag/resize.
 - [ ] T020: Smoke test — create bins via grid picker, bins render with correct Gridfinity styling, drag/resize bins, collision rejection works, bins persist across save/load.
 
@@ -73,7 +73,7 @@
 | Phase | Tasks | Status |
 |-------|-------|--------|
 | 1 | T001–T011 | Done (except T011 smoke test) |
-| 2 | T012–T020 | Partially done (T012-T014, T016) |
+| 2 | T012–T020 | Partially done (T012-T014, T016-T017) |
 | 3 | T021–T026 | Not started |
 | 4 | T027–T032 | Not started |
 | 5 | T033–T038 | Partially done (T033-T035, T037) |
