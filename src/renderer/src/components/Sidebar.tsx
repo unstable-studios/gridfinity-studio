@@ -26,15 +26,15 @@ export default function Sidebar(): React.JSX.Element {
 
 function LayoutSidebar(): React.JSX.Element {
   const engine = useLayoutEngine()
-  const { selectedIds } = useEngineState()
+  const { selectedIds, tick } = useEngineState()
   const project = useProject((s) => s.project)
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
-  // Get groups and shapes from engine (selectedIds triggers re-read on selection change)
+  // Re-read engine data on any mutation (tick) or selection change
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const groups = useMemo(() => engine?.getAllGroups() ?? [], [engine, selectedIds])
+  const groups = useMemo(() => engine?.getAllGroups() ?? [], [engine, selectedIds, tick])
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const shapes = useMemo(() => engine?.getAllShapes() ?? [], [engine, selectedIds])
+  const shapes = useMemo(() => engine?.getAllShapes() ?? [], [engine, selectedIds, tick])
   const binGroups = useMemo(() => groups.filter(isBinGroup), [groups])
 
   // Determine what's selected

@@ -418,12 +418,10 @@ export class FabricEngine implements LayoutEngine {
         if (patch.width !== undefined) {
           bgRect.set('width', group.width)
           bgRect.set('left', -group.width / 2)
-          fabricGroup.set('width', group.width)
         }
         if (patch.height !== undefined) {
           bgRect.set('height', group.height)
           bgRect.set('top', -group.height / 2)
-          fabricGroup.set('height', group.height)
         }
         if (patch.style) {
           bgRect.set('fill', group.style.fill)
@@ -433,6 +431,8 @@ export class FabricEngine implements LayoutEngine {
           bgRect.set('ry', group.style.cornerRadius ?? 0)
         }
       }
+      // Force Fabric to recalculate group bounding box from children
+      fabricGroup.triggerLayout()
     }
 
     fabricGroup.setCoords()
