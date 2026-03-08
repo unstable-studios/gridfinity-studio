@@ -7,11 +7,13 @@ export interface LayoutEngineContextValue {
   engineType: EngineType
   setEngineType: (type: EngineType) => void
   containerRef: RefObject<HTMLDivElement | null>
+  sidebarRef: RefObject<HTMLDivElement | null>
 }
 
 export const LayoutEngineCtx = createContext<LayoutEngineContextValue>({
   engine: null,
   engineType: 'fabric',
   setEngineType: () => {},
-  containerRef: { current: null }
+  containerRef: { current: null },
+  sidebarRef: { current: null }
 })

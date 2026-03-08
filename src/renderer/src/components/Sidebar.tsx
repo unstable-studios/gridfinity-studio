@@ -5,14 +5,23 @@ import { GridPicker } from '@/components/ui/grid-picker'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
-import { useLayoutEngine, useEngineState, isBinGroup } from '@/layout-engine'
+import {
+  useLayoutEngine,
+  useLayoutEngineContext,
+  useEngineState,
+  isBinGroup
+} from '@/layout-engine'
 import type { BinMetadata, LayoutGroup } from '@/layout-engine'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
+  const { sidebarRef } = useLayoutEngineContext()
 
   return (
-    <aside className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto">
+    <aside
+      ref={sidebarRef}
+      className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto"
+    >
       {mode === 'layout' ? (
         <LayoutSidebar />
       ) : (

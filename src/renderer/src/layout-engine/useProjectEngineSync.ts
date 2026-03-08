@@ -5,6 +5,21 @@ import type { LayoutSnapshotData } from '../../../shared/types/project'
 import type { LayoutSnapshot } from './types'
 
 /**
+ * Runtime type guard for layout snapshot data loaded from project files.
+ * Validates structural shape before passing to the engine.
+ */
+function isValidSnapshot(data: unknown): data is LayoutSnapshot {
+  if (data === null || typeof data !== 'object') return false
+  const obj = data as Record<string, unknown>
+  if (typeof obj.version !== 'string') return false
+  if (!Array.isArray(obj.shapes) || !Array.isArray(obj.groups)) return false
+  if (obj.gridConfig === null || typeof obj.gridConfig !== 'object') return false
+  const gc = obj.gridConfig as Record<string, unknown>
+  if (typeof gc.size !== 'number' || typeof gc.enabled !== 'boolean') return false
+  return true
+}
+
+/**
  * Syncs the layout engine snapshot with the project store.
  *
  * - Before save: captures engine.toSnapshot() → project.layoutSnapshot
@@ -33,7 +48,11 @@ export function useProjectEngineSync(): {
     if (loadedProjectRef.current === projectId) return
     loadedProjectRef.current = projectId
 
-    // LayoutSnapshotData → LayoutSnapshot: structurally equivalent
+    if (!isValidSnapshot(project.layoutSnapshot)) {
+      console.warn('Invalid layout snapshot in project file — skipping restore')
+      return
+    }
+
     engine.loadSnapshot(project.layoutSnapshot as unknown as LayoutSnapshot)
   }, [engine, project?.layoutSnapshot, projectId])
 

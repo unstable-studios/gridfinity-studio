@@ -25,6 +25,7 @@ export function LayoutEngineProvider({
     type: EngineType
   }>({ engine: null, type: controlledType ?? defaultEngine })
   const containerRef = useRef<HTMLDivElement>(null)
+  const sidebarRef = useRef<HTMLDivElement>(null)
   const pendingStateRef = useRef<{
     snapshot: ReturnType<LayoutEngine['toSnapshot']>
     transient: ReturnType<LayoutEngine['getTransientState']>
@@ -47,8 +48,13 @@ export function LayoutEngineProvider({
         resolvedTheme === 'light' ? 'rgba(100, 100, 120, 0.4)' : 'rgba(113, 113, 122, 0.35)'
     })
 
-    // Offset visual center for the sidebar overlay (w-64 + left-3 = 268px)
-    newEngine.setViewportInsets({ left: 268 })
+    // Derive sidebar inset from measured sidebar element, fallback to 0
+    const sidebar = sidebarRef.current
+    if (sidebar) {
+      const rect = sidebar.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      newEngine.setViewportInsets({ left: rect.right - containerRect.left })
+    }
 
     // Apply pending state from an engine switch
     const pending = pendingStateRef.current
@@ -58,20 +64,30 @@ export function LayoutEngineProvider({
       pendingStateRef.current = null
     }
 
-    // Use a ref callback approach — the state update schedules on next microtask
-    // to avoid synchronous setState within the effect body
-    queueMicrotask(() => {
-      setEngineState((prev) => ({ ...prev, engine: newEngine }))
-    })
+    setEngineState((prev) => ({ ...prev, engine: newEngine }))
 
     return () => {
       newEngine.dispose()
-      queueMicrotask(() => {
-        setEngineState((prev) => (prev.engine === newEngine ? { ...prev, engine: null } : prev))
-      })
+      setEngineState((prev) => (prev.engine === newEngine ? { ...prev, engine: null } : prev))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engineState.type])
+
+  // Re-measure sidebar inset when it resizes
+  useEffect(() => {
+    const sidebar = sidebarRef.current
+    const container = containerRef.current
+    const engine = engineState.engine
+    if (!sidebar || !container || !engine) return
+
+    const observer = new ResizeObserver(() => {
+      const rect = sidebar.getBoundingClientRect()
+      const containerRect = container.getBoundingClientRect()
+      engine.setViewportInsets({ left: rect.right - containerRect.left })
+    })
+    observer.observe(sidebar)
+    return () => observer.disconnect()
+  }, [engineState.engine])
 
   // Update theme colors when theme changes
   useEffect(() => {
@@ -112,7 +128,8 @@ export function LayoutEngineProvider({
         engine: engineState.engine,
         engineType: engineState.type,
         setEngineType: handleSetEngineType,
-        containerRef
+        containerRef,
+        sidebarRef
       }}
     >
       {children}
