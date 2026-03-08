@@ -57,8 +57,10 @@ function LayoutSidebar(): React.JSX.Element {
   const project = useProject((s) => s.project)
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
-  // Get groups and shapes from engine
+  // Get groups and shapes from engine (selectedIds triggers re-read on selection change)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const groups = useMemo(() => engine?.getAllGroups() ?? [], [engine, selectedIds])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const shapes = useMemo(() => engine?.getAllShapes() ?? [], [engine, selectedIds])
   const binGroups = useMemo(() => groups.filter(isBinGroup), [groups])
 
