@@ -74,9 +74,8 @@ describe('Layout snapshot persistence', () => {
     })
   })
 
-  it('T053: pre-migration .gfstudio file without layoutSnapshot loads correctly', () => {
-    // Simulate a v0.3.0 project without layoutSnapshot
-    // Simulate a pre-migration file that has no layoutSnapshot field
+  it('T053: pre-migration .gfstudio file loads and migrates to current schema', () => {
+    // Simulate a pre-migration file with old schema version
     const oldProject = {
       schemaVersion: '0.3.0',
       settings: {
@@ -93,37 +92,21 @@ describe('Layout snapshot persistence', () => {
         magnetHoles: { enabled: true, diameter: 6.5, depth: 2.4 },
         screwHoles: { enabled: false, diameter: 3, depth: 6 }
       },
-      entities: [
-        {
-          id: 'e1',
-          type: 'rectangle',
-          name: 'Rect 1',
-          width: 20,
-          height: 10,
-          transform: {
-            position: { x: 0, y: 0, z: 0 },
-            rotation: { x: 0, y: 0, z: 0 },
-            scale: { x: 1, y: 1, z: 1 }
-          },
-          visible: true,
-          locked: false,
-          properties: {}
-        }
-      ],
-      groups: [],
-      generators: [],
-      bins: []
+      layoutSnapshot: {
+        version: '1.0.0',
+        shapes: [],
+        groups: [],
+        gridConfig: { size: 42, enabled: true, visible: true }
+      }
     }
 
     // Roundtrip through JSON (simulate file load)
     const serialized = JSON.stringify(oldProject)
     const loaded = JSON.parse(serialized) as ProjectData
 
-    // Migration should work fine — layoutSnapshot is just absent
+    // Migration should bump schema version
     const migrated = migrateProject(loaded)
 
-    expect(migrated.layoutSnapshot).toBeUndefined()
-    expect(migrated.entities).toHaveLength(1)
     expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
     expect(migrated.settings.name).toBe('Old Project')
   })

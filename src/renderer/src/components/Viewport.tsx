@@ -361,7 +361,6 @@ export default function Viewport(): React.JSX.Element {
   const { mode, engineType } = useAppMode()
   const { project, bakeResults } = useProject()
 
-  const bins = project?.bins ?? []
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   return (
@@ -373,7 +372,7 @@ export default function Viewport(): React.JSX.Element {
         </div>
       )}
       <div className={mode === 'review' ? 'h-full' : 'hidden'}>
-        <ReviewCanvas bakeResults={bakeResults} bins={bins} baseUnit={baseUnit} />
+        <ReviewCanvas bakeResults={bakeResults} baseUnit={baseUnit} />
       </div>
       {mode === 'sandbox' && (
         <div className="relative h-full">

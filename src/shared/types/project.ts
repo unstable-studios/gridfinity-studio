@@ -83,170 +83,11 @@ export const GRIDFINITY_PRESETS: Record<TolerancePreset, GridfinityConfig> = {
   }
 }
 
-// ─── Geometric primitives ──────────────────────────────────────────
-
-export interface Position {
-  x: number
-  y: number
-  z: number
-}
-
-export interface Rotation {
-  x: number
-  y: number
-  z: number
-}
-
-export interface Scale {
-  x: number
-  y: number
-  z: number
-}
-
-export interface Transform {
-  position: Position
-  rotation: Rotation
-  scale: Scale
-}
-
-export interface Vertex2D {
-  x: number
-  y: number
-}
-
 // ─── Pocket ───────────────────────────────────────────────────────
 
 export interface PocketConfig {
   depth: number
   clearance: number
-}
-
-// ─── Extrusion (legacy, kept for migration) ───────────────────────
-
-export interface ExtrusionConfig {
-  depth: number
-  direction: 'up' | 'down'
-  role: 'solid' | 'cutter'
-}
-
-// ─── Entity types (discriminated union) ────────────────────────────
-
-interface BaseEntity {
-  id: string
-  name: string
-  transform: Transform
-  visible: boolean
-  locked: boolean
-  groupId?: string
-  pocket?: PocketConfig
-  properties: Record<string, unknown>
-}
-
-export interface LegacyEntity extends BaseEntity {
-  type: 'bin' | 'divider' | 'label' | 'custom'
-}
-
-export interface CircleEntity extends BaseEntity {
-  type: 'circle'
-  diameter: number
-}
-
-export interface RectangleEntity extends BaseEntity {
-  type: 'rectangle'
-  width: number
-  height: number
-  cornerRadius?: number
-}
-
-export interface PolygonEntity extends BaseEntity {
-  type: 'polygon'
-  vertices: Vertex2D[]
-}
-
-export interface SvgRegionEntity extends BaseEntity {
-  type: 'svg-region'
-  pathData: string
-  sourceFile?: string
-}
-
-export interface MeshEntity extends BaseEntity {
-  type: 'mesh'
-  sourceFile: string
-}
-
-export type Entity =
-  | LegacyEntity
-  | CircleEntity
-  | RectangleEntity
-  | PolygonEntity
-  | SvgRegionEntity
-  | MeshEntity
-
-export type EntityType = Entity['type']
-
-export const ENTITY_TYPES: EntityType[] = [
-  'bin',
-  'divider',
-  'label',
-  'custom',
-  'circle',
-  'rectangle',
-  'polygon',
-  'svg-region',
-  'mesh'
-]
-
-// ─── Groups ────────────────────────────────────────────────────────
-
-export interface Group {
-  id: string
-  name: string
-  entityIds: string[]
-  visible: boolean
-  locked: boolean
-  properties: Record<string, unknown>
-}
-
-// ─── Generators (pattern system) ───────────────────────────────────
-
-export type SpacingMode = 'constant-pitch' | 'size-aware' | 'explicit'
-
-export interface LinearPatternConfig {
-  axis: 'x' | 'y'
-  count: number
-  spacingMode: SpacingMode
-  constantPitch?: number
-  gap?: number
-  positions?: number[]
-}
-
-export type GeneratorConfig = LinearPatternConfig | Record<string, unknown>
-
-export interface Generator {
-  id: string
-  name: string
-  type: 'grid' | 'pattern' | 'array' | 'custom' | 'linear-pattern'
-  config: GeneratorConfig
-  sourceEntityId?: string
-  enabled: boolean
-}
-
-// ─── Bins ──────────────────────────────────────────────────────────
-
-export interface Bin {
-  id: string
-  name: string
-  width: number
-  depth: number
-  height: number
-  position: { x: number; y: number }
-  hasDividers: boolean
-  dividerCount?: number
-  hasLabel: boolean
-  labelText?: string
-  hasStackingLip: boolean
-  entityIds: string[]
-  properties: Record<string, unknown>
 }
 
 // ─── Layout Snapshot (engine-agnostic 2D canvas state) ────────────
@@ -317,10 +158,6 @@ export interface ProjectData {
   schemaVersion: string
   settings: GlobalSettings
   gridfinity: GridfinityConfig
-  entities: Entity[]
-  groups: Group[]
-  generators: Generator[]
-  bins: Bin[]
   layoutSnapshot: LayoutSnapshotData
 }
 
@@ -357,23 +194,11 @@ export function createEmptyProject(name: string = 'Untitled Project'): ProjectDa
       units: 'mm'
     },
     gridfinity: { ...DEFAULT_GRIDFINITY_CONFIG },
-    entities: [],
-    groups: [],
-    generators: [],
-    bins: [],
     layoutSnapshot: {
       version: '1.0.0',
       shapes: [],
       groups: [],
       gridConfig: { size: 42, enabled: true, visible: true }
     }
-  }
-}
-
-export function createDefaultTransform(): Transform {
-  return {
-    position: { x: 0, y: 0, z: 0 },
-    rotation: { x: 0, y: 0, z: 0 },
-    scale: { x: 1, y: 1, z: 1 }
   }
 }

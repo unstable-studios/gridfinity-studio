@@ -18,14 +18,14 @@
 
 ## Phase 2: Bin Groups
 
-- [ ] T012: Define `BinMetadata` interface — `{ widthUnits, depthUnits, heightUnits, hasLip }`. Global gridfinity config provides magnet/screw hole settings.
-- [ ] T013: Implement bin creation via `engine.createGroup()` — wire the existing grid picker / "Add Bin" UI to create a `LayoutGroup` with `BinMetadata` and correct dimensions (`widthUnits * baseUnit`).
-- [ ] T014: Bin visual rendering — ensure groups render as rounded rectangles with Gridfinity styling (fill, stroke, optional lip line). May need to extend engine adapters' group rendering or add non-interactive child shapes for lip line.
-- [ ] T015: Keep-out zone rendering — render magnet/screw hole circles and lip-inset annular ring as non-interactive shapes within the group. Reuse `computeKeepOut()` geometry, convert output to engine shapes.
-- [ ] T016: Bin selection — clicking a group selects the bin. Engine already supports group selection. Wire `selectionChanged` to update sidebar context (show bin properties when a group is selected, shape properties when a shape is selected).
-- [ ] T017: Bin drag with grid snap — groups should snap to grid positions. May need to handle this in the engine's snap-to-grid handler or at the event layer.
-- [ ] T018: Bin resize — drag bin edges to change `widthUnits`/`depthUnits`. This is grid-unit-quantized resize, not free resize. May need a custom resize handler that snaps to baseUnit increments and updates group metadata.
-- [ ] T019: Bin collision detection — prevent bin overlaps during drag/resize. Reuse `binOverlapsAny` logic from `collision.ts`, adapted to read group positions from engine.
+- [x] T012: Define `BinMetadata` interface — `{ widthUnits, depthUnits, heightUnits, hasLip }`. Global gridfinity config provides magnet/screw hole settings.
+- [x] T013: Implement bin creation via `engine.createGroup()` — wire the existing grid picker / "Add Bin" UI to create a `LayoutGroup` with `BinMetadata` and correct dimensions (`widthUnits * baseUnit`).
+- [x] T014: Bin visual rendering — groups render as rounded rectangles with background fill/stroke via engine adapters.
+- [x] T016: Bin selection — clicking a group selects the bin. Sidebar shows bin properties when a group is selected, shape properties when a shape is selected.
+- [ ] T015: Keep-out zone rendering — render magnet/screw hole circles and lip-inset annular ring as non-interactive shapes within the group.
+- [ ] T017: Bin drag with grid snap — groups should snap to grid positions.
+- [ ] T018: Bin resize — drag bin edges to change `widthUnits`/`depthUnits`. Grid-unit-quantized resize.
+- [ ] T019: Bin collision detection — prevent bin overlaps during drag/resize.
 - [ ] T020: Smoke test — create bins via grid picker, bins render with correct Gridfinity styling, drag/resize bins, collision rejection works, bins persist across save/load.
 
 ## Phase 3: Drawing Tools
@@ -41,41 +41,40 @@
 
 - [ ] T027: Create `layoutShapeToPocketSpec()` — converts `LayoutShape` geometry to `PocketSpec` (Float32Array vertices + depth + position relative to bin center). Handles rect, circle, polygon. SVG path and mesh import deferred.
 - [ ] T028: Create `layoutGroupToCSGBinParams()` — reads `BinMetadata` from `LayoutGroup.metadata` + global `GridfinityConfig` to produce `CSGBinParams`. Gathers child shapes as `PocketSpec[]`.
-- [ ] T029: Wire sidebar bake flow — replace entity-based bake trigger with engine-based. Read shapes from `engine.getShape()` for group children, convert to pocket specs, send to worker.
-- [ ] T030: Verify 3D preview — `ReviewCanvas` and `BinPreview` render bake results (mesh arrays). These components read from Zustand `bakeResults` which is unchanged. Verify meshes look correct.
-- [ ] T031: Run existing CSG tests — `bin-generator.test.ts` tests the builder directly with `CSGBinParams`. Should pass unchanged. Add a new test that goes LayoutShape → PocketSpec → CSGBinParams to verify the new adapter.
-- [ ] T032: Verify export — STL and 3MF export reads from bake results. Should work unchanged. End-to-end test: draw shapes → bake → export → inspect file.
+- [ ] T029: Wire bake flow — engine-based BinBaker reads groups/shapes from engine, converts to CSGBinParams, sends to worker. Replaces old entity-based BinBaker (now deleted).
+- [ ] T030: Verify 3D preview — `ReviewCanvas` renders bake results. Updated to iterate bakeResults directly (no longer depends on old Bin type).
+- [ ] T031: Run existing CSG tests — `bin-generator.test.ts` tests the builder directly with `CSGBinParams`. Add a new test that goes LayoutShape → PocketSpec → CSGBinParams to verify the adapter.
+- [ ] T032: Verify export — STL and 3MF export reads from bake results. End-to-end: draw shapes → bake → export → inspect file.
 
 ## Phase 5: Sidebar Rebuild
 
-- [ ] T033: Sidebar reads from engine — shape list reads `engine.getAllShapes()`, group list reads `engine.getAllGroups()`. Subscribe to engine events for live updates.
-- [ ] T034: Shape property editing — editing position/dimensions/fill/stroke in sidebar calls `engine.updateShape(id, patch)`. Replace Zustand `updateEntity` calls.
-- [ ] T035: Bin property editing — editing bin name, height, lip in sidebar calls `engine.updateGroup(id, patch)` with updated metadata. Gridfinity-specific fields update `BinMetadata`.
+- [x] T033: Sidebar reads from engine — shape list reads `engine.getAllShapes()`, group list reads `engine.getAllGroups()`. Subscribe to engine events for live updates.
+- [x] T034: Shape property editing — editing position in sidebar calls `engine.updateShape(id, patch)`.
+- [x] T035: Bin property editing — editing bin W/D/H and lip in sidebar calls `engine.updateGroup(id, patch)` with updated BinMetadata.
 - [ ] T036: Shape-to-bin assignment — when a shape is dragged into/out of a bin, call `engine.addToGroup()`/`engine.removeFromGroup()`. Sidebar reflects group membership.
-- [ ] T037: Delete key — delete selected shapes via `engine.removeShape()`, selected groups via `engine.removeGroup()`. Already have the pattern from sandbox.
+- [x] T037: Delete key — delete selected shapes/groups. Already wired in LayoutViewport and Sidebar.
 - [ ] T038: Smoke test — select shape in canvas, sidebar shows its properties. Edit properties, canvas updates. Same for bins. Delete works.
 
-## Phase 6: Teardown
+## Phase 6: Teardown (old entity/bin system)
 
-- [ ] T039: Delete `src/renderer/src/components/layout/` — LayoutCanvas, GridOverlay, EntityRenderer, EntityInteractionManager, TransformGizmo, SelectionBox, BinFootprint, KeepOutOverlay, BinInteractionManager.
-- [ ] T040: Delete `src/renderer/src/components/primitives/` — CircleTool, RectangleTool, PolygonTool (replaced by DrawingToolLayer).
-- [ ] T041: Delete entity system types — remove `Entity` discriminated union, `BaseEntity`, `CircleEntity`, `RectangleEntity`, `PolygonEntity`, `SvgRegionEntity`, `MeshEntity`, `LegacyEntity` from `project.ts`. Remove `Group`, `Generator` types if unused.
-- [ ] T042: Delete old hooks — `useSharedSelection`, `useSelection`, `useSnapping`. Engine handles selection and grid snap natively.
-- [ ] T043: Delete old utilities — `entity-shapes.ts`, `entity-geometry.ts`, `extrude.ts`, `z-layers.ts`, `snap.ts`. Keep `collision.ts` if bin collision logic still references it.
-- [ ] T044: Delete old tests — remove tests for deleted entity system, hooks, and utilities. Keep CSG, threemf-writer, and project-handler tests.
-- [ ] T045: Clean up imports — remove all dead imports across the codebase. Run typecheck + lint to catch stragglers.
-- [ ] T046: Update project validator — `project-validator.ts` currently validates entities/bins. Update to validate `layoutSnapshot` structure instead.
+- [x] T039: Delete `src/renderer/src/components/layout/` (done in earlier commit).
+- [x] T040: Delete `src/renderer/src/components/primitives/` — CircleTool, RectangleTool, PolygonTool.
+- [x] T041: Delete entity system types — removed Entity union, BaseEntity, all entity interfaces, Group, Generator, Bin from project.ts. Removed entities/groups/generators/bins from ProjectData.
+- [x] T042: Delete old hooks — useSelection, useSnapping.
+- [x] T043: Delete old utilities — entity-shapes.ts, entity-geometry.ts, extrude.ts, z-layers.ts, snap.ts, auto-wrap.ts, collision.ts.
+- [x] T044: Delete old tests — entity-mutations, store-operations, selection, entity-integration, auto-wrap, collision, snap, extrude tests.
+- [x] T045: Clean up imports — removed all dead imports. Typecheck + lint pass.
+- [x] T046: Update project validator — simplified to validate layoutSnapshot structure, removed entity/bin validation.
 - [ ] T047: Update CLAUDE.md — new architecture description, removed components, updated data flow.
-- [ ] T048: Final verification — run full test suite, typecheck, lint. Interactive smoke test: new project → draw shapes → create bins → bake → 3D preview → export → save → reload → engine switch → undo/redo.
+- [ ] T048: Final verification — run full test suite, typecheck, lint. Interactive smoke test.
 
 ## Summary
 
-| Phase | Tasks | Description |
-|-------|-------|-------------|
-| 1 | T001–T011 | Engine as source of truth, schema v0.5.0 |
-| 2 | T012–T020 | Bin groups with Gridfinity metadata |
-| 3 | T021–T026 | Drawing tools (DOM-based) |
-| 4 | T027–T032 | CSG pipeline adapter |
-| 5 | T033–T038 | Sidebar rebuild |
-| 6 | T039–T048 | Delete dead code, cleanup |
-| **Total** | **48 tasks** | |
+| Phase | Tasks | Status |
+|-------|-------|--------|
+| 1 | T001–T011 | Done (except T011 smoke test) |
+| 2 | T012–T020 | Partially done (T012-T014, T016) |
+| 3 | T021–T026 | Not started |
+| 4 | T027–T032 | Not started |
+| 5 | T033–T038 | Partially done (T033-T035, T037) |
+| 6 | T039–T048 | Done (except T047 CLAUDE.md, T048 final) |

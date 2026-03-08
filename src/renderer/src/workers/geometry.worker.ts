@@ -1,5 +1,4 @@
 import type { WorkerRequest, WorkerResponse, MeshData } from '../../../shared/types/worker'
-import { extrudePolygon } from '../lib/extrude'
 import { buildBinCSG } from '../lib/bin-csg-builder'
 
 // Worker globals
@@ -116,29 +115,6 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
           error: success ? undefined : 'Failed to load manifold WASM'
         }
         ctx.postMessage(response)
-      })
-      break
-    }
-
-    case 'extrude': {
-      const vertexCount = msg.vertices.length / 2
-      const vertices: Array<{ x: number; y: number }> = []
-      for (let i = 0; i < vertexCount; i++) {
-        vertices.push({ x: msg.vertices[i * 2], y: msg.vertices[i * 2 + 1] })
-      }
-
-      const result = extrudePolygon(vertices, msg.depth, msg.zTop ?? 0)
-      const colors = new Float32Array(0)
-      const response: WorkerResponse = {
-        type: 'extrude',
-        id: msg.id,
-        positions: result.positions,
-        indices: result.indices,
-        normals: result.normals,
-        colors
-      }
-      ctx.postMessage(response, {
-        transfer: [result.positions.buffer, result.indices.buffer, result.normals.buffer]
       })
       break
     }
