@@ -105,6 +105,7 @@ export class KonvaEngine implements LayoutEngine {
     gridOrigin: DEFAULT_GRID_ORIGIN
   }
   private bgRect: Konva.Rect | null = null
+  private gridBgRect: Konva.Rect | null = null
   private container: HTMLDivElement | null = null
 
   // Pan state — isPanning is set from a DOM capture listener so it's
@@ -149,13 +150,24 @@ export class KonvaEngine implements LayoutEngine {
     })
     this.mainLayer.add(this.transformer)
 
-    // Add background rect for stage click detection
-    this.bgRect = new Konva.Rect({
+    // Visible background on grid layer (beneath grid lines)
+    this.gridBgRect = new Konva.Rect({
       x: -GRID_EXTENT,
       y: -GRID_EXTENT,
       width: GRID_EXTENT * 2,
       height: GRID_EXTENT * 2,
       fill: this.themeColors.background,
+      listening: false
+    })
+    this.gridLayer.add(this.gridBgRect)
+
+    // Transparent click-detection rect on main layer
+    this.bgRect = new Konva.Rect({
+      x: -GRID_EXTENT,
+      y: -GRID_EXTENT,
+      width: GRID_EXTENT * 2,
+      height: GRID_EXTENT * 2,
+      fill: 'transparent',
       listening: true,
       name: 'background'
     })
@@ -165,6 +177,9 @@ export class KonvaEngine implements LayoutEngine {
     this.drawGrid()
     this.setupEventHandlers()
     this.setupPanZoom()
+
+    // Center origin in viewport
+    this.stage.position({ x: width / 2, y: height / 2 })
 
     this.resizeObserver = new ResizeObserver((entries) => {
       if (this.disposed || !this.stage) return
@@ -442,10 +457,36 @@ export class KonvaEngine implements LayoutEngine {
       stroke: group.style.stroke,
       strokeWidth: group.style.strokeWidth,
       cornerRadius: group.style.cornerRadius ?? 0,
-      listening: false,
+      listening: true,
       name: '__groupBg'
     })
     konvaGroup.add(bgRect)
+
+    // Snap group to grid during drag
+    konvaGroup.on('dragmove', () => {
+      if (this.gridConfig.enabled) {
+        const size = this.gridConfig.size
+        const g = this.groupMap.get(group.id)
+        if (g) {
+          const halfW = g.width / 2
+          const halfH = g.height / 2
+          konvaGroup.position({
+            x: Math.round((konvaGroup.x() - halfW) / size) * size + halfW,
+            y: Math.round((konvaGroup.y() - halfH) / size) * size + halfH
+          })
+        }
+      }
+    })
+
+    // Emit event when group drag ends
+    konvaGroup.on('dragend', () => {
+      const g = this.groupMap.get(group.id)
+      if (g) {
+        g.x = konvaGroup.x()
+        g.y = konvaGroup.y()
+      }
+      this.emitter.emit('groupMoved', { id: group.id, x: konvaGroup.x(), y: konvaGroup.y() })
+    })
 
     // Move children into group
     for (const childId of group.childIds) {
@@ -465,6 +506,7 @@ export class KonvaEngine implements LayoutEngine {
     this.mainLayer.add(konvaGroup)
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
+    this.emitter.emit('groupChanged', { groupId: group.id, childIds: [...group.childIds] })
   }
 
   updateGroup(id: string, patch: Partial<LayoutGroup>): void {
@@ -532,6 +574,7 @@ export class KonvaEngine implements LayoutEngine {
     this.konvaGroupMap.delete(id)
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
+    this.emitter.emit('groupChanged', { groupId: id, childIds: [] })
   }
 
   addToGroup(shapeId: string, groupId: string): void {
@@ -578,11 +621,21 @@ export class KonvaEngine implements LayoutEngine {
 
   getGroup(id: string): LayoutGroup | undefined {
     const group = this.groupMap.get(id)
-    return group ? { ...group } : undefined
+    if (!group) return undefined
+    const konvaGroup = this.konvaGroupMap.get(id)
+    if (konvaGroup) {
+      return {
+        ...group,
+        x: konvaGroup.x(),
+        y: konvaGroup.y(),
+        rotation: konvaGroup.rotation()
+      }
+    }
+    return { ...group }
   }
 
   getAllGroups(): LayoutGroup[] {
-    return Array.from(this.groupMap.values()).map((g) => ({ ...g }))
+    return Array.from(this.groupMap.keys()).map((id) => this.getGroup(id)!)
   }
 
   // ─── Selection ──────────────────────────────────────────────────────────────
@@ -591,8 +644,10 @@ export class KonvaEngine implements LayoutEngine {
     if (this.disposed || !this.transformer) return
 
     const nodes = ids
-      .map((id) => this.konvaMap.get(id))
-      .filter((n): n is Konva.Shape => n !== undefined)
+      .map(
+        (id) => (this.konvaMap.get(id) as Konva.Node) ?? (this.konvaGroupMap.get(id) as Konva.Node)
+      )
+      .filter((n): n is Konva.Node => n !== undefined)
 
     this.transformer.nodes(nodes)
 
@@ -664,10 +719,12 @@ export class KonvaEngine implements LayoutEngine {
 
   resetView(): void {
     if (this.disposed || !this.stage) return
-    this.stage.position({ x: 0, y: 0 })
+    const w = this.stage.width()
+    const h = this.stage.height()
+    this.stage.position({ x: w / 2, y: h / 2 })
     this.stage.scale({ x: 1, y: 1 })
     this.stage.batchDraw()
-    this.emitter.emit('viewportChanged', { panX: 0, panY: 0, zoom: 1 })
+    this.emitter.emit('viewportChanged', { panX: -w / 2, panY: -h / 2, zoom: 1 })
   }
 
   getViewport(): ViewportState {
@@ -694,8 +751,8 @@ export class KonvaEngine implements LayoutEngine {
 
   setThemeColors(colors: { background: string; grid: string; gridOrigin: string }): void {
     this.themeColors = colors
-    if (this.bgRect) {
-      this.bgRect.fill(colors.background)
+    if (this.gridBgRect) {
+      this.gridBgRect.fill(colors.background)
     }
     this.redrawGrid()
   }
@@ -819,6 +876,18 @@ export class KonvaEngine implements LayoutEngine {
   private redrawGrid(): void {
     if (!this.gridLayer) return
     this.gridLayer.destroyChildren()
+    // Re-add the background rect to grid layer
+    if (this.gridBgRect) {
+      this.gridBgRect = new Konva.Rect({
+        x: -GRID_EXTENT,
+        y: -GRID_EXTENT,
+        width: GRID_EXTENT * 2,
+        height: GRID_EXTENT * 2,
+        fill: this.themeColors.background,
+        listening: false
+      })
+      this.gridLayer.add(this.gridBgRect)
+    }
     this.drawGrid()
   }
 
@@ -877,6 +946,26 @@ export class KonvaEngine implements LayoutEngine {
         } else {
           if (!this.getSelectedIds().includes(id)) {
             this.select([id])
+          }
+        }
+      }
+
+      // Clicked on a group or its background
+      if (target.name() === 'group' || target.name() === '__groupBg') {
+        const groupNode = target.name() === '__groupBg' ? target.parent : target
+        if (groupNode) {
+          const id = groupNode.id()
+          if (nativeEvt.shiftKey) {
+            const current = this.getSelectedIds()
+            if (current.includes(id)) {
+              this.select(current.filter((sid) => sid !== id))
+            } else {
+              this.addToSelection([id])
+            }
+          } else {
+            if (!this.getSelectedIds().includes(id)) {
+              this.select([id])
+            }
           }
         }
       }
@@ -959,6 +1048,9 @@ export class KonvaEngine implements LayoutEngine {
         for (const node of this.konvaMap.values()) {
           node.draggable(false)
         }
+        for (const node of this.konvaGroupMap.values()) {
+          node.draggable(false)
+        }
         e.preventDefault()
       }
     }
@@ -981,8 +1073,11 @@ export class KonvaEngine implements LayoutEngine {
     this.stage.on('mouseup', () => {
       if (this.isPanning && this.stage) {
         this.isPanning = false
-        // Restore draggable on all shapes
+        // Restore draggable on all shapes and groups
         for (const node of this.konvaMap.values()) {
+          node.draggable(true)
+        }
+        for (const node of this.konvaGroupMap.values()) {
           node.draggable(true)
         }
         const vp = this.getViewport()

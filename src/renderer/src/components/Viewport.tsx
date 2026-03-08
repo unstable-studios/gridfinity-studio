@@ -59,7 +59,11 @@ function LayoutViewport(): React.JSX.Element {
         if (ids.length === 0) return
         engine.clearSelection()
         for (const id of ids) {
-          engine.removeShape(id)
+          if (engine.getGroup(id)) {
+            engine.removeGroup(id)
+          } else {
+            engine.removeShape(id)
+          }
         }
       }
     }
@@ -201,7 +205,11 @@ function SandboxToolbar(): React.JSX.Element {
         if (ids.length === 0) return
         engine.clearSelection()
         for (const id of ids) {
-          engine.removeShape(id)
+          if (engine.getGroup(id)) {
+            engine.removeGroup(id)
+          } else {
+            engine.removeShape(id)
+          }
         }
       }
     }

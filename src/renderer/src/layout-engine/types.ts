@@ -139,5 +139,6 @@ export type EngineEventMap = {
   shapeCreated: { shape: LayoutShape }
   shapeDeleted: { id: string }
   groupChanged: { groupId: string; childIds: string[] }
+  groupMoved: { id: string; x: number; y: number }
   viewportChanged: { panX: number; panY: number; zoom: number }
 }

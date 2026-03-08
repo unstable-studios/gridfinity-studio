@@ -186,6 +186,12 @@ export class FabricEngine implements LayoutEngine {
     this.setupPanZoom()
     this.setupSnapToGrid()
 
+    // Center origin in viewport
+    const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
+    vpt[4] = width / 2
+    vpt[5] = height / 2
+    this.canvas.setViewportTransform(vpt)
+
     this.resizeObserver = new ResizeObserver((entries) => {
       if (this.disposed || !this.canvas) return
       for (const entry of entries) {
@@ -368,13 +374,17 @@ export class FabricEngine implements LayoutEngine {
       width: group.width,
       height: group.height,
       subTargetCheck: true,
-      interactive: true
+      interactive: true,
+      lockScalingX: true,
+      lockScalingY: true,
+      hasControls: false
     })
     ;(fabricGroup as unknown as Record<string, unknown>)[GROUP_DATA_KEY] = group.id
 
     this.fabricGroupMap.set(group.id, fabricGroup)
     this.canvas?.add(fabricGroup)
     this.canvas?.requestRenderAll()
+    this.emitter.emit('groupChanged', { groupId: group.id, childIds: [...group.childIds] })
   }
 
   updateGroup(id: string, patch: Partial<LayoutGroup>): void {
@@ -450,6 +460,7 @@ export class FabricEngine implements LayoutEngine {
     this.groupMap.delete(id)
     this.fabricGroupMap.delete(id)
     this.canvas?.requestRenderAll()
+    this.emitter.emit('groupChanged', { groupId: id, childIds: [] })
   }
 
   addToGroup(shapeId: string, groupId: string): void {
@@ -498,11 +509,21 @@ export class FabricEngine implements LayoutEngine {
 
   getGroup(id: string): LayoutGroup | undefined {
     const group = this.groupMap.get(id)
-    return group ? { ...group } : undefined
+    if (!group) return undefined
+    const fabricGroup = this.fabricGroupMap.get(id)
+    if (fabricGroup) {
+      return {
+        ...group,
+        x: fabricGroup.left ?? group.x,
+        y: fabricGroup.top ?? group.y,
+        rotation: fabricGroup.angle ?? group.rotation
+      }
+    }
+    return { ...group }
   }
 
   getAllGroups(): LayoutGroup[] {
-    return Array.from(this.groupMap.values()).map((g) => ({ ...g }))
+    return Array.from(this.groupMap.keys()).map((id) => this.getGroup(id)!)
   }
 
   // ─── Selection ──────────────────────────────────────────────────────────────
@@ -512,7 +533,7 @@ export class FabricEngine implements LayoutEngine {
     this.canvas.discardActiveObject()
 
     const objects = ids
-      .map((id) => this.fabricMap.get(id))
+      .map((id) => this.fabricMap.get(id) ?? this.fabricGroupMap.get(id))
       .filter((o): o is fabric.FabricObject => o !== undefined)
 
     if (objects.length === 1) {
@@ -548,11 +569,15 @@ export class FabricEngine implements LayoutEngine {
     if (active instanceof fabric.ActiveSelection) {
       return active
         .getObjects()
-        .map((o) => (o as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string)
+        .map((o) => {
+          const rec = o as unknown as Record<string, unknown>
+          return (rec[SHAPE_DATA_KEY] as string) || (rec[GROUP_DATA_KEY] as string)
+        })
         .filter(Boolean)
     }
 
-    const id = (active as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
+    const rec = active as unknown as Record<string, unknown>
+    const id = (rec[SHAPE_DATA_KEY] as string) || (rec[GROUP_DATA_KEY] as string)
     return id ? [id] : []
   }
 
@@ -586,9 +611,11 @@ export class FabricEngine implements LayoutEngine {
 
   resetView(): void {
     if (this.disposed || !this.canvas) return
-    this.canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
+    const w = this.canvas.getWidth()
+    const h = this.canvas.getHeight()
+    this.canvas.setViewportTransform([1, 0, 0, 1, w / 2, h / 2])
     this.canvas.requestRenderAll()
-    this.emitter.emit('viewportChanged', { panX: 0, panY: 0, zoom: 1 })
+    this.emitter.emit('viewportChanged', { panX: -w / 2, panY: -h / 2, zoom: 1 })
   }
 
   getViewport(): ViewportState {
@@ -810,21 +837,32 @@ export class FabricEngine implements LayoutEngine {
       if (this.disposed) return
       const obj = e.target
       if (!obj) return
-      const id = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
-      if (!id) return
 
-      this.emitter.emit('shapeMoved', { id, x: obj.left ?? 0, y: obj.top ?? 0 })
+      const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
+      if (shapeId) {
+        this.emitter.emit('shapeMoved', { id: shapeId, x: obj.left ?? 0, y: obj.top ?? 0 })
 
-      // Emit shapeResized with current dimensions
-      const data = this.shapeMap.get(id)
-      if (data) {
-        const shape = fabricObjToLayoutShape(obj, data)
-        const resizePayload: EngineEventMap['shapeResized'] = { id }
-        if ('width' in shape) resizePayload.width = shape.width
-        if ('height' in shape) resizePayload.height = shape.height
-        if ('radiusX' in shape) resizePayload.radiusX = shape.radiusX
-        if ('radiusY' in shape) resizePayload.radiusY = shape.radiusY
-        this.emitter.emit('shapeResized', resizePayload)
+        // Emit shapeResized with current dimensions
+        const data = this.shapeMap.get(shapeId)
+        if (data) {
+          const shape = fabricObjToLayoutShape(obj, data)
+          const resizePayload: EngineEventMap['shapeResized'] = { id: shapeId }
+          if ('width' in shape) resizePayload.width = shape.width
+          if ('height' in shape) resizePayload.height = shape.height
+          if ('radiusX' in shape) resizePayload.radiusX = shape.radiusX
+          if ('radiusY' in shape) resizePayload.radiusY = shape.radiusY
+          this.emitter.emit('shapeResized', resizePayload)
+        }
+      }
+
+      const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (groupId) {
+        const group = this.groupMap.get(groupId)
+        if (group) {
+          group.x = obj.left ?? 0
+          group.y = obj.top ?? 0
+        }
+        this.emitter.emit('groupMoved', { id: groupId, x: obj.left ?? 0, y: obj.top ?? 0 })
       }
     })
 
@@ -846,9 +884,24 @@ export class FabricEngine implements LayoutEngine {
       const obj = e.target
       if (!obj) return
       const size = this.gridConfig.size
-      const left = Math.round((obj.left ?? 0) / size) * size
-      const top = Math.round((obj.top ?? 0) / size) * size
-      obj.set({ left, top })
+
+      const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (groupId) {
+        // Snap group edges to grid
+        const group = this.groupMap.get(groupId)
+        if (group) {
+          const halfW = group.width / 2
+          const halfH = group.height / 2
+          const left = Math.round(((obj.left ?? 0) - halfW) / size) * size + halfW
+          const top = Math.round(((obj.top ?? 0) - halfH) / size) * size + halfH
+          obj.set({ left, top })
+        }
+      } else {
+        // Snap shape center to grid
+        const left = Math.round((obj.left ?? 0) / size) * size
+        const top = Math.round((obj.top ?? 0) / size) * size
+        obj.set({ left, top })
+      }
       obj.setCoords()
     })
   }
