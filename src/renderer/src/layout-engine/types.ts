@@ -68,6 +68,30 @@ export interface LayoutGroup {
   metadata?: Record<string, unknown>
 }
 
+// ─── Bin Metadata (stored in LayoutGroup.metadata) ──────────────────────────
+
+export interface BinMetadata extends Record<string, unknown> {
+  widthUnits: number
+  depthUnits: number
+  heightUnits: number
+  hasLip: boolean
+  name?: string
+}
+
+/**
+ * Type guard: checks if a group's metadata contains BinMetadata fields.
+ */
+export function isBinGroup(group: LayoutGroup): group is LayoutGroup & { metadata: BinMetadata } {
+  const m = group.metadata as Record<string, unknown> | undefined
+  return (
+    m !== undefined &&
+    typeof m.widthUnits === 'number' &&
+    typeof m.depthUnits === 'number' &&
+    typeof m.heightUnits === 'number' &&
+    typeof m.hasLip === 'boolean'
+  )
+}
+
 // ─── Grid ───────────────────────────────────────────────────────────────────
 
 export interface GridConfig {

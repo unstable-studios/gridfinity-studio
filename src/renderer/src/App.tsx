@@ -4,21 +4,23 @@ import Sidebar from '@/components/Sidebar'
 import Viewport from '@/components/Viewport'
 import WelcomeScreen from '@/components/WelcomeScreen'
 import { ThemeProvider } from '@unstable-studios/ui'
-import { AppModeCtx } from '@/hooks/useAppMode'
+import { AppModeCtx, useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
 import { useSelection, SelectionCtx } from '@/hooks/useSelection'
 import { ReviewPrefsCtx } from '@/hooks/useReviewPrefs'
+import { LayoutEngineProvider } from '@/layout-engine'
 import type { AppMode, ActiveTool } from '@/hooks/useAppMode'
 import type { EngineType } from '@/layout-engine'
 
 function AppContent(): React.JSX.Element {
   const { project } = useProject()
+  const { mode, engineType } = useAppMode()
 
   if (!project) {
     return <WelcomeScreen />
   }
 
-  return (
+  const content = (
     <>
       <Navbar />
       <div className="flex flex-1 gap-4 overflow-hidden p-4 min-h-0">
@@ -27,6 +29,13 @@ function AppContent(): React.JSX.Element {
       </div>
     </>
   )
+
+  // Wrap layout mode in LayoutEngineProvider so both Sidebar and Viewport can access the engine
+  if (mode === 'layout') {
+    return <LayoutEngineProvider engineType={engineType}>{content}</LayoutEngineProvider>
+  }
+
+  return content
 }
 
 const APP_MODE_KEY = 'gfstudio:appMode'

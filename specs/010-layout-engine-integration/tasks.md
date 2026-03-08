@@ -4,16 +4,16 @@
 
 ## Phase 1: Engine as Source of Truth
 
-- [ ] T001: Mount `LayoutEngineProvider` in Viewport layout mode branch, replacing the `<LayoutCanvas>` mount. Engine type from `useAppMode().engineType`. Grid config from `GridfinityConfig.baseUnit`. Theme from `resolveColors(resolvedTheme)`.
-- [ ] T002: Strip entity mutations from `useProject.ts` — remove `addEntity`, `updateEntity`, `moveEntity`, `removeEntity`, and the entity array from `ProjectState`. Keep file ops, gridfinity config, project metadata, bake results.
-- [ ] T003: Strip bin mutations from `useProject.ts` — remove `addBin`, `updateBin`, `moveBin`, `removeBin`, and the bins array from `ProjectState`. Bins will live as LayoutGroups in the engine.
-- [ ] T004: Strip hand-rolled undo/redo from `useProject.ts` — remove `_undoStack`, `_redoStack`, `pushUndo`, `startDrag`/`endDrag`, `undo`/`redo`. Undo/redo is now engine-snapshot-based (already working in sandbox's `EngineToolbar`).
-- [ ] T005: Promote sandbox undo/redo to production — extract the undo/redo stack logic from `Viewport.tsx`'s `EngineToolbar` into a reusable `useEngineUndoRedo(engine)` hook. Wire Ctrl+Z / Ctrl+Shift+Z globally for layout mode.
-- [ ] T006: Wire `engine.toSnapshot()` into project save — `useProjectEngineSync.saveWithSnapshot()` already does this. Ensure it's called from Navbar save actions.
-- [ ] T007: Wire `engine.loadSnapshot()` from project load — `useProjectEngineSync` already handles this. Verify it fires correctly when a `.gfstudio` file is opened.
-- [ ] T008: Update `ProjectData` schema to v0.5.0 — make `layoutSnapshot` required (not optional). Remove `entities`, `bins`, `groups`, `generators` arrays. Update `createEmptyProject()` to include an empty `LayoutSnapshot`.
-- [ ] T009: Write v0.4.0 → v0.5.0 migration — convert old `entities[]` to `LayoutShape[]` and old `bins[]` to `LayoutGroup[]` (with metadata). Add to `migrations.ts`. Handle all entity type variants.
-- [ ] T010: Type `LayoutSnapshotData` properly — replace `Record<string, unknown>[]` with actual `LayoutShape[]` and `LayoutGroup[]` types in `src/shared/types/project.ts`. Remove unsafe casts in `useProjectEngineSync`.
+- [x] T001: Mount `LayoutEngineProvider` in Viewport layout mode branch, replacing the `<LayoutCanvas>` mount.
+- [x] T002: Strip entity mutations from `useProject.ts`. Also deleted old R3F layout components (LayoutCanvas, TransformGizmo, etc.).
+- [x] T003: Strip bin mutations from `useProject.ts`. Bins will live as LayoutGroups in the engine.
+- [x] T004: Strip hand-rolled undo/redo from `useProject.ts`. Undo/redo is now engine-snapshot-based.
+- [x] T005: Promote sandbox undo/redo to production — `useEngineUndoRedo(engine)` hook with keyboard shortcuts.
+- [x] T006: Wire `engine.toSnapshot()` into project save via `useProjectEngineSync`.
+- [x] T007: Wire `engine.loadSnapshot()` from project load via `useProjectEngineSync`.
+- [x] T008: Update `ProjectData` schema to v0.5.0 — `layoutSnapshot` required, typed `LayoutShapeData`/`LayoutGroupData`.
+- [x] T009: Write v0.4.0 → v0.5.0 migration converting entities→shapes and bins→groups.
+- [x] T010: Type `LayoutSnapshotData` properly with `LayoutShapeData[]` and `LayoutGroupData[]`.
 - [ ] T011: Smoke test — create new project, shapes render in engine. Open existing v0.4.0 project, migration runs, shapes appear. Save and reload, data round-trips.
 
 ## Phase 2: Bin Groups

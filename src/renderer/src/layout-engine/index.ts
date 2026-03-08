@@ -6,8 +6,10 @@ export type {
   GridConfig,
   ViewportState,
   TransientState,
-  EngineEventMap
+  EngineEventMap,
+  BinMetadata
 } from './types'
+export { isBinGroup } from './types'
 export { createLayoutEngine, registerEngine } from './create-engine'
 export type { EngineType } from './create-engine'
 export { LayoutEngineProvider } from './LayoutEngineContext'
