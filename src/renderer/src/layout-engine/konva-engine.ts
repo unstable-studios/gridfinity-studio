@@ -432,6 +432,21 @@ export class KonvaEngine implements LayoutEngine {
       name: 'group'
     })
 
+    // Background rect (makes bin visible even when empty)
+    const bgRect = new Konva.Rect({
+      x: -group.width / 2,
+      y: -group.height / 2,
+      width: group.width,
+      height: group.height,
+      fill: group.style.fill,
+      stroke: group.style.stroke,
+      strokeWidth: group.style.strokeWidth,
+      cornerRadius: group.style.cornerRadius ?? 0,
+      listening: false,
+      name: '__groupBg'
+    })
+    konvaGroup.add(bgRect)
+
     // Move children into group
     for (const childId of group.childIds) {
       const node = this.konvaMap.get(childId)
@@ -465,6 +480,27 @@ export class KonvaEngine implements LayoutEngine {
     if (patch.x !== undefined) konvaGroup.x(patch.x)
     if (patch.y !== undefined) konvaGroup.y(patch.y)
     if (patch.rotation !== undefined) konvaGroup.rotation(patch.rotation)
+
+    // Update background rect if width/height/style changed
+    if (patch.width !== undefined || patch.height !== undefined || patch.style !== undefined) {
+      const bgRect = konvaGroup.findOne('.__groupBg')
+      if (bgRect) {
+        if (patch.width !== undefined) {
+          bgRect.setAttrs({ width: group.width, x: -group.width / 2 })
+        }
+        if (patch.height !== undefined) {
+          bgRect.setAttrs({ height: group.height, y: -group.height / 2 })
+        }
+        if (patch.style) {
+          bgRect.setAttrs({
+            fill: group.style.fill,
+            stroke: group.style.stroke,
+            strokeWidth: group.style.strokeWidth,
+            cornerRadius: group.style.cornerRadius ?? 0
+          })
+        }
+      }
+    }
 
     this.mainLayer?.batchDraw()
   }

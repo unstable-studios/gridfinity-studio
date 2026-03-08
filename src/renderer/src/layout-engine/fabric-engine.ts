@@ -331,8 +331,24 @@ export class FabricEngine implements LayoutEngine {
     if (this.disposed) return
     this.groupMap.set(group.id, { ...group })
 
+    // Background rect for the group (makes it visible even when empty)
+    const bgRect = new fabric.Rect({
+      left: -group.width / 2,
+      top: -group.height / 2,
+      width: group.width,
+      height: group.height,
+      fill: group.style.fill,
+      stroke: group.style.stroke,
+      strokeWidth: group.style.strokeWidth,
+      rx: group.style.cornerRadius ?? 0,
+      ry: group.style.cornerRadius ?? 0,
+      selectable: false,
+      evented: false
+    })
+    ;(bgRect as unknown as Record<string, unknown>).__groupBg = true
+
     // Collect fabric objects for children
-    const children: fabric.FabricObject[] = []
+    const children: fabric.FabricObject[] = [bgRect]
     for (const childId of group.childIds) {
       const obj = this.fabricMap.get(childId)
       if (obj) {
@@ -349,6 +365,8 @@ export class FabricEngine implements LayoutEngine {
     const fabricGroup = new fabric.Group(children, {
       left: group.x,
       top: group.y,
+      width: group.width,
+      height: group.height,
       subTargetCheck: true,
       interactive: true
     })
@@ -372,6 +390,32 @@ export class FabricEngine implements LayoutEngine {
     if (patch.x !== undefined) fabricGroup.set('left', patch.x)
     if (patch.y !== undefined) fabricGroup.set('top', patch.y)
     if (patch.rotation !== undefined) fabricGroup.set('angle', patch.rotation)
+
+    // Update background rect if width/height/style changed
+    if (patch.width !== undefined || patch.height !== undefined || patch.style !== undefined) {
+      const bgRect = fabricGroup
+        .getObjects()
+        .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+      if (bgRect) {
+        if (patch.width !== undefined) {
+          bgRect.set('width', group.width)
+          bgRect.set('left', -group.width / 2)
+          fabricGroup.set('width', group.width)
+        }
+        if (patch.height !== undefined) {
+          bgRect.set('height', group.height)
+          bgRect.set('top', -group.height / 2)
+          fabricGroup.set('height', group.height)
+        }
+        if (patch.style) {
+          bgRect.set('fill', group.style.fill)
+          bgRect.set('stroke', group.style.stroke)
+          bgRect.set('strokeWidth', group.style.strokeWidth)
+          bgRect.set('rx', group.style.cornerRadius ?? 0)
+          bgRect.set('ry', group.style.cornerRadius ?? 0)
+        }
+      }
+    }
 
     fabricGroup.setCoords()
     this.canvas?.requestRenderAll()
