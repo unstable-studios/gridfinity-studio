@@ -405,8 +405,6 @@ export class FabricEngine implements LayoutEngine {
     const fabricGroup = this.fabricGroupMap.get(id)
     if (!fabricGroup) return
 
-    if (patch.x !== undefined) fabricGroup.set('left', patch.x)
-    if (patch.y !== undefined) fabricGroup.set('top', patch.y)
     if (patch.rotation !== undefined) fabricGroup.set('angle', patch.rotation)
 
     // Update background rect if width/height/style changed
@@ -434,6 +432,10 @@ export class FabricEngine implements LayoutEngine {
       // Force Fabric to recalculate group bounding box from children
       fabricGroup.triggerLayout()
     }
+
+    // Set position AFTER triggerLayout so it doesn't get overridden
+    if (patch.x !== undefined) fabricGroup.set('left', group.x)
+    if (patch.y !== undefined) fabricGroup.set('top', group.y)
 
     fabricGroup.setCoords()
     this.canvas?.requestRenderAll()
@@ -803,13 +805,13 @@ export class FabricEngine implements LayoutEngine {
 
   // ─── Private: Event handlers ────────────────────────────────────────────────
 
-  /** Disable scaling/rotation on Fabric's ActiveSelection when it contains groups */
-  private lockActiveSelectionIfGroups(): void {
+  /** Disable scaling/rotation on Fabric's ActiveSelection (multi-select frame) */
+  private lockActiveSelection(): void {
     if (!this.canvas) return
     const active = this.canvas.getActiveObject()
-    if (!active || active.type !== 'activeSelection') return
+    if (!active || !(active instanceof fabric.ActiveSelection)) return
 
-    // Always lock the multi-select frame — it shouldn't scale individual objects
+    // Lock the multi-select frame — it shouldn't scale/rotate individual objects
     active.set({
       lockScalingX: true,
       lockScalingY: true,
@@ -823,13 +825,13 @@ export class FabricEngine implements LayoutEngine {
 
     this.canvas.on('selection:created', () => {
       if (this.disposed) return
-      this.lockActiveSelectionIfGroups()
+      this.lockActiveSelection()
       this.emitter.emit('selectionChanged', { ids: this.getSelectedIds() })
     })
 
     this.canvas.on('selection:updated', () => {
       if (this.disposed) return
-      this.lockActiveSelectionIfGroups()
+      this.lockActiveSelection()
       this.emitter.emit('selectionChanged', { ids: this.getSelectedIds() })
     })
 
@@ -915,7 +917,7 @@ export class FabricEngine implements LayoutEngine {
       const size = this.gridConfig.size
 
       // Multi-select (ActiveSelection): snap the frame center to grid
-      if (obj.type === 'activeSelection') {
+      if (obj instanceof fabric.ActiveSelection) {
         const left = Math.round((obj.left ?? 0) / size) * size
         const top = Math.round((obj.top ?? 0) / size) * size
         obj.set({ left, top })

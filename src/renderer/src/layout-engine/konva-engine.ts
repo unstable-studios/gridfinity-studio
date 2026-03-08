@@ -244,6 +244,7 @@ export class KonvaEngine implements LayoutEngine {
           x: Math.round(node.x() / size) * size,
           y: Math.round(node.y() / size) * size
         })
+        this.transformer?.forceUpdate()
       }
     })
 
@@ -476,6 +477,10 @@ export class KonvaEngine implements LayoutEngine {
             x: Math.round((konvaGroup.x() - halfW) / size) * size + halfW,
             y: Math.round((konvaGroup.y() - halfH) / size) * size + halfH
           })
+          // Force transformer to follow the snapped position
+          if (this.transformer) {
+            this.transformer.forceUpdate()
+          }
         }
       }
     })
