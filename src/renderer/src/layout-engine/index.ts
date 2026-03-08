@@ -8,7 +8,8 @@ export type {
   TransientState,
   EngineEventMap,
   BinMetadata,
-  GroupDecoration
+  GroupDecoration,
+  ViewportInsets
 } from './types'
 export { isBinGroup } from './types'
 export { computeBinArtwork } from './bin-artwork'

@@ -304,13 +304,27 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
       expect(engine.getViewport().zoom).toBe(2)
     })
 
-    it('C14: resetView → viewport returns to origin', () => {
+    it('C14: resetView → viewport centers origin and resets zoom', () => {
       engine.panTo(100, 200)
       engine.zoomTo(3)
       engine.resetView()
       const vp = engine.getViewport()
-      expect(vp.panX).toBe(0)
-      expect(vp.panY).toBe(0)
+      // With an 800×600 container and no insets, origin is centered at (400, 300)
+      // → panX = -400, panY = -300
+      expect(vp.panX).toBeCloseTo(-400, 0)
+      expect(vp.panY).toBeCloseTo(-300, 0)
+      expect(vp.zoom).toBe(1)
+    })
+
+    it('C24: setViewportInsets shifts the visual center', () => {
+      // Simulate a 200px left sidebar
+      engine.setViewportInsets({ left: 200 })
+      engine.resetView()
+      const vp = engine.getViewport()
+      // Unoccluded center: (200 + 800) / 2 = 500, 600 / 2 = 300
+      // → panX = -500, panY = -300
+      expect(vp.panX).toBeCloseTo(-500, 0)
+      expect(vp.panY).toBeCloseTo(-300, 0)
       expect(vp.zoom).toBe(1)
     })
   })

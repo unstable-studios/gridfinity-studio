@@ -7,6 +7,7 @@ import type {
   LayoutSnapshot,
   GridConfig,
   ViewportState,
+  ViewportInsets,
   TransientState,
   EngineEventMap,
   GroupDecoration
@@ -161,6 +162,7 @@ export class FabricEngine implements LayoutEngine {
     grid: DEFAULT_GRID_COLOR,
     gridOrigin: DEFAULT_GRID_ORIGIN
   }
+  private insets: ViewportInsets = {}
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -188,11 +190,8 @@ export class FabricEngine implements LayoutEngine {
     this.setupPanZoom()
     this.setupSnapToGrid()
 
-    // Center origin in viewport
-    const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
-    vpt[4] = width / 2
-    vpt[5] = height / 2
-    this.canvas.setViewportTransform(vpt)
+    // Center origin in the visible (unoccluded) area of the viewport
+    this.centerOrigin()
 
     this.resizeObserver = new ResizeObserver((entries) => {
       if (this.disposed || !this.canvas) return
@@ -557,17 +556,28 @@ export class FabricEngine implements LayoutEngine {
 
   resetView(): void {
     if (this.disposed || !this.canvas) return
-    const w = this.canvas.getWidth()
-    const h = this.canvas.getHeight()
-    this.canvas.setViewportTransform([1, 0, 0, 1, w / 2, h / 2])
+    this.canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
+    this.centerOrigin()
     this.canvas.requestRenderAll()
-    this.emitter.emit('viewportChanged', { panX: -w / 2, panY: -h / 2, zoom: 1 })
+    const vp = this.getViewport()
+    this.emitter.emit('viewportChanged', vp)
   }
 
   getViewport(): ViewportState {
     if (!this.canvas) return { panX: 0, panY: 0, zoom: 1 }
     const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
     return { panX: -vpt[4] || 0, panY: -vpt[5] || 0, zoom: vpt[0] }
+  }
+
+  setViewportInsets(insets: ViewportInsets): void {
+    this.insets = insets
+    // Re-center with new insets
+    if (this.canvas && !this.disposed) {
+      this.centerOrigin()
+      this.canvas.requestRenderAll()
+      const vp = this.getViewport()
+      this.emitter.emit('viewportChanged', vp)
+    }
   }
 
   // ─── Grid ───────────────────────────────────────────────────────────────────
@@ -672,6 +682,26 @@ export class FabricEngine implements LayoutEngine {
 
   isInteracting(): boolean {
     return this.interacting
+  }
+
+  // ─── Private: Viewport centering ────────────────────────────────────────────
+
+  /** Center the world origin in the unoccluded area of the canvas. */
+  private centerOrigin(): void {
+    if (!this.canvas) return
+    const w = this.canvas.getWidth()
+    const h = this.canvas.getHeight()
+    const l = this.insets.left ?? 0
+    const r = this.insets.right ?? 0
+    const t = this.insets.top ?? 0
+    const b = this.insets.bottom ?? 0
+    // Visual center of the unoccluded area
+    const cx = (l + w - r) / 2
+    const cy = (t + h - b) / 2
+    const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
+    vpt[4] = cx
+    vpt[5] = cy
+    this.canvas.setViewportTransform(vpt)
   }
 
   // ─── Private: Grid ──────────────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import type {
   LayoutSnapshot,
   GridConfig,
   ViewportState,
+  ViewportInsets,
   TransientState,
   EngineEventMap,
   GroupDecoration
@@ -46,6 +47,12 @@ export interface LayoutEngine {
   zoomTo(level: number, center?: { x: number; y: number }): void
   resetView(): void
   getViewport(): ViewportState
+
+  /**
+   * Set viewport insets for UI overlays (sidebar, toolbar).
+   * Affects where resetView() and initial mount place the visual center.
+   */
+  setViewportInsets(insets: ViewportInsets): void
 
   // ─── Grid ───────────────────────────────────────────────────────────────────
   setGridConfig(config: Partial<GridConfig>): void

@@ -131,6 +131,22 @@ export interface RectDecoration {
 
 export type GroupDecoration = CircleDecoration | RectDecoration
 
+// ─── Viewport Insets ────────────────────────────────────────────────────────
+
+/**
+ * Insets describe UI elements (sidebar, toolbar) that overlap the canvas.
+ * The engine uses these to offset the "visual center" so that resetView()
+ * and initial mount center the origin in the unoccluded area.
+ *
+ * Values are in screen pixels.
+ */
+export interface ViewportInsets {
+  left?: number
+  right?: number
+  top?: number
+  bottom?: number
+}
+
 // ─── Grid ───────────────────────────────────────────────────────────────────
 
 export interface GridConfig {

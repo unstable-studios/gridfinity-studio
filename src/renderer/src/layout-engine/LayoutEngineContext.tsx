@@ -47,6 +47,9 @@ export function LayoutEngineProvider({
         resolvedTheme === 'light' ? 'rgba(100, 100, 120, 0.4)' : 'rgba(113, 113, 122, 0.35)'
     })
 
+    // Offset visual center for the sidebar overlay (w-64 + left-3 = 268px)
+    newEngine.setViewportInsets({ left: 268 })
+
     // Apply pending state from an engine switch
     const pending = pendingStateRef.current
     if (pending) {

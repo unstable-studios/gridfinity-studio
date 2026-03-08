@@ -7,6 +7,7 @@ import type {
   LayoutSnapshot,
   GridConfig,
   ViewportState,
+  ViewportInsets,
   TransientState,
   EngineEventMap,
   GroupDecoration
@@ -109,6 +110,7 @@ export class KonvaEngine implements LayoutEngine {
   private bgRect: Konva.Rect | null = null
   private gridBgRect: Konva.Rect | null = null
   private container: HTMLDivElement | null = null
+  private insets: ViewportInsets = {}
 
   // Pan state — isPanning is set from a DOM capture listener so it's
   // guaranteed to be true before Konva's internal drag tracking fires.
@@ -182,8 +184,8 @@ export class KonvaEngine implements LayoutEngine {
     this.setupEventHandlers()
     this.setupPanZoom()
 
-    // Center origin in viewport
-    this.stage.position({ x: width / 2, y: height / 2 })
+    // Center origin in the visible (unoccluded) area of the viewport
+    this.centerOrigin()
 
     this.resizeObserver = new ResizeObserver((entries) => {
       if (this.disposed || !this.stage) return
@@ -691,12 +693,11 @@ export class KonvaEngine implements LayoutEngine {
 
   resetView(): void {
     if (this.disposed || !this.stage) return
-    const w = this.stage.width()
-    const h = this.stage.height()
-    this.stage.position({ x: w / 2, y: h / 2 })
     this.stage.scale({ x: 1, y: 1 })
+    this.centerOrigin()
     this.stage.batchDraw()
-    this.emitter.emit('viewportChanged', { panX: -w / 2, panY: -h / 2, zoom: 1 })
+    const vp = this.getViewport()
+    this.emitter.emit('viewportChanged', vp)
   }
 
   getViewport(): ViewportState {
@@ -705,6 +706,16 @@ export class KonvaEngine implements LayoutEngine {
       panX: -this.stage.x() || 0,
       panY: -this.stage.y() || 0,
       zoom: this.stage.scaleX()
+    }
+  }
+
+  setViewportInsets(insets: ViewportInsets): void {
+    this.insets = insets
+    if (this.stage && !this.disposed) {
+      this.centerOrigin()
+      this.stage.batchDraw()
+      const vp = this.getViewport()
+      this.emitter.emit('viewportChanged', vp)
     }
   }
 
@@ -801,6 +812,23 @@ export class KonvaEngine implements LayoutEngine {
 
   isInteracting(): boolean {
     return this.interacting
+  }
+
+  // ─── Private: Viewport centering ────────────────────────────────────────────
+
+  /** Center the world origin in the unoccluded area of the stage. */
+  private centerOrigin(): void {
+    if (!this.stage) return
+    const w = this.stage.width()
+    const h = this.stage.height()
+    const l = this.insets.left ?? 0
+    const r = this.insets.right ?? 0
+    const t = this.insets.top ?? 0
+    const b = this.insets.bottom ?? 0
+    // Visual center of the unoccluded area
+    const cx = (l + w - r) / 2
+    const cy = (t + h - b) / 2
+    this.stage.position({ x: cx, y: cy })
   }
 
   // ─── Private: Grid ──────────────────────────────────────────────────────────
