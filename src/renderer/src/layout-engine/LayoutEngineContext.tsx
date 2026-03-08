@@ -67,6 +67,7 @@ export function LayoutEngineProvider({
         setEngineState((prev) => (prev.engine === newEngine ? { ...prev, engine: null } : prev))
       })
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engineState.type])
 
   // Update theme colors when theme changes
