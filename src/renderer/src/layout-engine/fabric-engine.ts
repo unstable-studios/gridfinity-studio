@@ -916,25 +916,21 @@ export class FabricEngine implements LayoutEngine {
       if (!obj) return
       const size = this.gridConfig.size
 
-      // Multi-select (ActiveSelection): snap the frame center to grid
-      if (obj instanceof fabric.ActiveSelection) {
-        const left = Math.round((obj.left ?? 0) / size) * size
-        const top = Math.round((obj.top ?? 0) / size) * size
-        obj.set({ left, top })
-        obj.setCoords()
-        return
-      }
+      // Multi-select: Fabric handles each object individually via
+      // ActiveSelection, so no special case needed — each group snaps
+      // its own lower-left corner.
 
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {
-        // Snap group edges to grid
+        // Snap group lower-left corner to grid
         const group = this.groupMap.get(groupId)
         if (group) {
           const halfW = group.width / 2
           const halfH = group.height / 2
-          const left = Math.round(((obj.left ?? 0) - halfW) / size) * size + halfW
-          const top = Math.round(((obj.top ?? 0) - halfH) / size) * size + halfH
-          obj.set({ left, top })
+          // Lower-left corner in screen coords: (left - halfW, top + halfH)
+          const snappedLeft = Math.round(((obj.left ?? 0) - halfW) / size) * size
+          const snappedBottom = Math.round(((obj.top ?? 0) + halfH) / size) * size
+          obj.set({ left: snappedLeft + halfW, top: snappedBottom - halfH })
         }
       } else {
         // Snap shape center to grid
