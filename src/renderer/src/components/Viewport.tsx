@@ -62,11 +62,11 @@ function EngineToolbar(): React.JSX.Element {
   }, [engine])
 
   const undo = useCallback(() => {
-    if (!engine || undoStackRef.current.length === 0) return
+    if (!engine || undoStackRef.current.length < 2) return
     isUndoingRef.current = true
-    // Save current state to redo
-    redoStackRef.current.push(JSON.stringify(engine.toSnapshot()))
-    const json = undoStackRef.current.pop()!
+    // Move current state to redo, load previous
+    redoStackRef.current.push(undoStackRef.current.pop()!)
+    const json = undoStackRef.current[undoStackRef.current.length - 1]
     engine.loadSnapshot(JSON.parse(json))
     setUndoLen(undoStackRef.current.length)
     setRedoLen(redoStackRef.current.length)
@@ -109,10 +109,11 @@ function EngineToolbar(): React.JSX.Element {
     } catch {
       // Ignore corrupt data
     }
-    // Initialize undo stack with initial state
-    undoStackRef.current = []
+    // Initialize undo stack with baseline state
+    const baseline = JSON.stringify(engine.toSnapshot())
+    undoStackRef.current = [baseline]
     redoStackRef.current = []
-    setUndoLen(0)
+    setUndoLen(1)
     setRedoLen(0)
   }, [engine])
 

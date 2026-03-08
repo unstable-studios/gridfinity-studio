@@ -28,11 +28,11 @@ export function useProjectEngineSync(): {
     engine.loadSnapshot(snapshot)
   }, [engine, project?.layoutSnapshot])
 
-  // Reset loaded flag when project changes (new project or different file)
+  // Reset loaded flag when project or engine changes (new project, different file, or engine switch)
   const projectId = project?.settings?.createdAt
   useEffect(() => {
     loadedRef.current = false
-  }, [projectId])
+  }, [projectId, engine])
 
   const captureSnapshot = useCallback((): void => {
     if (!engine) return

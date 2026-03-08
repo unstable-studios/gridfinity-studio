@@ -9,6 +9,8 @@ export interface BaseShape {
   stroke: string
   strokeWidth: number
   groupId: string | null
+  scaleX?: number
+  scaleY?: number
   lockAspectRatio?: boolean
   metadata?: Record<string, unknown>
 }

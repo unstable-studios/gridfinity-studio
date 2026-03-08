@@ -67,7 +67,9 @@ function layoutShapeToFabric(shape: LayoutShape): fabric.FabricObject {
     objectCaching: false,
     originX: 'center',
     originY: 'center',
-    lockUniScaling: shape.lockAspectRatio ?? false
+    lockUniScaling: shape.lockAspectRatio ?? false,
+    scaleX: shape.scaleX ?? 1,
+    scaleY: shape.scaleY ?? 1
   })
 
   // Store shape ID on the fabric object for reverse lookup
@@ -119,14 +121,18 @@ function fabricObjToLayoutShape(obj: fabric.FabricObject, shapeData: LayoutShape
         ...base,
         type: 'svgPath',
         pathData: shapeData.pathData,
-        viewBox: shapeData.viewBox
+        viewBox: shapeData.viewBox,
+        scaleX: obj.scaleX ?? 1,
+        scaleY: obj.scaleY ?? 1
       }
     case 'meshImport':
       return {
         ...base,
         type: 'meshImport',
         meshRef: shapeData.meshRef,
-        silhouettePath: shapeData.silhouettePath
+        silhouettePath: shapeData.silhouettePath,
+        scaleX: obj.scaleX ?? 1,
+        scaleY: obj.scaleY ?? 1
       }
   }
 }
@@ -764,6 +770,18 @@ export class FabricEngine implements LayoutEngine {
       if (!id) return
 
       this.emitter.emit('shapeMoved', { id, x: obj.left ?? 0, y: obj.top ?? 0 })
+
+      // Emit shapeResized with current dimensions
+      const data = this.shapeMap.get(id)
+      if (data) {
+        const shape = fabricObjToLayoutShape(obj, data)
+        const resizePayload: EngineEventMap['shapeResized'] = { id }
+        if ('width' in shape) resizePayload.width = shape.width
+        if ('height' in shape) resizePayload.height = shape.height
+        if ('radiusX' in shape) resizePayload.radiusX = shape.radiusX
+        if ('radiusY' in shape) resizePayload.radiusY = shape.radiusY
+        this.emitter.emit('shapeResized', resizePayload)
+      }
     })
 
     this.canvas.on('mouse:down', () => {

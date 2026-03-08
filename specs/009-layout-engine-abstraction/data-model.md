@@ -15,11 +15,14 @@ The canonical shape representation shared between engines and the host app. No e
 | type | `'rect' \| 'circle' \| 'polygon' \| 'svgPath' \| 'meshImport'` | yes | Discriminant |
 | x | number | yes | World-space X position (left edge for rect, center for circle/polygon) |
 | y | number | yes | World-space Y position (top edge for rect, center for circle/polygon) |
-| rotation | number | yes | Rotation in radians, default 0 |
+| rotation | number | yes | Rotation in degrees, default 0 |
 | fill | string | yes | CSS color string |
 | stroke | string | yes | CSS color string |
 | strokeWidth | number | yes | Stroke width in px |
 | groupId | string \| null | yes | Parent group ID, or null if top-level |
+| scaleX | number | no | Horizontal scale factor (default 1, used by svgPath/meshImport) |
+| scaleY | number | no | Vertical scale factor (default 1, used by svgPath/meshImport) |
+| lockAspectRatio | boolean | no | When true, aspect ratio is locked during resize |
 | metadata | Record<string, unknown> | no | Extensible metadata (mesh ref, offset tolerance, etc.) |
 
 **Type-specific fields:**
@@ -27,7 +30,7 @@ The canonical shape representation shared between engines and the host app. No e
 | Type | Additional Fields |
 |------|-------------------|
 | rect | `width: number`, `height: number`, `cornerRadius?: number` |
-| circle | `radius: number` |
+| circle | `radiusX: number`, `radiusY: number` |
 | polygon | `points: { x: number; y: number }[]` (vertices relative to position) |
 | svgPath | `pathData: string` (SVG path d attribute), `viewBox?: { width: number; height: number }` |
 | meshImport | `meshRef: string` (reference to imported file), `silhouettePath?: string` (SVG path for 2D projection) |
@@ -43,7 +46,7 @@ Represents a bin containing pocket shapes. Groups can be nested (future-proofing
 | y | number | yes | World-space Y position |
 | width | number | yes | Group bounding width (grid units × baseUnit) |
 | height | number | yes | Group bounding height (grid units × baseUnit) |
-| rotation | number | yes | Rotation in radians, default 0 |
+| rotation | number | yes | Rotation in degrees, default 0 |
 | childIds | string[] | yes | Ordered list of child LayoutShape IDs |
 | style | GroupStyle | yes | Visual style (fill, stroke, cornerRadius) |
 
@@ -98,7 +101,7 @@ Captured separately for engine switching. Not persisted to project files.
 |------------|---------|-------------|
 | selectionChanged | `{ ids: string[] }` | Selection changes (click, shift-click, marquee, clear, programmatic) |
 | shapeMoved | `{ id: string, x: number, y: number }` | Shape position changed (drag end) |
-| shapeResized | `{ id: string, width?: number, height?: number, radius?: number, scaleX?: number, scaleY?: number }` | Shape dimensions changed (transform end) |
+| shapeResized | `{ id: string, width?: number, height?: number, radiusX?: number, radiusY?: number }` | Shape dimensions changed (transform end) |
 | shapeCreated | `{ shape: LayoutShape }` | New shape added to canvas |
 | shapeDeleted | `{ id: string }` | Shape removed from canvas |
 | groupChanged | `{ groupId: string, childIds: string[] }` | Group membership changed (add/remove children) |

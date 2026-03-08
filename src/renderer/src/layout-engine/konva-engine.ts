@@ -73,6 +73,8 @@ function layoutShapeToKonva(shape: LayoutShape): Konva.Shape {
     stroke: shape.stroke,
     strokeWidth: shape.strokeWidth,
     strokeScaleEnabled: false,
+    scaleX: shape.scaleX ?? 1,
+    scaleY: shape.scaleY ?? 1,
     draggable: true
   })
 
@@ -402,6 +404,10 @@ export class KonvaEngine implements LayoutEngine {
       for (let i = 0; i < pts.length; i += 2) {
         result.points.push({ x: pts[i] * sx, y: pts[i + 1] * sy })
       }
+    } else if (sx !== 1 || sy !== 1) {
+      // svgPath/meshImport: persist scale for faithful roundtrip
+      result.scaleX = sx
+      result.scaleY = sy
     }
 
     return result
