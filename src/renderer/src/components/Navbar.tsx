@@ -74,7 +74,10 @@ export default function Navbar(): React.JSX.Element {
 
   return (
     <>
-      <NavbarRoot brand={<Logo />} className="relative z-50 max-w-none [&>div]:max-w-none py-2">
+      <NavbarRoot
+        brand={<Logo />}
+        className="relative z-50 max-w-none [&>div]:max-w-none py-2 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950"
+      >
         <NavbarContent className="gap-1">
           <AppMenubar
             onOpenPreferences={() => setPrefsOpen(true)}

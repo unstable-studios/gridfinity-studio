@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useContext, useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '@unstable-studios/ui'
 import { resolveColors } from '@/lib/theme-config'
 import type { EngineType } from './create-engine'
@@ -107,11 +107,20 @@ export function LayoutEngineProvider({
       value={{
         engine: engineState.engine,
         engineType: engineState.type,
-        setEngineType: handleSetEngineType
+        setEngineType: handleSetEngineType,
+        containerRef
       }}
     >
-      <div ref={containerRef} className="absolute inset-0" />
       {children}
     </LayoutEngineCtx.Provider>
   )
+}
+
+/**
+ * Renders the canvas mount point. Place this inside the area where you want
+ * the engine canvas to appear (e.g. the Viewport component).
+ */
+export function LayoutEngineCanvas(): React.JSX.Element {
+  const { containerRef } = useContext(LayoutEngineCtx)
+  return <div ref={containerRef} className="absolute inset-0" />
 }

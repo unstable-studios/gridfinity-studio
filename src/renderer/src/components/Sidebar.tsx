@@ -42,7 +42,7 @@ export default function Sidebar(): React.JSX.Element {
   }, [bins, baseUnit])
 
   return (
-    <aside className="w-72 shrink-0 rounded-xl border border-zinc-300/80 bg-white/80 px-4 py-5 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 overflow-y-auto">
+    <aside className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto">
       {!binsOverlap && bins.map((bin) => <BinBaker key={bin.id} bin={bin} />)}
       {mode === 'layout' ? <LayoutSidebar /> : <ReviewSidebar binsOverlap={binsOverlap} />}
     </aside>

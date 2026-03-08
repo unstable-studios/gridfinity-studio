@@ -12,7 +12,7 @@ export type {
 export { isBinGroup } from './types'
 export { createLayoutEngine, registerEngine } from './create-engine'
 export type { EngineType } from './create-engine'
-export { LayoutEngineProvider } from './LayoutEngineContext'
+export { LayoutEngineProvider, LayoutEngineCanvas } from './LayoutEngineContext'
 export { useLayoutEngineContext, useLayoutEngine, useEngineState } from './useLayoutEngine'
 export { useProjectEngineSync } from './useProjectEngineSync'
 export { useEngineUndoRedo } from './useEngineUndoRedo'

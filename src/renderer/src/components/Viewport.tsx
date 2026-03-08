@@ -4,6 +4,7 @@ import { useProject } from '@/hooks/useProject'
 import ReviewCanvas from './review/ReviewCanvas'
 import {
   LayoutEngineProvider,
+  LayoutEngineCanvas,
   useLayoutEngineContext,
   useEngineUndoRedo,
   useProjectEngineSync
@@ -364,9 +365,10 @@ export default function Viewport(): React.JSX.Element {
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
   return (
-    <div className="relative flex-1 min-h-0 overflow-hidden rounded-xl border border-zinc-300 bg-linear-to-b from-zinc-100/50 via-white to-zinc-100 shadow-inner dark:border-zinc-800 dark:from-zinc-900/50 dark:via-zinc-900 dark:to-zinc-900/70">
+    <div className="absolute inset-0 overflow-hidden">
       {mode === 'layout' && (
         <div className="relative h-full">
+          <LayoutEngineCanvas />
           <LayoutViewport />
         </div>
       )}
@@ -376,6 +378,7 @@ export default function Viewport(): React.JSX.Element {
       {mode === 'sandbox' && (
         <div className="relative h-full">
           <LayoutEngineProvider engineType={engineType}>
+            <LayoutEngineCanvas />
             <SandboxToolbar />
           </LayoutEngineProvider>
         </div>

@@ -22,10 +22,12 @@ function AppContent(): React.JSX.Element {
 
   const content = (
     <>
+      {/* Navbar: solid bar at top */}
       <Navbar />
-      <div className="flex flex-1 gap-4 overflow-hidden p-4 min-h-0">
-        <Sidebar />
+      {/* Canvas fills remaining space; sidebar floats above it */}
+      <div className="relative flex-1 min-h-0 overflow-hidden">
         <Viewport />
+        <Sidebar />
       </div>
     </>
   )
