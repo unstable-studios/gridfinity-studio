@@ -2277,7 +2277,7 @@ packages:
     resolution: {integrity: sha512-WmoN8qaIAo7WTYWbAZuG8PYEhn5fkz7dZrqTBZ7dtt//lL2Gwms1IcnQ5yHqjDfX8Ft5j4YzDM23f87zBfDe9g==}
 
   '@unstable-studios/ui@0.1.10':
-    resolution: {integrity: sha512-1ROrRu6CNjpIRGVO9AvRXHX8p5OEoklJkivuNuTBdFC+Bf5G/5Q6mMYb4rrMlZeIGdxnxRM1Aa02ptVe8MTs2g==}
+    resolution: {integrity: sha512-1ROrRu6CNjpIRGVO9AvRXHX8p5OEoklJkivuNuTBdFC+Bf5G/5Q6mMYb4rrMlZeIGdxnxRM1Aa02ptVe8MTs2g==, tarball: https://npm.pkg.github.com/download/@unstable-studios/ui/0.1.10/f01677c06a3ab8b313e91b9888a97bbf4721c201}
     engines: {node: '>=22.22.0'}
     peerDependencies:
       react: '>=19.2.4'
