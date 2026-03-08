@@ -78,6 +78,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
       fill: group.style.fill,
       stroke: group.style.stroke,
       strokeWidth: group.style.strokeWidth,
+      strokeScaleEnabled: false,
       cornerRadius: group.style.cornerRadius ?? 0,
       listening: true,
       name: '__groupBg'
@@ -266,16 +267,18 @@ export class KonvaGroupRenderer implements GroupRenderer {
   }
 
   private setupResizeHandlers(): void {
-    // Save bounds before resize for edge-anchoring calculation.
+    // Save bounds before resize; show ghost preview (hide decorations, fade fill).
     this.konvaGroup.on('transformstart', () => {
       const pos = this.readPosition()
       this.preResizeBounds = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+      this.setResizeGhost(true)
     })
 
     // Konva Transformer applies scale to the group during resize.
     // Don't snap during live drag — modifying scale inside `transform` fights
     // the Transformer's position anchoring. Snap on release only.
     this.konvaGroup.on('transformend', () => {
+      this.setResizeGhost(false)
       const gridConfig = this.deps.getGridConfig()
       const gs = gridConfig.size
       const orig = this.preResizeBounds
@@ -366,6 +369,19 @@ export class KonvaGroupRenderer implements GroupRenderer {
     if (selectedNodes.some((n) => n.id() === this.groupId)) {
       transformer.forceUpdate()
     }
+  }
+
+  /** Toggle ghost preview during resize: hide decorations, fade fill. */
+  private setResizeGhost(ghost: boolean): void {
+    const decorations = this.konvaGroup.find('.__binArtwork')
+    for (const node of decorations) {
+      node.visible(!ghost)
+    }
+    const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
+    if (bgRect) {
+      bgRect.opacity(ghost ? 0.4 : 1)
+    }
+    this.deps.layer.batchDraw()
   }
 
   /** Brief red flash on the group border to indicate a collision rejection. */

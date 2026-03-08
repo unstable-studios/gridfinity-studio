@@ -830,8 +830,12 @@ export class FabricEngine implements LayoutEngine {
 
       // Skip groups — their resize is finalized in object:modified to avoid
       // fighting between live scale snap and Fabric's position anchoring.
+      // Show ghost preview (hide decorations, fade fill) while scaling.
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
-      if (groupId) return
+      if (groupId) {
+        this.setResizeGhost(groupId, true)
+        return
+      }
 
       if (obj instanceof fabric.Polygon || obj instanceof fabric.Path) return
 
@@ -914,6 +918,9 @@ export class FabricEngine implements LayoutEngine {
     const renderer = this.rendererMap.get(groupId)
     const group = this.groupMap.get(groupId)
     if (!renderer || !group) return
+
+    // Restore from ghost preview (if resize was in progress)
+    this.setResizeGhost(groupId, false)
 
     const gs = this.gridConfig.size
     const saved = this.preDragState.get(groupId)
@@ -1020,6 +1027,24 @@ export class FabricEngine implements LayoutEngine {
       this.lastGoodPos.delete(groupId)
       this.emitter.emit('groupMoved', { id: groupId, x: group.x, y: group.y })
     }
+  }
+
+  /** Toggle ghost preview during resize: hide decorations, fade fill. */
+  private setResizeGhost(groupId: string, ghost: boolean): void {
+    const renderer = this.rendererMap.get(groupId)
+    if (!renderer) return
+    const objects = renderer.fabricGroup.getObjects()
+    for (const obj of objects) {
+      const rec = obj as unknown as Record<string, unknown>
+      if (rec.__binArtwork) {
+        obj.set('visible', !ghost)
+      }
+      if (rec.__groupBg) {
+        obj.set('opacity', ghost ? 0.4 : 1)
+      }
+    }
+    renderer.fabricGroup.set('dirty', true)
+    this.canvas?.requestRenderAll()
   }
 
   /** Brief red flash on the group border to indicate a collision rejection. */

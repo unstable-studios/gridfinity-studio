@@ -33,6 +33,7 @@ export class FabricGroupRenderer implements GroupRenderer {
       fill: group.style.fill,
       stroke: group.style.stroke,
       strokeWidth: group.style.strokeWidth,
+      strokeUniform: true,
       rx: group.style.cornerRadius ?? 0,
       ry: group.style.cornerRadius ?? 0,
       selectable: false,
