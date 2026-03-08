@@ -22,22 +22,20 @@ export function useProjectEngineSync(): {
   const engine = useLayoutEngine()
   const { saveProject, saveProjectAs, setLayoutSnapshot } = useProject()
   const project = useProject((s) => s.project)
-  const loadedRef = useRef(false)
+  const loadedProjectRef = useRef<string | null>(null)
 
-  // On project load: restore engine state from layoutSnapshot
+  // On project load: restore engine state from layoutSnapshot.
+  // Only runs when a NEW project is loaded (different createdAt), not on engine switches.
+  // Engine switches preserve state via LayoutEngineContext's pendingStateRef.
+  const projectId = project?.settings?.createdAt ?? null
   useEffect(() => {
-    if (!engine || !project?.layoutSnapshot || loadedRef.current) return
-    loadedRef.current = true
+    if (!engine || !project?.layoutSnapshot) return
+    if (loadedProjectRef.current === projectId) return
+    loadedProjectRef.current = projectId
 
     // LayoutSnapshotData → LayoutSnapshot: structurally equivalent
     engine.loadSnapshot(project.layoutSnapshot as unknown as LayoutSnapshot)
-  }, [engine, project?.layoutSnapshot])
-
-  // Reset loaded flag when project or engine changes
-  const projectId = project?.settings?.createdAt
-  useEffect(() => {
-    loadedRef.current = false
-  }, [projectId, engine])
+  }, [engine, project?.layoutSnapshot, projectId])
 
   const captureSnapshot = useCallback((): void => {
     if (!engine) return

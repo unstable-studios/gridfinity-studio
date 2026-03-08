@@ -373,12 +373,15 @@ export default function Viewport(): React.JSX.Element {
 
   return (
     <div className="absolute inset-0 overflow-hidden">
-      {mode === 'layout' && (
-        <div className="relative h-full">
-          <LayoutEngineCanvas />
-          <LayoutViewport />
-        </div>
-      )}
+      {/* Layout canvas always mounted so engine survives mode switches */}
+      <div
+        className={
+          mode === 'layout' ? 'relative h-full' : 'absolute inset-0 invisible pointer-events-none'
+        }
+      >
+        <LayoutEngineCanvas />
+        {mode === 'layout' && <LayoutViewport />}
+      </div>
       <div className={mode === 'review' ? 'h-full' : 'hidden'}>
         <ReviewCanvas bakeResults={bakeResults} baseUnit={baseUnit} />
       </div>
