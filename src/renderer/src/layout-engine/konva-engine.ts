@@ -693,7 +693,6 @@ export class KonvaEngine implements LayoutEngine {
 
   resetView(): void {
     if (this.disposed || !this.stage) return
-    this.stage.scale({ x: 1, y: 1 })
     this.centerOrigin()
     this.stage.batchDraw()
     const vp = this.getViewport()
@@ -816,19 +815,25 @@ export class KonvaEngine implements LayoutEngine {
 
   // ─── Private: Viewport centering ────────────────────────────────────────────
 
-  /** Center the world origin in the unoccluded area of the stage. */
+  /**
+   * Position the world origin near the bottom-left of the unoccluded stage
+   * area with 1.5 grid-unit padding. Zoom is derived from grid size alone
+   * (not viewport dimensions) so resizing the window changes how many cells
+   * are visible, not how large they appear.
+   */
   private centerOrigin(): void {
     if (!this.stage) return
-    const w = this.stage.width()
     const h = this.stage.height()
     const l = this.insets.left ?? 0
-    const r = this.insets.right ?? 0
-    const t = this.insets.top ?? 0
     const b = this.insets.bottom ?? 0
-    // Visual center of the unoccluded area
-    const cx = (l + w - r) / 2
-    const cy = (t + h - b) / 2
-    this.stage.position({ x: cx, y: cy })
+    const gs = this.gridConfig.size
+    // Target: each grid cell ≈ 64 screen pixels at default zoom
+    const zoom = 64 / gs
+    const pad = 1.5 * gs * zoom
+    const ox = l + pad
+    const oy = h - b - pad
+    this.stage.scale({ x: zoom, y: zoom })
+    this.stage.position({ x: ox, y: oy })
   }
 
   // ─── Private: Grid ──────────────────────────────────────────────────────────

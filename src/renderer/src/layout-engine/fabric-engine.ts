@@ -556,7 +556,6 @@ export class FabricEngine implements LayoutEngine {
 
   resetView(): void {
     if (this.disposed || !this.canvas) return
-    this.canvas.setViewportTransform([1, 0, 0, 1, 0, 0])
     this.centerOrigin()
     this.canvas.requestRenderAll()
     const vp = this.getViewport()
@@ -686,22 +685,24 @@ export class FabricEngine implements LayoutEngine {
 
   // ─── Private: Viewport centering ────────────────────────────────────────────
 
-  /** Center the world origin in the unoccluded area of the canvas. */
+  /**
+   * Position the world origin near the bottom-left of the unoccluded canvas
+   * area with 1.5 grid-unit padding. Zoom is derived from grid size alone
+   * (not viewport dimensions) so resizing the window changes how many cells
+   * are visible, not how large they appear.
+   */
   private centerOrigin(): void {
     if (!this.canvas) return
-    const w = this.canvas.getWidth()
     const h = this.canvas.getHeight()
     const l = this.insets.left ?? 0
-    const r = this.insets.right ?? 0
-    const t = this.insets.top ?? 0
     const b = this.insets.bottom ?? 0
-    // Visual center of the unoccluded area
-    const cx = (l + w - r) / 2
-    const cy = (t + h - b) / 2
-    const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
-    vpt[4] = cx
-    vpt[5] = cy
-    this.canvas.setViewportTransform(vpt)
+    const gs = this.gridConfig.size
+    // Target: each grid cell ≈ 64 screen pixels at default zoom
+    const zoom = 64 / gs
+    const pad = 1.5 * gs * zoom
+    const ox = l + pad
+    const oy = h - b - pad
+    this.canvas.setViewportTransform([zoom, 0, 0, zoom, ox, oy])
   }
 
   // ─── Private: Grid ──────────────────────────────────────────────────────────

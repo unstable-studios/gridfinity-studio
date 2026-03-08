@@ -304,28 +304,44 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
       expect(engine.getViewport().zoom).toBe(2)
     })
 
-    it('C14: resetView → viewport centers origin and resets zoom', () => {
+    it('C14: resetView → origin at bottom-left, zoom derived from grid size', () => {
       engine.panTo(100, 200)
       engine.zoomTo(3)
       engine.resetView()
       const vp = engine.getViewport()
-      // With an 800×600 container and no insets, origin is centered at (400, 300)
-      // → panX = -400, panY = -300
-      expect(vp.panX).toBeCloseTo(-400, 0)
-      expect(vp.panY).toBeCloseTo(-300, 0)
-      expect(vp.zoom).toBe(1)
+      // zoom = 64 / gridSize, independent of viewport dimensions
+      const gs = 42
+      const expectedZoom = 64 / gs
+      const expectedPad = 1.5 * gs * expectedZoom // = 96
+      expect(vp.zoom).toBeCloseTo(expectedZoom, 2)
+      expect(vp.panX).toBeCloseTo(-expectedPad, 0)
+      expect(vp.panY).toBeCloseTo(-(600 - expectedPad), 0)
     })
 
-    it('C24: setViewportInsets shifts the visual center', () => {
-      // Simulate a 200px left sidebar
+    it('C24: setViewportInsets shifts origin but zoom stays the same', () => {
       engine.setViewportInsets({ left: 200 })
       engine.resetView()
       const vp = engine.getViewport()
-      // Unoccluded center: (200 + 800) / 2 = 500, 600 / 2 = 300
-      // → panX = -500, panY = -300
-      expect(vp.panX).toBeCloseTo(-500, 0)
-      expect(vp.panY).toBeCloseTo(-300, 0)
-      expect(vp.zoom).toBe(1)
+      // zoom still = 64/42, only origin x shifts by the inset
+      const gs = 42
+      const expectedZoom = 64 / gs
+      const expectedPad = 1.5 * gs * expectedZoom
+      expect(vp.zoom).toBeCloseTo(expectedZoom, 2)
+      expect(vp.panX).toBeCloseTo(-(200 + expectedPad), 0)
+      expect(vp.panY).toBeCloseTo(-(600 - expectedPad), 0)
+    })
+
+    it('C25: resetView zoom scales with grid size, not viewport', () => {
+      engine.setGridConfig({ size: 80 })
+      engine.resetView()
+      const vp = engine.getViewport()
+      // zoom = 64/80 = 0.8, pad = 1.5 * 80 * 0.8 = 96
+      const gs = 80
+      const expectedZoom = 64 / gs
+      const expectedPad = 1.5 * gs * expectedZoom
+      expect(vp.zoom).toBeCloseTo(expectedZoom, 2)
+      expect(vp.panX).toBeCloseTo(-expectedPad, 0)
+      expect(vp.panY).toBeCloseTo(-(600 - expectedPad), 0)
     })
   })
 
