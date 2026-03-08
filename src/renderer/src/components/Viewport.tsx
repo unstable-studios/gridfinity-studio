@@ -11,6 +11,7 @@ import {
   useProjectEngineSync,
   useBinArtwork
 } from '@/layout-engine'
+import DrawingToolLayer from './DrawingToolLayer'
 import HintCard from './HintCard'
 
 // ─── Sandbox helpers (only used in sandbox mode) ────────────────────────────
@@ -387,6 +388,7 @@ export default function Viewport(): React.JSX.Element {
       >
         <LayoutEngineCanvas />
         {mode === 'layout' && <LayoutViewport />}
+        {mode === 'layout' && <DrawingToolLayer />}
       </div>
       <div className={mode === 'review' ? 'h-full' : 'hidden'}>
         <ReviewCanvas bakeResults={bakeResults} baseUnit={baseUnit} />
