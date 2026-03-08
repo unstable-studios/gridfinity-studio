@@ -4,8 +4,10 @@ import type {
   LayoutSnapshot,
   GridConfig,
   ViewportState,
+  ViewportInsets,
   TransientState,
-  EngineEventMap
+  EngineEventMap,
+  GroupDecoration
 } from './types'
 
 export interface LayoutEngine {
@@ -30,6 +32,10 @@ export interface LayoutEngine {
   getGroup(id: string): LayoutGroup | undefined
   getAllGroups(): LayoutGroup[]
 
+  // ─── Group Decorations ─────────────────────────────────────────────────────
+  /** Render non-interactive artwork within a group (replaces any existing decorations) */
+  setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void
+
   // ─── Selection ──────────────────────────────────────────────────────────────
   select(ids: string[]): void
   addToSelection(ids: string[]): void
@@ -41,6 +47,12 @@ export interface LayoutEngine {
   zoomTo(level: number, center?: { x: number; y: number }): void
   resetView(): void
   getViewport(): ViewportState
+
+  /**
+   * Set viewport insets for UI overlays (sidebar, toolbar).
+   * Affects where resetView() and initial mount position the origin.
+   */
+  setViewportInsets(insets: ViewportInsets): void
 
   // ─── Grid ───────────────────────────────────────────────────────────────────
   setGridConfig(config: Partial<GridConfig>): void

@@ -103,6 +103,51 @@ export function isBinGroup(group: LayoutGroup): group is LayoutGroup & { metadat
   )
 }
 
+// ─── Group Decorations (non-interactive artwork within groups) ───────────────
+
+export interface CircleDecoration {
+  type: 'circle'
+  cx: number
+  cy: number
+  radius: number
+  stroke: string
+  strokeWidth: number
+  fill: string
+  dash?: number[]
+}
+
+export interface RectDecoration {
+  type: 'rect'
+  x: number
+  y: number
+  width: number
+  height: number
+  cornerRadius?: number
+  stroke: string
+  strokeWidth: number
+  fill: string
+  dash?: number[]
+}
+
+export type GroupDecoration = CircleDecoration | RectDecoration
+
+// ─── Viewport Insets ────────────────────────────────────────────────────────
+
+/**
+ * Insets describe UI elements (sidebar, toolbar) that overlap the canvas.
+ * The engine uses these to position the origin near the bottom-left of the
+ * unoccluded area (with padding) and to derive the default viewport when
+ * resetView() runs or the engine is initially mounted.
+ *
+ * Values are in screen pixels.
+ */
+export interface ViewportInsets {
+  left?: number
+  right?: number
+  top?: number
+  bottom?: number
+}
+
 // ─── Grid ───────────────────────────────────────────────────────────────────
 
 export interface GridConfig {

@@ -216,6 +216,50 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
     })
   })
 
+  // ─── C22: Group positions stable under multi-select ────────────────────────
+
+  describe('Group position stability', () => {
+    it('C22: getAllGroups returns correct positions when multiple groups are selected', () => {
+      // When multiple groups are selected in Fabric, an ActiveSelection wraps
+      // them and changes their left/top to selection-relative coords. The engine
+      // must still return world-space positions from getGroup/getAllGroups.
+      const g1 = makeGroup({ id: 'g1', x: 0, y: 84, width: 84, height: 84 })
+      const g2 = makeGroup({ id: 'g2', x: 126, y: 84, width: 84, height: 84 })
+      engine.createGroup(g1)
+      engine.createGroup(g2)
+
+      // Select both — in Fabric this creates an ActiveSelection
+      engine.select(['g1', 'g2'])
+
+      const groups = engine.getAllGroups()
+      const got1 = groups.find((g) => g.id === 'g1')!
+      const got2 = groups.find((g) => g.id === 'g2')!
+
+      expect(got1.x).toBeCloseTo(0, 0)
+      expect(got1.y).toBeCloseTo(84, 0)
+      expect(got2.x).toBeCloseTo(126, 0)
+      expect(got2.y).toBeCloseTo(84, 0)
+    })
+
+    it('C23: toSnapshot preserves group positions when groups are selected', () => {
+      const g1 = makeGroup({ id: 'g1', x: 0, y: 84, width: 84, height: 84 })
+      const g2 = makeGroup({ id: 'g2', x: 126, y: 84, width: 84, height: 84 })
+      engine.createGroup(g1)
+      engine.createGroup(g2)
+
+      engine.select(['g1', 'g2'])
+      const snapshot = engine.toSnapshot()
+
+      const snap1 = snapshot.groups.find((g) => g.id === 'g1')!
+      const snap2 = snapshot.groups.find((g) => g.id === 'g2')!
+
+      expect(snap1.x).toBeCloseTo(0, 0)
+      expect(snap1.y).toBeCloseTo(84, 0)
+      expect(snap2.x).toBeCloseTo(126, 0)
+      expect(snap2.y).toBeCloseTo(84, 0)
+    })
+  })
+
   // ─── C9-C11: Selection ──────────────────────────────────────────────────────
 
   describe('Selection', () => {
@@ -260,14 +304,44 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
       expect(engine.getViewport().zoom).toBe(2)
     })
 
-    it('C14: resetView → viewport returns to origin', () => {
+    it('C14: resetView → origin at bottom-left, zoom derived from grid size', () => {
       engine.panTo(100, 200)
       engine.zoomTo(3)
       engine.resetView()
       const vp = engine.getViewport()
-      expect(vp.panX).toBe(0)
-      expect(vp.panY).toBe(0)
-      expect(vp.zoom).toBe(1)
+      // zoom = 64 / gridSize, independent of viewport dimensions
+      const gs = 42
+      const expectedZoom = 64 / gs
+      const expectedPad = 1.5 * gs * expectedZoom // = 96
+      expect(vp.zoom).toBeCloseTo(expectedZoom, 2)
+      expect(vp.panX).toBeCloseTo(-expectedPad, 0)
+      expect(vp.panY).toBeCloseTo(-(600 - expectedPad), 0)
+    })
+
+    it('C24: setViewportInsets shifts origin but zoom stays the same', () => {
+      engine.setViewportInsets({ left: 200 })
+      engine.resetView()
+      const vp = engine.getViewport()
+      // zoom still = 64/42, only origin x shifts by the inset
+      const gs = 42
+      const expectedZoom = 64 / gs
+      const expectedPad = 1.5 * gs * expectedZoom
+      expect(vp.zoom).toBeCloseTo(expectedZoom, 2)
+      expect(vp.panX).toBeCloseTo(-(200 + expectedPad), 0)
+      expect(vp.panY).toBeCloseTo(-(600 - expectedPad), 0)
+    })
+
+    it('C25: resetView zoom scales with grid size, not viewport', () => {
+      engine.setGridConfig({ size: 80 })
+      engine.resetView()
+      const vp = engine.getViewport()
+      // zoom = 64/80 = 0.8, pad = 1.5 * 80 * 0.8 = 96
+      const gs = 80
+      const expectedZoom = 64 / gs
+      const expectedPad = 1.5 * gs * expectedZoom
+      expect(vp.zoom).toBeCloseTo(expectedZoom, 2)
+      expect(vp.panX).toBeCloseTo(-expectedPad, 0)
+      expect(vp.panY).toBeCloseTo(-(600 - expectedPad), 0)
     })
   })
 

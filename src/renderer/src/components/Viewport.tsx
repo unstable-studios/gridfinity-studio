@@ -7,7 +7,9 @@ import {
   LayoutEngineCanvas,
   useLayoutEngineContext,
   useEngineUndoRedo,
-  useProjectEngineSync
+  useEngineState,
+  useProjectEngineSync,
+  useBinArtwork
 } from '@/layout-engine'
 import HintCard from './HintCard'
 
@@ -37,6 +39,7 @@ const STAR_PATH =
 function LayoutViewport(): React.JSX.Element {
   const { engine } = useLayoutEngineContext()
   const { canUndo, canRedo } = useEngineUndoRedo(engine)
+  const { tick } = useEngineState()
   useProjectEngineSync()
 
   // Wire grid config from gridfinity settings
@@ -47,6 +50,9 @@ function LayoutViewport(): React.JSX.Element {
     if (!engine) return
     engine.setGridConfig({ size: baseUnit, enabled: true, visible: true })
   }, [engine, baseUnit])
+
+  // Render bin detail artwork (magnet holes, screw holes, lip boundary)
+  useBinArtwork(engine, project?.gridfinity, tick)
 
   // Delete key for selected shapes
   useEffect(() => {

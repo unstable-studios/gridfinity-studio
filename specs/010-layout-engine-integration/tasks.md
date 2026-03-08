@@ -22,7 +22,13 @@
 - [x] T013: Implement bin creation via `engine.createGroup()` — wire the existing grid picker / "Add Bin" UI to create a `LayoutGroup` with `BinMetadata` and correct dimensions (`widthUnits * baseUnit`).
 - [x] T014: Bin visual rendering — groups render as rounded rectangles with background fill/stroke via engine adapters.
 - [x] T016: Bin selection — clicking a group selects the bin. Sidebar shows bin properties when a group is selected, shape properties when a shape is selected.
-- [ ] T015: Keep-out zone rendering — render magnet/screw hole circles and lip-inset annular ring as non-interactive shapes within the group.
+- [x] T015: Bin detail artwork — render magnet/screw hole circles and lip-inset boundary as non-interactive decorations within bin groups.
+  - [x] T015-spike: Initial implementation with direct `_objects` manipulation (checkpoint commit)
+  - [x] T015a: Define `GroupRenderer` interface (`group-renderer.ts`)
+  - [x] T015b: Implement `FabricGroupRenderer` — extract all Fabric group internals
+  - [x] T015c: Implement `KonvaGroupRenderer` — extract all Konva group internals
+  - [x] T015d: Simplify engine group methods to thin delegators
+  - [x] T015e: Verify all contract tests pass (19 decoration + 42 engine contract)
 - [x] T017: Bin drag with grid snap — groups snap to grid via lower-left corner. Single-select snaps live in both engines. Fabric multi-select snaps live via ActiveSelection; Konva multi-select snaps on dragend (Transformer limitation).
 - [ ] T018: Bin resize — drag bin edges to change `widthUnits`/`depthUnits`. Grid-unit-quantized resize. (Sidebar resize works; drag-to-resize not yet implemented.)
 - [ ] T019: Bin collision detection — prevent bin overlaps during drag/resize.
