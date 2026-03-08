@@ -64,9 +64,10 @@ function LayoutSidebar(): React.JSX.Element {
     const height = depthUnits * baseUnit
     const existingCount = binGroups.length
 
-    // Place bins starting at the origin, stacked rightward with spacing.
+    // Place new bin to the right of the rightmost existing bin (with one grid unit gap).
     // x,y = lower-left corner: left edge at x, bottom edge at y.
-    const x = existingCount * (width + baseUnit)
+    const rightEdge = binGroups.reduce((max, g) => Math.max(max, g.x + g.width), 0)
+    const x = binGroups.length === 0 ? 0 : rightEdge + baseUnit
     const y = 0
 
     const metadata: BinMetadata = {
