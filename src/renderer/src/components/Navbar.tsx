@@ -22,6 +22,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import PreferencesModal from '@/components/settings/PreferencesModal'
 import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
+import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
   SquareDashedIcon,
@@ -120,6 +121,7 @@ function AppMenubar({
 }) {
   const { project, saveProject, saveProjectAs, loadProject, recentProjects, loadRecentProjects } =
     useProject()
+  const { undo, redo, canUndo, canRedo } = useUndoRedo()
 
   useEffect(() => {
     loadRecentProjects()
@@ -201,11 +203,11 @@ function AppMenubar({
       <MenubarMenu>
         <MenubarTrigger>Edit</MenubarTrigger>
         <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <MenubarItem disabled>
+          <MenubarItem disabled={!canUndo} onSelect={undo}>
             Undo
             <MenubarShortcut>Cmd+Z</MenubarShortcut>
           </MenubarItem>
-          <MenubarItem disabled>
+          <MenubarItem disabled={!canRedo} onSelect={redo}>
             Redo
             <MenubarShortcut>Cmd+Shift+Z</MenubarShortcut>
           </MenubarItem>

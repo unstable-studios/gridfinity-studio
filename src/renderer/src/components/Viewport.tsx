@@ -1,12 +1,12 @@
 import { useEffect, useCallback, useRef, useState } from 'react'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
+import { useUndoRedo } from '@/hooks/useUndoRedo'
 import ReviewCanvas from './review/ReviewCanvas'
 import {
   LayoutEngineProvider,
   LayoutEngineCanvas,
   useLayoutEngineContext,
-  useEngineUndoRedo,
   useEngineState,
   useProjectEngineSync,
   useBinArtwork
@@ -39,7 +39,7 @@ const STAR_PATH =
 
 function LayoutViewport(): React.JSX.Element {
   const { engine } = useLayoutEngineContext()
-  const { canUndo, canRedo } = useEngineUndoRedo(engine)
+  const { canUndo, canRedo } = useUndoRedo()
   const { tick } = useEngineState()
   useProjectEngineSync()
 

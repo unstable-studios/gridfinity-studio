@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Navbar from '@/components/Navbar'
 import Sidebar from '@/components/Sidebar'
 import Viewport from '@/components/Viewport'
@@ -7,9 +7,17 @@ import { ThemeProvider } from '@unstable-studios/ui'
 import { AppModeCtx, useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
 import { ReviewPrefsCtx } from '@/hooks/useReviewPrefs'
-import { LayoutEngineProvider } from '@/layout-engine'
+import { UndoRedoCtx } from '@/hooks/useUndoRedo'
+import { LayoutEngineProvider, useLayoutEngineContext, useEngineUndoRedo } from '@/layout-engine'
 import type { AppMode, ActiveTool } from '@/hooks/useAppMode'
 import type { EngineType } from '@/layout-engine'
+
+function UndoRedoProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const { engine } = useLayoutEngineContext()
+  const { undo, redo, canUndo, canRedo } = useEngineUndoRedo(engine)
+  const value = useMemo(() => ({ undo, redo, canUndo, canRedo }), [undo, redo, canUndo, canRedo])
+  return <UndoRedoCtx.Provider value={value}>{children}</UndoRedoCtx.Provider>
+}
 
 function AppContent(): React.JSX.Element {
   const { project } = useProject()
@@ -19,20 +27,20 @@ function AppContent(): React.JSX.Element {
     return <WelcomeScreen />
   }
 
-  const content = (
-    <>
-      {/* Navbar: solid bar at top */}
-      <Navbar />
-      {/* Canvas fills remaining space; sidebar floats above it */}
-      <div className="relative flex-1 min-h-0 overflow-hidden">
-        <Viewport />
-        <Sidebar />
-      </div>
-    </>
-  )
-
   // Always mount the engine provider so state survives mode switches
-  return <LayoutEngineProvider engineType={engineType}>{content}</LayoutEngineProvider>
+  return (
+    <LayoutEngineProvider engineType={engineType}>
+      <UndoRedoProvider>
+        {/* Navbar: solid bar at top */}
+        <Navbar />
+        {/* Canvas fills remaining space; sidebar floats above it */}
+        <div className="relative flex-1 min-h-0 overflow-hidden">
+          <Viewport />
+          <Sidebar />
+        </div>
+      </UndoRedoProvider>
+    </LayoutEngineProvider>
+  )
 }
 
 const APP_MODE_KEY = 'gfstudio:appMode'

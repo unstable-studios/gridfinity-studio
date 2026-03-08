@@ -24,12 +24,16 @@ function isValidSnapshot(data: unknown): data is LayoutSnapshot {
   return true
 }
 
+const SYNC_DEBOUNCE_MS = 1000
+
 /**
  * Syncs the layout engine snapshot with the project store.
  *
  * - Before save: registers a callback that captures engine.toSnapshot() →
  *   project.layoutSnapshot automatically whenever saveProject/saveProjectAs
  *   is called (from Navbar or anywhere else).
+ * - On mutation: debounce-syncs the snapshot to the project store so that
+ *   session persistence (sessionStorage) always has a recent layout.
  * - After load: reads project.layoutSnapshot → engine.loadSnapshot()
  *
  * The LayoutSnapshotData (shared/) and LayoutSnapshot (renderer/) types are
@@ -42,6 +46,7 @@ export function useProjectEngineSync(): void {
   const { setLayoutSnapshot, registerBeforeSave } = useProject()
   const project = useProject((s) => s.project)
   const loadedProjectRef = useRef<string | null>(null)
+  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // On project load: restore engine state from layoutSnapshot.
   // Only runs when a NEW project is loaded (different createdAt), not on engine switches.
@@ -72,4 +77,28 @@ export function useProjectEngineSync(): void {
   useEffect(() => {
     return registerBeforeSave(captureSnapshot)
   }, [registerBeforeSave, captureSnapshot])
+
+  // Debounce-sync engine state to project store on mutations so
+  // sessionStorage always has a recent layout (survives page refresh).
+  useEffect(() => {
+    if (!engine) return
+
+    const debouncedSync = (): void => {
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+      syncTimerRef.current = setTimeout(captureSnapshot, SYNC_DEBOUNCE_MS)
+    }
+
+    const unsubs = [
+      engine.on('shapeCreated', debouncedSync),
+      engine.on('shapeDeleted', debouncedSync),
+      engine.on('shapeMoved', debouncedSync),
+      engine.on('shapeResized', debouncedSync),
+      engine.on('groupChanged', debouncedSync)
+    ]
+
+    return () => {
+      unsubs.forEach((u) => u())
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
+    }
+  }, [engine, captureSnapshot])
 }
