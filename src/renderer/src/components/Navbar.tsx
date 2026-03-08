@@ -21,7 +21,7 @@ import {
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import PreferencesModal from '@/components/settings/PreferencesModal'
 import NewProjectDialog from '@/components/settings/NewProjectDialog'
-import { useProject, useUndo } from '@/hooks/useProject'
+import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
   SquareDashedIcon,
@@ -117,13 +117,12 @@ function AppMenubar({
 }) {
   const { project, saveProject, saveProjectAs, loadProject, recentProjects, loadRecentProjects } =
     useProject()
-  const { undo, redo, canUndo, canRedo } = useUndo()
 
   useEffect(() => {
     loadRecentProjects()
   }, [loadRecentProjects])
 
-  // File keyboard shortcuts
+  // File keyboard shortcuts (undo/redo handled by useEngineUndoRedo)
   const handleFileKeys = useCallback(
     (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
@@ -145,32 +144,10 @@ function AppMenubar({
     [onNewProject, loadProject, saveProject, saveProjectAs]
   )
 
-  // Edit keyboard shortcuts
-  const handleEditKeys = useCallback(
-    (e: KeyboardEvent) => {
-      const mod = e.metaKey || e.ctrlKey
-      if (mod && e.code === 'KeyZ' && !e.shiftKey) {
-        e.preventDefault()
-        undo()
-      } else if (mod && e.code === 'KeyZ' && e.shiftKey) {
-        e.preventDefault()
-        redo()
-      } else if (mod && e.code === 'KeyY') {
-        e.preventDefault()
-        redo()
-      }
-    },
-    [undo, redo]
-  )
-
   useEffect(() => {
     window.addEventListener('keydown', handleFileKeys)
-    window.addEventListener('keydown', handleEditKeys)
-    return () => {
-      window.removeEventListener('keydown', handleFileKeys)
-      window.removeEventListener('keydown', handleEditKeys)
-    }
-  }, [handleFileKeys, handleEditKeys])
+    return () => window.removeEventListener('keydown', handleFileKeys)
+  }, [handleFileKeys])
 
   const hasProject = project !== null
 
@@ -221,11 +198,11 @@ function AppMenubar({
       <MenubarMenu>
         <MenubarTrigger>Edit</MenubarTrigger>
         <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <MenubarItem disabled={!canUndo} onSelect={() => undo()}>
+          <MenubarItem disabled>
             Undo
             <MenubarShortcut>Cmd+Z</MenubarShortcut>
           </MenubarItem>
-          <MenubarItem disabled={!canRedo} onSelect={() => redo()}>
+          <MenubarItem disabled>
             Redo
             <MenubarShortcut>Cmd+Shift+Z</MenubarShortcut>
           </MenubarItem>

@@ -1,33 +1,17 @@
-import { useState, useCallback, useEffect, useRef, useMemo, forwardRef } from 'react'
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { Button } from '@unstable-studios/ui'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
-import { NumericInput } from '@/components/ui/numeric-input'
-import { GridPicker } from '@/components/ui/grid-picker'
 import { Switch } from '@/components/ui/switch'
-import {
-  ContextMenu,
-  ContextMenuTrigger,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator
-} from '@/components/ui/context-menu'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
-import { useSharedSelection } from '@/hooks/useSelection'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
-
-import type { DisplayUnit } from '../../../shared/types/units'
 import { exportSTL as createSTLBlob } from '@/lib/stl-io'
 import { export3MF as create3MFBlob } from '@/lib/threemf-writer'
 import { meshDataToBufferGeometry } from '@/lib/mesh-convert'
 import { entityToVertices } from '@/lib/entity-shapes'
-import { autoWrap } from '@/lib/auto-wrap'
-import { binOverlapsAny, findNonOverlappingPosition, hasBinOverlaps } from '@/lib/collision'
+import { hasBinOverlaps } from '@/lib/collision'
 import { useGeometryWorker } from '@/hooks/useGeometryWorker'
 import type { PocketSpec, CSGBinParams } from '../../../shared/types/worker'
-import type { Entity, Bin, PocketConfig } from '../../../shared/types/project'
-import { computeDefaultPocketDepth } from '../../../shared/types/project'
+import type { Bin } from '../../../shared/types/project'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
@@ -56,341 +40,31 @@ export default function Sidebar(): React.JSX.Element {
   return (
     <aside className="w-72 shrink-0 rounded-xl border border-zinc-300/80 bg-white/80 px-4 py-5 shadow-sm backdrop-blur dark:border-zinc-800 dark:bg-zinc-900/70 overflow-y-auto">
       {!binsOverlap && bins.map((bin) => <BinBaker key={bin.id} bin={bin} />)}
-      {mode === 'layout' ? (
-        <LayoutSidebar entities={project?.entities ?? []} binsOverlap={binsOverlap} />
-      ) : (
-        <ReviewSidebar binsOverlap={binsOverlap} />
-      )}
+      {mode === 'layout' ? <LayoutSidebar /> : <ReviewSidebar binsOverlap={binsOverlap} />}
     </aside>
   )
 }
 
-function LayoutSidebar({
-  entities,
-  binsOverlap
-}: {
-  entities: Entity[]
-  binsOverlap: boolean
-}): React.JSX.Element {
-  const { project, updateEntity, removeEntity, addBin, updateBin, removeBin } = useProject()
-  const selection = useSharedSelection()
-  const { selectedIds, selectionType, select, selectBin } = selection
+// ─── Layout Sidebar (placeholder — rebuilt in Phase 5) ──────
 
-  const bins = useMemo(() => project?.bins ?? [], [project?.bins])
-  const baseUnit = project?.gridfinity.baseUnit ?? 42
-
-  // Build entity lookup and assignment sets
-  const assignedEntityIds = useMemo(() => {
-    const ids = new Set<string>()
-    for (const bin of bins) {
-      for (const eid of bin.entityIds) ids.add(eid)
-    }
-    return ids
-  }, [bins])
-
-  const unassignedEntities = useMemo(
-    () => entities.filter((e) => !assignedEntityIds.has(e.id)),
-    [entities, assignedEntityIds]
-  )
-
-  const selectedEntity =
-    selectionType === 'entity' && selectedIds.size > 0
-      ? (entities.find((e) => selectedIds.has(e.id)) ?? null)
-      : null
-
-  const selectedBin =
-    selectionType === 'bin' && selectedIds.size > 0
-      ? (bins.find((b) => selectedIds.has(b.id)) ?? null)
-      : null
-
-  const otherBinRects = useCallback(
-    (excludeId?: string) =>
-      bins
-        .filter((b) => b.id !== excludeId)
-        .map((b) => ({
-          x: b.position.x,
-          y: b.position.y,
-          w: b.width * baseUnit,
-          d: b.depth * baseUnit
-        })),
-    [bins, baseUnit]
-  )
-
-  const handleAddBin = (): void => {
-    const w = 1 * baseUnit
-    const d = 1 * baseUnit
-    const existing = otherBinRects()
-    const pos = findNonOverlappingPosition(w, d, baseUnit, existing)
-    const bin = addBin({ position: pos })
-    selectBin(bin.id)
-  }
-
-  const handleAutoWrap = (): void => {
-    // Use selected entities if any are selected, otherwise fall back to unassigned
-    const selectedEntities =
-      selectionType === 'entity' && selectedIds.size > 0
-        ? entities.filter((e) => selectedIds.has(e.id))
-        : null
-    const wrapTargets = selectedEntities ?? unassignedEntities
-    if (wrapTargets.length === 0) return
-
-    const result = autoWrap(wrapTargets, baseUnit)
-    const w = result.width * baseUnit
-    const d = result.depth * baseUnit
-    const existing = otherBinRects()
-
-    // If the auto-wrap position overlaps, find the next free spot
-    let pos = result.position
-    if (binOverlapsAny({ x: pos.x, y: pos.y, w, d }, existing)) {
-      pos = findNonOverlappingPosition(w, d, baseUnit, existing, pos.x, pos.y)
-    }
-
-    const heightUnits = 3
-    const unitHeight = project?.gridfinity.unitHeight ?? 7
-    const defaultDepth = computeDefaultPocketDepth(heightUnits, unitHeight)
-
-    // Remove selected entities from any existing bin they're in
-    if (selectedEntities) {
-      const targetIds = new Set(selectedEntities.map((e) => e.id))
-      for (const bin of bins) {
-        const remaining = bin.entityIds.filter((eid) => !targetIds.has(eid))
-        if (remaining.length !== bin.entityIds.length) {
-          updateBin(bin.id, { entityIds: remaining })
-        }
-      }
-    }
-
-    // Assign default pockets to entities that don't already have one
-    for (const entity of wrapTargets) {
-      if (!entity.pocket) {
-        updateEntity(entity.id, { pocket: { depth: defaultDepth, clearance: 0.2 } })
-      }
-    }
-
-    const bin = addBin({
-      width: result.width,
-      depth: result.depth,
-      height: heightUnits,
-      position: pos,
-      entityIds: wrapTargets.map((e) => e.id)
-    })
-    selectBin(bin.id)
-  }
-
-  const handleBinUpdate = (binId: string, patch: Partial<Bin>): void => {
-    const bin = bins.find((b) => b.id === binId)
-    if (!bin) return
-
-    // If width or depth changed, check for overlap at the new size
-    const newWidth = patch.width ?? bin.width
-    const newDepth = patch.depth ?? bin.depth
-    if (newWidth !== bin.width || newDepth !== bin.depth) {
-      const candidate = {
-        x: bin.position.x,
-        y: bin.position.y,
-        w: newWidth * baseUnit,
-        d: newDepth * baseUnit
-      }
-      const others = otherBinRects(binId)
-      if (binOverlapsAny(candidate, others)) return // reject resize
-    }
-
-    updateBin(binId, patch)
-  }
-
+function LayoutSidebar(): React.JSX.Element {
   return (
     <div className="space-y-4">
-      {binsOverlap && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-400">
-          Bins overlap — move or resize bins to resolve before models can be generated.
-        </div>
-      )}
-
-      {/* Project name header (read-only) */}
       <ProjectNameHeader />
-
-      {/* Bin tree with nested entities */}
-      <div>
-        {bins.length === 0 && entities.length === 0 ? (
-          <p className="text-xs text-zinc-500">No bins or entities yet.</p>
-        ) : (
-          <div className="space-y-0.5">
-            {bins.map((bin) => {
-              const binEntities = entities.filter((e) => bin.entityIds.includes(e.id))
-              const isBinSelected = selectionType === 'bin' && selectedIds.has(bin.id)
-              return (
-                <div key={bin.id}>
-                  <ContextMenu>
-                    <ContextMenuTrigger asChild>
-                      <BinListItem
-                        bin={bin}
-                        selected={isBinSelected}
-                        onSelect={(additive) => selectBin(bin.id, additive)}
-                        onRename={(name) => updateBin(bin.id, { name })}
-                      />
-                    </ContextMenuTrigger>
-                    <ContextMenuContent>
-                      <ContextMenuItem
-                        onSelect={() => {
-                          selectBin(bin.id)
-                          // Trigger rename via a custom event the BinListItem listens for
-                          window.dispatchEvent(
-                            new CustomEvent('sidebar:rename', { detail: bin.id })
-                          )
-                        }}
-                      >
-                        Rename
-                      </ContextMenuItem>
-                      <ContextMenuSeparator />
-                      <ContextMenuItem
-                        variant="destructive"
-                        onSelect={() => {
-                          const wasSelected = selectionType === 'bin' && selectedIds.has(bin.id)
-                          removeBin(bin.id)
-                          if (wasSelected) selection.clearSelection()
-                        }}
-                      >
-                        Delete
-                      </ContextMenuItem>
-                    </ContextMenuContent>
-                  </ContextMenu>
-                  {binEntities.length > 0 && (
-                    <div className="ml-3 border-l border-zinc-800 pl-2 space-y-0.5">
-                      {binEntities.map((entity) => (
-                        <ContextMenu key={entity.id}>
-                          <ContextMenuTrigger asChild>
-                            <EntityListItem
-                              entity={entity}
-                              selected={selectionType === 'entity' && selectedIds.has(entity.id)}
-                              onSelect={select}
-                              onRename={(name) => updateEntity(entity.id, { name })}
-                            />
-                          </ContextMenuTrigger>
-                          <ContextMenuContent>
-                            <ContextMenuItem
-                              onSelect={() => {
-                                select(entity.id)
-                                window.dispatchEvent(
-                                  new CustomEvent('sidebar:rename', { detail: entity.id })
-                                )
-                              }}
-                            >
-                              Rename
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem
-                              variant="destructive"
-                              onSelect={() => {
-                                removeEntity(entity.id)
-                                selection.clearSelection()
-                              }}
-                            >
-                              Delete
-                            </ContextMenuItem>
-                          </ContextMenuContent>
-                        </ContextMenu>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-
-            {/* Unassigned entities */}
-            {unassignedEntities.length > 0 && (
-              <div>
-                <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
-                  Unassigned
-                </p>
-                <div className="space-y-0.5">
-                  {unassignedEntities.map((entity) => (
-                    <ContextMenu key={entity.id}>
-                      <ContextMenuTrigger asChild>
-                        <EntityListItem
-                          entity={entity}
-                          selected={selectionType === 'entity' && selectedIds.has(entity.id)}
-                          onSelect={select}
-                          onRename={(name) => updateEntity(entity.id, { name })}
-                        />
-                      </ContextMenuTrigger>
-                      <ContextMenuContent>
-                        <ContextMenuItem
-                          onSelect={() => {
-                            select(entity.id)
-                            window.dispatchEvent(
-                              new CustomEvent('sidebar:rename', { detail: entity.id })
-                            )
-                          }}
-                        >
-                          Rename
-                        </ContextMenuItem>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem
-                          variant="destructive"
-                          onSelect={() => {
-                            removeEntity(entity.id)
-                            selection.clearSelection()
-                          }}
-                        >
-                          Delete
-                        </ContextMenuItem>
-                      </ContextMenuContent>
-                    </ContextMenu>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        <div className="flex items-center gap-3 mt-2">
-          <button
-            type="button"
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition"
-            onClick={handleAddBin}
-          >
-            + Add Bin
-          </button>
-          <button
-            type="button"
-            className="text-xs text-zinc-500 hover:text-zinc-300 transition disabled:opacity-40 disabled:cursor-default"
-            disabled={
-              unassignedEntities.length === 0 &&
-              !(selectionType === 'entity' && selectedIds.size > 0)
-            }
-            onClick={handleAutoWrap}
-          >
-            {selectionType === 'entity' && selectedIds.size > 0
-              ? `Wrap (${selectedIds.size})`
-              : 'Auto-wrap'}
-          </button>
-        </div>
-      </div>
-
-      {selectedBin && (
-        <SidebarSection title="Bin Properties">
-          <BinProperties
-            key={selectedBin.id}
-            bin={selectedBin}
-            onUpdate={(patch) => handleBinUpdate(selectedBin.id, patch)}
-          />
-        </SidebarSection>
-      )}
-
-      {selectedEntity && (
-        <EntityProperties
-          key={selectedEntity.id}
-          entity={selectedEntity}
-          onUpdate={updateEntity}
-          displayUnit={(project?.settings.units ?? 'mm') as DisplayUnit}
-        />
-      )}
+      <SidebarSection title="Design">
+        <p className="text-xs text-zinc-500">
+          Use canvas tools to create and edit shapes and bins. Select items on canvas to see their
+          properties here.
+        </p>
+      </SidebarSection>
     </div>
   )
 }
 
-/** Headless component that auto-bakes the bin mesh via CSG worker whenever inputs change. */
+// ─── BinBaker (headless, triggers CSG worker on bin/entity changes) ──
+
 function BinBaker({ bin }: { bin: Bin }): null {
-  const { project, setBakeResult } = useProject()
+  const { setBakeResult, project } = useProject()
   const { ready, bakePockets } = useGeometryWorker()
 
   const entities = project?.entities ?? []
@@ -505,239 +179,7 @@ function BinBaker({ bin }: { bin: Bin }): null {
   return null
 }
 
-function BinProperties({
-  bin,
-  onUpdate
-}: {
-  bin: Bin
-  onUpdate: (patch: Partial<Bin>) => void
-}): React.JSX.Element {
-  return (
-    <div className="space-y-2 text-xs">
-      <GridPicker
-        width={bin.width}
-        depth={bin.depth}
-        onChange={(w, d) => onUpdate({ width: w, depth: d })}
-      />
-      <div className="grid grid-cols-3 gap-1">
-        <NumericInput
-          label="W"
-          value={bin.width}
-          suffix="u"
-          step={1}
-          min={1}
-          precision={0}
-          onChange={(v) => onUpdate({ width: v })}
-        />
-        <NumericInput
-          label="D"
-          value={bin.depth}
-          suffix="u"
-          step={1}
-          min={1}
-          precision={0}
-          onChange={(v) => onUpdate({ depth: v })}
-        />
-        <NumericInput
-          label="H"
-          value={bin.height}
-          suffix="u"
-          step={1}
-          min={1}
-          precision={0}
-          onChange={(v) => onUpdate({ height: v })}
-        />
-      </div>
-      <label className="flex items-center gap-2 text-zinc-400 cursor-pointer">
-        <Checkbox
-          checked={bin.hasStackingLip}
-          onCheckedChange={(checked) => onUpdate({ hasStackingLip: checked === true })}
-        />
-        <span className="text-xs">Lip</span>
-      </label>
-    </div>
-  )
-}
-
-const BinListItem = forwardRef<
-  HTMLElement,
-  {
-    bin: Bin
-    selected: boolean
-    onSelect: (additive?: boolean) => void
-    onRename: (name: string) => void
-  } & React.ComponentPropsWithoutRef<'button'>
->(function BinListItem({ bin, selected, onSelect, onRename, ...props }, ref) {
-  const [editing, setEditing] = useState(false)
-  const [editName, setEditName] = useState(bin.name)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus()
-  }, [editing])
-
-  useEffect(() => {
-    const handler = (e: Event): void => {
-      if ((e as CustomEvent).detail === bin.id) {
-        setEditName(bin.name)
-        setEditing(true)
-      }
-    }
-    window.addEventListener('sidebar:rename', handler)
-    return () => window.removeEventListener('sidebar:rename', handler)
-  }, [bin.id, bin.name])
-
-  const commitName = (): void => {
-    const trimmed = editName.trim()
-    if (trimmed && trimmed !== bin.name) {
-      onRename(trimmed)
-    } else {
-      setEditName(bin.name)
-    }
-    setEditing(false)
-  }
-
-  const className = `w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-    selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
-  }`
-
-  if (editing) {
-    return (
-      <div ref={ref as React.Ref<HTMLDivElement>} className={className} {...(props as object)}>
-        <Input
-          ref={inputRef}
-          type="text"
-          className="w-full bg-transparent text-xs font-medium border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 focus:ring-0"
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitName()
-            if (e.key === 'Escape') {
-              setEditName(bin.name)
-              setEditing(false)
-            }
-          }}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <button
-      ref={ref as React.Ref<HTMLButtonElement>}
-      type="button"
-      className={className}
-      onClick={(e) => onSelect(e.shiftKey || e.metaKey || e.ctrlKey)}
-      onDoubleClick={() => {
-        setEditName(bin.name)
-        setEditing(true)
-      }}
-      {...props}
-    >
-      <span className="font-medium">{bin.name}</span>
-      <span className="ml-2 text-zinc-600">
-        {bin.width}×{bin.depth}×{bin.height}u
-      </span>
-    </button>
-  )
-})
-
-const EntityListItem = forwardRef<
-  HTMLElement,
-  {
-    entity: Entity
-    selected: boolean
-    onSelect: (id: string, additive?: boolean) => void
-    onRename: (name: string) => void
-  } & Omit<React.ComponentPropsWithoutRef<'button'>, 'onSelect'>
->(function EntityListItem({ entity, selected, onSelect, onRename, ...props }, ref) {
-  const [editing, setEditing] = useState(false)
-  const [editName, setEditName] = useState(entity.name)
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    if (editing) inputRef.current?.focus()
-  }, [editing])
-
-  useEffect(() => {
-    const handler = (e: Event): void => {
-      if ((e as CustomEvent).detail === entity.id) {
-        setEditName(entity.name)
-        setEditing(true)
-      }
-    }
-    window.addEventListener('sidebar:rename', handler)
-    return () => window.removeEventListener('sidebar:rename', handler)
-  }, [entity.id, entity.name])
-
-  const commitName = (): void => {
-    const trimmed = editName.trim()
-    if (trimmed && trimmed !== entity.name) {
-      onRename(trimmed)
-    } else {
-      setEditName(entity.name)
-    }
-    setEditing(false)
-  }
-
-  const className = `w-full rounded-md px-2 py-1.5 text-left text-xs transition ${
-    selected ? 'bg-blue-600/20 text-blue-400' : 'text-zinc-400 hover:bg-zinc-800'
-  }`
-
-  if (editing) {
-    return (
-      <div ref={ref as React.Ref<HTMLDivElement>} className={className} {...(props as object)}>
-        <Input
-          ref={inputRef}
-          type="text"
-          className="w-full bg-transparent text-xs font-medium border-0 border-b border-blue-400 rounded-none shadow-none px-0 py-0 focus:ring-0"
-          value={editName}
-          onChange={(e) => setEditName(e.target.value)}
-          onBlur={commitName}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') commitName()
-            if (e.key === 'Escape') {
-              setEditName(entity.name)
-              setEditing(false)
-            }
-          }}
-        />
-      </div>
-    )
-  }
-
-  return (
-    <button
-      ref={ref as React.Ref<HTMLButtonElement>}
-      type="button"
-      className={className}
-      onClick={(e) => onSelect(entity.id, e.shiftKey || e.metaKey || e.ctrlKey)}
-      onDoubleClick={() => {
-        setEditName(entity.name)
-        setEditing(true)
-      }}
-      {...props}
-    >
-      <span className="font-medium">{entity.name}</span>
-      <span className="ml-2 text-zinc-600">{entity.type}</span>
-    </button>
-  )
-})
-
-function ProjectNameHeader(): React.JSX.Element {
-  const filePath = useProject((s) => s.filePath)
-  const name = filePath
-    ? filePath
-        .split(/[\\/]/)
-        .pop()!
-        .replace(/\.gfstudio$/, '')
-    : 'Untitled Project'
-
-  return (
-    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate">{name}</p>
-  )
-}
+// ─── Review Sidebar ─────────────────────────────────────────
 
 function ReviewSidebar({ binsOverlap }: { binsOverlap: boolean }): React.JSX.Element {
   const {
@@ -876,6 +318,22 @@ function ReviewSidebar({ binsOverlap }: { binsOverlap: boolean }): React.JSX.Ele
   )
 }
 
+// ─── Shared components ──────────────────────────────────────
+
+function ProjectNameHeader(): React.JSX.Element {
+  const filePath = useProject((s) => s.filePath)
+  const name = filePath
+    ? filePath
+        .split(/[\\/]/)
+        .pop()!
+        .replace(/\.gfstudio$/, '')
+    : 'Untitled Project'
+
+  return (
+    <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate">{name}</p>
+  )
+}
+
 function SidebarSection({
   title,
   children
@@ -889,191 +347,6 @@ function SidebarSection({
         {title}
       </p>
       {children}
-    </div>
-  )
-}
-
-function EntityProperties({
-  entity,
-  onUpdate,
-  displayUnit
-}: {
-  entity: Entity
-  onUpdate: (id: string, patch: Partial<Entity>) => void
-  displayUnit: DisplayUnit
-}): React.JSX.Element {
-  const handlePositionChange = (axis: 'x' | 'y', value: number): void => {
-    onUpdate(entity.id, {
-      transform: {
-        ...entity.transform,
-        position: { ...entity.transform.position, [axis]: value }
-      }
-    })
-  }
-
-  const { project } = useProject()
-  const bins = project?.bins ?? []
-  const unitHeight = project?.gridfinity.unitHeight ?? 7
-
-  // Find the bin this entity belongs to (for default pocket depth)
-  const ownerBin = bins.find((b) => b.entityIds.includes(entity.id))
-
-  const handlePocketChange = (patch: Partial<PocketConfig>): void => {
-    const defaultDepth = ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : 5
-    const current = entity.pocket ?? { depth: defaultDepth, clearance: 0.2 }
-    onUpdate(entity.id, { pocket: { ...current, ...patch } })
-  }
-
-  const maxDepth = ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : null
-
-  return (
-    <SidebarSection title="Properties">
-      <div className="space-y-2 text-xs">
-        <PropertyRow label="Type" value={entity.type} />
-        <NumericInput
-          label="X"
-          value={entity.transform.position.x}
-          displayUnit={displayUnit}
-          step={0.5}
-          fineStep={0.1}
-          coarseStep={5}
-          precision={1}
-          onChange={(v) => handlePositionChange('x', v)}
-        />
-        <NumericInput
-          label="Y"
-          value={entity.transform.position.y}
-          displayUnit={displayUnit}
-          step={0.5}
-          fineStep={0.1}
-          coarseStep={5}
-          precision={1}
-          onChange={(v) => handlePositionChange('y', v)}
-        />
-        {entity.type === 'circle' && (
-          <NumericInput
-            label="Diameter"
-            value={entity.diameter}
-            displayUnit={displayUnit}
-            step={0.5}
-            fineStep={0.1}
-            coarseStep={5}
-            precision={1}
-            min={0.1}
-            onChange={(v) => onUpdate(entity.id, { diameter: v })}
-          />
-        )}
-        {entity.type === 'rectangle' && (
-          <>
-            <NumericInput
-              label="Width"
-              value={entity.width}
-              displayUnit={displayUnit}
-              step={0.5}
-              fineStep={0.1}
-              coarseStep={5}
-              precision={1}
-              min={0.1}
-              onChange={(v) => onUpdate(entity.id, { width: v })}
-            />
-            <NumericInput
-              label="Height"
-              value={entity.height}
-              displayUnit={displayUnit}
-              step={0.5}
-              fineStep={0.1}
-              coarseStep={5}
-              precision={1}
-              min={0.1}
-              onChange={(v) => onUpdate(entity.id, { height: v })}
-            />
-          </>
-        )}
-        {entity.type === 'polygon' && (
-          <PropertyRow label="Vertices" value={String(entity.vertices.length)} />
-        )}
-
-        <PocketControls
-          entity={entity}
-          onPocketChange={handlePocketChange}
-          defaultDepth={ownerBin ? computeDefaultPocketDepth(ownerBin.height, unitHeight) : 5}
-          maxDepth={maxDepth}
-          displayUnit={displayUnit}
-        />
-      </div>
-    </SidebarSection>
-  )
-}
-
-function PocketControls({
-  entity,
-  onPocketChange,
-  defaultDepth,
-  maxDepth,
-  displayUnit
-}: {
-  entity: Entity
-  onPocketChange: (patch: Partial<PocketConfig>) => void
-  defaultDepth: number
-  maxDepth: number | null
-  displayUnit: DisplayUnit
-}): React.JSX.Element {
-  const hasPocket = entity.pocket !== undefined
-  const depthExceeded = hasPocket && maxDepth !== null && entity.pocket!.depth > maxDepth
-
-  return (
-    <div className="mt-2 pt-2 border-t border-zinc-800">
-      <p className="text-xs font-medium text-zinc-400 mb-1">Pocket</p>
-      {hasPocket ? (
-        <div className="space-y-1">
-          <NumericInput
-            label="Depth"
-            value={entity.pocket!.depth}
-            displayUnit={displayUnit}
-            step={0.5}
-            fineStep={0.1}
-            coarseStep={5}
-            precision={1}
-            min={0.1}
-            onChange={(v) => onPocketChange({ depth: v })}
-          />
-          {depthExceeded && (
-            <p className="text-[11px] text-amber-500">
-              Depth exceeds cavity ({maxDepth!.toFixed(1)} mm) — pocket will be clipped.
-            </p>
-          )}
-          <NumericInput
-            label="Clearance"
-            value={entity.pocket!.clearance}
-            displayUnit={displayUnit}
-            step={0.05}
-            fineStep={0.01}
-            coarseStep={0.5}
-            precision={2}
-            min={0}
-            max={5}
-            onChange={(v) => onPocketChange({ clearance: v })}
-          />
-        </div>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => onPocketChange({ depth: defaultDepth, clearance: 0.2 })}
-        >
-          Add Pocket
-        </Button>
-      )}
-    </div>
-  )
-}
-
-function PropertyRow({ label, value }: { label: string; value: string }): React.JSX.Element {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-zinc-500">{label}</span>
-      <span className="text-zinc-300 font-mono">{value}</span>
     </div>
   )
 }
