@@ -1173,15 +1173,16 @@ export class FabricEngine implements LayoutEngine {
   private setupSnapToGrid(): void {
     if (!this.canvas) return
     this.canvas.on('object:moving', (e) => {
-      if (!this.gridConfig.enabled) return
       const obj = e.target
       if (!obj) return
+      const gridEnabled = this.gridConfig.enabled
       const size = this.gridConfig.size
 
       // Multi-select (ActiveSelection): snap based on first group's lower-left corner.
       // Using the frame center would cause half-grid snapping when the combined
       // frame width is an odd number of grid units.
       if (obj instanceof fabric.ActiveSelection) {
+        if (!gridEnabled) return
         const children = obj.getObjects()
         const firstGroupObj = children.find(
           (o) => (o as unknown as Record<string, unknown>)[GROUP_DATA_KEY]
@@ -1215,7 +1216,7 @@ export class FabricEngine implements LayoutEngine {
 
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {
-        // Skip snap if the group is being resized (scale != 1).
+        // Skip snap + collision if the group is being resized (scale != 1).
         // Fabric fires object:moving during resize to anchor the opposite edge;
         // snapping the position mid-resize causes the group to slide.
         const sx = obj.scaleX ?? 1
@@ -1224,7 +1225,9 @@ export class FabricEngine implements LayoutEngine {
 
         const renderer = this.rendererMap.get(groupId)
         if (renderer) {
-          renderer.snapToGrid(size)
+          if (gridEnabled) {
+            renderer.snapToGrid(size)
+          }
 
           // Live collision prevention — revert to last good position if overlapping
           const group = this.groupMap.get(groupId)
@@ -1241,7 +1244,7 @@ export class FabricEngine implements LayoutEngine {
             }
           }
         }
-      } else {
+      } else if (gridEnabled) {
         // Snap shape center to grid
         const left = Math.round((obj.left ?? 0) / size) * size
         const top = Math.round((obj.top ?? 0) / size) * size

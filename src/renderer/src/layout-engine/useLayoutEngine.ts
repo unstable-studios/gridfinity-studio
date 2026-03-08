@@ -47,7 +47,8 @@ export function useEngineState(): EngineState {
         'shapeCreated',
         'shapeDeleted',
         'groupChanged',
-        'groupMoved'
+        'groupMoved',
+        'groupResized'
       ]
 
       for (const event of stateEvents) {
