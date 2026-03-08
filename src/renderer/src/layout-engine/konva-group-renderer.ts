@@ -405,20 +405,56 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.deps.layer.batchDraw()
   }
 
-  /** Update overlay position/size to match the group's scaled visual bounds. */
+  /** Update overlay to show grid-snapped dimensions anchored to the correct edge. */
   private updateResizeOverlay(): void {
-    if (!this.resizeOverlay) return
+    if (!this.resizeOverlay || !this.preResizeBounds) return
+    const gridConfig = this.deps.getGridConfig()
+    const gs = gridConfig.size
+    const orig = this.preResizeBounds
     const sx = this.konvaGroup.scaleX()
     const sy = this.konvaGroup.scaleY()
     const cx = this.konvaGroup.x()
     const cy = this.konvaGroup.y()
-    const visW = this.width * sx
-    const visH = this.height * sy
+
+    // Raw scaled dimensions, grid-quantized
+    let snapW = this.width * sx
+    let snapH = this.height * sy
+    if (gridConfig.enabled) {
+      snapW = Math.max(gs, Math.round(snapW / gs) * gs)
+      snapH = Math.max(gs, Math.round(snapH / gs) * gs)
+    }
+
+    // Edge-anchor: detect which edges are stationary by comparing visual
+    // bounds to the original on-grid bounds, then derive overlay position.
+    const visualLeft = cx - (this.width * sx) / 2
+    const visualRight = cx + (this.width * sx) / 2
+    const visualTop = cy - (this.height * sy) / 2
+    const visualBottom = cy + (this.height * sy) / 2
+
+    const origLeft = orig.x
+    const origRight = orig.x + orig.width
+    const origTop = orig.y - orig.height
+    const origBottom = orig.y
+
+    let overlayLeft: number
+    if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
+      overlayLeft = origLeft
+    } else {
+      overlayLeft = origRight - snapW
+    }
+
+    let overlayTop: number
+    if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
+      overlayTop = origTop
+    } else {
+      overlayTop = origBottom - snapH
+    }
+
     this.resizeOverlay.setAttrs({
-      x: cx - visW / 2,
-      y: cy - visH / 2,
-      width: visW,
-      height: visH
+      x: overlayLeft,
+      y: overlayTop,
+      width: snapW,
+      height: snapH
     })
     this.deps.layer.batchDraw()
   }

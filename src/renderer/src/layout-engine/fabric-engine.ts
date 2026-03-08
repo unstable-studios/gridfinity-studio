@@ -1032,35 +1032,72 @@ export class FabricEngine implements LayoutEngine {
     }
   }
 
-  /** Create or update a non-scaling overlay rect on the canvas as resize ghost. */
+  /** Create or update a non-scaling overlay rect showing grid-snapped resize preview. */
   private updateResizeOverlay(groupId: string, obj: fabric.FabricObject): void {
     if (!this.canvas) return
     const renderer = this.rendererMap.get(groupId)
     const group = this.groupMap.get(groupId)
-    if (!renderer || !group) return
+    const saved = this.preDragState.get(groupId)
+    if (!renderer || !group || !saved) return
 
     const sx = obj.scaleX ?? 1
     const sy = obj.scaleY ?? 1
     const cx = obj.left ?? 0
     const cy = obj.top ?? 0
-    const visW = group.width * sx
-    const visH = group.height * sy
+    const gs = this.gridConfig.size
 
-    // Read style from bgRect
-    const bgRect = renderer.fabricGroup
-      .getObjects()
-      .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
-    const stroke = (bgRect?.get('stroke') as string) ?? '#666666'
-    const strokeWidth = (bgRect?.get('strokeWidth') as number) ?? 1
-    const cornerRadius = (bgRect?.get('rx') as number) ?? 0
+    // Grid-quantized dimensions
+    let snapW = group.width * sx
+    let snapH = group.height * sy
+    if (this.gridConfig.enabled) {
+      snapW = Math.max(gs, Math.round(snapW / gs) * gs)
+      snapH = Math.max(gs, Math.round(snapH / gs) * gs)
+    }
+
+    // Edge-anchor: detect which edges are stationary
+    const visualLeft = cx - (group.width * sx) / 2
+    const visualRight = cx + (group.width * sx) / 2
+    const visualTop = cy - (group.height * sy) / 2
+    const visualBottom = cy + (group.height * sy) / 2
+
+    const origLeft = saved.lowerLeftX
+    const origRight = saved.lowerLeftX + saved.width
+    const origTop = saved.lowerLeftY - saved.height
+    const origBottom = saved.lowerLeftY
+
+    let overlayLeft: number
+    if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
+      overlayLeft = origLeft
+    } else {
+      overlayLeft = origRight - snapW
+    }
+
+    let overlayTop: number
+    if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
+      overlayTop = origTop
+    } else {
+      overlayTop = origBottom - snapH
+    }
+
+    // Overlay uses center origin — convert from top-left
+    const overlayCX = overlayLeft + snapW / 2
+    const overlayCY = overlayTop + snapH / 2
 
     if (!this.resizeOverlay) {
+      // Read style from bgRect
+      const bgObj = renderer.fabricGroup
+        .getObjects()
+        .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+      const stroke = (bgObj?.get('stroke') as string) ?? '#666666'
+      const strokeWidth = (bgObj?.get('strokeWidth') as number) ?? 1
+      const cornerRadius = (bgObj?.get('rx') as number) ?? 0
+
       // First frame — create overlay and hide the actual group
       this.resizeOverlay = new fabric.Rect({
-        left: cx,
-        top: cy,
-        width: visW,
-        height: visH,
+        left: overlayCX,
+        top: overlayCY,
+        width: snapW,
+        height: snapH,
         fill: 'rgba(113, 113, 122, 0.08)',
         stroke,
         strokeWidth,
@@ -1079,7 +1116,7 @@ export class FabricEngine implements LayoutEngine {
       renderer.fabricGroup.set('opacity', 0)
     } else {
       // Subsequent frames — update position and size
-      this.resizeOverlay.set({ left: cx, top: cy, width: visW, height: visH })
+      this.resizeOverlay.set({ left: overlayCX, top: overlayCY, width: snapW, height: snapH })
       this.resizeOverlay.setCoords()
     }
     this.canvas.requestRenderAll()
