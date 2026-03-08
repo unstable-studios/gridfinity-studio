@@ -86,6 +86,17 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 
 ## Development Principles
 
+### Adapter-Based Modularity
+
+Major subsystems must be decoupled from their implementation libraries through adapter interfaces. Application code consumes abstract interfaces; concrete library bindings live behind adapters that can be swapped, tested, or replaced independently.
+
+- Define a TypeScript interface that captures the **capability**, not the library's API surface.
+- Application components depend on the interface, never on library imports directly.
+- Adapters convert between the interface's data model and the library's internals at the boundary (e.g., lower-left corner ↔ centroid coordinate conversion in the layout engine).
+- Persisted data must be engine-agnostic — no library-specific artifacts in snapshots or project files.
+
+**Established pattern**: The `LayoutEngine` interface with Fabric.js and Konva adapters (009/010). Future candidates include the CSG/geometry pipeline, 3D preview renderer, file format exporters, and input handling layer.
+
 ### Integration-First Development
 
 **Every feature must be exercised end-to-end before it is considered done.** Building a component in isolation and marking it complete is not acceptable — it must be mounted in the component tree, connected to state, and verified to actually work when a user interacts with it.
