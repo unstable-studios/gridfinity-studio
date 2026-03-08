@@ -41,6 +41,8 @@ export class KonvaGroupRenderer implements GroupRenderer {
   private lastGoodPos: { x: number; y: number } | null = null
   /** Snapshot of bounds before a resize starts, for edge-anchoring. */
   private preResizeBounds: { x: number; y: number; width: number; height: number } | null = null
+  /** Non-scaling overlay rect shown during resize as ghost preview. */
+  private resizeOverlay: Konva.Rect | null = null
 
   constructor(
     group: LayoutGroup,
@@ -267,18 +269,23 @@ export class KonvaGroupRenderer implements GroupRenderer {
   }
 
   private setupResizeHandlers(): void {
-    // Save bounds before resize; show ghost preview (hide decorations, fade fill).
+    // Save bounds; hide group and show a non-scaling overlay as ghost preview.
     this.konvaGroup.on('transformstart', () => {
       const pos = this.readPosition()
       this.preResizeBounds = { x: pos.x, y: pos.y, width: this.width, height: this.height }
-      this.setResizeGhost(true)
+      this.showResizeOverlay()
+    })
+
+    // Update overlay on each transform frame to track the scaled bounds.
+    this.konvaGroup.on('transform', () => {
+      this.updateResizeOverlay()
     })
 
     // Konva Transformer applies scale to the group during resize.
     // Don't snap during live drag — modifying scale inside `transform` fights
     // the Transformer's position anchoring. Snap on release only.
     this.konvaGroup.on('transformend', () => {
-      this.setResizeGhost(false)
+      this.removeResizeOverlay()
       const gridConfig = this.deps.getGridConfig()
       const gs = gridConfig.size
       const orig = this.preResizeBounds
@@ -371,16 +378,58 @@ export class KonvaGroupRenderer implements GroupRenderer {
     }
   }
 
-  /** Toggle ghost preview during resize: hide decorations, fade fill. */
-  private setResizeGhost(ghost: boolean): void {
-    const decorations = this.konvaGroup.find('.__binArtwork')
-    for (const node of decorations) {
-      node.visible(!ghost)
-    }
+  /** Create a non-scaling overlay rect on the layer as resize ghost preview. */
+  private showResizeOverlay(): void {
     const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
-    if (bgRect) {
-      bgRect.opacity(ghost ? 0.4 : 1)
+    const stroke = bgRect?.stroke() ?? '#666666'
+    const strokeWidth = bgRect?.strokeWidth() ?? 1
+    const cornerRadius = bgRect?.cornerRadius() ?? 0
+
+    this.resizeOverlay = new Konva.Rect({
+      x: this.konvaGroup.x() - this.width / 2,
+      y: this.konvaGroup.y() - this.height / 2,
+      width: this.width,
+      height: this.height,
+      fill: 'rgba(113, 113, 122, 0.08)',
+      stroke,
+      strokeWidth,
+      cornerRadius: cornerRadius as number,
+      dash: [6, 3],
+      listening: false,
+      name: '__resizeOverlay'
+    })
+    this.deps.layer.add(this.resizeOverlay)
+
+    // Hide the actual group so only the overlay is visible
+    this.konvaGroup.opacity(0)
+    this.deps.layer.batchDraw()
+  }
+
+  /** Update overlay position/size to match the group's scaled visual bounds. */
+  private updateResizeOverlay(): void {
+    if (!this.resizeOverlay) return
+    const sx = this.konvaGroup.scaleX()
+    const sy = this.konvaGroup.scaleY()
+    const cx = this.konvaGroup.x()
+    const cy = this.konvaGroup.y()
+    const visW = this.width * sx
+    const visH = this.height * sy
+    this.resizeOverlay.setAttrs({
+      x: cx - visW / 2,
+      y: cy - visH / 2,
+      width: visW,
+      height: visH
+    })
+    this.deps.layer.batchDraw()
+  }
+
+  /** Remove overlay and restore group visibility. */
+  private removeResizeOverlay(): void {
+    if (this.resizeOverlay) {
+      this.resizeOverlay.destroy()
+      this.resizeOverlay = null
     }
+    this.konvaGroup.opacity(1)
     this.deps.layer.batchDraw()
   }
 

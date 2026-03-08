@@ -170,6 +170,9 @@ export class FabricEngine implements LayoutEngine {
   >()
   /** Last known non-colliding position during drag, for live collision prevention */
   private lastGoodPos = new Map<string, { left: number; top: number }>()
+  /** Non-scaling overlay rect shown during resize as ghost preview. */
+  private resizeOverlay: fabric.Rect | null = null
+  private resizeOverlayGroupId: string | null = null
   private gridLines: fabric.FabricObject[] = []
   private gridConfig: GridConfig = { size: 42, enabled: true, visible: true }
   private themeColors = {
@@ -830,10 +833,10 @@ export class FabricEngine implements LayoutEngine {
 
       // Skip groups — their resize is finalized in object:modified to avoid
       // fighting between live scale snap and Fabric's position anchoring.
-      // Show ghost preview (hide decorations, fade fill) while scaling.
+      // Show a non-scaling overlay as ghost preview while scaling.
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {
-        this.setResizeGhost(groupId, true)
+        this.updateResizeOverlay(groupId, obj)
         return
       }
 
@@ -919,8 +922,8 @@ export class FabricEngine implements LayoutEngine {
     const group = this.groupMap.get(groupId)
     if (!renderer || !group) return
 
-    // Restore from ghost preview (if resize was in progress)
-    this.setResizeGhost(groupId, false)
+    // Remove resize overlay (if resize was in progress)
+    this.removeResizeOverlay()
 
     const gs = this.gridConfig.size
     const saved = this.preDragState.get(groupId)
@@ -1029,21 +1032,72 @@ export class FabricEngine implements LayoutEngine {
     }
   }
 
-  /** Toggle ghost preview during resize: hide decorations, fade fill. */
-  private setResizeGhost(groupId: string, ghost: boolean): void {
+  /** Create or update a non-scaling overlay rect on the canvas as resize ghost. */
+  private updateResizeOverlay(groupId: string, obj: fabric.FabricObject): void {
+    if (!this.canvas) return
     const renderer = this.rendererMap.get(groupId)
-    if (!renderer) return
-    const objects = renderer.fabricGroup.getObjects()
-    for (const obj of objects) {
-      const rec = obj as unknown as Record<string, unknown>
-      if (rec.__binArtwork) {
-        obj.set('visible', !ghost)
-      }
-      if (rec.__groupBg) {
-        obj.set('opacity', ghost ? 0.4 : 1)
-      }
+    const group = this.groupMap.get(groupId)
+    if (!renderer || !group) return
+
+    const sx = obj.scaleX ?? 1
+    const sy = obj.scaleY ?? 1
+    const cx = obj.left ?? 0
+    const cy = obj.top ?? 0
+    const visW = group.width * sx
+    const visH = group.height * sy
+
+    // Read style from bgRect
+    const bgRect = renderer.fabricGroup
+      .getObjects()
+      .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+    const stroke = (bgRect?.get('stroke') as string) ?? '#666666'
+    const strokeWidth = (bgRect?.get('strokeWidth') as number) ?? 1
+    const cornerRadius = (bgRect?.get('rx') as number) ?? 0
+
+    if (!this.resizeOverlay) {
+      // First frame — create overlay and hide the actual group
+      this.resizeOverlay = new fabric.Rect({
+        left: cx,
+        top: cy,
+        width: visW,
+        height: visH,
+        fill: 'rgba(113, 113, 122, 0.08)',
+        stroke,
+        strokeWidth,
+        strokeUniform: true,
+        strokeDashArray: [6, 3],
+        rx: cornerRadius,
+        ry: cornerRadius,
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+        excludeFromExport: true
+      })
+      this.resizeOverlayGroupId = groupId
+      this.canvas.add(this.resizeOverlay)
+      renderer.fabricGroup.set('opacity', 0)
+    } else {
+      // Subsequent frames — update position and size
+      this.resizeOverlay.set({ left: cx, top: cy, width: visW, height: visH })
+      this.resizeOverlay.setCoords()
     }
-    renderer.fabricGroup.set('dirty', true)
+    this.canvas.requestRenderAll()
+  }
+
+  /** Remove overlay and restore group visibility. */
+  private removeResizeOverlay(): void {
+    if (this.resizeOverlay && this.canvas) {
+      this.canvas.remove(this.resizeOverlay)
+      this.resizeOverlay = null
+    }
+    if (this.resizeOverlayGroupId) {
+      const renderer = this.rendererMap.get(this.resizeOverlayGroupId)
+      if (renderer) {
+        renderer.fabricGroup.set('opacity', 1)
+      }
+      this.resizeOverlayGroupId = null
+    }
     this.canvas?.requestRenderAll()
   }
 
