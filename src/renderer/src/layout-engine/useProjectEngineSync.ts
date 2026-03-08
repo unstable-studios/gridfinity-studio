@@ -15,7 +15,12 @@ function isValidSnapshot(data: unknown): data is LayoutSnapshot {
   if (!Array.isArray(obj.shapes) || !Array.isArray(obj.groups)) return false
   if (obj.gridConfig === null || typeof obj.gridConfig !== 'object') return false
   const gc = obj.gridConfig as Record<string, unknown>
-  if (typeof gc.size !== 'number' || typeof gc.enabled !== 'boolean') return false
+  if (
+    typeof gc.size !== 'number' ||
+    typeof gc.enabled !== 'boolean' ||
+    typeof gc.visible !== 'boolean'
+  )
+    return false
   return true
 }
 
