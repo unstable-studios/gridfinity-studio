@@ -239,11 +239,23 @@ export class KonvaEngine implements LayoutEngine {
 
     node.on('dragmove', () => {
       if (!this.gridConfig.enabled) return
+      // Multi-select: skip if another node is the snap leader
+      const selectedNodes = this.transformer?.nodes() ?? []
+      if (selectedNodes.length > 1 && selectedNodes[0] !== node) return
+
       const size = this.gridConfig.size
-      node.position({
-        x: Math.round(node.x() / size) * size,
-        y: Math.round(node.y() / size) * size
-      })
+      const snappedX = Math.round(node.x() / size) * size
+      const snappedY = Math.round(node.y() / size) * size
+      const dx = snappedX - node.x()
+      const dy = snappedY - node.y()
+
+      if (selectedNodes.length > 1) {
+        for (const n of selectedNodes) {
+          n.position({ x: n.x() + dx, y: n.y() + dy })
+        }
+      } else {
+        node.position({ x: snappedX, y: snappedY })
+      }
       this.transformer?.forceUpdate()
     })
 
@@ -469,22 +481,36 @@ export class KonvaEngine implements LayoutEngine {
     konvaGroup.add(bgRect)
 
     // Snap group lower-left corner to grid during drag.
-    // Each bin snaps independently — works for single and multi-select.
     konvaGroup.on('dragmove', () => {
       if (!this.gridConfig.enabled) return
+
+      // Multi-select: only the FIRST selected node handles snap for all.
+      // This prevents double-snap when multiple dragmove handlers fire.
+      const selectedNodes = this.transformer?.nodes() ?? []
+      if (selectedNodes.length > 1 && selectedNodes[0] !== konvaGroup) return
+
       const size = this.gridConfig.size
       const g = this.groupMap.get(group.id)
       if (!g) return
 
       const halfW = g.width / 2
       const halfH = g.height / 2
-      // Lower-left corner in screen coords: (x - halfW, y + halfH)
-      const snappedLeft = Math.round((konvaGroup.x() - halfW) / size) * size
-      const snappedBottom = Math.round((konvaGroup.y() + halfH) / size) * size
-      konvaGroup.position({
-        x: snappedLeft + halfW,
-        y: snappedBottom - halfH
-      })
+      // Lower-left corner: (centroidX - halfW, centroidY + halfH)
+      const lowerLeftX = konvaGroup.x() - halfW
+      const lowerLeftY = konvaGroup.y() + halfH
+      const snappedX = Math.round(lowerLeftX / size) * size
+      const snappedY = Math.round(lowerLeftY / size) * size
+      const dx = snappedX - lowerLeftX
+      const dy = snappedY - lowerLeftY
+
+      if (selectedNodes.length > 1) {
+        // Apply uniform delta to all selected nodes
+        for (const n of selectedNodes) {
+          n.position({ x: n.x() + dx, y: n.y() + dy })
+        }
+      } else {
+        konvaGroup.position({ x: snappedX + halfW, y: snappedY - halfH })
+      }
       this.transformer?.forceUpdate()
     })
 
