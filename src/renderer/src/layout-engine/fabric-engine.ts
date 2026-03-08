@@ -803,16 +803,33 @@ export class FabricEngine implements LayoutEngine {
 
   // ─── Private: Event handlers ────────────────────────────────────────────────
 
+  /** Disable scaling/rotation on Fabric's ActiveSelection when it contains groups */
+  private lockActiveSelectionIfGroups(): void {
+    if (!this.canvas) return
+    const active = this.canvas.getActiveObject()
+    if (!active || active.type !== 'activeSelection') return
+
+    // Always lock the multi-select frame — it shouldn't scale individual objects
+    active.set({
+      lockScalingX: true,
+      lockScalingY: true,
+      lockRotation: true,
+      hasControls: false
+    })
+  }
+
   private setupEventHandlers(): void {
     if (!this.canvas) return
 
     this.canvas.on('selection:created', () => {
       if (this.disposed) return
+      this.lockActiveSelectionIfGroups()
       this.emitter.emit('selectionChanged', { ids: this.getSelectedIds() })
     })
 
     this.canvas.on('selection:updated', () => {
       if (this.disposed) return
+      this.lockActiveSelectionIfGroups()
       this.emitter.emit('selectionChanged', { ids: this.getSelectedIds() })
     })
 
@@ -896,6 +913,15 @@ export class FabricEngine implements LayoutEngine {
       const obj = e.target
       if (!obj) return
       const size = this.gridConfig.size
+
+      // Multi-select (ActiveSelection): snap the frame center to grid
+      if (obj.type === 'activeSelection') {
+        const left = Math.round((obj.left ?? 0) / size) * size
+        const top = Math.round((obj.top ?? 0) / size) * size
+        obj.set({ left, top })
+        obj.setCoords()
+        return
+      }
 
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {

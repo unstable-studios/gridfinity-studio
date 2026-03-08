@@ -96,10 +96,18 @@ function LayoutSidebar(): React.JSX.Element {
     const updated: BinMetadata = { ...group.metadata, ...patch }
     const groupPatch: Partial<LayoutGroup> = { metadata: updated }
 
-    // If width/depth units changed, resize the group
+    // If width/depth units changed, resize the group anchored at bottom-left.
+    // x,y is the centroid, so shift it so the left and bottom edges stay fixed.
     if (patch.widthUnits !== undefined || patch.depthUnits !== undefined) {
-      groupPatch.width = updated.widthUnits * baseUnit
-      groupPatch.height = updated.depthUnits * baseUnit
+      const newW = updated.widthUnits * baseUnit
+      const newH = updated.depthUnits * baseUnit
+      const dw = newW - group.width
+      const dh = newH - group.height
+      groupPatch.width = newW
+      groupPatch.height = newH
+      // Anchor bottom-left: grow rightward (+x) and upward (-y in canvas)
+      groupPatch.x = group.x + dw / 2
+      groupPatch.y = group.y - dh / 2
     }
 
     engine.updateGroup(groupId, groupPatch)
