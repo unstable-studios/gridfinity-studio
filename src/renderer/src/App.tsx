@@ -13,7 +13,7 @@ import type { EngineType } from '@/layout-engine'
 
 function AppContent(): React.JSX.Element {
   const { project } = useProject()
-  const { mode, engineType } = useAppMode()
+  const { engineType } = useAppMode()
 
   if (!project) {
     return <WelcomeScreen />
@@ -31,12 +31,8 @@ function AppContent(): React.JSX.Element {
     </>
   )
 
-  // Wrap layout mode in LayoutEngineProvider so both Sidebar and Viewport can access the engine
-  if (mode === 'layout') {
-    return <LayoutEngineProvider engineType={engineType}>{content}</LayoutEngineProvider>
-  }
-
-  return content
+  // Always mount the engine provider so state survives mode switches
+  return <LayoutEngineProvider engineType={engineType}>{content}</LayoutEngineProvider>
 }
 
 const APP_MODE_KEY = 'gfstudio:appMode'

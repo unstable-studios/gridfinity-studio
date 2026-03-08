@@ -377,7 +377,13 @@ export class FabricEngine implements LayoutEngine {
       interactive: true,
       lockScalingX: true,
       lockScalingY: true,
+      lockRotation: true,
+      hasBorders: true,
       hasControls: false,
+      borderColor: '#60a5fa',
+      borderDashArray: [4, 3],
+      borderScaleFactor: 1.5,
+      padding: 2,
       originX: 'center',
       originY: 'center'
     })
@@ -431,6 +437,7 @@ export class FabricEngine implements LayoutEngine {
 
     fabricGroup.setCoords()
     this.canvas?.requestRenderAll()
+    this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
   }
 
   removeGroup(id: string): void {

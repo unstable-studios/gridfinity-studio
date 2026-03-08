@@ -141,12 +141,14 @@ export class KonvaEngine implements LayoutEngine {
     this.transformer = new Konva.Transformer({
       keepRatio: false,
       borderStroke: '#60a5fa',
-      borderStrokeWidth: 1,
+      borderStrokeWidth: 1.5,
+      borderDash: [4, 3],
       anchorStroke: '#60a5fa',
       anchorFill: '#18181b',
       anchorSize: 8,
       anchorCornerRadius: 2,
-      rotateAnchorOffset: 20
+      rotateAnchorOffset: 20,
+      padding: 2
     })
     this.mainLayer.add(this.transformer)
 
@@ -553,6 +555,7 @@ export class KonvaEngine implements LayoutEngine {
     }
 
     this.mainLayer?.batchDraw()
+    this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
   }
 
   removeGroup(id: string): void {
