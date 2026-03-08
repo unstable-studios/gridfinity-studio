@@ -460,7 +460,8 @@ export class KonvaGroupRenderer implements GroupRenderer {
       y: overlayTop,
       width: snapW,
       height: snapH,
-      stroke: wouldCollide ? '#ef4444' : this.resizeOverlay.getAttr('__origStroke')
+      stroke: wouldCollide ? '#ef4444' : this.resizeOverlay.getAttr('__origStroke'),
+      fill: wouldCollide ? 'rgba(239, 68, 68, 0.08)' : 'rgba(113, 113, 122, 0.08)'
     })
     this.deps.layer.batchDraw()
   }

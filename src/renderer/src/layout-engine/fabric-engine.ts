@@ -1102,7 +1102,7 @@ export class FabricEngine implements LayoutEngine {
         top: overlayCY,
         width: snapW,
         height: snapH,
-        fill: 'rgba(113, 113, 122, 0.08)',
+        fill: wouldCollide ? 'rgba(239, 68, 68, 0.08)' : 'rgba(113, 113, 122, 0.08)',
         stroke: wouldCollide ? '#ef4444' : stroke,
         strokeWidth,
         strokeUniform: true,
@@ -1128,7 +1128,8 @@ export class FabricEngine implements LayoutEngine {
         top: overlayCY,
         width: snapW,
         height: snapH,
-        stroke: wouldCollide ? '#ef4444' : origStroke
+        stroke: wouldCollide ? '#ef4444' : origStroke,
+        fill: wouldCollide ? 'rgba(239, 68, 68, 0.08)' : 'rgba(113, 113, 122, 0.08)'
       })
       this.resizeOverlay.setCoords()
     }
