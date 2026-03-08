@@ -216,6 +216,50 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
     })
   })
 
+  // ─── C22: Group positions stable under multi-select ────────────────────────
+
+  describe('Group position stability', () => {
+    it('C22: getAllGroups returns correct positions when multiple groups are selected', () => {
+      // When multiple groups are selected in Fabric, an ActiveSelection wraps
+      // them and changes their left/top to selection-relative coords. The engine
+      // must still return world-space positions from getGroup/getAllGroups.
+      const g1 = makeGroup({ id: 'g1', x: 0, y: 84, width: 84, height: 84 })
+      const g2 = makeGroup({ id: 'g2', x: 126, y: 84, width: 84, height: 84 })
+      engine.createGroup(g1)
+      engine.createGroup(g2)
+
+      // Select both — in Fabric this creates an ActiveSelection
+      engine.select(['g1', 'g2'])
+
+      const groups = engine.getAllGroups()
+      const got1 = groups.find((g) => g.id === 'g1')!
+      const got2 = groups.find((g) => g.id === 'g2')!
+
+      expect(got1.x).toBeCloseTo(0, 0)
+      expect(got1.y).toBeCloseTo(84, 0)
+      expect(got2.x).toBeCloseTo(126, 0)
+      expect(got2.y).toBeCloseTo(84, 0)
+    })
+
+    it('C23: toSnapshot preserves group positions when groups are selected', () => {
+      const g1 = makeGroup({ id: 'g1', x: 0, y: 84, width: 84, height: 84 })
+      const g2 = makeGroup({ id: 'g2', x: 126, y: 84, width: 84, height: 84 })
+      engine.createGroup(g1)
+      engine.createGroup(g2)
+
+      engine.select(['g1', 'g2'])
+      const snapshot = engine.toSnapshot()
+
+      const snap1 = snapshot.groups.find((g) => g.id === 'g1')!
+      const snap2 = snapshot.groups.find((g) => g.id === 'g2')!
+
+      expect(snap1.x).toBeCloseTo(0, 0)
+      expect(snap1.y).toBeCloseTo(84, 0)
+      expect(snap2.x).toBeCloseTo(126, 0)
+      expect(snap2.y).toBeCloseTo(84, 0)
+    })
+  })
+
   // ─── C9-C11: Selection ──────────────────────────────────────────────────────
 
   describe('Selection', () => {

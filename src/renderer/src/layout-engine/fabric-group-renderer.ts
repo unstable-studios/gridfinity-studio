@@ -173,9 +173,13 @@ export class FabricGroupRenderer implements GroupRenderer {
   }
 
   readPosition(): { x: number; y: number; rotation: number } {
-    // Centroid → lower-left
-    const centroidX = this.fabricGroup.left ?? 0
-    const centroidY = this.fabricGroup.top ?? 0
+    // Use calcTransformMatrix() to get world position — when the group is
+    // inside an ActiveSelection (multi-select), left/top are relative to
+    // the selection center, not the canvas. The transform matrix always
+    // gives us the true world centroid regardless of selection state.
+    const matrix = this.fabricGroup.calcTransformMatrix()
+    const centroidX = matrix[4]
+    const centroidY = matrix[5]
     return {
       x: centroidX - this.width / 2,
       y: centroidY + this.height / 2,
