@@ -377,7 +377,9 @@ export class FabricEngine implements LayoutEngine {
       interactive: true,
       lockScalingX: true,
       lockScalingY: true,
-      hasControls: false
+      hasControls: false,
+      originX: 'center',
+      originY: 'center'
     })
     ;(fabricGroup as unknown as Record<string, unknown>)[GROUP_DATA_KEY] = group.id
 
@@ -438,9 +440,10 @@ export class FabricEngine implements LayoutEngine {
 
     const fabricGroup = this.fabricGroupMap.get(id)
     if (fabricGroup && this.canvas) {
-      // Ungroup: move children back to canvas at world-space positions
+      // Ungroup: move child shapes back to canvas, skip internal bg rect
       const items = [...fabricGroup.getObjects()]
       for (const item of items) {
+        if ((item as unknown as Record<string, unknown>).__groupBg) continue
         const matrix = item.calcTransformMatrix()
         const point = new fabric.Point(matrix[4], matrix[5])
         fabricGroup.remove(item)
@@ -736,6 +739,8 @@ export class FabricEngine implements LayoutEngine {
     const size = this.gridConfig.size
     const sub = size / 4
     const { grid, gridOrigin } = this.themeColors
+    const startMajor = Math.ceil(-GRID_EXTENT / size) * size
+    const startSub = Math.ceil(-GRID_EXTENT / sub) * sub
 
     const addLine = (
       coords: [number, number, number, number],
@@ -755,27 +760,27 @@ export class FabricEngine implements LayoutEngine {
       this.canvas!.sendObjectToBack(line)
     }
 
-    // Subdivision lines
-    for (let x = -GRID_EXTENT; x <= GRID_EXTENT; x += sub) {
-      if (x % size === 0) continue
+    // Subdivision lines — start from aligned position
+    for (let x = startSub; x <= GRID_EXTENT; x += sub) {
+      if (Math.abs(x % size) < 0.001) continue
       addLine([x, -GRID_EXTENT, x, GRID_EXTENT], grid, 0.25)
     }
-    for (let y = -GRID_EXTENT; y <= GRID_EXTENT; y += sub) {
-      if (y % size === 0) continue
+    for (let y = startSub; y <= GRID_EXTENT; y += sub) {
+      if (Math.abs(y % size) < 0.001) continue
       addLine([-GRID_EXTENT, y, GRID_EXTENT, y], grid, 0.25)
     }
 
-    // Major grid lines
-    for (let x = -GRID_EXTENT; x <= GRID_EXTENT; x += size) {
+    // Major grid lines — start from aligned position
+    for (let x = startMajor; x <= GRID_EXTENT; x += size) {
       if (x === 0) continue
       addLine([x, -GRID_EXTENT, x, GRID_EXTENT], grid, 0.5)
     }
-    for (let y = -GRID_EXTENT; y <= GRID_EXTENT; y += size) {
+    for (let y = startMajor; y <= GRID_EXTENT; y += size) {
       if (y === 0) continue
       addLine([-GRID_EXTENT, y, GRID_EXTENT, y], grid, 0.5)
     }
 
-    // Origin crosshair
+    // Origin crosshair stays at exact 0,0
     addLine([0, -GRID_EXTENT, 0, GRID_EXTENT], gridOrigin, 1.5)
     addLine([-GRID_EXTENT, 0, GRID_EXTENT, 0], gridOrigin, 1.5)
   }

@@ -55,9 +55,10 @@ function LayoutSidebar(): React.JSX.Element {
     const height = depthUnits * baseUnit
     const existingCount = binGroups.length
 
-    // Place at origin offset by bin count to avoid overlap
-    const x = width / 2 + existingCount * baseUnit
-    const y = height / 2
+    // Place in upper-right quadrant (positive X, negative Y in canvas coords)
+    // Stack bins horizontally with spacing to avoid overlap
+    const x = width / 2 + existingCount * baseUnit * 3
+    const y = -(height / 2)
 
     const metadata: BinMetadata = {
       widthUnits,

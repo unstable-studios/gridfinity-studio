@@ -544,6 +544,14 @@ export class KonvaEngine implements LayoutEngine {
       }
     }
 
+    // Refresh transformer if this group is currently selected
+    if (this.transformer) {
+      const selectedNodes = this.transformer.nodes()
+      if (selectedNodes.some((n) => n.id() === id)) {
+        this.transformer.nodes(selectedNodes)
+      }
+    }
+
     this.mainLayer?.batchDraw()
   }
 
@@ -649,12 +657,22 @@ export class KonvaEngine implements LayoutEngine {
       )
       .filter((n): n is Konva.Node => n !== undefined)
 
+    const hasGroups = ids.some((id) => this.konvaGroupMap.has(id))
+
     this.transformer.nodes(nodes)
 
-    // Lock ratio only when ALL selected shapes have lockAspectRatio explicitly set
-    const shouldLock =
-      ids.length > 0 && ids.every((id) => this.shapeMap.get(id)?.lockAspectRatio === true)
-    this.transformer.keepRatio(shouldLock)
+    // Disable resize/rotate for groups (bins resize via sidebar only)
+    if (hasGroups) {
+      this.transformer.resizeEnabled(false)
+      this.transformer.rotateEnabled(false)
+    } else {
+      this.transformer.resizeEnabled(true)
+      this.transformer.rotateEnabled(true)
+      // Lock ratio only when ALL selected shapes have lockAspectRatio explicitly set
+      const shouldLock =
+        ids.length > 0 && ids.every((id) => this.shapeMap.get(id)?.lockAspectRatio === true)
+      this.transformer.keepRatio(shouldLock)
+    }
 
     this.mainLayer?.batchDraw()
     this.emitter.emit('selectionChanged', { ids: [...ids] })
@@ -839,6 +857,8 @@ export class KonvaEngine implements LayoutEngine {
     const size = this.gridConfig.size
     const sub = size / 4
     const { grid, gridOrigin } = this.themeColors
+    const startMajor = Math.ceil(-GRID_EXTENT / size) * size
+    const startSub = Math.ceil(-GRID_EXTENT / sub) * sub
 
     const addLine = (points: number[], stroke: string, strokeWidth: number, opacity = 1): void => {
       this.gridLayer!.add(
@@ -846,27 +866,27 @@ export class KonvaEngine implements LayoutEngine {
       )
     }
 
-    // Subdivision lines
-    for (let x = -GRID_EXTENT; x <= GRID_EXTENT; x += sub) {
-      if (x % size === 0) continue
+    // Subdivision lines — start from aligned position
+    for (let x = startSub; x <= GRID_EXTENT; x += sub) {
+      if (Math.abs(x % size) < 0.001) continue
       addLine([x, -GRID_EXTENT, x, GRID_EXTENT], grid, 0.25, 0.4)
     }
-    for (let y = -GRID_EXTENT; y <= GRID_EXTENT; y += sub) {
-      if (y % size === 0) continue
+    for (let y = startSub; y <= GRID_EXTENT; y += sub) {
+      if (Math.abs(y % size) < 0.001) continue
       addLine([-GRID_EXTENT, y, GRID_EXTENT, y], grid, 0.25, 0.4)
     }
 
-    // Major grid lines
-    for (let x = -GRID_EXTENT; x <= GRID_EXTENT; x += size) {
+    // Major grid lines — start from aligned position
+    for (let x = startMajor; x <= GRID_EXTENT; x += size) {
       if (x === 0) continue
       addLine([x, -GRID_EXTENT, x, GRID_EXTENT], grid, 0.5)
     }
-    for (let y = -GRID_EXTENT; y <= GRID_EXTENT; y += size) {
+    for (let y = startMajor; y <= GRID_EXTENT; y += size) {
       if (y === 0) continue
       addLine([-GRID_EXTENT, y, GRID_EXTENT, y], grid, 0.5)
     }
 
-    // Origin crosshair
+    // Origin crosshair stays at exact 0,0
     addLine([0, -GRID_EXTENT, 0, GRID_EXTENT], gridOrigin, 1.5)
     addLine([-GRID_EXTENT, 0, GRID_EXTENT, 0], gridOrigin, 1.5)
 
@@ -1000,8 +1020,22 @@ export class KonvaEngine implements LayoutEngine {
         const selBox = this.selectionRect.getClientRect()
         const hits: string[] = []
 
+        // Check shapes
         for (const [id, node] of this.konvaMap) {
           const nodeBox = node.getClientRect()
+          if (
+            nodeBox.x < selBox.x + selBox.width &&
+            nodeBox.x + nodeBox.width > selBox.x &&
+            nodeBox.y < selBox.y + selBox.height &&
+            nodeBox.y + nodeBox.height > selBox.y
+          ) {
+            hits.push(id)
+          }
+        }
+
+        // Also check groups
+        for (const [id, konvaGroup] of this.konvaGroupMap) {
+          const nodeBox = konvaGroup.getClientRect()
           if (
             nodeBox.x < selBox.x + selBox.width &&
             nodeBox.x + nodeBox.width > selBox.x &&
