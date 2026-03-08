@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gridfinity Studio is a cross-platform Electron desktop application for designing and managing Gridfinity modular storage systems. It provides interactive 3D visualization and editing of storage bin configurations using React, Three.js (via react-three-fiber), and TypeScript.
+Gridfinity Studio is a cross-platform Electron desktop application for designing Gridfinity modular storage systems. Users lay out bins on a 2D canvas (Fabric.js or Konva), draw pocket shapes inside them, and preview the result as 3D meshes via a CSG pipeline. Built with React, TypeScript, and Electron.
 
 ## Commands
 
@@ -37,14 +37,56 @@ IPC communication flows through `window.api.project.*` methods (save, load, vali
 
 ### Key Data Flow
 
-The canonical project schema (`src/shared/types/project.ts`) is the single source of truth for project data. Projects are saved as `.gfstudio` files (JSON). The validator (`src/shared/validation/project-validator.ts`) enforces schema correctness including duplicate ID detection.
+```
+LayoutEngine (source of truth for 2D)
+  ├─ LayoutShape[]  — pocket geometry (rect, circle, polygon, svgPath, meshImport)
+  ├─ LayoutGroup[]  — bins with Gridfinity metadata (widthUnits, depthUnits, etc.)
+  ├─ Selection, viewport, grid, undo/redo (snapshot-based)
+  └─ Persisted as engine-agnostic LayoutSnapshot in .gfstudio files (schema v0.5.0)
+
+Zustand (useProject)
+  ├─ GlobalSettings, GridfinityConfig
+  ├─ File operations (save/load via IPC)
+  └─ Bake cache
+
+CSG Pipeline (3D preview)
+  ├─ LayoutShape[] → PocketSpec[] (converter)
+  ├─ LayoutGroup metadata → CSGBinParams
+  ├─ geometry.worker.ts → bin-csg-builder.ts → mesh arrays
+  └─ ReviewCanvas renders meshes via R3F
+```
+
+The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnapshot` field containing all shapes, groups, and grid config. The validator (`src/shared/validation/project-validator.ts`) enforces schema correctness including duplicate ID detection.
 
 ### Renderer Architecture
 
-- **App.tsx** - Root layout: Navbar (top) + Sidebar (left) + Viewport (main)
-- **Viewport.tsx** - Three.js canvas using `@react-three/fiber` and `@react-three/drei`
-- **useProject()** hook - Project state management wrapping IPC calls
-- **UI components** - Shadcn/ui (Radix + Tailwind) in `src/renderer/src/components/ui/`
+- **App.tsx** — Root layout: Navbar (top) + Sidebar (left) + Viewport (main)
+- **Viewport.tsx** — 2D canvas powered by the active LayoutEngine (Fabric.js or Konva)
+- **LayoutEngineContext** — Provides the engine instance to the component tree
+- **useEngineState()** — Reactive engine state via `useSyncExternalStore` with tick-based mutation tracking
+- **useProject()** — Project metadata and file operations (Zustand)
+- **UI components** — Shadcn/ui (Radix + Tailwind) in `src/renderer/src/components/ui/`
+
+### Layout Engine (`src/renderer/src/layout-engine/`)
+
+The `LayoutEngine` interface abstracts all 2D canvas operations. Two implementations exist:
+
+| File | Purpose |
+|------|---------|
+| `interface.ts` | Abstract LayoutEngine interface |
+| `types.ts` | LayoutShape, LayoutGroup, LayoutSnapshot, events |
+| `fabric-engine.ts` | Fabric.js v7 adapter (imperative) |
+| `konva-engine.ts` | Konva 10 adapter (imperative) |
+| `fabric-group-renderer.ts` | Fabric bin rendering (centroid positioning, decorations) |
+| `konva-group-renderer.ts` | Konva bin rendering (centroid positioning, decorations) |
+| `collision.ts` | AABB collision detection for drag/resize |
+| `bin-artwork.ts` | Generates bin decorations (grid lines, screw holes, magnet holes) |
+| `useLayoutEngine.ts` | React hook — reactive engine state via useSyncExternalStore |
+| `useProjectEngineSync.ts` | Syncs engine ↔ project store on save/load |
+| `useEngineUndoRedo.ts` | Snapshot-based undo/redo |
+| `LayoutEngineContext.tsx` | React context provider |
+
+**Coordinate convention**: `LayoutGroup.x/y` is the **lower-left corner** (smallest x, largest y in screen coords). Engines use center-based coords internally and convert at the boundary.
 
 ### Path Aliases
 
@@ -72,17 +114,12 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 
 - **Runtime**: Electron 39, Node v24, pnpm
 - **Frontend**: React 19, Tailwind CSS 4, Shadcn/ui, Headless UI
-- **3D**: Three.js via @react-three/fiber and @react-three/drei
+- **2D Canvas**: Fabric.js v7 (imperative), Konva 10 (imperative) — swappable via LayoutEngine interface
+- **3D Preview**: Three.js via @react-three/fiber and @react-three/drei
+- **CSG**: Manifold (WASM) for solid geometry, earcut for triangulation
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
 - **Release**: release-please for automated versioning and CHANGELOG
-
-## Active Technologies
-- TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep) (001-full-roadmap)
-- `.gfstudio` files (JSON, project schema v0.2.0+) (001-full-roadmap)
-- TypeScript 5.9 (strict mode, no `any`) + React 19, Three.js via @react-three/fiber, @react-three/drei, Electron 39 (007-interaction-layer-refactor)
-- `.gfstudio` JSON files, schema version 0.3.0 → 0.4.0 (007-interaction-layer-refactor)
-- TypeScript 5.9 (strict mode, no `any`) + Fabric.js v7 (imperative canvas), Konva 10 + react-konva 19 (declarative React canvas), React 19, Tailwind CSS 4, Shadcn/ui (009-layout-engine-abstraction)
-- `.gfstudio` JSON files — project schema extended with engine-agnostic layout shapes (009-layout-engine-abstraction)
+- **Project files**: `.gfstudio` (JSON, schema v0.5.0)
 
 ## Development Principles
 
@@ -108,6 +145,7 @@ Concretely:
 - **Never mark a task done without verifying integration.** A component that compiles but isn't wired into the app is dead code, not a feature.
 
 ## Recent Changes
-- 009-layout-engine-abstraction: Added TypeScript 5.9 (strict mode, no `any`) + Fabric.js v7 (imperative canvas), Konva 10 + react-konva 19 (declarative React canvas), React 19, Tailwind CSS 4, Shadcn/ui
-- 007-interaction-layer-refactor: Added TypeScript 5.9 (strict mode, no `any`) + React 19, Three.js via @react-three/fiber, @react-three/drei, Electron 39
-- 001-full-roadmap: Added TypeScript 5.9 (strict mode, no `any`) + Electron 39, React 19, @react-three/fiber, @react-three/drei, Three.js, Tailwind CSS 4, Shadcn/ui, manifold (WASM, new), earcut (already a Three.js dep)
+- 010-layout-engine-integration: LayoutEngine is now source of truth for all 2D state. Project schema v0.5.0 with `layoutSnapshot`. Old entity/bin system fully removed. Drag-to-resize with collision detection, bin artwork decorations, snapshot-based undo/redo.
+- 009-layout-engine-abstraction: Introduced LayoutEngine interface with Fabric.js and Konva adapters. Dual-engine support with runtime switching.
+- 007-interaction-layer-refactor: Consolidated canvas interaction handling.
+- 001-full-roadmap: Initial architecture with R3F viewport, Manifold CSG pipeline.
