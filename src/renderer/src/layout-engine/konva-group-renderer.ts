@@ -37,8 +37,8 @@ export class KonvaGroupRenderer implements GroupRenderer {
     | null = null
   private onCollisionRejected: ((id: string, reason: 'move' | 'resize') => void) | null = null
 
-  /** Snapshot of position before a drag starts, for collision rollback. */
-  private preDragPos: { x: number; y: number } | null = null
+  /** Last known non-colliding centroid during drag, for live collision prevention. */
+  private lastGoodPos: { x: number; y: number } | null = null
   /** Snapshot of bounds before a resize starts, for edge-anchoring. */
   private preResizeBounds: { x: number; y: number; width: number; height: number } | null = null
 
@@ -212,44 +212,55 @@ export class KonvaGroupRenderer implements GroupRenderer {
   // ─── Private ──────────────────────────────────────────────────────────────────
 
   private setupSnapHandlers(): void {
-    // Save position before drag for collision rollback
+    // Save initial position as last-good for live collision prevention
     this.konvaGroup.on('dragstart', () => {
-      this.preDragPos = { x: this.konvaGroup.x(), y: this.konvaGroup.y() }
+      this.lastGoodPos = { x: this.konvaGroup.x(), y: this.konvaGroup.y() }
     })
 
-    // Snap group lower-left corner to grid during drag.
-    // Multi-select: skip live snap — Konva's Transformer fights per-node
-    // corrections causing drift. Each bin snaps on dragend instead.
+    // Snap to grid + live collision prevention during drag.
+    // Multi-select: skip — Konva's Transformer fights per-node corrections.
     this.konvaGroup.on('dragmove', () => {
       const gridConfig = this.deps.getGridConfig()
-      if (!gridConfig.enabled) return
       const selectedNodes = this.deps.getTransformer()?.nodes() ?? []
       if (selectedNodes.length > 1) return
 
-      this.snapToGrid(gridConfig.size)
+      if (gridConfig.enabled) {
+        this.snapToGrid(gridConfig.size)
+      }
+
+      // Live collision check — revert to last good position if overlapping
+      const pos = this.readPosition()
+      const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+      if (collider && this.lastGoodPos) {
+        this.konvaGroup.position(this.lastGoodPos)
+        this.deps.getTransformer()?.forceUpdate()
+      } else {
+        this.lastGoodPos = { x: this.konvaGroup.x(), y: this.konvaGroup.y() }
+      }
     })
 
-    // On drag end: snap, collision check, and sync data model
+    // On drag end: final snap + sync data model. Safety collision check
+    // for edge cases (multi-select, etc.) — flash red only if truly overlapping.
     this.konvaGroup.on('dragend', () => {
       const gridConfig = this.deps.getGridConfig()
       if (gridConfig.enabled) {
         this.snapToGrid(gridConfig.size)
       }
 
-      // Collision check — revert if overlapping
       const pos = this.readPosition()
       const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
       const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
-      if (collider && this.preDragPos) {
-        this.konvaGroup.position(this.preDragPos)
+      if (collider && this.lastGoodPos) {
+        this.konvaGroup.position(this.lastGoodPos)
         this.deps.getTransformer()?.forceUpdate()
         this.flashCollision()
         this.onCollisionRejected?.(this.groupId, 'move')
-        this.preDragPos = null
+        this.lastGoodPos = null
         return
       }
 
-      this.preDragPos = null
+      this.lastGoodPos = null
       this.onMoved(this.groupId, pos.x, pos.y)
     })
   }
@@ -319,11 +330,10 @@ export class KonvaGroupRenderer implements GroupRenderer {
       const proposed = { x: finalX, y: finalY, width: newW, height: newH }
       const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
       if (collider) {
-        // Revert to pre-resize state
+        // Revert to pre-resize state — no flash since this is expected prevention
         this.konvaGroup.position({ x: orig.x + orig.width / 2, y: orig.y - orig.height / 2 })
         this.deps.getTransformer()?.forceUpdate()
         this.preResizeBounds = null
-        this.flashCollision()
         this.onCollisionRejected?.(this.groupId, 'resize')
         return
       }

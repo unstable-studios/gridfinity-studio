@@ -156,7 +156,7 @@ export class FabricEngine implements LayoutEngine {
   private fabricMap = new Map<string, fabric.FabricObject>()
   private groupMap = new Map<string, LayoutGroup>()
   private rendererMap = new Map<string, FabricGroupRenderer>()
-  /** Pre-drag/resize state for collision rollback and edge-anchoring */
+  /** Pre-drag/resize state for edge-anchoring during resize */
   private preDragState = new Map<
     string,
     {
@@ -168,6 +168,8 @@ export class FabricEngine implements LayoutEngine {
       height: number
     }
   >()
+  /** Last known non-colliding position during drag, for live collision prevention */
+  private lastGoodPos = new Map<string, { left: number; top: number }>()
   private gridLines: fabric.FabricObject[] = []
   private gridConfig: GridConfig = { size: 42, enabled: true, visible: true }
   private themeColors = {
@@ -849,7 +851,7 @@ export class FabricEngine implements LayoutEngine {
       obj.setCoords()
     })
 
-    // Capture pre-drag/resize state for collision rollback and edge-anchoring
+    // Capture pre-drag/resize state for edge-anchoring and live collision
     this.canvas.on('mouse:down', (opt) => {
       this.interacting = true
       const obj = opt.target
@@ -868,6 +870,7 @@ export class FabricEngine implements LayoutEngine {
             width: group.width,
             height: group.height
           })
+          this.lastGoodPos.set(groupId, { left: obj.left ?? 0, top: obj.top ?? 0 })
         }
       }
     })
@@ -963,11 +966,12 @@ export class FabricEngine implements LayoutEngine {
       const proposed = { x: finalX, y: finalY, width: newW, height: newH }
       const collider = checkGroupCollision(proposed, groupId, this.getAllGroups())
       if (collider) {
+        // Revert to pre-resize state — no flash since this is expected prevention
         obj.set({ left: saved.left, top: saved.top, scaleX: 1, scaleY: 1 })
         obj.setCoords()
         this.canvas?.requestRenderAll()
         this.preDragState.delete(groupId)
-        this.flashCollision(renderer)
+        this.lastGoodPos.delete(groupId)
         this.emitter.emit('collisionRejected', { id: groupId, reason: 'resize' })
         return
       }
@@ -987,10 +991,12 @@ export class FabricEngine implements LayoutEngine {
 
       renderer.update({ x: finalX, y: finalY, width: newW, height: newH }, group)
       this.preDragState.delete(groupId)
+      this.lastGoodPos.delete(groupId)
       this.emitter.emit('groupResized', { id: groupId, width: newW, height: newH })
       this.emitter.emit('groupChanged', { groupId, childIds: [...group.childIds] })
     } else {
-      // Move only — read position and check collision
+      // Move only — live prevention should have handled collision during drag.
+      // Safety check: flash red if bins are truly overlapping (edge case).
       const pos = renderer.readPosition()
 
       const proposed = { x: pos.x, y: pos.y, width: group.width, height: group.height }
@@ -1002,6 +1008,7 @@ export class FabricEngine implements LayoutEngine {
           this.canvas?.requestRenderAll()
         }
         this.preDragState.delete(groupId)
+        this.lastGoodPos.delete(groupId)
         this.flashCollision(renderer)
         this.emitter.emit('collisionRejected', { id: groupId, reason: 'move' })
         return
@@ -1010,6 +1017,7 @@ export class FabricEngine implements LayoutEngine {
       group.x = pos.x
       group.y = pos.y
       this.preDragState.delete(groupId)
+      this.lastGoodPos.delete(groupId)
       this.emitter.emit('groupMoved', { id: groupId, x: group.x, y: group.y })
     }
   }
@@ -1087,6 +1095,21 @@ export class FabricEngine implements LayoutEngine {
         const renderer = this.rendererMap.get(groupId)
         if (renderer) {
           renderer.snapToGrid(size)
+
+          // Live collision prevention — revert to last good position if overlapping
+          const group = this.groupMap.get(groupId)
+          if (group) {
+            const pos = renderer.readPosition()
+            const proposed = { x: pos.x, y: pos.y, width: group.width, height: group.height }
+            const collider = checkGroupCollision(proposed, groupId, this.getAllGroups())
+            const lastGood = this.lastGoodPos.get(groupId)
+            if (collider && lastGood) {
+              obj.set({ left: lastGood.left, top: lastGood.top })
+              obj.setCoords()
+            } else {
+              this.lastGoodPos.set(groupId, { left: obj.left ?? 0, top: obj.top ?? 0 })
+            }
+          }
         }
       } else {
         // Snap shape center to grid
