@@ -33,6 +33,7 @@ export class FabricGroupRenderer implements GroupRenderer {
       fill: group.style.fill,
       stroke: group.style.stroke,
       strokeWidth: group.style.strokeWidth,
+      strokeUniform: true,
       rx: group.style.cornerRadius ?? 0,
       ry: group.style.cornerRadius ?? 0,
       selectable: false,
@@ -51,11 +52,10 @@ export class FabricGroupRenderer implements GroupRenderer {
       height: group.height,
       subTargetCheck: true,
       interactive: true,
-      lockScalingX: true,
-      lockScalingY: true,
+      lockScalingFlip: true,
       lockRotation: true,
       hasBorders: true,
-      hasControls: false,
+      hasControls: true,
       borderColor: '#60a5fa',
       borderDashArray: [4, 3],
       borderScaleFactor: 1.5,
@@ -63,6 +63,19 @@ export class FabricGroupRenderer implements GroupRenderer {
       originX: 'center',
       originY: 'center',
       objectCaching: false
+    })
+
+    // Show edge + corner resize controls; no rotation handle
+    this.fabricGroup.setControlsVisibility({
+      ml: true,
+      mr: true,
+      mt: true,
+      mb: true,
+      tl: true,
+      tr: true,
+      bl: true,
+      br: true,
+      mtr: false
     })
   }
 

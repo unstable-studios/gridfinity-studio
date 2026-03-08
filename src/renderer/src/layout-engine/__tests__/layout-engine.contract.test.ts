@@ -17,6 +17,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { LayoutEngine } from '../interface'
 import type { LayoutShape, LayoutGroup } from '../types'
 import { createLayoutEngine } from '../create-engine'
+import { checkGroupCollision } from '../collision'
 // Import adapters to trigger self-registration
 import '../fabric-engine'
 import '../konva-engine'
@@ -445,6 +446,70 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
         expect(keys).not.toContain('attrs')
         expect(keys).not.toContain('className')
       }
+    })
+  })
+
+  // ─── C26-C32: Resize & Collision ──────────────────────────────────────────
+
+  describe('Resize & Collision', () => {
+    it('C26: updateGroup with new width/height updates dimensions', () => {
+      const g = makeGroup({ id: 'g-resize', x: 0, y: 168, width: 168, height: 168 })
+      engine.createGroup(g)
+      engine.updateGroup('g-resize', { width: 252, height: 84 })
+      const updated = engine.getGroup('g-resize')!
+      expect(updated.width).toBe(252)
+      expect(updated.height).toBe(84)
+    })
+
+    it('C27: updateGroup resize preserves lower-left x when growing right', () => {
+      const g = makeGroup({ id: 'g-grow', x: 84, y: 168, width: 168, height: 168 })
+      engine.createGroup(g)
+      engine.updateGroup('g-grow', { width: 252 })
+      const updated = engine.getGroup('g-grow')!
+      // x (lower-left) stays at 84
+      expect(updated.x).toBeCloseTo(84, 0)
+    })
+
+    it('C28: checkGroupCollision detects overlap', () => {
+      const groups: LayoutGroup[] = [
+        makeGroup({ id: 'a', x: 0, y: 168, width: 168, height: 168 }),
+        makeGroup({ id: 'b', x: 210, y: 168, width: 168, height: 168 })
+      ]
+      const collider = checkGroupCollision({ x: 210, y: 168, width: 168, height: 168 }, 'a', groups)
+      expect(collider).toBe('b')
+    })
+
+    it('C29: checkGroupCollision returns null when no overlap', () => {
+      const groups: LayoutGroup[] = [
+        makeGroup({ id: 'a', x: 0, y: 168, width: 168, height: 168 }),
+        makeGroup({ id: 'b', x: 210, y: 168, width: 168, height: 168 })
+      ]
+      const collider = checkGroupCollision({ x: 0, y: 420, width: 168, height: 168 }, 'a', groups)
+      expect(collider).toBeNull()
+    })
+
+    it('C30: checkGroupCollision ignores self', () => {
+      const groups: LayoutGroup[] = [makeGroup({ id: 'a', x: 0, y: 168, width: 168, height: 168 })]
+      const collider = checkGroupCollision({ x: 0, y: 168, width: 168, height: 168 }, 'a', groups)
+      expect(collider).toBeNull()
+    })
+
+    it('C31: touching edges do not collide', () => {
+      const groups: LayoutGroup[] = [
+        makeGroup({ id: 'a', x: 0, y: 168, width: 168, height: 168 }),
+        makeGroup({ id: 'b', x: 168, y: 168, width: 168, height: 168 })
+      ]
+      const collider = checkGroupCollision({ x: 0, y: 168, width: 168, height: 168 }, 'a', groups)
+      expect(collider).toBeNull()
+    })
+
+    it('C32: resize expansion into neighbor detects collision', () => {
+      const groups: LayoutGroup[] = [
+        makeGroup({ id: 'a', x: 0, y: 168, width: 168, height: 168 }),
+        makeGroup({ id: 'b', x: 168, y: 168, width: 168, height: 168 })
+      ]
+      const collider = checkGroupCollision({ x: 0, y: 168, width: 169, height: 168 }, 'a', groups)
+      expect(collider).toBe('b')
     })
   })
 })

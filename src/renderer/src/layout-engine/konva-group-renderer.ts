@@ -1,6 +1,7 @@
 import Konva from 'konva'
 import type { GroupRenderer } from './group-renderer'
 import type { LayoutGroup, GroupDecoration, GridConfig } from './types'
+import { checkGroupCollision } from './collision'
 
 /**
  * Dependencies injected from the KonvaEngine.
@@ -10,6 +11,7 @@ export interface KonvaGroupRendererDeps {
   layer: Konva.Layer
   getGridConfig(): GridConfig
   getTransformer(): Konva.Transformer | null
+  getAllGroups(): LayoutGroup[]
 }
 
 /**
@@ -30,14 +32,29 @@ export class KonvaGroupRenderer implements GroupRenderer {
   private groupId: string
   private deps: KonvaGroupRendererDeps
   private onMoved: (id: string, x: number, y: number) => void
+  private onResized:
+    | ((id: string, x: number, y: number, width: number, height: number) => void)
+    | null = null
+  private onCollisionRejected: ((id: string, reason: 'move' | 'resize') => void) | null = null
+
+  /** Last known non-colliding centroid during drag, for live collision prevention. */
+  private lastGoodPos: { x: number; y: number } | null = null
+  /** Snapshot of bounds before a resize starts, for edge-anchoring. */
+  private preResizeBounds: { x: number; y: number; width: number; height: number } | null = null
+  /** Non-scaling overlay rect shown during resize as ghost preview. */
+  private resizeOverlay: Konva.Rect | null = null
 
   constructor(
     group: LayoutGroup,
     deps: KonvaGroupRendererDeps,
-    onMoved: (id: string, x: number, y: number) => void
+    onMoved: (id: string, x: number, y: number) => void,
+    onResized?: (id: string, x: number, y: number, width: number, height: number) => void,
+    onCollisionRejected?: (id: string, reason: 'move' | 'resize') => void
   ) {
     this.deps = deps
     this.onMoved = onMoved
+    this.onResized = onResized ?? null
+    this.onCollisionRejected = onCollisionRejected ?? null
     this.groupId = group.id
     this.width = group.width
     this.height = group.height
@@ -63,6 +80,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
       fill: group.style.fill,
       stroke: group.style.stroke,
       strokeWidth: group.style.strokeWidth,
+      strokeScaleEnabled: false,
       cornerRadius: group.style.cornerRadius ?? 0,
       listening: true,
       name: '__groupBg'
@@ -70,6 +88,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.konvaGroup.add(bgRect)
 
     this.setupSnapHandlers()
+    this.setupResizeHandlers()
   }
 
   update(patch: Partial<LayoutGroup>, current: LayoutGroup): void {
@@ -196,19 +215,36 @@ export class KonvaGroupRenderer implements GroupRenderer {
   // ─── Private ──────────────────────────────────────────────────────────────────
 
   private setupSnapHandlers(): void {
-    // Snap group lower-left corner to grid during drag.
-    // Multi-select: skip live snap — Konva's Transformer fights per-node
-    // corrections causing drift. Each bin snaps on dragend instead.
+    // Save initial position as last-good for live collision prevention
+    this.konvaGroup.on('dragstart', () => {
+      this.lastGoodPos = { x: this.konvaGroup.x(), y: this.konvaGroup.y() }
+    })
+
+    // Snap to grid + live collision prevention during drag.
+    // Multi-select: skip — Konva's Transformer fights per-node corrections.
     this.konvaGroup.on('dragmove', () => {
       const gridConfig = this.deps.getGridConfig()
-      if (!gridConfig.enabled) return
       const selectedNodes = this.deps.getTransformer()?.nodes() ?? []
       if (selectedNodes.length > 1) return
 
-      this.snapToGrid(gridConfig.size)
+      if (gridConfig.enabled) {
+        this.snapToGrid(gridConfig.size)
+      }
+
+      // Live collision check — revert to last good position if overlapping
+      const pos = this.readPosition()
+      const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+      if (collider && this.lastGoodPos) {
+        this.konvaGroup.position(this.lastGoodPos)
+        this.deps.getTransformer()?.forceUpdate()
+      } else {
+        this.lastGoodPos = { x: this.konvaGroup.x(), y: this.konvaGroup.y() }
+      }
     })
 
-    // On drag end: snap and sync data model
+    // On drag end: final snap + sync data model. Safety collision check
+    // for edge cases (multi-select, etc.) — flash red only if truly overlapping.
     this.konvaGroup.on('dragend', () => {
       const gridConfig = this.deps.getGridConfig()
       if (gridConfig.enabled) {
@@ -216,7 +252,120 @@ export class KonvaGroupRenderer implements GroupRenderer {
       }
 
       const pos = this.readPosition()
+      const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+      if (collider && this.lastGoodPos) {
+        this.konvaGroup.position(this.lastGoodPos)
+        this.deps.getTransformer()?.forceUpdate()
+        this.flashCollision()
+        this.onCollisionRejected?.(this.groupId, 'move')
+        this.lastGoodPos = null
+        return
+      }
+
+      this.lastGoodPos = null
       this.onMoved(this.groupId, pos.x, pos.y)
+    })
+  }
+
+  private setupResizeHandlers(): void {
+    // Save bounds; hide group and show a non-scaling overlay as ghost preview.
+    this.konvaGroup.on('transformstart', () => {
+      const pos = this.readPosition()
+      this.preResizeBounds = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+      this.showResizeOverlay()
+    })
+
+    // Update overlay on each transform frame to track the scaled bounds.
+    this.konvaGroup.on('transform', () => {
+      this.updateResizeOverlay()
+    })
+
+    // Konva Transformer applies scale to the group during resize.
+    // Don't snap during live drag — modifying scale inside `transform` fights
+    // the Transformer's position anchoring. Snap on release only.
+    this.konvaGroup.on('transformend', () => {
+      this.removeResizeOverlay()
+      const gridConfig = this.deps.getGridConfig()
+      const gs = gridConfig.size
+      const orig = this.preResizeBounds
+      if (!orig) return
+
+      const sx = this.konvaGroup.scaleX()
+      const sy = this.konvaGroup.scaleY()
+
+      // Compute new dimensions (grid-quantized)
+      let newW = this.width * sx
+      let newH = this.height * sy
+      if (gridConfig.enabled) {
+        newW = Math.max(gs, Math.round(newW / gs) * gs)
+        newH = Math.max(gs, Math.round(newH / gs) * gs)
+      }
+
+      // Determine which edges were anchored by comparing the Transformer's
+      // visual result to the original bounds. The anchored edge barely moved.
+      const centroidX = this.konvaGroup.x()
+      const centroidY = this.konvaGroup.y()
+      const visualLeft = centroidX - (this.width * sx) / 2
+      const visualRight = centroidX + (this.width * sx) / 2
+      const visualTop = centroidY - (this.height * sy) / 2
+      const visualBottom = centroidY + (this.height * sy) / 2
+
+      const origLeft = orig.x
+      const origRight = orig.x + orig.width
+      const origTop = orig.y - orig.height // top in screen coords (smaller y)
+      const origBottom = orig.y // lower-left y = bottom in screen coords
+
+      // Derive new lower-left from anchored edges (already on-grid)
+      let finalX: number
+      if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
+        finalX = origLeft // left edge anchored
+      } else {
+        finalX = origRight - newW // right edge anchored
+      }
+
+      let finalY: number
+      if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
+        // Top edge anchored → bottom (lower-left y) = top + newH
+        finalY = origTop + newH
+      } else {
+        finalY = origBottom // bottom edge anchored
+      }
+
+      // Reset scale
+      this.konvaGroup.scaleX(1)
+      this.konvaGroup.scaleY(1)
+
+      // Collision check
+      const proposed = { x: finalX, y: finalY, width: newW, height: newH }
+      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+      if (collider) {
+        // Revert to pre-resize state — no flash since this is expected prevention
+        this.konvaGroup.position({ x: orig.x + orig.width / 2, y: orig.y - orig.height / 2 })
+        this.deps.getTransformer()?.forceUpdate()
+        this.preResizeBounds = null
+        this.onCollisionRejected?.(this.groupId, 'resize')
+        return
+      }
+
+      // Commit the new size
+      this.width = newW
+      this.height = newH
+
+      // Update bg rect
+      const bgRect = this.konvaGroup.findOne('.__groupBg')
+      if (bgRect) {
+        bgRect.setAttrs({ x: -newW / 2, y: -newH / 2, width: newW, height: newH })
+      }
+
+      // Reposition centroid from the final lower-left
+      this.konvaGroup.position({ x: finalX + newW / 2, y: finalY - newH / 2 })
+
+      this.refreshTransformerIfSelected()
+      this.deps.layer.batchDraw()
+      this.preResizeBounds = null
+
+      this.onResized?.(this.groupId, finalX, finalY, newW, newH)
     })
   }
 
@@ -227,6 +376,120 @@ export class KonvaGroupRenderer implements GroupRenderer {
     if (selectedNodes.some((n) => n.id() === this.groupId)) {
       transformer.forceUpdate()
     }
+  }
+
+  /** Create a non-scaling overlay rect on the layer as resize ghost preview. */
+  private showResizeOverlay(): void {
+    const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
+    const stroke = bgRect?.stroke() ?? '#666666'
+    const strokeWidth = bgRect?.strokeWidth() ?? 1
+    const cornerRadius = bgRect?.cornerRadius() ?? 0
+
+    this.resizeOverlay = new Konva.Rect({
+      x: this.konvaGroup.x() - this.width / 2,
+      y: this.konvaGroup.y() - this.height / 2,
+      width: this.width,
+      height: this.height,
+      fill: 'rgba(113, 113, 122, 0.08)',
+      stroke,
+      strokeWidth,
+      cornerRadius: cornerRadius as number,
+      dash: [6, 3],
+      listening: false,
+      name: '__resizeOverlay'
+    })
+    this.resizeOverlay.setAttr('__origStroke', stroke)
+    this.deps.layer.add(this.resizeOverlay)
+
+    // Hide the actual group so only the overlay is visible
+    this.konvaGroup.opacity(0)
+    this.deps.layer.batchDraw()
+  }
+
+  /** Update overlay to show grid-snapped dimensions anchored to the correct edge. */
+  private updateResizeOverlay(): void {
+    if (!this.resizeOverlay || !this.preResizeBounds) return
+    const gridConfig = this.deps.getGridConfig()
+    const gs = gridConfig.size
+    const orig = this.preResizeBounds
+    const sx = this.konvaGroup.scaleX()
+    const sy = this.konvaGroup.scaleY()
+    const cx = this.konvaGroup.x()
+    const cy = this.konvaGroup.y()
+
+    // Raw scaled dimensions, grid-quantized
+    let snapW = this.width * sx
+    let snapH = this.height * sy
+    if (gridConfig.enabled) {
+      snapW = Math.max(gs, Math.round(snapW / gs) * gs)
+      snapH = Math.max(gs, Math.round(snapH / gs) * gs)
+    }
+
+    // Edge-anchor: detect which edges are stationary by comparing visual
+    // bounds to the original on-grid bounds, then derive overlay position.
+    const visualLeft = cx - (this.width * sx) / 2
+    const visualRight = cx + (this.width * sx) / 2
+    const visualTop = cy - (this.height * sy) / 2
+    const visualBottom = cy + (this.height * sy) / 2
+
+    const origLeft = orig.x
+    const origRight = orig.x + orig.width
+    const origTop = orig.y - orig.height
+    const origBottom = orig.y
+
+    let overlayLeft: number
+    if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
+      overlayLeft = origLeft
+    } else {
+      overlayLeft = origRight - snapW
+    }
+
+    let overlayTop: number
+    if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
+      overlayTop = origTop
+    } else {
+      overlayTop = origBottom - snapH
+    }
+
+    // Check if snapped dimensions would collide
+    const proposed = { x: overlayLeft, y: overlayTop + snapH, width: snapW, height: snapH }
+    const wouldCollide = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+
+    this.resizeOverlay.setAttrs({
+      x: overlayLeft,
+      y: overlayTop,
+      width: snapW,
+      height: snapH,
+      stroke: wouldCollide ? '#ef4444' : this.resizeOverlay.getAttr('__origStroke'),
+      fill: wouldCollide ? 'rgba(239, 68, 68, 0.08)' : 'rgba(113, 113, 122, 0.08)'
+    })
+    this.deps.layer.batchDraw()
+  }
+
+  /** Remove overlay and restore group visibility. */
+  private removeResizeOverlay(): void {
+    if (this.resizeOverlay) {
+      this.resizeOverlay.destroy()
+      this.resizeOverlay = null
+    }
+    this.konvaGroup.opacity(1)
+    this.deps.layer.batchDraw()
+  }
+
+  /** Brief red flash on the group border to indicate a collision rejection. */
+  private flashCollision(): void {
+    const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
+    if (!bgRect) return
+    const origStroke = bgRect.stroke()
+    const origStrokeWidth = bgRect.strokeWidth()
+    bgRect.stroke('#ef4444')
+    bgRect.strokeWidth(2)
+    this.deps.layer.batchDraw()
+    setTimeout(() => {
+      bgRect.stroke(origStroke ?? '#666666')
+      bgRect.strokeWidth(origStrokeWidth ?? 1)
+      this.deps.layer.batchDraw()
+    }, 300)
   }
 
   /** Full transformer reset for decoration changes (clears NODES_RECT cache). */

@@ -14,6 +14,7 @@ import type {
 } from './types'
 import { registerEngine } from './create-engine'
 import { FabricGroupRenderer } from './fabric-group-renderer'
+import { checkGroupCollision } from './collision'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -155,6 +156,23 @@ export class FabricEngine implements LayoutEngine {
   private fabricMap = new Map<string, fabric.FabricObject>()
   private groupMap = new Map<string, LayoutGroup>()
   private rendererMap = new Map<string, FabricGroupRenderer>()
+  /** Pre-drag/resize state for edge-anchoring during resize */
+  private preDragState = new Map<
+    string,
+    {
+      left: number
+      top: number
+      lowerLeftX: number
+      lowerLeftY: number
+      width: number
+      height: number
+    }
+  >()
+  /** Last known non-colliding position during drag, for live collision prevention */
+  private lastGoodPos = new Map<string, { left: number; top: number }>()
+  /** Non-scaling overlay rect shown during resize as ghost preview. */
+  private resizeOverlay: fabric.Rect | null = null
+  private resizeOverlayGroupId: string | null = null
   private gridLines: fabric.FabricObject[] = []
   private gridConfig: GridConfig = { size: 42, enabled: true, visible: true }
   private themeColors = {
@@ -807,10 +825,21 @@ export class FabricEngine implements LayoutEngine {
 
     // Rects and ellipses: reset scale and update real dimensions so they stay crisp
     // and corner radii remain constant. Polygons/paths are natively vector — let them keep scale.
+    // Groups (bins): let Fabric handle scale freely during drag; snap on release in object:modified.
     this.canvas.on('object:scaling', (e) => {
       if (this.disposed) return
       const obj = e.target
       if (!obj) return
+
+      // Skip groups — their resize is finalized in object:modified to avoid
+      // fighting between live scale snap and Fabric's position anchoring.
+      // Show a non-scaling overlay as ghost preview while scaling.
+      const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (groupId) {
+        this.updateResizeOverlay(groupId, obj)
+        return
+      }
+
       if (obj instanceof fabric.Polygon || obj instanceof fabric.Path) return
 
       const scaleX = obj.scaleX ?? 1
@@ -827,6 +856,30 @@ export class FabricEngine implements LayoutEngine {
         })
       }
       obj.setCoords()
+    })
+
+    // Capture pre-drag/resize state for edge-anchoring and live collision
+    this.canvas.on('mouse:down', (opt) => {
+      this.interacting = true
+      const obj = opt.target
+      if (!obj) return
+      const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (groupId) {
+        const group = this.groupMap.get(groupId)
+        const renderer = this.rendererMap.get(groupId)
+        if (group && renderer) {
+          const pos = renderer.readPosition()
+          this.preDragState.set(groupId, {
+            left: obj.left ?? 0,
+            top: obj.top ?? 0,
+            lowerLeftX: pos.x,
+            lowerLeftY: pos.y,
+            width: group.width,
+            height: group.height
+          })
+          this.lastGoodPos.set(groupId, { left: obj.left ?? 0, top: obj.top ?? 0 })
+        }
+      }
     })
 
     this.canvas.on('object:modified', (e) => {
@@ -853,23 +906,8 @@ export class FabricEngine implements LayoutEngine {
 
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {
-        const renderer = this.rendererMap.get(groupId)
-        const group = this.groupMap.get(groupId)
-        if (renderer && group) {
-          const pos = renderer.readPosition()
-          group.x = pos.x
-          group.y = pos.y
-        }
-        this.emitter.emit('groupMoved', {
-          id: groupId,
-          x: group?.x ?? 0,
-          y: group?.y ?? 0
-        })
+        this.handleGroupModified(groupId, obj)
       }
-    })
-
-    this.canvas.on('mouse:down', () => {
-      this.interacting = true
     })
 
     this.canvas.on('mouse:up', () => {
@@ -877,20 +915,274 @@ export class FabricEngine implements LayoutEngine {
     })
   }
 
+  // ─── Private: Group move/resize with collision ─────────────────────────────
+
+  private handleGroupModified(groupId: string, obj: fabric.FabricObject): void {
+    const renderer = this.rendererMap.get(groupId)
+    const group = this.groupMap.get(groupId)
+    if (!renderer || !group) return
+
+    // Remove resize overlay (if resize was in progress)
+    this.removeResizeOverlay()
+
+    const gs = this.gridConfig.size
+    const saved = this.preDragState.get(groupId)
+    const scaleX = obj.scaleX ?? 1
+    const scaleY = obj.scaleY ?? 1
+    const wasResized = Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
+
+    if (wasResized && saved) {
+      // Compute new dimensions from scale
+      let newW = group.width * scaleX
+      let newH = group.height * scaleY
+      if (this.gridConfig.enabled) {
+        newW = Math.max(gs, Math.round(newW / gs) * gs)
+        newH = Math.max(gs, Math.round(newH / gs) * gs)
+      }
+
+      // Reset scale to 1 — we commit actual dimensions
+      obj.set({ scaleX: 1, scaleY: 1 })
+
+      // Determine which edges were anchored by comparing the Fabric object's
+      // post-scale visual bounds to the original on-grid bounds.
+      const centroidX = obj.left ?? 0
+      const centroidY = obj.top ?? 0
+      const visualLeft = centroidX - (group.width * scaleX) / 2
+      const visualRight = centroidX + (group.width * scaleX) / 2
+      const visualTop = centroidY - (group.height * scaleY) / 2
+      const visualBottom = centroidY + (group.height * scaleY) / 2
+
+      const origLeft = saved.lowerLeftX
+      const origRight = saved.lowerLeftX + saved.width
+      const origTop = saved.lowerLeftY - saved.height
+      const origBottom = saved.lowerLeftY
+
+      // Derive new lower-left from anchored edges (already on-grid)
+      let finalX: number
+      if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
+        finalX = origLeft
+      } else {
+        finalX = origRight - newW
+      }
+
+      let finalY: number
+      if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
+        finalY = origTop + newH
+      } else {
+        finalY = origBottom
+      }
+
+      // Collision check
+      const proposed = { x: finalX, y: finalY, width: newW, height: newH }
+      const collider = checkGroupCollision(proposed, groupId, this.getAllGroups())
+      if (collider) {
+        // Revert to pre-resize state — no flash since this is expected prevention
+        obj.set({ left: saved.left, top: saved.top, scaleX: 1, scaleY: 1 })
+        obj.setCoords()
+        this.canvas?.requestRenderAll()
+        this.preDragState.delete(groupId)
+        this.lastGoodPos.delete(groupId)
+        this.emitter.emit('collisionRejected', { id: groupId, reason: 'resize' })
+        return
+      }
+
+      // Commit the resize
+      group.x = finalX
+      group.y = finalY
+      group.width = newW
+      group.height = newH
+
+      // Update bin metadata units
+      const meta = group.metadata as Record<string, unknown> | undefined
+      if (meta && typeof meta.widthUnits === 'number') {
+        meta.widthUnits = Math.round(newW / gs)
+        meta.depthUnits = Math.round(newH / gs)
+      }
+
+      renderer.update({ x: finalX, y: finalY, width: newW, height: newH }, group)
+      this.preDragState.delete(groupId)
+      this.lastGoodPos.delete(groupId)
+      this.emitter.emit('groupResized', { id: groupId, width: newW, height: newH })
+      this.emitter.emit('groupChanged', { groupId, childIds: [...group.childIds] })
+    } else {
+      // Move only — live prevention should have handled collision during drag.
+      // Safety check: flash red if bins are truly overlapping (edge case).
+      const pos = renderer.readPosition()
+
+      const proposed = { x: pos.x, y: pos.y, width: group.width, height: group.height }
+      const collider = checkGroupCollision(proposed, groupId, this.getAllGroups())
+      if (collider) {
+        if (saved) {
+          obj.set({ left: saved.left, top: saved.top })
+          obj.setCoords()
+          this.canvas?.requestRenderAll()
+        }
+        this.preDragState.delete(groupId)
+        this.lastGoodPos.delete(groupId)
+        this.flashCollision(renderer)
+        this.emitter.emit('collisionRejected', { id: groupId, reason: 'move' })
+        return
+      }
+
+      group.x = pos.x
+      group.y = pos.y
+      this.preDragState.delete(groupId)
+      this.lastGoodPos.delete(groupId)
+      this.emitter.emit('groupMoved', { id: groupId, x: group.x, y: group.y })
+    }
+  }
+
+  /** Create or update a non-scaling overlay rect showing grid-snapped resize preview. */
+  private updateResizeOverlay(groupId: string, obj: fabric.FabricObject): void {
+    if (!this.canvas) return
+    const renderer = this.rendererMap.get(groupId)
+    const group = this.groupMap.get(groupId)
+    const saved = this.preDragState.get(groupId)
+    if (!renderer || !group || !saved) return
+
+    const sx = obj.scaleX ?? 1
+    const sy = obj.scaleY ?? 1
+    const cx = obj.left ?? 0
+    const cy = obj.top ?? 0
+    const gs = this.gridConfig.size
+
+    // Grid-quantized dimensions
+    let snapW = group.width * sx
+    let snapH = group.height * sy
+    if (this.gridConfig.enabled) {
+      snapW = Math.max(gs, Math.round(snapW / gs) * gs)
+      snapH = Math.max(gs, Math.round(snapH / gs) * gs)
+    }
+
+    // Edge-anchor: detect which edges are stationary
+    const visualLeft = cx - (group.width * sx) / 2
+    const visualRight = cx + (group.width * sx) / 2
+    const visualTop = cy - (group.height * sy) / 2
+    const visualBottom = cy + (group.height * sy) / 2
+
+    const origLeft = saved.lowerLeftX
+    const origRight = saved.lowerLeftX + saved.width
+    const origTop = saved.lowerLeftY - saved.height
+    const origBottom = saved.lowerLeftY
+
+    let overlayLeft: number
+    if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
+      overlayLeft = origLeft
+    } else {
+      overlayLeft = origRight - snapW
+    }
+
+    let overlayTop: number
+    if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
+      overlayTop = origTop
+    } else {
+      overlayTop = origBottom - snapH
+    }
+
+    // Overlay uses center origin — convert from top-left
+    const overlayCX = overlayLeft + snapW / 2
+    const overlayCY = overlayTop + snapH / 2
+
+    // Check if snapped dimensions would collide (lower-left y = overlayTop + snapH)
+    const proposed = { x: overlayLeft, y: overlayTop + snapH, width: snapW, height: snapH }
+    const wouldCollide = checkGroupCollision(proposed, groupId, this.getAllGroups())
+
+    if (!this.resizeOverlay) {
+      // Read style from bgRect
+      const bgObj = renderer.fabricGroup
+        .getObjects()
+        .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+      const stroke = (bgObj?.get('stroke') as string) ?? '#666666'
+      const strokeWidth = (bgObj?.get('strokeWidth') as number) ?? 1
+      const cornerRadius = (bgObj?.get('rx') as number) ?? 0
+
+      // First frame — create overlay and hide the actual group
+      this.resizeOverlay = new fabric.Rect({
+        left: overlayCX,
+        top: overlayCY,
+        width: snapW,
+        height: snapH,
+        fill: wouldCollide ? 'rgba(239, 68, 68, 0.08)' : 'rgba(113, 113, 122, 0.08)',
+        stroke: wouldCollide ? '#ef4444' : stroke,
+        strokeWidth,
+        strokeUniform: true,
+        strokeDashArray: [6, 3],
+        rx: cornerRadius,
+        ry: cornerRadius,
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+        excludeFromExport: true
+      })
+      ;(this.resizeOverlay as unknown as Record<string, unknown>).__origStroke = stroke
+      this.resizeOverlayGroupId = groupId
+      this.canvas.add(this.resizeOverlay)
+      renderer.fabricGroup.set('opacity', 0)
+    } else {
+      // Subsequent frames — update position, size, and collision indicator
+      const origStroke = (this.resizeOverlay as unknown as Record<string, unknown>)
+        .__origStroke as string
+      this.resizeOverlay.set({
+        left: overlayCX,
+        top: overlayCY,
+        width: snapW,
+        height: snapH,
+        stroke: wouldCollide ? '#ef4444' : origStroke,
+        fill: wouldCollide ? 'rgba(239, 68, 68, 0.08)' : 'rgba(113, 113, 122, 0.08)'
+      })
+      this.resizeOverlay.setCoords()
+    }
+    this.canvas.requestRenderAll()
+  }
+
+  /** Remove overlay and restore group visibility. */
+  private removeResizeOverlay(): void {
+    if (this.resizeOverlay && this.canvas) {
+      this.canvas.remove(this.resizeOverlay)
+      this.resizeOverlay = null
+    }
+    if (this.resizeOverlayGroupId) {
+      const renderer = this.rendererMap.get(this.resizeOverlayGroupId)
+      if (renderer) {
+        renderer.fabricGroup.set('opacity', 1)
+      }
+      this.resizeOverlayGroupId = null
+    }
+    this.canvas?.requestRenderAll()
+  }
+
+  /** Brief red flash on the group border to indicate a collision rejection. */
+  private flashCollision(renderer: FabricGroupRenderer): void {
+    const bgRect = renderer.fabricGroup
+      .getObjects()
+      .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+    if (!bgRect) return
+    const origStroke = bgRect.get('stroke') as string
+    const origStrokeWidth = bgRect.get('strokeWidth') as number
+    bgRect.set({ stroke: '#ef4444', strokeWidth: 2 })
+    this.canvas?.requestRenderAll()
+    setTimeout(() => {
+      bgRect.set({ stroke: origStroke, strokeWidth: origStrokeWidth })
+      this.canvas?.requestRenderAll()
+    }, 300)
+  }
+
   // ─── Private: Snap to grid ──────────────────────────────────────────────────
 
   private setupSnapToGrid(): void {
     if (!this.canvas) return
     this.canvas.on('object:moving', (e) => {
-      if (!this.gridConfig.enabled) return
       const obj = e.target
       if (!obj) return
+      const gridEnabled = this.gridConfig.enabled
       const size = this.gridConfig.size
 
       // Multi-select (ActiveSelection): snap based on first group's lower-left corner.
       // Using the frame center would cause half-grid snapping when the combined
       // frame width is an odd number of grid units.
       if (obj instanceof fabric.ActiveSelection) {
+        if (!gridEnabled) return
         const children = obj.getObjects()
         const firstGroupObj = children.find(
           (o) => (o as unknown as Record<string, unknown>)[GROUP_DATA_KEY]
@@ -924,11 +1216,35 @@ export class FabricEngine implements LayoutEngine {
 
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {
+        // Skip snap + collision if the group is being resized (scale != 1).
+        // Fabric fires object:moving during resize to anchor the opposite edge;
+        // snapping the position mid-resize causes the group to slide.
+        const sx = obj.scaleX ?? 1
+        const sy = obj.scaleY ?? 1
+        if (Math.abs(sx - 1) > 0.001 || Math.abs(sy - 1) > 0.001) return
+
         const renderer = this.rendererMap.get(groupId)
         if (renderer) {
-          renderer.snapToGrid(size)
+          if (gridEnabled) {
+            renderer.snapToGrid(size)
+          }
+
+          // Live collision prevention — revert to last good position if overlapping
+          const group = this.groupMap.get(groupId)
+          if (group) {
+            const pos = renderer.readPosition()
+            const proposed = { x: pos.x, y: pos.y, width: group.width, height: group.height }
+            const collider = checkGroupCollision(proposed, groupId, this.getAllGroups())
+            const lastGood = this.lastGoodPos.get(groupId)
+            if (collider && lastGood) {
+              obj.set({ left: lastGood.left, top: lastGood.top })
+              obj.setCoords()
+            } else {
+              this.lastGoodPos.set(groupId, { left: obj.left ?? 0, top: obj.top ?? 0 })
+            }
+          }
         }
-      } else {
+      } else if (gridEnabled) {
         // Snap shape center to grid
         const left = Math.round((obj.left ?? 0) / size) * size
         const top = Math.round((obj.top ?? 0) / size) * size

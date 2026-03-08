@@ -12,6 +12,7 @@ export type {
   ViewportInsets
 } from './types'
 export { isBinGroup } from './types'
+export { checkGroupCollision } from './collision'
 export { computeBinArtwork } from './bin-artwork'
 export type { BinArtwork } from './bin-artwork'
 export { createLayoutEngine, registerEngine } from './create-engine'
