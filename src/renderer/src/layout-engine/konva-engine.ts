@@ -239,27 +239,28 @@ export class KonvaEngine implements LayoutEngine {
 
     node.on('dragmove', () => {
       if (!this.gridConfig.enabled) return
-      // Multi-select: skip if another node is the snap leader
+      // Multi-select: skip live snap — defer to dragend
       const selectedNodes = this.transformer?.nodes() ?? []
-      if (selectedNodes.length > 1 && selectedNodes[0] !== node) return
+      if (selectedNodes.length > 1) return
 
       const size = this.gridConfig.size
-      const snappedX = Math.round(node.x() / size) * size
-      const snappedY = Math.round(node.y() / size) * size
-      const dx = snappedX - node.x()
-      const dy = snappedY - node.y()
-
-      if (selectedNodes.length > 1) {
-        for (const n of selectedNodes) {
-          n.position({ x: n.x() + dx, y: n.y() + dy })
-        }
-      } else {
-        node.position({ x: snappedX, y: snappedY })
-      }
+      node.position({
+        x: Math.round(node.x() / size) * size,
+        y: Math.round(node.y() / size) * size
+      })
       this.transformer?.forceUpdate()
     })
 
     node.on('dragend', () => {
+      // Snap on release (covers multi-select case)
+      if (this.gridConfig.enabled) {
+        const size = this.gridConfig.size
+        node.position({
+          x: Math.round(node.x() / size) * size,
+          y: Math.round(node.y() / size) * size
+        })
+        this.transformer?.forceUpdate()
+      }
       const data = this.shapeMap.get(shape.id)
       if (data) {
         data.x = node.x()
@@ -481,13 +482,11 @@ export class KonvaEngine implements LayoutEngine {
     konvaGroup.add(bgRect)
 
     // Snap group lower-left corner to grid during drag.
+    // Multi-select: skip live snap to avoid fighting the Transformer — snap on dragend.
     konvaGroup.on('dragmove', () => {
       if (!this.gridConfig.enabled) return
-
-      // Multi-select: only the FIRST selected node handles snap for all.
-      // This prevents double-snap when multiple dragmove handlers fire.
       const selectedNodes = this.transformer?.nodes() ?? []
-      if (selectedNodes.length > 1 && selectedNodes[0] !== konvaGroup) return
+      if (selectedNodes.length > 1) return // defer to dragend
 
       const size = this.gridConfig.size
       const g = this.groupMap.get(group.id)
@@ -495,37 +494,37 @@ export class KonvaEngine implements LayoutEngine {
 
       const halfW = g.width / 2
       const halfH = g.height / 2
-      // Lower-left corner: (centroidX - halfW, centroidY + halfH)
       const lowerLeftX = konvaGroup.x() - halfW
       const lowerLeftY = konvaGroup.y() + halfH
-      const snappedX = Math.round(lowerLeftX / size) * size
-      const snappedY = Math.round(lowerLeftY / size) * size
-      const dx = snappedX - lowerLeftX
-      const dy = snappedY - lowerLeftY
-
-      if (selectedNodes.length > 1) {
-        // Apply uniform delta to all selected nodes
-        for (const n of selectedNodes) {
-          n.position({ x: n.x() + dx, y: n.y() + dy })
-        }
-      } else {
-        konvaGroup.position({ x: snappedX + halfW, y: snappedY - halfH })
-      }
+      konvaGroup.position({
+        x: Math.round(lowerLeftX / size) * size + halfW,
+        y: Math.round(lowerLeftY / size) * size - halfH
+      })
       this.transformer?.forceUpdate()
     })
 
-    // Emit event when group drag ends — convert centroid → lower-left
+    // On drag end: snap lower-left corner to grid and sync data model
     konvaGroup.on('dragend', () => {
       const g = this.groupMap.get(group.id)
-      if (g) {
-        g.x = konvaGroup.x() - g.width / 2
-        g.y = konvaGroup.y() + g.height / 2
+      if (!g) return
+
+      if (this.gridConfig.enabled) {
+        const size = this.gridConfig.size
+        const halfW = g.width / 2
+        const halfH = g.height / 2
+        const lowerLeftX = konvaGroup.x() - halfW
+        const lowerLeftY = konvaGroup.y() + halfH
+        konvaGroup.position({
+          x: Math.round(lowerLeftX / size) * size + halfW,
+          y: Math.round(lowerLeftY / size) * size - halfH
+        })
+        this.transformer?.forceUpdate()
       }
-      this.emitter.emit('groupMoved', {
-        id: group.id,
-        x: g?.x ?? 0,
-        y: g?.y ?? 0
-      })
+
+      // Sync data model (centroid → lower-left)
+      g.x = konvaGroup.x() - g.width / 2
+      g.y = konvaGroup.y() + g.height / 2
+      this.emitter.emit('groupMoved', { id: group.id, x: g.x, y: g.y })
     })
 
     // Move children into group (positions relative to group centroid)

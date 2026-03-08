@@ -936,11 +936,37 @@ export class FabricEngine implements LayoutEngine {
       if (!obj) return
       const size = this.gridConfig.size
 
-      // Multi-select (ActiveSelection): snap the frame position to grid
+      // Multi-select (ActiveSelection): snap based on first group's lower-left corner.
+      // Using the frame center would cause half-grid snapping when the combined
+      // frame width is an odd number of grid units.
       if (obj instanceof fabric.ActiveSelection) {
-        const left = Math.round((obj.left ?? 0) / size) * size
-        const top = Math.round((obj.top ?? 0) / size) * size
-        obj.set({ left, top })
+        const children = obj.getObjects()
+        const firstGroupObj = children.find(
+          (o) => (o as unknown as Record<string, unknown>)[GROUP_DATA_KEY]
+        )
+        if (firstGroupObj) {
+          const gid = (firstGroupObj as unknown as Record<string, unknown>)[
+            GROUP_DATA_KEY
+          ] as string
+          const group = this.groupMap.get(gid)
+          if (group) {
+            // Child left/top is relative to ActiveSelection center.
+            // World centroid = selectionCenter + childOffset
+            const worldCentroidX = (obj.left ?? 0) + (firstGroupObj.left ?? 0)
+            const worldCentroidY = (obj.top ?? 0) + (firstGroupObj.top ?? 0)
+            const lowerLeftX = worldCentroidX - group.width / 2
+            const lowerLeftY = worldCentroidY + group.height / 2
+            const dx = Math.round(lowerLeftX / size) * size - lowerLeftX
+            const dy = Math.round(lowerLeftY / size) * size - lowerLeftY
+            obj.set({ left: (obj.left ?? 0) + dx, top: (obj.top ?? 0) + dy })
+          }
+        } else {
+          // No groups — snap frame center
+          obj.set({
+            left: Math.round((obj.left ?? 0) / size) * size,
+            top: Math.round((obj.top ?? 0) / size) * size
+          })
+        }
         obj.setCoords()
         return
       }
