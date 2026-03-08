@@ -111,9 +111,11 @@ Handles internally:
 
 ## Impact on LayoutEngine Interface
 
-**No changes to the public `LayoutEngine` interface.** The `GroupRenderer` is an
-internal implementation detail of each engine adapter. The engine's `createGroup`,
-`updateGroup`, `setGroupDecorations`, `removeGroup`, `getGroup` methods simply
+This refactor adds public `LayoutEngine` methods (`setGroupDecorations`,
+`setViewportInsets`) and re-exports the associated types, but does not change the
+behavior or signatures of existing methods. The `GroupRenderer` itself remains an
+internal implementation detail of each engine adapter: the engine's `createGroup`,
+`updateGroup`, `setGroupDecorations`, `removeGroup`, and `getGroup` methods simply
 delegate to the renderer.
 
 ## Impact on Existing Tests

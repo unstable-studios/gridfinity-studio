@@ -135,8 +135,9 @@ export type GroupDecoration = CircleDecoration | RectDecoration
 
 /**
  * Insets describe UI elements (sidebar, toolbar) that overlap the canvas.
- * The engine uses these to offset the "visual center" so that resetView()
- * and initial mount center the origin in the unoccluded area.
+ * The engine uses these to position the origin near the bottom-left of the
+ * unoccluded area (with padding) and to derive the default viewport when
+ * resetView() runs or the engine is initially mounted.
  *
  * Values are in screen pixels.
  */

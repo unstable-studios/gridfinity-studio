@@ -50,7 +50,7 @@ export interface LayoutEngine {
 
   /**
    * Set viewport insets for UI overlays (sidebar, toolbar).
-   * Affects where resetView() and initial mount place the visual center.
+   * Affects where resetView() and initial mount position the origin.
    */
   setViewportInsets(insets: ViewportInsets): void
 

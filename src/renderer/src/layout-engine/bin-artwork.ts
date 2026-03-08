@@ -60,13 +60,13 @@ export function computeBinArtwork(meta: BinMetadata, config: GridfinityConfig): 
   for (let gx = 0; gx < meta.widthUnits; gx++) {
     for (let gy = 0; gy < meta.depthUnits; gy++) {
       const cellLeft = gx * baseUnit - widthMm / 2
-      const cellTop = gy * baseUnit - depthMm / 2
+      const cellBottom = gy * baseUnit - depthMm / 2
 
       const corners = [
-        { cx: cellLeft + HOLE_OFFSET, cy: cellTop + HOLE_OFFSET },
-        { cx: cellLeft + baseUnit - HOLE_OFFSET, cy: cellTop + HOLE_OFFSET },
-        { cx: cellLeft + HOLE_OFFSET, cy: cellTop + baseUnit - HOLE_OFFSET },
-        { cx: cellLeft + baseUnit - HOLE_OFFSET, cy: cellTop + baseUnit - HOLE_OFFSET }
+        { cx: cellLeft + HOLE_OFFSET, cy: cellBottom + HOLE_OFFSET },
+        { cx: cellLeft + baseUnit - HOLE_OFFSET, cy: cellBottom + HOLE_OFFSET },
+        { cx: cellLeft + HOLE_OFFSET, cy: cellBottom + baseUnit - HOLE_OFFSET },
+        { cx: cellLeft + baseUnit - HOLE_OFFSET, cy: cellBottom + baseUnit - HOLE_OFFSET }
       ]
 
       for (const pos of corners) {
