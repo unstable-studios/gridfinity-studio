@@ -440,9 +440,13 @@ export class KonvaEngine implements LayoutEngine {
     if (this.disposed || !this.mainLayer) return
     this.groupMap.set(group.id, { ...group })
 
+    // Data x,y = lower-left corner; Konva position = centroid
+    const centroidX = group.x + group.width / 2
+    const centroidY = group.y - group.height / 2
+
     const konvaGroup = new Konva.Group({
-      x: group.x,
-      y: group.y,
+      x: centroidX,
+      y: centroidY,
       rotation: group.rotation,
       draggable: true,
       id: group.id,
@@ -484,25 +488,28 @@ export class KonvaEngine implements LayoutEngine {
       this.transformer?.forceUpdate()
     })
 
-    // Emit event when group drag ends
+    // Emit event when group drag ends — convert centroid → lower-left
     konvaGroup.on('dragend', () => {
       const g = this.groupMap.get(group.id)
       if (g) {
-        g.x = konvaGroup.x()
-        g.y = konvaGroup.y()
+        g.x = konvaGroup.x() - g.width / 2
+        g.y = konvaGroup.y() + g.height / 2
       }
-      this.emitter.emit('groupMoved', { id: group.id, x: konvaGroup.x(), y: konvaGroup.y() })
+      this.emitter.emit('groupMoved', {
+        id: group.id,
+        x: g?.x ?? 0,
+        y: g?.y ?? 0
+      })
     })
 
-    // Move children into group
+    // Move children into group (positions relative to group centroid)
     for (const childId of group.childIds) {
       const node = this.konvaMap.get(childId)
       if (node) {
-        // Calculate position relative to group
         const absX = node.x()
         const absY = node.y()
         node.moveTo(konvaGroup)
-        node.position({ x: absX - group.x, y: absY - group.y })
+        node.position({ x: absX - centroidX, y: absY - centroidY })
       }
       const shape = this.shapeMap.get(childId)
       if (shape) shape.groupId = group.id
@@ -525,8 +532,17 @@ export class KonvaEngine implements LayoutEngine {
     const konvaGroup = this.konvaGroupMap.get(id)
     if (!konvaGroup) return
 
-    if (patch.x !== undefined) konvaGroup.x(patch.x)
-    if (patch.y !== undefined) konvaGroup.y(patch.y)
+    // Data x,y = lower-left corner → Konva position = centroid
+    // Always recompute centroid when x, y, width, or height changes
+    if (
+      patch.x !== undefined ||
+      patch.y !== undefined ||
+      patch.width !== undefined ||
+      patch.height !== undefined
+    ) {
+      konvaGroup.x(group.x + group.width / 2)
+      konvaGroup.y(group.y - group.height / 2)
+    }
     if (patch.rotation !== undefined) konvaGroup.rotation(patch.rotation)
 
     // Update background rect if width/height/style changed
@@ -639,10 +655,11 @@ export class KonvaEngine implements LayoutEngine {
     if (!group) return undefined
     const konvaGroup = this.konvaGroupMap.get(id)
     if (konvaGroup) {
+      // Konva centroid → data lower-left corner
       return {
         ...group,
-        x: konvaGroup.x(),
-        y: konvaGroup.y(),
+        x: konvaGroup.x() - group.width / 2,
+        y: konvaGroup.y() + group.height / 2,
         rotation: konvaGroup.rotation()
       }
     }

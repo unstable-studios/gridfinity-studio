@@ -56,9 +56,20 @@ export interface GroupStyle {
   cornerRadius?: number
 }
 
+/**
+ * Layout group (bin container).
+ *
+ * **Coordinate convention**: `x, y` is the **lower-left corner** in screen
+ * space (smallest x, largest y). The bin extends rightward (+x) by `width`
+ * and upward (−y) by `height`.
+ *
+ * Centroid (when needed): `(x + width/2, y − height/2)`.
+ */
 export interface LayoutGroup {
   id: string
+  /** X of lower-left corner */
   x: number
+  /** Y of lower-left corner (largest y — bottom in screen coords) */
   y: number
   width: number
   height: number

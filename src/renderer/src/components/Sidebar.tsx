@@ -55,10 +55,10 @@ function LayoutSidebar(): React.JSX.Element {
     const height = depthUnits * baseUnit
     const existingCount = binGroups.length
 
-    // Place in upper-right quadrant (positive X, negative Y in canvas coords)
-    // Stack bins horizontally with spacing to avoid overlap
-    const x = width / 2 + existingCount * baseUnit * 3
-    const y = -(height / 2)
+    // Place bins starting at the origin, stacked rightward with spacing.
+    // x,y = lower-left corner: left edge at x, bottom edge at y.
+    const x = existingCount * (width + baseUnit)
+    const y = 0
 
     const metadata: BinMetadata = {
       widthUnits,
@@ -96,18 +96,11 @@ function LayoutSidebar(): React.JSX.Element {
     const updated: BinMetadata = { ...group.metadata, ...patch }
     const groupPatch: Partial<LayoutGroup> = { metadata: updated }
 
-    // If width/depth units changed, resize the group anchored at bottom-left.
-    // x,y is the centroid, so shift it so the left and bottom edges stay fixed.
+    // If width/depth units changed, just update dimensions.
+    // x,y is the lower-left corner, so it stays fixed — bin grows rightward and upward.
     if (patch.widthUnits !== undefined || patch.depthUnits !== undefined) {
-      const newW = updated.widthUnits * baseUnit
-      const newH = updated.depthUnits * baseUnit
-      const dw = newW - group.width
-      const dh = newH - group.height
-      groupPatch.width = newW
-      groupPatch.height = newH
-      // Anchor bottom-left: grow rightward (+x) and upward (-y in canvas)
-      groupPatch.x = group.x + dw / 2
-      groupPatch.y = group.y - dh / 2
+      groupPatch.width = updated.widthUnits * baseUnit
+      groupPatch.height = updated.depthUnits * baseUnit
     }
 
     engine.updateGroup(groupId, groupPatch)

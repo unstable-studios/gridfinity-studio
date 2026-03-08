@@ -368,9 +368,13 @@ export class FabricEngine implements LayoutEngine {
       }
     }
 
+    // Data x,y = lower-left corner; Fabric uses centroid (originX/Y: 'center')
+    const centroidX = group.x + group.width / 2
+    const centroidY = group.y - group.height / 2
+
     const fabricGroup = new fabric.Group(children, {
-      left: group.x,
-      top: group.y,
+      left: centroidX,
+      top: centroidY,
       width: group.width,
       height: group.height,
       subTargetCheck: true,
@@ -433,9 +437,17 @@ export class FabricEngine implements LayoutEngine {
       fabricGroup.triggerLayout()
     }
 
-    // Set position AFTER triggerLayout so it doesn't get overridden
-    if (patch.x !== undefined) fabricGroup.set('left', group.x)
-    if (patch.y !== undefined) fabricGroup.set('top', group.y)
+    // Set centroid position AFTER triggerLayout so it doesn't get overridden
+    // Data x,y = lower-left corner → Fabric left/top = centroid
+    if (
+      patch.x !== undefined ||
+      patch.y !== undefined ||
+      patch.width !== undefined ||
+      patch.height !== undefined
+    ) {
+      fabricGroup.set('left', group.x + group.width / 2)
+      fabricGroup.set('top', group.y - group.height / 2)
+    }
 
     fabricGroup.setCoords()
     this.canvas?.requestRenderAll()
@@ -524,10 +536,13 @@ export class FabricEngine implements LayoutEngine {
     if (!group) return undefined
     const fabricGroup = this.fabricGroupMap.get(id)
     if (fabricGroup) {
+      // Fabric centroid → data lower-left corner
+      const centroidX = fabricGroup.left ?? 0
+      const centroidY = fabricGroup.top ?? 0
       return {
         ...group,
-        x: fabricGroup.left ?? group.x,
-        y: fabricGroup.top ?? group.y,
+        x: centroidX - group.width / 2,
+        y: centroidY + group.height / 2,
         rotation: fabricGroup.angle ?? group.rotation
       }
     }
@@ -890,10 +905,15 @@ export class FabricEngine implements LayoutEngine {
       if (groupId) {
         const group = this.groupMap.get(groupId)
         if (group) {
-          group.x = obj.left ?? 0
-          group.y = obj.top ?? 0
+          // Fabric centroid → data lower-left corner
+          group.x = (obj.left ?? 0) - group.width / 2
+          group.y = (obj.top ?? 0) + group.height / 2
         }
-        this.emitter.emit('groupMoved', { id: groupId, x: obj.left ?? 0, y: obj.top ?? 0 })
+        this.emitter.emit('groupMoved', {
+          id: groupId,
+          x: group?.x ?? 0,
+          y: group?.y ?? 0
+        })
       }
     })
 
