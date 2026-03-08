@@ -5,14 +5,23 @@ import { GridPicker } from '@/components/ui/grid-picker'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
-import { useLayoutEngine, useEngineState, isBinGroup } from '@/layout-engine'
+import {
+  useLayoutEngine,
+  useLayoutEngineContext,
+  useEngineState,
+  isBinGroup
+} from '@/layout-engine'
 import type { BinMetadata, LayoutGroup } from '@/layout-engine'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
+  const { sidebarRef } = useLayoutEngineContext()
 
   return (
-    <aside className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto">
+    <aside
+      ref={sidebarRef}
+      className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto"
+    >
       {mode === 'layout' ? (
         <LayoutSidebar />
       ) : (
@@ -55,9 +64,10 @@ function LayoutSidebar(): React.JSX.Element {
     const height = depthUnits * baseUnit
     const existingCount = binGroups.length
 
-    // Place bins starting at the origin, stacked rightward with spacing.
+    // Place new bin to the right of the rightmost existing bin (with one grid unit gap).
     // x,y = lower-left corner: left edge at x, bottom edge at y.
-    const x = existingCount * (width + baseUnit)
+    const rightEdge = binGroups.reduce((max, g) => Math.max(max, g.x + g.width), 0)
+    const x = binGroups.length === 0 ? 0 : rightEdge + baseUnit
     const y = 0
 
     const metadata: BinMetadata = {

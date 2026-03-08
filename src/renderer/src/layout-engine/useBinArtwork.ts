@@ -88,14 +88,14 @@ export function useBinArtwork(
   config: GridfinityConfig | undefined,
   tick: number
 ): void {
-  // Track what we last rendered so we only update on real changes
-  const prevKeyRef = useRef('')
+  // Per-group cache: only re-render decorations for groups whose key changed
+  const prevKeysRef = useRef<Map<string, string>>(new Map())
   const prevEngineRef = useRef<LayoutEngine | null>(null)
 
   useEffect(() => {
     // Reset cache when engine instance changes (e.g., engine switch)
     if (engine !== prevEngineRef.current) {
-      prevKeyRef.current = ''
+      prevKeysRef.current = new Map()
       prevEngineRef.current = engine
     }
     if (!engine || !config) return
@@ -103,23 +103,29 @@ export function useBinArtwork(
     const groups = engine.getAllGroups()
     const binGroups = groups.filter(isBinGroup)
 
-    // Build a cache key from all bin group metadata + config
-    const key =
-      binGroups
-        .map(
-          (g) => `${g.id}:${g.metadata.widthUnits}x${g.metadata.depthUnits}:${g.metadata.hasLip}`
-        )
-        .join('|') +
-      `|bu=${config.baseUnit}` +
+    const configKey =
+      `bu=${config.baseUnit}` +
       `|mag=${config.magnetHoles.enabled}:${config.magnetHoles.diameter}` +
       `|scr=${config.screwHoles.enabled}:${config.screwHoles.diameter}`
 
-    if (key === prevKeyRef.current) return
-    prevKeyRef.current = key
+    const nextKeys = new Map<string, string>()
 
     for (const group of binGroups) {
+      const key = `${group.metadata.widthUnits}x${group.metadata.depthUnits}:${group.metadata.hasLip}|${configKey}`
+      nextKeys.set(group.id, key)
+
+      if (prevKeysRef.current.get(group.id) === key) continue
       const decorations = artworkToDecorations(group.metadata, config)
       engine.setGroupDecorations(group.id, decorations)
     }
+
+    // Clear decorations for removed groups
+    for (const id of prevKeysRef.current.keys()) {
+      if (!nextKeys.has(id)) {
+        engine.setGroupDecorations(id, [])
+      }
+    }
+
+    prevKeysRef.current = nextKeys
   }, [engine, config, tick])
 }
