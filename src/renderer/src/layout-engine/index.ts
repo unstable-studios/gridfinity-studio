@@ -20,3 +20,4 @@ export { useLayoutEngineContext, useLayoutEngine, useEngineState } from './useLa
 export { useProjectEngineSync } from './useProjectEngineSync'
 export { useEngineUndoRedo } from './useEngineUndoRedo'
 export { useBinArtwork } from './useBinArtwork'
+export type { GroupRenderer } from './group-renderer'

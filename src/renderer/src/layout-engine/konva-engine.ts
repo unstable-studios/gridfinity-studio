@@ -12,6 +12,7 @@ import type {
   GroupDecoration
 } from './types'
 import { registerEngine } from './create-engine'
+import { KonvaGroupRenderer } from './konva-group-renderer'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export class KonvaEngine implements LayoutEngine {
   private shapeMap = new Map<string, LayoutShape>()
   private konvaMap = new Map<string, Konva.Shape>()
   private groupMap = new Map<string, LayoutGroup>()
-  private konvaGroupMap = new Map<string, Konva.Group>()
+  private rendererMap = new Map<string, KonvaGroupRenderer>()
   private gridConfig: GridConfig = { size: 42, enabled: true, visible: true }
   private themeColors = {
     background: DEFAULT_BG,
@@ -220,7 +221,7 @@ export class KonvaEngine implements LayoutEngine {
     this.shapeMap.clear()
     this.konvaMap.clear()
     this.groupMap.clear()
-    this.konvaGroupMap.clear()
+    this.rendererMap.clear()
   }
 
   resize(width: number, height: number): void {
@@ -328,8 +329,8 @@ export class KonvaEngine implements LayoutEngine {
       // svgPath/meshImport: scale tracked implicitly
     })
 
-    if (shape.groupId && this.konvaGroupMap.has(shape.groupId)) {
-      this.konvaGroupMap.get(shape.groupId)!.add(node)
+    if (shape.groupId && this.rendererMap.has(shape.groupId)) {
+      this.rendererMap.get(shape.groupId)!.konvaGroup.add(node)
     } else {
       this.mainLayer.add(node)
       // Keep transformer on top
@@ -452,94 +453,40 @@ export class KonvaEngine implements LayoutEngine {
     if (this.disposed || !this.mainLayer) return
     this.groupMap.set(group.id, { ...group })
 
-    // Data x,y = lower-left corner; Konva position = centroid
-    const centroidX = group.x + group.width / 2
-    const centroidY = group.y - group.height / 2
-
-    const konvaGroup = new Konva.Group({
-      x: centroidX,
-      y: centroidY,
-      rotation: group.rotation,
-      draggable: true,
-      id: group.id,
-      name: 'group'
-    })
-
-    // Background rect (makes bin visible even when empty)
-    const bgRect = new Konva.Rect({
-      x: -group.width / 2,
-      y: -group.height / 2,
-      width: group.width,
-      height: group.height,
-      fill: group.style.fill,
-      stroke: group.style.stroke,
-      strokeWidth: group.style.strokeWidth,
-      cornerRadius: group.style.cornerRadius ?? 0,
-      listening: true,
-      name: '__groupBg'
-    })
-    konvaGroup.add(bgRect)
-
-    // Snap group lower-left corner to grid during drag.
-    // Multi-select: skip live snap — Konva's Transformer fights per-node
-    // corrections causing drift. Each bin snaps on dragend instead.
-    konvaGroup.on('dragmove', () => {
-      if (!this.gridConfig.enabled) return
-      const selectedNodes = this.transformer?.nodes() ?? []
-      if (selectedNodes.length > 1) return
-
-      const size = this.gridConfig.size
-      const g = this.groupMap.get(group.id)
-      if (!g) return
-      const halfW = g.width / 2
-      const halfH = g.height / 2
-      const lowerLeftX = konvaGroup.x() - halfW
-      const lowerLeftY = konvaGroup.y() + halfH
-      konvaGroup.position({
-        x: Math.round(lowerLeftX / size) * size + halfW,
-        y: Math.round(lowerLeftY / size) * size - halfH
-      })
-      this.transformer?.forceUpdate()
-    })
-
-    // On drag end: snap and sync data model
-    konvaGroup.on('dragend', () => {
-      const g = this.groupMap.get(group.id)
-      if (!g) return
-
-      if (this.gridConfig.enabled) {
-        const size = this.gridConfig.size
-        const halfW = g.width / 2
-        const halfH = g.height / 2
-        const lowerLeftX = konvaGroup.x() - halfW
-        const lowerLeftY = konvaGroup.y() + halfH
-        konvaGroup.position({
-          x: Math.round(lowerLeftX / size) * size + halfW,
-          y: Math.round(lowerLeftY / size) * size - halfH
-        })
-        this.transformer?.forceUpdate()
+    const renderer = new KonvaGroupRenderer(
+      group,
+      {
+        layer: this.mainLayer,
+        getGridConfig: () => this.gridConfig,
+        getTransformer: () => this.transformer
+      },
+      (id, x, y) => {
+        const g = this.groupMap.get(id)
+        if (g) {
+          g.x = x
+          g.y = y
+        }
+        this.emitter.emit('groupMoved', { id, x, y })
       }
-
-      g.x = konvaGroup.x() - g.width / 2
-      g.y = konvaGroup.y() + g.height / 2
-      this.emitter.emit('groupMoved', { id: group.id, x: g.x, y: g.y })
-    })
+    )
+    this.rendererMap.set(group.id, renderer)
 
     // Move children into group (positions relative to group centroid)
+    const centroidX = group.x + group.width / 2
+    const centroidY = group.y - group.height / 2
     for (const childId of group.childIds) {
       const node = this.konvaMap.get(childId)
       if (node) {
         const absX = node.x()
         const absY = node.y()
-        node.moveTo(konvaGroup)
+        node.moveTo(renderer.konvaGroup)
         node.position({ x: absX - centroidX, y: absY - centroidY })
       }
       const shape = this.shapeMap.get(childId)
       if (shape) shape.groupId = group.id
     }
 
-    this.konvaGroupMap.set(group.id, konvaGroup)
-    this.mainLayer.add(konvaGroup)
+    this.mainLayer.add(renderer.konvaGroup)
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
     this.emitter.emit('groupChanged', { groupId: group.id, childIds: [...group.childIds] })
@@ -549,55 +496,11 @@ export class KonvaEngine implements LayoutEngine {
     if (this.disposed) return
     const group = this.groupMap.get(id)
     if (!group) return
+    const renderer = this.rendererMap.get(id)
+    if (!renderer) return
 
     Object.assign(group, patch, { id })
-
-    const konvaGroup = this.konvaGroupMap.get(id)
-    if (!konvaGroup) return
-
-    // Data x,y = lower-left corner → Konva position = centroid
-    // Always recompute centroid when x, y, width, or height changes
-    if (
-      patch.x !== undefined ||
-      patch.y !== undefined ||
-      patch.width !== undefined ||
-      patch.height !== undefined
-    ) {
-      konvaGroup.x(group.x + group.width / 2)
-      konvaGroup.y(group.y - group.height / 2)
-    }
-    if (patch.rotation !== undefined) konvaGroup.rotation(patch.rotation)
-
-    // Update background rect if width/height/style changed
-    if (patch.width !== undefined || patch.height !== undefined || patch.style !== undefined) {
-      const bgRect = konvaGroup.findOne('.__groupBg')
-      if (bgRect) {
-        if (patch.width !== undefined) {
-          bgRect.setAttrs({ width: group.width, x: -group.width / 2 })
-        }
-        if (patch.height !== undefined) {
-          bgRect.setAttrs({ height: group.height, y: -group.height / 2 })
-        }
-        if (patch.style) {
-          bgRect.setAttrs({
-            fill: group.style.fill,
-            stroke: group.style.stroke,
-            strokeWidth: group.style.strokeWidth,
-            cornerRadius: group.style.cornerRadius ?? 0
-          })
-        }
-      }
-    }
-
-    // Refresh transformer if this group is currently selected
-    if (this.transformer) {
-      const selectedNodes = this.transformer.nodes()
-      if (selectedNodes.some((n) => n.id() === id)) {
-        this.transformer.forceUpdate()
-      }
-    }
-
-    this.mainLayer?.batchDraw()
+    renderer.update(patch, group)
     this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
   }
 
@@ -606,17 +509,17 @@ export class KonvaEngine implements LayoutEngine {
     const group = this.groupMap.get(id)
     if (!group) return
 
-    const konvaGroup = this.konvaGroupMap.get(id)
-    if (konvaGroup) {
+    const renderer = this.rendererMap.get(id)
+    if (renderer) {
       // Ungroup: move children back to main layer at world-space positions
-      const children = [...konvaGroup.getChildren()]
+      const children = [...renderer.konvaGroup.getChildren()]
       for (const child of children) {
         if (child.name() !== 'shape') continue
         const absPos = child.getAbsolutePosition()
         child.moveTo(this.mainLayer)
         child.position(absPos)
       }
-      konvaGroup.destroy()
+      renderer.destroy()
     }
 
     for (const childId of group.childIds) {
@@ -625,7 +528,7 @@ export class KonvaEngine implements LayoutEngine {
     }
 
     this.groupMap.delete(id)
-    this.konvaGroupMap.delete(id)
+    this.rendererMap.delete(id)
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
     this.emitter.emit('groupChanged', { groupId: id, childIds: [] })
@@ -634,16 +537,16 @@ export class KonvaEngine implements LayoutEngine {
   addToGroup(shapeId: string, groupId: string): void {
     if (this.disposed) return
     const group = this.groupMap.get(groupId)
-    const konvaGroup = this.konvaGroupMap.get(groupId)
+    const renderer = this.rendererMap.get(groupId)
     const node = this.konvaMap.get(shapeId)
     const shape = this.shapeMap.get(shapeId)
 
-    if (!group || !konvaGroup || !node || !shape) return
+    if (!group || !renderer || !node || !shape) return
 
     const absX = node.x()
     const absY = node.y()
-    node.moveTo(konvaGroup)
-    node.position({ x: absX - konvaGroup.x(), y: absY - konvaGroup.y() })
+    node.moveTo(renderer.konvaGroup)
+    node.position({ x: absX - renderer.konvaGroup.x(), y: absY - renderer.konvaGroup.y() })
 
     group.childIds = [...group.childIds, shapeId]
     shape.groupId = groupId
@@ -657,10 +560,10 @@ export class KonvaEngine implements LayoutEngine {
     if (!shape?.groupId) return
 
     const group = this.groupMap.get(shape.groupId)
-    const konvaGroup = this.konvaGroupMap.get(shape.groupId)
+    const renderer = this.rendererMap.get(shape.groupId)
     const node = this.konvaMap.get(shapeId)
 
-    if (!group || !konvaGroup || !node) return
+    if (!group || !renderer || !node) return
 
     const absPos = node.getAbsolutePosition()
     node.moveTo(this.mainLayer)
@@ -675,80 +578,18 @@ export class KonvaEngine implements LayoutEngine {
 
   setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void {
     if (this.disposed) return
-    const konvaGroup = this.konvaGroupMap.get(groupId)
-    if (!konvaGroup) return
-
-    // Remove existing decorations
-    const existing = konvaGroup.find('.__binArtwork')
-    for (const node of existing) {
-      node.destroy()
-    }
-
-    // Add new decorations
-    for (const dec of decorations) {
-      let node: Konva.Shape
-      if (dec.type === 'circle') {
-        node = new Konva.Circle({
-          x: dec.cx,
-          y: dec.cy,
-          radius: dec.radius,
-          fill: dec.fill,
-          stroke: dec.stroke,
-          strokeWidth: dec.strokeWidth,
-          dash: dec.dash,
-          strokeScaleEnabled: false,
-          listening: false,
-          name: '__binArtwork'
-        })
-      } else {
-        node = new Konva.Rect({
-          x: dec.x,
-          y: dec.y,
-          width: dec.width,
-          height: dec.height,
-          cornerRadius: dec.cornerRadius ?? 0,
-          fill: dec.fill,
-          stroke: dec.stroke,
-          strokeWidth: dec.strokeWidth,
-          dash: dec.dash,
-          strokeScaleEnabled: false,
-          listening: false,
-          name: '__binArtwork'
-        })
-      }
-      konvaGroup.add(node)
-    }
-
-    // Move bg rect and decorations behind interactive children
-    const bg = konvaGroup.findOne('.__groupBg')
-    if (bg) bg.moveToBottom()
-
-    // Refresh transformer — stale decorations from the previous bin size
-    // inflate the Group's getClientRect() bounds, causing the transformer
-    // frame to lag behind when a bin shrinks.
-    if (this.transformer) {
-      const selectedNodes = this.transformer.nodes()
-      if (selectedNodes.some((n) => n.id() === groupId)) {
-        this.transformer.nodes([])
-        this.transformer.nodes(selectedNodes)
-      }
-    }
-
-    this.mainLayer?.batchDraw()
+    const renderer = this.rendererMap.get(groupId)
+    if (!renderer) return
+    renderer.setDecorations(decorations)
   }
 
   getGroup(id: string): LayoutGroup | undefined {
     const group = this.groupMap.get(id)
     if (!group) return undefined
-    const konvaGroup = this.konvaGroupMap.get(id)
-    if (konvaGroup) {
-      // Konva centroid → data lower-left corner
-      return {
-        ...group,
-        x: konvaGroup.x() - group.width / 2,
-        y: konvaGroup.y() + group.height / 2,
-        rotation: konvaGroup.rotation()
-      }
+    const renderer = this.rendererMap.get(id)
+    if (renderer) {
+      const pos = renderer.readPosition()
+      return { ...group, x: pos.x, y: pos.y, rotation: pos.rotation }
     }
     return { ...group }
   }
@@ -764,11 +605,13 @@ export class KonvaEngine implements LayoutEngine {
 
     const nodes = ids
       .map(
-        (id) => (this.konvaMap.get(id) as Konva.Node) ?? (this.konvaGroupMap.get(id) as Konva.Node)
+        (id) =>
+          (this.konvaMap.get(id) as Konva.Node) ??
+          (this.rendererMap.get(id)?.konvaGroup as Konva.Node)
       )
       .filter((n): n is Konva.Node => n !== undefined)
 
-    const hasGroups = ids.some((id) => this.konvaGroupMap.has(id))
+    const hasGroups = ids.some((id) => this.rendererMap.has(id))
 
     this.transformer.nodes(nodes)
 
@@ -1145,8 +988,8 @@ export class KonvaEngine implements LayoutEngine {
         }
 
         // Also check groups
-        for (const [id, konvaGroup] of this.konvaGroupMap) {
-          const nodeBox = konvaGroup.getClientRect()
+        for (const [id, renderer] of this.rendererMap) {
+          const nodeBox = renderer.konvaGroup.getClientRect()
           if (
             nodeBox.x < selBox.x + selBox.width &&
             nodeBox.x + nodeBox.width > selBox.x &&
@@ -1193,8 +1036,8 @@ export class KonvaEngine implements LayoutEngine {
         for (const node of this.konvaMap.values()) {
           node.draggable(false)
         }
-        for (const node of this.konvaGroupMap.values()) {
-          node.draggable(false)
+        for (const renderer of this.rendererMap.values()) {
+          renderer.konvaGroup.draggable(false)
         }
         e.preventDefault()
       }
@@ -1222,8 +1065,8 @@ export class KonvaEngine implements LayoutEngine {
         for (const node of this.konvaMap.values()) {
           node.draggable(true)
         }
-        for (const node of this.konvaGroupMap.values()) {
-          node.draggable(true)
+        for (const renderer of this.rendererMap.values()) {
+          renderer.konvaGroup.draggable(true)
         }
         const vp = this.getViewport()
         this.emitter.emit('viewportChanged', vp)
