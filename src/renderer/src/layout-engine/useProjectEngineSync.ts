@@ -27,7 +27,9 @@ function isValidSnapshot(data: unknown): data is LayoutSnapshot {
 /**
  * Syncs the layout engine snapshot with the project store.
  *
- * - Before save: captures engine.toSnapshot() → project.layoutSnapshot
+ * - Before save: registers a callback that captures engine.toSnapshot() →
+ *   project.layoutSnapshot automatically whenever saveProject/saveProjectAs
+ *   is called (from Navbar or anywhere else).
  * - After load: reads project.layoutSnapshot → engine.loadSnapshot()
  *
  * The LayoutSnapshotData (shared/) and LayoutSnapshot (renderer/) types are
@@ -35,12 +37,9 @@ function isValidSnapshot(data: unknown): data is LayoutSnapshot {
  * (flat vs discriminated union). The casts here are safe because both encode
  * the same data — just with different TypeScript narrowing strategies.
  */
-export function useProjectEngineSync(): {
-  saveWithSnapshot: (targetPath?: string) => Promise<boolean>
-  saveAsWithSnapshot: () => Promise<boolean>
-} {
+export function useProjectEngineSync(): void {
   const engine = useLayoutEngine()
-  const { saveProject, saveProjectAs, setLayoutSnapshot } = useProject()
+  const { setLayoutSnapshot, registerBeforeSave } = useProject()
   const project = useProject((s) => s.project)
   const loadedProjectRef = useRef<string | null>(null)
 
@@ -68,18 +67,9 @@ export function useProjectEngineSync(): {
     setLayoutSnapshot(snapshot as unknown as LayoutSnapshotData)
   }, [engine, setLayoutSnapshot])
 
-  const saveWithSnapshot = useCallback(
-    async (targetPath?: string): Promise<boolean> => {
-      captureSnapshot()
-      return saveProject(targetPath)
-    },
-    [captureSnapshot, saveProject]
-  )
-
-  const saveAsWithSnapshot = useCallback(async (): Promise<boolean> => {
-    captureSnapshot()
-    return saveProjectAs()
-  }, [captureSnapshot, saveProjectAs])
-
-  return { saveWithSnapshot, saveAsWithSnapshot }
+  // Register snapshot capture as a before-save callback so ANY save path
+  // (Navbar, keyboard shortcut, etc.) captures engine state automatically.
+  useEffect(() => {
+    return registerBeforeSave(captureSnapshot)
+  }, [registerBeforeSave, captureSnapshot])
 }
