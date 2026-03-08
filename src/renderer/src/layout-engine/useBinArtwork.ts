@@ -15,14 +15,14 @@ import type { GridfinityConfig } from '../../../shared/types/project'
 
 // ─── Artwork → Decoration conversion ────────────────────────────────────────
 
-const HOLE_STROKE = 'rgba(113, 113, 122, 0.35)'
-const HOLE_FILL = 'transparent'
-const HOLE_STROKE_WIDTH = 0.5
+const HOLE_STROKE = 'rgba(202, 138, 4, 0.6)'
+const HOLE_FILL = 'rgba(234, 179, 8, 0.08)'
+const HOLE_STROKE_WIDTH = 0.75
 const HOLE_DASH = [2, 2]
 
-const LIP_STROKE = 'rgba(96, 165, 250, 0.3)'
+const LIP_STROKE = 'rgba(202, 138, 4, 0.5)'
 const LIP_FILL = 'transparent'
-const LIP_STROKE_WIDTH = 0.5
+const LIP_STROKE_WIDTH = 0.75
 const LIP_DASH = [3, 2]
 
 function artworkToDecorations(
@@ -90,8 +90,14 @@ export function useBinArtwork(
 ): void {
   // Track what we last rendered so we only update on real changes
   const prevKeyRef = useRef('')
+  const prevEngineRef = useRef<LayoutEngine | null>(null)
 
   useEffect(() => {
+    // Reset cache when engine instance changes (e.g., engine switch)
+    if (engine !== prevEngineRef.current) {
+      prevKeyRef.current = ''
+      prevEngineRef.current = engine
+    }
     if (!engine || !config) return
 
     const groups = engine.getAllGroups()

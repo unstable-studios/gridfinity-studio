@@ -593,7 +593,7 @@ export class KonvaEngine implements LayoutEngine {
     if (this.transformer) {
       const selectedNodes = this.transformer.nodes()
       if (selectedNodes.some((n) => n.id() === id)) {
-        this.transformer.nodes(selectedNodes)
+        this.transformer.forceUpdate()
       }
     }
 
@@ -722,6 +722,18 @@ export class KonvaEngine implements LayoutEngine {
     // Move bg rect and decorations behind interactive children
     const bg = konvaGroup.findOne('.__groupBg')
     if (bg) bg.moveToBottom()
+
+    // Refresh transformer — stale decorations from the previous bin size
+    // inflate the Group's getClientRect() bounds, causing the transformer
+    // frame to lag behind when a bin shrinks.
+    if (this.transformer) {
+      const selectedNodes = this.transformer.nodes()
+      if (selectedNodes.some((n) => n.id() === groupId)) {
+        this.transformer.nodes([])
+        this.transformer.nodes(selectedNodes)
+      }
+    }
+
     this.mainLayer?.batchDraw()
   }
 

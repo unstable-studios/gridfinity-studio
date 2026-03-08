@@ -390,7 +390,8 @@ export class FabricEngine implements LayoutEngine {
       borderScaleFactor: 1.5,
       padding: 2,
       originX: 'center',
-      originY: 'center'
+      originY: 'center',
+      objectCaching: false
     })
     ;(fabricGroup as unknown as Record<string, unknown>)[GROUP_DATA_KEY] = group.id
 
@@ -434,8 +435,25 @@ export class FabricEngine implements LayoutEngine {
           bgRect.set('ry', group.style.cornerRadius ?? 0)
         }
       }
-      // Force Fabric to recalculate group bounding box from children
+      // triggerLayout() recalculates group bounds from children via
+      // FitContentLayout. We must temporarily remove decorations from
+      // _objects so they don't inflate the bounding box or shift children.
+      const internalObjects = (fabricGroup as unknown as { _objects: fabric.FabricObject[] })
+        ._objects
+      const decorations: fabric.FabricObject[] = []
+      for (let i = internalObjects.length - 1; i >= 0; i--) {
+        if ((internalObjects[i] as unknown as Record<string, unknown>).__binArtwork) {
+          decorations.push(internalObjects[i])
+          internalObjects.splice(i, 1)
+        }
+      }
+
       fabricGroup.triggerLayout()
+
+      // Re-add decorations after layout
+      for (const dec of decorations) {
+        internalObjects.push(dec)
+      }
     }
 
     // Set centroid position AFTER triggerLayout so it doesn't get overridden
@@ -538,15 +556,28 @@ export class FabricEngine implements LayoutEngine {
     const fabricGroup = this.fabricGroupMap.get(groupId)
     if (!fabricGroup) return
 
+    // Bypass Fabric's group.add()/remove() entirely for decorations.
+    //
+    // Why: group.add() calls enterGroup() which applies the inverse group
+    // transform (treating coords as canvas-space), then FitContentLayout
+    // recalculates group bounds from ALL children and shifts everything.
+    // Decorations are purely visual and should not participate in layout.
+    //
+    // We manipulate _objects directly. Decoration coords are already in
+    // group-local space (relative to centroid), matching the bgRect which
+    // sits at (-width/2, -height/2).
+    //
+    // Note: getObjects() returns a copy — we must access _objects directly.
+    const internalObjects = (fabricGroup as unknown as { _objects: fabric.FabricObject[] })._objects
+
     // Remove existing decorations
-    const existing = fabricGroup
-      .getObjects()
-      .filter((o) => (o as unknown as Record<string, unknown>).__binArtwork)
-    for (const obj of existing) {
-      fabricGroup.remove(obj)
+    for (let i = internalObjects.length - 1; i >= 0; i--) {
+      if ((internalObjects[i] as unknown as Record<string, unknown>).__binArtwork) {
+        internalObjects.splice(i, 1)
+      }
     }
 
-    // Add new decorations
+    // Add new decorations directly to the group's internal array
     for (const dec of decorations) {
       let obj: fabric.FabricObject
       if (dec.type === 'circle') {
@@ -562,37 +593,43 @@ export class FabricEngine implements LayoutEngine {
           strokeDashArray: dec.dash ?? null,
           strokeUniform: true,
           selectable: false,
-          evented: false
+          evented: false,
+          objectCaching: false
         })
       } else {
+        // Use center origin to match circles — bypassing enterGroup means
+        // non-center origins render at the wrong position because Fabric's
+        // calcOwnMatrix() applies an origin-based offset we can't predict
+        // without going through the full enterGroup transform.
         obj = new fabric.Rect({
-          left: dec.x,
-          top: dec.y,
+          left: dec.x + dec.width / 2,
+          top: dec.y + dec.height / 2,
           width: dec.width,
           height: dec.height,
           rx: dec.cornerRadius ?? 0,
           ry: dec.cornerRadius ?? 0,
+          originX: 'center',
+          originY: 'center',
           fill: dec.fill,
           stroke: dec.stroke,
           strokeWidth: dec.strokeWidth,
           strokeDashArray: dec.dash ?? null,
           strokeUniform: true,
           selectable: false,
-          evented: false
+          evented: false,
+          objectCaching: false
         })
       }
+      // Set refs needed for rendering inside the group
+      obj._set('parent', fabricGroup)
+      obj._set('group', fabricGroup)
+      obj._set('canvas', this.canvas!)
       ;(obj as unknown as Record<string, unknown>).__binArtwork = true
-      fabricGroup.add(obj)
+      internalObjects.push(obj)
     }
 
-    fabricGroup.triggerLayout()
-    // Restore centroid position after triggerLayout
-    const group = this.groupMap.get(groupId)
-    if (group) {
-      fabricGroup.set('left', group.x + group.width / 2)
-      fabricGroup.set('top', group.y - group.height / 2)
-    }
-    fabricGroup.setCoords()
+    // Invalidate cache and render
+    fabricGroup.set('dirty', true)
     this.canvas?.requestRenderAll()
   }
 
