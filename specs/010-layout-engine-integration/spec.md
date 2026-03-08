@@ -208,6 +208,12 @@ This is a thin adapter. The CSG builder itself (`bin-csg-builder.ts`) and worker
 7. **Remove R3F entirely** — if 3D preview moves to raw Three.js, the R3F dependency can be dropped.
 8. **Pattern system** — generators/patterns become engine-level operations on shapes.
 
+### Design Principle: Adapter-Based Modularity
+
+The layout engine integration (009 + 010) established adapter-based modularity as a core project principle (Constitution VII). The `LayoutEngine` interface with Fabric.js and Konva adapters proved that major subsystems can be decoupled from their implementation libraries through abstract interfaces, enabling runtime swapping, independent testing, and localized migration when libraries change.
+
+This pattern should be extended to future subsystems: CSG/geometry pipeline, 3D preview renderer, file format exporters, and input handling. See the constitution for the full principle statement.
+
 ## Acceptance Criteria
 
 - [ ] Layout mode renders all shape types via LayoutEngine (no R3F)

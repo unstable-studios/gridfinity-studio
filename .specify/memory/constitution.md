@@ -1,13 +1,10 @@
 <!--
 Sync Impact Report
 ===================
-Version change: N/A → 1.0.0 (initial ratification)
-Modified principles: N/A (initial)
+Version change: 1.0.0 → 1.1.0
+Modified principles: VII renumbered to VIII (Simplicity & YAGNI)
 Added sections:
-  - 7 Core Principles (I–VII)
-  - Development Constraints
-  - Quality Gates & Workflow
-  - Governance
+  - Principle VII: Adapter-Based Modularity
 Removed sections: N/A
 Templates requiring updates:
   - .specify/templates/plan-template.md — ✅ compatible (Constitution Check section present)
@@ -135,7 +132,42 @@ Skipping CI checks or force-pushing over failures is prohibited.
 **Rationale**: Consistent commit history enables automated changelogs
 via release-please and makes bisecting regressions tractable.
 
-### VII. Simplicity & YAGNI
+### VII. Adapter-Based Modularity
+
+Major subsystems MUST be decoupled from their implementation libraries
+through adapter interfaces. Application code consumes abstract
+interfaces; concrete library bindings live behind adapters that can be
+swapped, tested, or replaced independently.
+
+This principle applies to any component whose implementation is likely
+to evolve or where multiple viable libraries exist:
+
+- **Layout engine**: `LayoutEngine` interface with Fabric.js and Konva
+  adapters (established in 009/010).
+- **CSG/geometry pipeline**: adapter boundary between layout shapes and
+  the Manifold-based builder.
+- **Future candidates**: 3D preview renderer, file format exporters,
+  input handling layer.
+
+Concretely:
+
+- Define a TypeScript interface that captures the capability, not the
+  library's API surface.
+- Application components depend on the interface, never on library
+  imports directly.
+- Adapters convert between the interface's data model and the library's
+  internal representation at the boundary (e.g., lower-left corner ↔
+  centroid coordinate conversion).
+- Engine-agnostic snapshot/serialization — persisted data MUST NOT
+  contain library-specific artifacts.
+
+**Rationale**: Gridfinity Studio has already gone through three
+rendering technology changes (R3F → Fabric.js / Konva). The adapter
+pattern absorbs these migrations into localized adapter rewrites instead
+of app-wide refactors. It also enables runtime engine switching and
+side-by-side evaluation of alternatives.
+
+### VIII. Simplicity & YAGNI
 
 Every abstraction, dependency, and architectural decision MUST justify
 its existence against a simpler alternative:
@@ -205,4 +237,4 @@ comments, and verbal agreements.
 applicable principles. The plan template's "Constitution Check" section
 MUST be completed before implementation begins.
 
-**Version**: 1.0.0 | **Ratified**: 2026-03-04 | **Last Amended**: 2026-03-04
+**Version**: 1.1.0 | **Ratified**: 2026-03-04 | **Last Amended**: 2026-03-08
