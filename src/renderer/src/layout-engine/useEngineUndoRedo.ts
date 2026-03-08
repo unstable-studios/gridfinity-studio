@@ -80,7 +80,10 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
       engine.on('shapeCreated', debouncedPush),
       engine.on('shapeDeleted', debouncedPush),
       engine.on('shapeMoved', debouncedPush),
-      engine.on('shapeResized', debouncedPush)
+      engine.on('shapeResized', debouncedPush),
+      engine.on('groupChanged', debouncedPush),
+      engine.on('groupMoved', debouncedPush),
+      engine.on('groupResized', debouncedPush)
     ]
 
     return () => {

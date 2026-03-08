@@ -93,7 +93,9 @@ export function useProjectEngineSync(): void {
       engine.on('shapeDeleted', debouncedSync),
       engine.on('shapeMoved', debouncedSync),
       engine.on('shapeResized', debouncedSync),
-      engine.on('groupChanged', debouncedSync)
+      engine.on('groupChanged', debouncedSync),
+      engine.on('groupMoved', debouncedSync),
+      engine.on('groupResized', debouncedSync)
     ]
 
     return () => {
