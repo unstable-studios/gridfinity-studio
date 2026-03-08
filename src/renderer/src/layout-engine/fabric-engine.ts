@@ -1083,6 +1083,10 @@ export class FabricEngine implements LayoutEngine {
     const overlayCX = overlayLeft + snapW / 2
     const overlayCY = overlayTop + snapH / 2
 
+    // Check if snapped dimensions would collide (lower-left y = overlayTop + snapH)
+    const proposed = { x: overlayLeft, y: overlayTop + snapH, width: snapW, height: snapH }
+    const wouldCollide = checkGroupCollision(proposed, groupId, this.getAllGroups())
+
     if (!this.resizeOverlay) {
       // Read style from bgRect
       const bgObj = renderer.fabricGroup
@@ -1099,7 +1103,7 @@ export class FabricEngine implements LayoutEngine {
         width: snapW,
         height: snapH,
         fill: 'rgba(113, 113, 122, 0.08)',
-        stroke,
+        stroke: wouldCollide ? '#ef4444' : stroke,
         strokeWidth,
         strokeUniform: true,
         strokeDashArray: [6, 3],
@@ -1111,12 +1115,21 @@ export class FabricEngine implements LayoutEngine {
         evented: false,
         excludeFromExport: true
       })
+      ;(this.resizeOverlay as unknown as Record<string, unknown>).__origStroke = stroke
       this.resizeOverlayGroupId = groupId
       this.canvas.add(this.resizeOverlay)
       renderer.fabricGroup.set('opacity', 0)
     } else {
-      // Subsequent frames — update position and size
-      this.resizeOverlay.set({ left: overlayCX, top: overlayCY, width: snapW, height: snapH })
+      // Subsequent frames — update position, size, and collision indicator
+      const origStroke = (this.resizeOverlay as unknown as Record<string, unknown>)
+        .__origStroke as string
+      this.resizeOverlay.set({
+        left: overlayCX,
+        top: overlayCY,
+        width: snapW,
+        height: snapH,
+        stroke: wouldCollide ? '#ef4444' : origStroke
+      })
       this.resizeOverlay.setCoords()
     }
     this.canvas.requestRenderAll()

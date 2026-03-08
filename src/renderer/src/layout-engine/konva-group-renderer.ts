@@ -398,6 +398,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
       listening: false,
       name: '__resizeOverlay'
     })
+    this.resizeOverlay.setAttr('__origStroke', stroke)
     this.deps.layer.add(this.resizeOverlay)
 
     // Hide the actual group so only the overlay is visible
@@ -450,11 +451,16 @@ export class KonvaGroupRenderer implements GroupRenderer {
       overlayTop = origBottom - snapH
     }
 
+    // Check if snapped dimensions would collide
+    const proposed = { x: overlayLeft, y: overlayTop + snapH, width: snapW, height: snapH }
+    const wouldCollide = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+
     this.resizeOverlay.setAttrs({
       x: overlayLeft,
       y: overlayTop,
       width: snapW,
-      height: snapH
+      height: snapH,
+      stroke: wouldCollide ? '#ef4444' : this.resizeOverlay.getAttr('__origStroke')
     })
     this.deps.layer.batchDraw()
   }
