@@ -36,10 +36,12 @@ export function GridPicker({
         style={{ gridTemplateColumns: `repeat(${maxWidth}, 1fr)` }}
         onMouseLeave={handleMouseLeave}
       >
+        {/* Render rows bottom-up: row 0 in the loop = top visual row = highest depth */}
         {Array.from({ length: maxDepth }, (_, d) =>
           Array.from({ length: maxWidth }, (_, w) => {
             const col = w + 1
-            const row = d + 1
+            // Flip: visual top row corresponds to maxDepth, bottom row to 1
+            const row = maxDepth - d
             const isHighlighted = col <= displayW && row <= displayD
             const isActive = col <= width && row <= depth
             return (
