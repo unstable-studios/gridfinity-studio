@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ProjectData, LayoutSnapshotData } from '../../../../shared/types/project'
-import { createEmptyProject } from '../../../../shared/types/project'
+import { createEmptyProject, CURRENT_SCHEMA_VERSION } from '../../../../shared/types/project'
 import { migrateProject } from '../../../../shared/validation/project-validator'
 
 describe('Layout snapshot persistence', () => {
@@ -76,7 +76,8 @@ describe('Layout snapshot persistence', () => {
 
   it('T053: pre-migration .gfstudio file without layoutSnapshot loads correctly', () => {
     // Simulate a v0.3.0 project without layoutSnapshot
-    const oldProject: ProjectData = {
+    // Simulate a pre-migration file that has no layoutSnapshot field
+    const oldProject = {
       schemaVersion: '0.3.0',
       settings: {
         name: 'Old Project',
@@ -116,14 +117,14 @@ describe('Layout snapshot persistence', () => {
 
     // Roundtrip through JSON (simulate file load)
     const serialized = JSON.stringify(oldProject)
-    const loaded: ProjectData = JSON.parse(serialized)
+    const loaded = JSON.parse(serialized) as ProjectData
 
     // Migration should work fine — layoutSnapshot is just absent
     const migrated = migrateProject(loaded)
 
     expect(migrated.layoutSnapshot).toBeUndefined()
     expect(migrated.entities).toHaveLength(1)
-    expect(migrated.schemaVersion).toBe('0.4.0')
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
     expect(migrated.settings.name).toBe('Old Project')
   })
 })

@@ -6,12 +6,12 @@
 /**
  * Schema version for project file format
  */
-export const CURRENT_SCHEMA_VERSION = '0.4.0'
+export const CURRENT_SCHEMA_VERSION = '0.5.0'
 
 /**
  * Supported schema versions for backward compatibility
  */
-export const SUPPORTED_SCHEMA_VERSIONS = ['0.1.0', '0.2.0', '0.3.0', '0.4.0']
+export const SUPPORTED_SCHEMA_VERSIONS = ['0.1.0', '0.2.0', '0.3.0', '0.4.0', '0.5.0']
 
 /**
  * Global settings for the project
@@ -251,10 +251,59 @@ export interface Bin {
 
 // ─── Layout Snapshot (engine-agnostic 2D canvas state) ────────────
 
+/**
+ * Typed layout snapshot for project persistence.
+ * Shape and group types mirror the engine's LayoutShape/LayoutGroup interfaces
+ * but are defined here in shared/ so they're available to all processes.
+ */
+export interface LayoutShapeData {
+  id: string
+  type: 'rect' | 'circle' | 'polygon' | 'svgPath' | 'meshImport'
+  x: number
+  y: number
+  rotation: number
+  fill: string
+  stroke: string
+  strokeWidth: number
+  groupId: string | null
+  scaleX?: number
+  scaleY?: number
+  lockAspectRatio?: boolean
+  metadata?: Record<string, unknown>
+  // Type-specific fields (present depending on type)
+  width?: number
+  height?: number
+  cornerRadius?: number
+  radiusX?: number
+  radiusY?: number
+  points?: { x: number; y: number }[]
+  pathData?: string
+  viewBox?: { width: number; height: number }
+  meshRef?: string
+  silhouettePath?: string
+}
+
+export interface LayoutGroupData {
+  id: string
+  x: number
+  y: number
+  width: number
+  height: number
+  rotation: number
+  childIds: string[]
+  style: {
+    fill: string
+    stroke: string
+    strokeWidth: number
+    cornerRadius?: number
+  }
+  metadata?: Record<string, unknown>
+}
+
 export interface LayoutSnapshotData {
   version: string
-  shapes: Record<string, unknown>[]
-  groups: Record<string, unknown>[]
+  shapes: LayoutShapeData[]
+  groups: LayoutGroupData[]
   gridConfig: {
     size: number
     enabled: boolean
@@ -272,7 +321,7 @@ export interface ProjectData {
   groups: Group[]
   generators: Generator[]
   bins: Bin[]
-  layoutSnapshot?: LayoutSnapshotData
+  layoutSnapshot: LayoutSnapshotData
 }
 
 // ─── Defaults & factories ──────────────────────────────────────────
@@ -311,7 +360,13 @@ export function createEmptyProject(name: string = 'Untitled Project'): ProjectDa
     entities: [],
     groups: [],
     generators: [],
-    bins: []
+    bins: [],
+    layoutSnapshot: {
+      version: '1.0.0',
+      shapes: [],
+      groups: [],
+      gridConfig: { size: 42, enabled: true, visible: true }
+    }
   }
 }
 

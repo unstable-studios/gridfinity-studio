@@ -9,6 +9,11 @@ import type { LayoutSnapshot } from './types'
  *
  * - Before save: captures engine.toSnapshot() → project.layoutSnapshot
  * - After load: reads project.layoutSnapshot → engine.loadSnapshot()
+ *
+ * The LayoutSnapshotData (shared/) and LayoutSnapshot (renderer/) types are
+ * structurally equivalent but use slightly different shape representations
+ * (flat vs discriminated union). The casts here are safe because both encode
+ * the same data — just with different TypeScript narrowing strategies.
  */
 export function useProjectEngineSync(): {
   saveWithSnapshot: (targetPath?: string) => Promise<boolean>
@@ -24,11 +29,11 @@ export function useProjectEngineSync(): {
     if (!engine || !project?.layoutSnapshot || loadedRef.current) return
     loadedRef.current = true
 
-    const snapshot = project.layoutSnapshot as unknown as LayoutSnapshot
-    engine.loadSnapshot(snapshot)
+    // LayoutSnapshotData → LayoutSnapshot: structurally equivalent
+    engine.loadSnapshot(project.layoutSnapshot as unknown as LayoutSnapshot)
   }, [engine, project?.layoutSnapshot])
 
-  // Reset loaded flag when project or engine changes (new project, different file, or engine switch)
+  // Reset loaded flag when project or engine changes
   const projectId = project?.settings?.createdAt
   useEffect(() => {
     loadedRef.current = false
@@ -37,6 +42,7 @@ export function useProjectEngineSync(): {
   const captureSnapshot = useCallback((): void => {
     if (!engine) return
     const snapshot = engine.toSnapshot()
+    // LayoutSnapshot → LayoutSnapshotData: structurally equivalent
     setLayoutSnapshot(snapshot as unknown as LayoutSnapshotData)
   }, [engine, setLayoutSnapshot])
 

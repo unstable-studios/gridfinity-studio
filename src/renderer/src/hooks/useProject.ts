@@ -82,7 +82,7 @@ interface ProjectState {
   ) => Promise<{ success: boolean; exported: number }>
 
   // Layout snapshot (not undoable)
-  setLayoutSnapshot: (snapshot: LayoutSnapshotData | undefined) => void
+  setLayoutSnapshot: (snapshot: LayoutSnapshotData) => void
 
   // Bake results (not undoable)
   setBakeResult: (binId: string, result: BakeResult | null) => void

@@ -65,6 +65,7 @@ export interface LayoutGroup {
   rotation: number
   childIds: string[]
   style: GroupStyle
+  metadata?: Record<string, unknown>
 }
 
 // ─── Grid ───────────────────────────────────────────────────────────────────
