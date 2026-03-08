@@ -5,7 +5,8 @@ import type {
   GridConfig,
   ViewportState,
   TransientState,
-  EngineEventMap
+  EngineEventMap,
+  GroupDecoration
 } from './types'
 
 export interface LayoutEngine {
@@ -29,6 +30,10 @@ export interface LayoutEngine {
   removeFromGroup(shapeId: string): void
   getGroup(id: string): LayoutGroup | undefined
   getAllGroups(): LayoutGroup[]
+
+  // ─── Group Decorations ─────────────────────────────────────────────────────
+  /** Render non-interactive artwork within a group (replaces any existing decorations) */
+  setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void
 
   // ─── Selection ──────────────────────────────────────────────────────────────
   select(ids: string[]): void

@@ -8,7 +8,8 @@ import type {
   GridConfig,
   ViewportState,
   TransientState,
-  EngineEventMap
+  EngineEventMap,
+  GroupDecoration
 } from './types'
 import { registerEngine } from './create-engine'
 
@@ -464,7 +465,8 @@ export class FabricEngine implements LayoutEngine {
       // Ungroup: move child shapes back to canvas, skip internal bg rect
       const items = [...fabricGroup.getObjects()]
       for (const item of items) {
-        if ((item as unknown as Record<string, unknown>).__groupBg) continue
+        const rec = item as unknown as Record<string, unknown>
+        if (rec.__groupBg || rec.__binArtwork) continue
         const matrix = item.calcTransformMatrix()
         const point = new fabric.Point(matrix[4], matrix[5])
         fabricGroup.remove(item)
@@ -528,6 +530,69 @@ export class FabricEngine implements LayoutEngine {
     group.childIds = group.childIds.filter((id) => id !== shapeId)
     shape.groupId = null
 
+    this.canvas?.requestRenderAll()
+  }
+
+  setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void {
+    if (this.disposed) return
+    const fabricGroup = this.fabricGroupMap.get(groupId)
+    if (!fabricGroup) return
+
+    // Remove existing decorations
+    const existing = fabricGroup
+      .getObjects()
+      .filter((o) => (o as unknown as Record<string, unknown>).__binArtwork)
+    for (const obj of existing) {
+      fabricGroup.remove(obj)
+    }
+
+    // Add new decorations
+    for (const dec of decorations) {
+      let obj: fabric.FabricObject
+      if (dec.type === 'circle') {
+        obj = new fabric.Circle({
+          left: dec.cx,
+          top: dec.cy,
+          radius: dec.radius,
+          originX: 'center',
+          originY: 'center',
+          fill: dec.fill,
+          stroke: dec.stroke,
+          strokeWidth: dec.strokeWidth,
+          strokeDashArray: dec.dash ?? null,
+          strokeUniform: true,
+          selectable: false,
+          evented: false
+        })
+      } else {
+        obj = new fabric.Rect({
+          left: dec.x,
+          top: dec.y,
+          width: dec.width,
+          height: dec.height,
+          rx: dec.cornerRadius ?? 0,
+          ry: dec.cornerRadius ?? 0,
+          fill: dec.fill,
+          stroke: dec.stroke,
+          strokeWidth: dec.strokeWidth,
+          strokeDashArray: dec.dash ?? null,
+          strokeUniform: true,
+          selectable: false,
+          evented: false
+        })
+      }
+      ;(obj as unknown as Record<string, unknown>).__binArtwork = true
+      fabricGroup.add(obj)
+    }
+
+    fabricGroup.triggerLayout()
+    // Restore centroid position after triggerLayout
+    const group = this.groupMap.get(groupId)
+    if (group) {
+      fabricGroup.set('left', group.x + group.width / 2)
+      fabricGroup.set('top', group.y - group.height / 2)
+    }
+    fabricGroup.setCoords()
     this.canvas?.requestRenderAll()
   }
 

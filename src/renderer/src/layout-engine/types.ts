@@ -103,6 +103,34 @@ export function isBinGroup(group: LayoutGroup): group is LayoutGroup & { metadat
   )
 }
 
+// ─── Group Decorations (non-interactive artwork within groups) ───────────────
+
+export interface CircleDecoration {
+  type: 'circle'
+  cx: number
+  cy: number
+  radius: number
+  stroke: string
+  strokeWidth: number
+  fill: string
+  dash?: number[]
+}
+
+export interface RectDecoration {
+  type: 'rect'
+  x: number
+  y: number
+  width: number
+  height: number
+  cornerRadius?: number
+  stroke: string
+  strokeWidth: number
+  fill: string
+  dash?: number[]
+}
+
+export type GroupDecoration = CircleDecoration | RectDecoration
+
 // ─── Grid ───────────────────────────────────────────────────────────────────
 
 export interface GridConfig {

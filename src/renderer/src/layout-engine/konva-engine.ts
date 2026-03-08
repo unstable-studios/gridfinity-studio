@@ -8,7 +8,8 @@ import type {
   GridConfig,
   ViewportState,
   TransientState,
-  EngineEventMap
+  EngineEventMap,
+  GroupDecoration
 } from './types'
 import { registerEngine } from './create-engine'
 
@@ -670,6 +671,58 @@ export class KonvaEngine implements LayoutEngine {
 
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
+  }
+
+  setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void {
+    if (this.disposed) return
+    const konvaGroup = this.konvaGroupMap.get(groupId)
+    if (!konvaGroup) return
+
+    // Remove existing decorations
+    const existing = konvaGroup.find('.__binArtwork')
+    for (const node of existing) {
+      node.destroy()
+    }
+
+    // Add new decorations
+    for (const dec of decorations) {
+      let node: Konva.Shape
+      if (dec.type === 'circle') {
+        node = new Konva.Circle({
+          x: dec.cx,
+          y: dec.cy,
+          radius: dec.radius,
+          fill: dec.fill,
+          stroke: dec.stroke,
+          strokeWidth: dec.strokeWidth,
+          dash: dec.dash,
+          strokeScaleEnabled: false,
+          listening: false,
+          name: '__binArtwork'
+        })
+      } else {
+        node = new Konva.Rect({
+          x: dec.x,
+          y: dec.y,
+          width: dec.width,
+          height: dec.height,
+          cornerRadius: dec.cornerRadius ?? 0,
+          fill: dec.fill,
+          stroke: dec.stroke,
+          strokeWidth: dec.strokeWidth,
+          dash: dec.dash,
+          strokeScaleEnabled: false,
+          listening: false,
+          name: '__binArtwork'
+        })
+      }
+      konvaGroup.add(node)
+    }
+
+    // Move bg rect and decorations behind interactive children
+    const bg = konvaGroup.findOne('.__groupBg')
+    if (bg) bg.moveToBottom()
+    this.mainLayer?.batchDraw()
   }
 
   getGroup(id: string): LayoutGroup | undefined {
