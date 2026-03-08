@@ -196,5 +196,7 @@ export type EngineEventMap = {
   shapeDeleted: { id: string }
   groupChanged: { groupId: string; childIds: string[] }
   groupMoved: { id: string; x: number; y: number }
+  groupResized: { id: string; width: number; height: number }
+  collisionRejected: { id: string; reason: 'move' | 'resize' }
   viewportChanged: { panX: number; panY: number; zoom: number }
 }

@@ -460,7 +460,8 @@ export class KonvaEngine implements LayoutEngine {
       {
         layer: this.mainLayer,
         getGridConfig: () => this.gridConfig,
-        getTransformer: () => this.transformer
+        getTransformer: () => this.transformer,
+        getAllGroups: () => this.getAllGroups()
       },
       (id, x, y) => {
         const g = this.groupMap.get(id)
@@ -469,6 +470,26 @@ export class KonvaEngine implements LayoutEngine {
           g.y = y
         }
         this.emitter.emit('groupMoved', { id, x, y })
+      },
+      (id, x, y, width, height) => {
+        const g = this.groupMap.get(id)
+        if (g) {
+          g.x = x
+          g.y = y
+          g.width = width
+          g.height = height
+          // Update bin metadata units if this is a bin group
+          const meta = g.metadata as Record<string, unknown> | undefined
+          if (meta && typeof meta.widthUnits === 'number') {
+            meta.widthUnits = Math.round(width / this.gridConfig.size)
+            meta.depthUnits = Math.round(height / this.gridConfig.size)
+          }
+        }
+        this.emitter.emit('groupResized', { id, width, height })
+        this.emitter.emit('groupChanged', { groupId: id, childIds: [...(g?.childIds ?? [])] })
+      },
+      (id, reason) => {
+        this.emitter.emit('collisionRejected', { id, reason })
       }
     )
     this.rendererMap.set(group.id, renderer)
@@ -613,12 +634,18 @@ export class KonvaEngine implements LayoutEngine {
       )
       .filter((n): n is Konva.Node => n !== undefined)
 
-    const hasGroups = ids.some((id) => this.rendererMap.has(id))
+    const groupIds = ids.filter((id) => this.rendererMap.has(id))
+    const isSingleBin = groupIds.length === 1 && ids.length === 1
 
     this.transformer.nodes(nodes)
 
-    // Disable resize/rotate for groups (bins resize via sidebar only)
-    if (hasGroups) {
+    if (isSingleBin) {
+      // Single bin: enable resize, disable rotate
+      this.transformer.resizeEnabled(true)
+      this.transformer.rotateEnabled(false)
+      this.transformer.keepRatio(false)
+    } else if (groupIds.length > 0) {
+      // Multi-select with bins: disable resize and rotate
       this.transformer.resizeEnabled(false)
       this.transformer.rotateEnabled(false)
     } else {

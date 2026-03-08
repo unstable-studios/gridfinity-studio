@@ -1,6 +1,7 @@
 import Konva from 'konva'
 import type { GroupRenderer } from './group-renderer'
 import type { LayoutGroup, GroupDecoration, GridConfig } from './types'
+import { checkGroupCollision } from './collision'
 
 /**
  * Dependencies injected from the KonvaEngine.
@@ -10,6 +11,7 @@ export interface KonvaGroupRendererDeps {
   layer: Konva.Layer
   getGridConfig(): GridConfig
   getTransformer(): Konva.Transformer | null
+  getAllGroups(): LayoutGroup[]
 }
 
 /**
@@ -30,14 +32,27 @@ export class KonvaGroupRenderer implements GroupRenderer {
   private groupId: string
   private deps: KonvaGroupRendererDeps
   private onMoved: (id: string, x: number, y: number) => void
+  private onResized:
+    | ((id: string, x: number, y: number, width: number, height: number) => void)
+    | null = null
+  private onCollisionRejected: ((id: string, reason: 'move' | 'resize') => void) | null = null
+
+  /** Snapshot of position before a drag starts, for collision rollback. */
+  private preDragPos: { x: number; y: number } | null = null
+  /** Snapshot of bounds before a resize starts, for edge-anchoring. */
+  private preResizeBounds: { x: number; y: number; width: number; height: number } | null = null
 
   constructor(
     group: LayoutGroup,
     deps: KonvaGroupRendererDeps,
-    onMoved: (id: string, x: number, y: number) => void
+    onMoved: (id: string, x: number, y: number) => void,
+    onResized?: (id: string, x: number, y: number, width: number, height: number) => void,
+    onCollisionRejected?: (id: string, reason: 'move' | 'resize') => void
   ) {
     this.deps = deps
     this.onMoved = onMoved
+    this.onResized = onResized ?? null
+    this.onCollisionRejected = onCollisionRejected ?? null
     this.groupId = group.id
     this.width = group.width
     this.height = group.height
@@ -70,6 +85,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.konvaGroup.add(bgRect)
 
     this.setupSnapHandlers()
+    this.setupResizeHandlers()
   }
 
   update(patch: Partial<LayoutGroup>, current: LayoutGroup): void {
@@ -196,6 +212,11 @@ export class KonvaGroupRenderer implements GroupRenderer {
   // ─── Private ──────────────────────────────────────────────────────────────────
 
   private setupSnapHandlers(): void {
+    // Save position before drag for collision rollback
+    this.konvaGroup.on('dragstart', () => {
+      this.preDragPos = { x: this.konvaGroup.x(), y: this.konvaGroup.y() }
+    })
+
     // Snap group lower-left corner to grid during drag.
     // Multi-select: skip live snap — Konva's Transformer fights per-node
     // corrections causing drift. Each bin snaps on dragend instead.
@@ -208,15 +229,123 @@ export class KonvaGroupRenderer implements GroupRenderer {
       this.snapToGrid(gridConfig.size)
     })
 
-    // On drag end: snap and sync data model
+    // On drag end: snap, collision check, and sync data model
     this.konvaGroup.on('dragend', () => {
       const gridConfig = this.deps.getGridConfig()
       if (gridConfig.enabled) {
         this.snapToGrid(gridConfig.size)
       }
 
+      // Collision check — revert if overlapping
       const pos = this.readPosition()
+      const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+      if (collider && this.preDragPos) {
+        this.konvaGroup.position(this.preDragPos)
+        this.deps.getTransformer()?.forceUpdate()
+        this.flashCollision()
+        this.onCollisionRejected?.(this.groupId, 'move')
+        this.preDragPos = null
+        return
+      }
+
+      this.preDragPos = null
       this.onMoved(this.groupId, pos.x, pos.y)
+    })
+  }
+
+  private setupResizeHandlers(): void {
+    // Save bounds before resize for edge-anchoring calculation.
+    this.konvaGroup.on('transformstart', () => {
+      const pos = this.readPosition()
+      this.preResizeBounds = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+    })
+
+    // Konva Transformer applies scale to the group during resize.
+    // Don't snap during live drag — modifying scale inside `transform` fights
+    // the Transformer's position anchoring. Snap on release only.
+    this.konvaGroup.on('transformend', () => {
+      const gridConfig = this.deps.getGridConfig()
+      const gs = gridConfig.size
+      const orig = this.preResizeBounds
+      if (!orig) return
+
+      const sx = this.konvaGroup.scaleX()
+      const sy = this.konvaGroup.scaleY()
+
+      // Compute new dimensions (grid-quantized)
+      let newW = this.width * sx
+      let newH = this.height * sy
+      if (gridConfig.enabled) {
+        newW = Math.max(gs, Math.round(newW / gs) * gs)
+        newH = Math.max(gs, Math.round(newH / gs) * gs)
+      }
+
+      // Determine which edges were anchored by comparing the Transformer's
+      // visual result to the original bounds. The anchored edge barely moved.
+      const centroidX = this.konvaGroup.x()
+      const centroidY = this.konvaGroup.y()
+      const visualLeft = centroidX - (this.width * sx) / 2
+      const visualRight = centroidX + (this.width * sx) / 2
+      const visualTop = centroidY - (this.height * sy) / 2
+      const visualBottom = centroidY + (this.height * sy) / 2
+
+      const origLeft = orig.x
+      const origRight = orig.x + orig.width
+      const origTop = orig.y - orig.height // top in screen coords (smaller y)
+      const origBottom = orig.y // lower-left y = bottom in screen coords
+
+      // Derive new lower-left from anchored edges (already on-grid)
+      let finalX: number
+      if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
+        finalX = origLeft // left edge anchored
+      } else {
+        finalX = origRight - newW // right edge anchored
+      }
+
+      let finalY: number
+      if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
+        // Top edge anchored → bottom (lower-left y) = top + newH
+        finalY = origTop + newH
+      } else {
+        finalY = origBottom // bottom edge anchored
+      }
+
+      // Reset scale
+      this.konvaGroup.scaleX(1)
+      this.konvaGroup.scaleY(1)
+
+      // Collision check
+      const proposed = { x: finalX, y: finalY, width: newW, height: newH }
+      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+      if (collider) {
+        // Revert to pre-resize state
+        this.konvaGroup.position({ x: orig.x + orig.width / 2, y: orig.y - orig.height / 2 })
+        this.deps.getTransformer()?.forceUpdate()
+        this.preResizeBounds = null
+        this.flashCollision()
+        this.onCollisionRejected?.(this.groupId, 'resize')
+        return
+      }
+
+      // Commit the new size
+      this.width = newW
+      this.height = newH
+
+      // Update bg rect
+      const bgRect = this.konvaGroup.findOne('.__groupBg')
+      if (bgRect) {
+        bgRect.setAttrs({ x: -newW / 2, y: -newH / 2, width: newW, height: newH })
+      }
+
+      // Reposition centroid from the final lower-left
+      this.konvaGroup.position({ x: finalX + newW / 2, y: finalY - newH / 2 })
+
+      this.refreshTransformerIfSelected()
+      this.deps.layer.batchDraw()
+      this.preResizeBounds = null
+
+      this.onResized?.(this.groupId, finalX, finalY, newW, newH)
     })
   }
 
@@ -227,6 +356,22 @@ export class KonvaGroupRenderer implements GroupRenderer {
     if (selectedNodes.some((n) => n.id() === this.groupId)) {
       transformer.forceUpdate()
     }
+  }
+
+  /** Brief red flash on the group border to indicate a collision rejection. */
+  private flashCollision(): void {
+    const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
+    if (!bgRect) return
+    const origStroke = bgRect.stroke()
+    const origStrokeWidth = bgRect.strokeWidth()
+    bgRect.stroke('#ef4444')
+    bgRect.strokeWidth(2)
+    this.deps.layer.batchDraw()
+    setTimeout(() => {
+      bgRect.stroke(origStroke ?? '#666666')
+      bgRect.strokeWidth(origStrokeWidth ?? 1)
+      this.deps.layer.batchDraw()
+    }, 300)
   }
 
   /** Full transformer reset for decoration changes (clears NODES_RECT cache). */
