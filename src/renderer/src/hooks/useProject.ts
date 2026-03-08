@@ -19,7 +19,8 @@ import type {
   Entity,
   Bin,
   GlobalSettings,
-  GridfinityConfig
+  GridfinityConfig,
+  LayoutSnapshotData
 } from '../../../shared/types/project'
 import type { MeshDataWithNormals } from '../../../shared/types/worker'
 
@@ -79,6 +80,9 @@ interface ProjectState {
   exportBatch: (
     files: Array<{ filename: string; data: ArrayBuffer }>
   ) => Promise<{ success: boolean; exported: number }>
+
+  // Layout snapshot (not undoable)
+  setLayoutSnapshot: (snapshot: LayoutSnapshotData | undefined) => void
 
   // Bake results (not undoable)
   setBakeResult: (binId: string, result: BakeResult | null) => void
@@ -586,6 +590,16 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         set({ error: `Export error: ${err instanceof Error ? err.message : 'Unknown error'}` })
         return { success: false, exported: 0 }
       }
+    },
+
+    // ── Layout snapshot ──
+
+    setLayoutSnapshot: (snapshot) => {
+      const state = get()
+      if (!state.project) return
+      set({
+        project: { ...state.project, layoutSnapshot: snapshot }
+      })
     },
 
     // ── Bake results ──

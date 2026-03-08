@@ -69,6 +69,7 @@ All feature work MUST follow test-driven development:
 4. Refactor while keeping tests green.
 
 This applies to:
+
 - New features and user stories.
 - Bug fixes (write a failing test that reproduces the bug first).
 - Schema changes (contract tests for new/modified shapes).
@@ -186,12 +187,14 @@ Studio development practices. It supersedes ad-hoc decisions, PR
 comments, and verbal agreements.
 
 **Amendment procedure**:
+
 1. Propose the change in a PR modifying this file.
 2. Document the rationale and migration impact.
 3. Version bump per semantic versioning (see below).
 4. All active contributors MUST acknowledge the change.
 
 **Versioning policy**:
+
 - MAJOR: Principle removed, redefined, or made incompatible with
   existing code.
 - MINOR: New principle or section added, or existing guidance
