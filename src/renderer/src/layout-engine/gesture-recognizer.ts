@@ -138,9 +138,11 @@ export class GestureRecognizer {
       this.startTargetId = hit.id
     } else {
       // Press on empty canvas → rubberBand candidate (wait for threshold)
-      // Stop propagation to prevent the engine's native rubber-band (Fabric)
+      // preventDefault suppresses compatibility mousedown (prevents Fabric's
+      // native rubber-band). stopPropagation prevents capture-phase leak.
       this.mode = 'dragReady'
       this.startTargetId = null
+      e.preventDefault()
       e.stopPropagation()
     }
   }

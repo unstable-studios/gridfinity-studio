@@ -1080,9 +1080,10 @@ export class KonvaEngine implements LayoutEngine {
 
     // Click-select, rubber-band, and pan/zoom now handled by GestureRecognizer (#226).
     // Only interaction state tracking remains here — set interacting only when
-    // an actual object is under the pointer (not empty canvas clicks).
+    // an actual object is under the pointer (not empty canvas / background).
     this.stage.on('mousedown', (e) => {
-      if (e.target && e.target !== this.stage) this.interacting = true
+      const t = e.target
+      if (t && t !== this.stage && t !== this.bgRect) this.interacting = true
     })
     this.stage.on('mouseup', () => {
       this.interacting = false
