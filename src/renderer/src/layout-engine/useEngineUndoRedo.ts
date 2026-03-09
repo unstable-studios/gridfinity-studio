@@ -57,6 +57,13 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     redoStackRef.current.push(undoStackRef.current.pop()!)
     const json = undoStackRef.current[undoStackRef.current.length - 1]
     engine.loadSnapshot(JSON.parse(json))
+    // Cancel any debounced push scheduled by loadSnapshot's events —
+    // without this, the debounce fires after isUndoingRef resets and
+    // treats the restore as a fresh mutation, clearing the redo stack.
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
     syncCounts()
     isUndoingRef.current = false
   }, [engine, syncCounts])
@@ -67,6 +74,10 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     undoStackRef.current.push(JSON.stringify(engine.toSnapshot()))
     const json = redoStackRef.current.pop()!
     engine.loadSnapshot(JSON.parse(json))
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = null
+    }
     syncCounts()
     isUndoingRef.current = false
   }, [engine, syncCounts])
