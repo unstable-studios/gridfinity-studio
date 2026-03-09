@@ -85,7 +85,7 @@ function UndoRedoDebugOverlay({ debugState }: { debugState: UndoRedoDebugState }
     return (
       <button
         onClick={() => setOpen(true)}
-        className="absolute top-2 left-2 z-20 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[9px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors"
+        className="absolute bottom-10 right-2 z-20 rounded bg-zinc-800/80 px-1.5 py-0.5 text-[9px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors"
       >
         U:{debugState.undoStack.length} R:{debugState.redoStack.length}
       </button>
@@ -95,7 +95,7 @@ function UndoRedoDebugOverlay({ debugState }: { debugState: UndoRedoDebugState }
   const { undoStack, redoStack, cursor } = debugState
 
   return (
-    <div className="absolute top-2 left-2 z-20 w-56 max-h-72 overflow-y-auto rounded border border-zinc-700 bg-zinc-900/95 text-[10px] font-mono text-zinc-300 shadow-lg">
+    <div className="absolute bottom-10 right-2 z-20 w-56 max-h-72 overflow-y-auto rounded border border-zinc-700 bg-zinc-900/95 text-[10px] font-mono text-zinc-300 shadow-lg">
       <div className="sticky top-0 flex items-center justify-between border-b border-zinc-700 bg-zinc-900 px-2 py-1">
         <span className="font-semibold text-zinc-100">Undo/Redo Stack</span>
         <button onClick={() => setOpen(false)} className="text-zinc-500 hover:text-zinc-200">
