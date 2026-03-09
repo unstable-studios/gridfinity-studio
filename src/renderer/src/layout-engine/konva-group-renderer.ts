@@ -13,6 +13,13 @@ export interface KonvaGroupRendererDeps {
   getGridConfig(): GridConfig
   getTransformer(): Konva.Transformer | null
   getAllGroups(): LayoutGroup[]
+  /**
+   * After a bin snaps to the grid during multi-select dragend, offset all
+   * non-group sibling nodes in the Transformer selection by the same delta
+   * so shapes follow bins. Idempotent within a synchronous batch — only
+   * the first call per batch applies; subsequent calls are ignored.
+   */
+  applySnapDeltaToSiblings(dx: number, dy: number): void
 }
 
 /**
@@ -248,10 +255,26 @@ export class KonvaGroupRenderer implements GroupRenderer {
 
     // On drag end: final snap + sync data model. Safety collision check
     // for edge cases (multi-select, etc.) — flash red only if truly overlapping.
+    // In multi-select, also offset sibling shapes by the snap delta so they
+    // follow the bins.
     this.konvaGroup.on('dragend', () => {
       const gridConfig = this.deps.getGridConfig()
+      const selectedNodes = this.deps.getTransformer()?.nodes() ?? []
+      const isMultiSelect = selectedNodes.length > 1
+
       if (gridConfig.enabled) {
+        const preSnapX = this.konvaGroup.x()
+        const preSnapY = this.konvaGroup.y()
         this.snapToGrid(gridConfig.size)
+
+        // In multi-select, offset sibling shapes by the snap delta
+        if (isMultiSelect) {
+          const dx = this.konvaGroup.x() - preSnapX
+          const dy = this.konvaGroup.y() - preSnapY
+          if (dx !== 0 || dy !== 0) {
+            this.deps.applySnapDeltaToSiblings(dx, dy)
+          }
+        }
       }
 
       const pos = this.readPosition()

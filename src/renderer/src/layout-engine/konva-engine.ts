@@ -451,7 +451,8 @@ export class KonvaEngine implements LayoutEngine {
         layer: this.mainLayer,
         getGridConfig: () => this.gridConfig,
         getTransformer: () => this.transformer,
-        getAllGroups: () => this.getAllGroups()
+        getAllGroups: () => this.getAllGroups(),
+        applySnapDeltaToSiblings: (dx, dy) => this.applySnapDeltaToSiblings(dx, dy)
       },
       (id, x, y) => {
         const g = this.groupMap.get(id)
@@ -609,6 +610,47 @@ export class KonvaEngine implements LayoutEngine {
 
   getAllGroups(): LayoutGroup[] {
     return Array.from(this.groupMap.keys()).map((id) => this.getGroup(id)!)
+  }
+
+  // ─── Multi-Select Snap Compensation ─────────────────────────────────────────
+
+  /** Guard: prevents multiple bins from applying the same snap delta to shapes. */
+  private snapDeltaApplied = false
+
+  /**
+   * Offset all non-group (shape) nodes in the Transformer selection by the
+   * given delta. Called by KonvaGroupRenderer after a bin snaps to the grid
+   * during multi-select dragend. Idempotent per synchronous batch — the first
+   * call applies, subsequent calls (from other bins) are ignored since all
+   * bins snap by the same delta.
+   */
+  private applySnapDeltaToSiblings(dx: number, dy: number): void {
+    if (this.snapDeltaApplied) return
+    this.snapDeltaApplied = true
+
+    // Reset the guard on the next microtask (after all synchronous dragend handlers fire)
+    queueMicrotask(() => {
+      this.snapDeltaApplied = false
+    })
+
+    const nodes = this.transformer?.nodes() ?? []
+    for (const node of nodes) {
+      // Skip groups (bins) — they snap themselves
+      if (node.name() === 'group') continue
+      node.position({ x: node.x() + dx, y: node.y() + dy })
+
+      // Sync shape data model
+      const id = node.id()
+      const data = this.shapeMap.get(id)
+      if (data) {
+        data.x = node.x()
+        data.y = node.y()
+      }
+      this.emitter.emit('shapeMoved', { id, x: node.x(), y: node.y() })
+    }
+
+    this.transformer?.forceUpdate()
+    this.mainLayer?.batchDraw()
   }
 
   // ─── Selection ──────────────────────────────────────────────────────────────
