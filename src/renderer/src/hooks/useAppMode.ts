@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 import type { EngineType } from '@/layout-engine'
 
-export type AppMode = 'layout' | 'review' | 'sandbox'
+export type AppMode = 'layout' | 'review'
 export type ActiveTool = 'select' | 'circle' | 'rectangle' | 'polygon' | null
 
 export interface AppModeContext {
