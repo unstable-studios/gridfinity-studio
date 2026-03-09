@@ -5,6 +5,7 @@ import type { EngineType } from './create-engine'
 import { createLayoutEngine } from './create-engine'
 import type { LayoutEngine } from './interface'
 import { LayoutEngineCtx } from './engine-context'
+import { GestureRecognizer } from './gesture-recognizer'
 // Import adapters to trigger self-registration
 import './fabric-engine'
 import './konva-engine'
@@ -26,6 +27,7 @@ export function LayoutEngineProvider({
   }>({ engine: null, type: controlledType ?? defaultEngine })
   const containerRef = useRef<HTMLDivElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
+  const gestureRef = useRef<GestureRecognizer | null>(null)
   const pendingStateRef = useRef<{
     snapshot: ReturnType<LayoutEngine['toSnapshot']>
     transient: ReturnType<LayoutEngine['getTransientState']>
@@ -64,10 +66,21 @@ export function LayoutEngineProvider({
       pendingStateRef.current = null
     }
 
+    // Initialize or update GestureRecognizer
+    if (!gestureRef.current) {
+      gestureRef.current = new GestureRecognizer()
+      gestureRef.current.attach(container)
+    }
+    gestureRef.current.setActionHandler(newEngine)
+
     setEngineState((prev) => ({ ...prev, engine: newEngine }))
 
     return () => {
       newEngine.dispose()
+      if (gestureRef.current) {
+        gestureRef.current.dispose()
+        gestureRef.current = null
+      }
       setEngineState((prev) => (prev.engine === newEngine ? { ...prev, engine: null } : prev))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

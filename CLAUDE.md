@@ -145,7 +145,10 @@ Concretely:
 - **Never mark a task done without verifying integration.** A component that compiles but isn't wired into the app is dead code, not a feature.
 
 ## Recent Changes
+- 012-input-decoupling: Added TypeScript 5.9 (strict mode, no `any`) + Fabric.js v7, Konva 10, React 19, mitt (event emitter)
 - 010-layout-engine-integration: LayoutEngine is now source of truth for all 2D state. Project schema v0.5.0 with `layoutSnapshot`. Old entity/bin system fully removed. Drag-to-resize with collision detection, bin artwork decorations, snapshot-based undo/redo.
 - 009-layout-engine-abstraction: Introduced LayoutEngine interface with Fabric.js and Konva adapters. Dual-engine support with runtime switching.
-- 007-interaction-layer-refactor: Consolidated canvas interaction handling.
-- 001-full-roadmap: Initial architecture with R3F viewport, Manifold CSG pipeline.
+
+## Active Technologies
+- TypeScript 5.9 (strict mode, no `any`) + Fabric.js v7, Konva 10, React 19, mitt (event emitter) (012-input-decoupling)
+- N/A (renderer-only refactor) (012-input-decoupling)

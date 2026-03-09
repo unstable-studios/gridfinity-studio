@@ -14,6 +14,7 @@ import type {
 } from './types'
 import { registerEngine } from './create-engine'
 import { KonvaGroupRenderer } from './konva-group-renderer'
+import type { HitResult } from './input-action-handler'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -133,23 +134,13 @@ export class KonvaEngine implements LayoutEngine {
   }
   private bgRect: Konva.Rect | null = null
   private gridBgRect: Konva.Rect | null = null
-  private container: HTMLDivElement | null = null
   private insets: ViewportInsets = {}
 
-  // Pan state — isPanning is set from a DOM capture listener so it's
-  // guaranteed to be true before Konva's internal drag tracking fires.
-  private isPanning = false
-  private lastPointer = { x: 0, y: 0 }
-  private panCaptureHandler: ((e: MouseEvent) => void) | null = null
-
-  // Rubber-band selection state
-  private selectionRect: Konva.Rect | null = null
-  private selectionStart: { x: number; y: number } | null = null
+  // Pan/zoom, click-select, and rubber-band now handled by GestureRecognizer (#226)
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
   mount(container: HTMLDivElement): void {
-    this.container = container
     const width = container.clientWidth || 800
     const height = container.clientHeight || 600
 
@@ -206,7 +197,6 @@ export class KonvaEngine implements LayoutEngine {
 
     this.drawGrid()
     this.setupEventHandlers()
-    this.setupPanZoom()
 
     // Center origin in the visible (unoccluded) area of the viewport
     this.centerOrigin()
@@ -229,12 +219,6 @@ export class KonvaEngine implements LayoutEngine {
     this.emitter.all.clear()
     this.resizeObserver?.disconnect()
     this.resizeObserver = null
-
-    if (this.panCaptureHandler && this.container) {
-      this.container.removeEventListener('mousedown', this.panCaptureHandler, true)
-      this.panCaptureHandler = null
-    }
-    this.container = null
 
     if (this.stage) {
       this.stage.destroy()
@@ -666,12 +650,23 @@ export class KonvaEngine implements LayoutEngine {
     this.emitter.emit('selectionChanged', { ids: [...ids] })
   }
 
+  selectIds(ids: string[]): void {
+    this.select(ids)
+  }
+
   addToSelection(ids: string[]): void {
     if (this.disposed || !this.transformer) return
     const currentNodes = this.transformer.nodes()
     const currentIds = currentNodes.map((n) => n.id())
     const merged = [...new Set([...currentIds, ...ids])]
     this.select(merged)
+  }
+
+  removeFromSelection(ids: string[]): void {
+    if (this.disposed || !this.transformer) return
+    const currentIds = this.transformer.nodes().map((n) => n.id())
+    const remaining = currentIds.filter((id) => !ids.includes(id))
+    this.select(remaining)
   }
 
   clearSelection(): void {
@@ -845,6 +840,152 @@ export class KonvaEngine implements LayoutEngine {
     return this.interacting
   }
 
+  // ─── Input Action Handler ─────────────────────────────────────────────────
+
+  applyPan(dx: number, dy: number): void {
+    if (this.disposed || !this.stage) return
+    this.stage.position({
+      x: this.stage.x() + dx,
+      y: this.stage.y() + dy
+    })
+    this.stage.batchDraw()
+    this.emitter.emit('viewportChanged', this.getViewport())
+  }
+
+  applyZoom(delta: number, centerX: number, centerY: number): void {
+    if (this.disposed || !this.stage) return
+    const oldScale = this.stage.scaleX()
+    const scaleBy = 1.08
+    const direction = delta > 0 ? -1 : 1
+    const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy
+    this.zoomTo(newScale, { x: centerX, y: centerY })
+  }
+
+  setDragEnabled(enabled: boolean): void {
+    if (this.disposed) return
+    for (const node of this.konvaMap.values()) {
+      node.draggable(enabled)
+    }
+    for (const renderer of this.rendererMap.values()) {
+      renderer.konvaGroup.draggable(enabled)
+    }
+  }
+
+  objectAt(worldX: number, worldY: number): HitResult | null {
+    if (!this.stage) return null
+    const scale = this.stage.scaleX()
+    const pos = this.stage.position()
+    const screenX = worldX * scale + pos.x
+    const screenY = worldY * scale + pos.y
+
+    const node = this.stage.getIntersection({ x: screenX, y: screenY })
+    if (!node) return null
+
+    // Walk up to find a tagged node
+    let current: Konva.Node | null = node
+    while (current) {
+      const name = current.name()
+      if (name === 'shape' || name === 'group') {
+        return {
+          type: name === 'shape' ? 'shape' : 'group',
+          id: current.id()
+        }
+      }
+      if (name === '__groupBg' && current.parent) {
+        const parentId = current.parent.id()
+        if (this.rendererMap.has(parentId)) {
+          return { type: 'group', id: parentId }
+        }
+      }
+      current = current.parent
+    }
+
+    return null
+  }
+
+  objectsInRect(rect: { x: number; y: number; width: number; height: number }): HitResult[] {
+    if (!this.stage) return []
+    const scale = this.stage.scaleX()
+    const pos = this.stage.position()
+
+    // Convert world-space rect to screen-space for getClientRect() comparison
+    const selBox = {
+      x: rect.x * scale + pos.x,
+      y: rect.y * scale + pos.y,
+      width: rect.width * scale,
+      height: rect.height * scale
+    }
+
+    const hits: HitResult[] = []
+
+    for (const [id, node] of this.konvaMap) {
+      const nodeBox = node.getClientRect()
+      if (
+        nodeBox.x < selBox.x + selBox.width &&
+        nodeBox.x + nodeBox.width > selBox.x &&
+        nodeBox.y < selBox.y + selBox.height &&
+        nodeBox.y + nodeBox.height > selBox.y
+      ) {
+        hits.push({ type: 'shape', id })
+      }
+    }
+
+    for (const [id, renderer] of this.rendererMap) {
+      const nodeBox = renderer.konvaGroup.getClientRect()
+      if (
+        nodeBox.x < selBox.x + selBox.width &&
+        nodeBox.x + nodeBox.width > selBox.x &&
+        nodeBox.y < selBox.y + selBox.height &&
+        nodeBox.y + nodeBox.height > selBox.y
+      ) {
+        hits.push({ type: 'group', id })
+      }
+    }
+
+    return hits
+  }
+
+  screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    if (!this.stage) return { x: screenX, y: screenY }
+    const scale = this.stage.scaleX()
+    const pos = this.stage.position()
+    return {
+      x: (screenX - pos.x) / scale,
+      y: (screenY - pos.y) / scale
+    }
+  }
+
+  private rubberBandRect: Konva.Rect | null = null
+
+  showRubberBand(rect: { x: number; y: number; width: number; height: number }): void {
+    if (!this.mainLayer) return
+    if (!this.rubberBandRect) {
+      this.rubberBandRect = new Konva.Rect({
+        fill: 'rgba(100, 150, 255, 0.1)',
+        stroke: 'rgba(100, 150, 255, 0.6)',
+        strokeWidth: 1,
+        dash: [4, 4],
+        listening: false
+      })
+      this.mainLayer.add(this.rubberBandRect)
+    }
+    this.rubberBandRect.setAttrs({
+      x: rect.x,
+      y: rect.y,
+      width: rect.width,
+      height: rect.height,
+      visible: true
+    })
+    this.mainLayer.batchDraw()
+  }
+
+  hideRubberBand(): void {
+    if (!this.rubberBandRect) return
+    this.rubberBandRect.destroy()
+    this.rubberBandRect = null
+    this.mainLayer?.batchDraw()
+  }
+
   // ─── Private: Viewport centering ────────────────────────────────────────────
 
   /**
@@ -935,148 +1076,8 @@ export class KonvaEngine implements LayoutEngine {
   private setupEventHandlers(): void {
     if (!this.stage) return
 
-    // Click to select / deselect + rubber-band selection
-    this.stage.on('mousedown', (e) => {
-      if (this.disposed) return
-      const nativeEvt = e.evt
-
-      // Ignore pan-initiated clicks
-      if (nativeEvt.altKey || nativeEvt.button === 1) return
-
-      const target = e.target
-
-      // Clicked on background → start rubber-band
-      if (target === this.stage || target.name() === 'background') {
-        if (!nativeEvt.shiftKey) {
-          this.clearSelection()
-        }
-        const pointer = this.stage!.getPointerPosition()
-        if (pointer) {
-          const scale = this.stage!.scaleX()
-          const stagePos = this.stage!.position()
-          this.selectionStart = {
-            x: (pointer.x - stagePos.x) / scale,
-            y: (pointer.y - stagePos.y) / scale
-          }
-          if (!this.selectionRect) {
-            this.selectionRect = new Konva.Rect({
-              fill: 'rgba(96, 165, 250, 0.08)',
-              stroke: '#60a5fa',
-              strokeWidth: 1,
-              visible: false,
-              listening: false
-            })
-            this.mainLayer?.add(this.selectionRect)
-          }
-        }
-        return
-      }
-
-      // Clicked on a shape
-      if (target.name() === 'shape') {
-        const id = target.id()
-        if (nativeEvt.shiftKey) {
-          const current = this.getSelectedIds()
-          if (current.includes(id)) {
-            this.select(current.filter((sid) => sid !== id))
-          } else {
-            this.addToSelection([id])
-          }
-        } else {
-          if (!this.getSelectedIds().includes(id)) {
-            this.select([id])
-          }
-        }
-      }
-
-      // Clicked on a group or its background
-      if (target.name() === 'group' || target.name() === '__groupBg') {
-        const groupNode = target.name() === '__groupBg' ? target.parent : target
-        if (groupNode) {
-          const id = groupNode.id()
-          if (nativeEvt.shiftKey) {
-            const current = this.getSelectedIds()
-            if (current.includes(id)) {
-              this.select(current.filter((sid) => sid !== id))
-            } else {
-              this.addToSelection([id])
-            }
-          } else {
-            if (!this.getSelectedIds().includes(id)) {
-              this.select([id])
-            }
-          }
-        }
-      }
-    })
-
-    // Rubber-band drag
-    this.stage.on('mousemove', (e) => {
-      if (!this.selectionStart || !this.selectionRect || !this.stage) return
-      const pointer = this.stage.getPointerPosition()
-      if (!pointer) return
-
-      const scale = this.stage.scaleX()
-      const stagePos = this.stage.position()
-      const curX = (pointer.x - stagePos.x) / scale
-      const curY = (pointer.y - stagePos.y) / scale
-
-      const x = Math.min(this.selectionStart.x, curX)
-      const y = Math.min(this.selectionStart.y, curY)
-      const w = Math.abs(curX - this.selectionStart.x)
-      const h = Math.abs(curY - this.selectionStart.y)
-
-      this.selectionRect.setAttrs({ x, y, width: w, height: h, visible: true })
-      this.mainLayer?.batchDraw()
-
-      // Suppress native event to prevent text selection
-      e.evt.preventDefault()
-    })
-
-    // Rubber-band release
-    this.stage.on('mouseup', () => {
-      if (this.selectionStart && this.selectionRect && this.selectionRect.visible()) {
-        const selBox = this.selectionRect.getClientRect()
-        const hits: string[] = []
-
-        // Check shapes
-        for (const [id, node] of this.konvaMap) {
-          const nodeBox = node.getClientRect()
-          if (
-            nodeBox.x < selBox.x + selBox.width &&
-            nodeBox.x + nodeBox.width > selBox.x &&
-            nodeBox.y < selBox.y + selBox.height &&
-            nodeBox.y + nodeBox.height > selBox.y
-          ) {
-            hits.push(id)
-          }
-        }
-
-        // Also check groups
-        for (const [id, renderer] of this.rendererMap) {
-          const nodeBox = renderer.konvaGroup.getClientRect()
-          if (
-            nodeBox.x < selBox.x + selBox.width &&
-            nodeBox.x + nodeBox.width > selBox.x &&
-            nodeBox.y < selBox.y + selBox.height &&
-            nodeBox.y + nodeBox.height > selBox.y
-          ) {
-            hits.push(id)
-          }
-        }
-
-        if (hits.length > 0) {
-          this.select(hits)
-        }
-      }
-
-      if (this.selectionRect) {
-        this.selectionRect.visible(false)
-        this.mainLayer?.batchDraw()
-      }
-      this.selectionStart = null
-    })
-
+    // Click-select, rubber-band, and pan/zoom now handled by GestureRecognizer (#226).
+    // Only interaction state tracking remains here.
     this.stage.on('mousedown', () => {
       this.interacting = true
     })
@@ -1087,86 +1088,7 @@ export class KonvaEngine implements LayoutEngine {
 
   // ─── Private: Pan & Zoom ────────────────────────────────────────────────────
 
-  private setupPanZoom(): void {
-    if (!this.stage || !this.container) return
-
-    // TODO(#226): Replace this hack with a proper input manager that owns
-    // the event lifecycle. Currently we toggle draggable on every shape to
-    // prevent Konva's internal drag system from stealing pan gestures.
-    // The input decoupling refactor (#226) will make this unnecessary.
-    this.panCaptureHandler = (e: MouseEvent) => {
-      if (e.altKey || e.button === 1) {
-        this.isPanning = true
-        this.lastPointer = { x: e.clientX, y: e.clientY }
-        for (const node of this.konvaMap.values()) {
-          node.draggable(false)
-        }
-        for (const renderer of this.rendererMap.values()) {
-          renderer.konvaGroup.draggable(false)
-        }
-        e.preventDefault()
-      }
-    }
-    // Capture phase: fires before Konva's internal handlers
-    this.container.addEventListener('mousedown', this.panCaptureHandler, true)
-
-    this.stage.on('mousemove', (e) => {
-      if (!this.isPanning || !this.stage) return
-      const dx = e.evt.clientX - this.lastPointer.x
-      const dy = e.evt.clientY - this.lastPointer.y
-      this.lastPointer = { x: e.evt.clientX, y: e.evt.clientY }
-
-      this.stage.position({
-        x: this.stage.x() + dx,
-        y: this.stage.y() + dy
-      })
-      this.stage.batchDraw()
-    })
-
-    this.stage.on('mouseup', () => {
-      if (this.isPanning && this.stage) {
-        this.isPanning = false
-        // Restore draggable on all shapes and groups
-        for (const node of this.konvaMap.values()) {
-          node.draggable(true)
-        }
-        for (const renderer of this.rendererMap.values()) {
-          renderer.konvaGroup.draggable(true)
-        }
-        const vp = this.getViewport()
-        this.emitter.emit('viewportChanged', vp)
-      }
-    })
-
-    this.stage.on('wheel', (e) => {
-      if (!this.stage) return
-      e.evt.preventDefault()
-
-      const oldScale = this.stage.scaleX()
-      const pointer = this.stage.getPointerPosition()
-      if (!pointer) return
-
-      const scaleBy = 1.08
-      const direction = e.evt.deltaY > 0 ? -1 : 1
-      const newScale = direction > 0 ? oldScale * scaleBy : oldScale / scaleBy
-      const clamped = Math.max(0.1, Math.min(10, newScale))
-
-      const mousePointTo = {
-        x: (pointer.x - this.stage.x()) / oldScale,
-        y: (pointer.y - this.stage.y()) / oldScale
-      }
-
-      this.stage.scale({ x: clamped, y: clamped })
-      this.stage.position({
-        x: pointer.x - mousePointTo.x * clamped,
-        y: pointer.y - mousePointTo.y * clamped
-      })
-      this.stage.batchDraw()
-
-      const vp = this.getViewport()
-      this.emitter.emit('viewportChanged', vp)
-    })
-  }
+  // setupPanZoom removed — pan/zoom now handled by GestureRecognizer (#226)
 }
 
 // Auto-register
