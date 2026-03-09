@@ -556,6 +556,45 @@ describe('Cross-engine snapshot roundtrip', () => {
     konvaEngine.dispose()
   })
 
+  it('Fabric → Konva → Fabric: polygon position preserved (bbox center convention)', () => {
+    // Asymmetric triangle: bbox center = (50, 40), centroid ≠ bbox center.
+    // Regression test for #252 — polygon drift when switching engines.
+    const fabricEngine = createLayoutEngine('fabric')
+    fabricEngine.mount(container)
+
+    fabricEngine.addShape(makePolygon({ id: 'asym', x: 200, y: 150 }))
+
+    const origShape = fabricEngine.getShape('asym')!
+    const origX = origShape.x
+    const origY = origShape.y
+
+    // Fabric → Konva
+    const snap1 = fabricEngine.toSnapshot()
+    fabricEngine.dispose()
+
+    const konvaEngine = createLayoutEngine('konva')
+    konvaEngine.mount(container)
+    konvaEngine.loadSnapshot(snap1)
+
+    const konvaShape = konvaEngine.getShape('asym')!
+    expect(konvaShape.x).toBeCloseTo(origX, 1)
+    expect(konvaShape.y).toBeCloseTo(origY, 1)
+
+    // Konva → Fabric
+    const snap2 = konvaEngine.toSnapshot()
+    konvaEngine.dispose()
+
+    const fabricEngine2 = createLayoutEngine('fabric')
+    fabricEngine2.mount(container)
+    fabricEngine2.loadSnapshot(snap2)
+
+    const finalShape = fabricEngine2.getShape('asym')!
+    expect(finalShape.x).toBeCloseTo(origX, 1)
+    expect(finalShape.y).toBeCloseTo(origY, 1)
+
+    fabricEngine2.dispose()
+  })
+
   it('Konva → Fabric: snapshot preserves all shapes and groups', () => {
     const konvaEngine = createLayoutEngine('konva')
     konvaEngine.mount(container)
