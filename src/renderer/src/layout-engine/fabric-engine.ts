@@ -817,7 +817,10 @@ export class FabricEngine implements LayoutEngine {
         fill: 'rgba(100, 150, 255, 0.1)',
         stroke: 'rgba(100, 150, 255, 0.6)',
         strokeWidth: 1,
+        strokeUniform: true,
         strokeDashArray: [4, 4],
+        originX: 'left',
+        originY: 'top',
         selectable: false,
         evented: false,
         excludeFromExport: true

@@ -208,6 +208,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
       y: snapped.y - halfH
     })
     this.deps.getTransformer()?.forceUpdate()
+    this.deps.layer.batchDraw()
   }
 
   destroy(): void {
