@@ -14,18 +14,11 @@ export interface KonvaGroupRendererDeps {
   getTransformer(): Konva.Transformer | null
   getAllGroups(): LayoutGroup[]
   /**
-   * After a bin snaps to the grid during multi-select dragend, offset all
-   * non-group sibling nodes in the Transformer selection by the same delta
-   * so shapes follow bins. Idempotent within a synchronous batch — only
-   * the first call per batch applies; subsequent calls are ignored.
+   * Atomically finalize a multi-select drag: snap all bins, collision-check,
+   * then either commit all data model changes or revert the entire selection.
+   * Idempotent — only the first call per drag batch does work.
    */
-  applySnapDeltaToSiblings(dx: number, dy: number): void
-  /** Return the IDs of all groups currently in the Transformer selection. */
-  getSelectedGroupIds(): Set<string>
-  /** Revert all nodes in the Transformer selection to their pre-drag positions. */
-  revertMultiSelectDrag(): void
-  /** Whether the current multi-select drag has already been reverted. */
-  isMultiSelectReverted(): boolean
+  finalizeMultiSelectDrag(): void
 }
 
 /**
@@ -53,6 +46,12 @@ export class KonvaGroupRenderer implements GroupRenderer {
 
   /** Last known non-colliding centroid during drag, for live collision prevention. */
   private lastGoodPos: { x: number; y: number } | null = null
+  /** Timeout handle for collision flash — cleared before starting a new flash. */
+  private flashTimeout: ReturnType<typeof setTimeout> | null = null
+  /** Original stroke color from the group style, for reliable flash restore. */
+  private origStroke: string
+  /** Original stroke width from the group style, for reliable flash restore. */
+  private origStrokeWidth: number
   /** Snapshot of bounds before a resize starts, for edge-anchoring. */
   private preResizeBounds: { x: number; y: number; width: number; height: number } | null = null
   /** Non-scaling overlay rect shown during resize as ghost preview. */
@@ -72,6 +71,8 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.groupId = group.id
     this.width = group.width
     this.height = group.height
+    this.origStroke = group.style.stroke
+    this.origStrokeWidth = group.style.strokeWidth
 
     // Lower-left → centroid
     const centroidX = group.x + group.width / 2
@@ -140,6 +141,9 @@ export class KonvaGroupRenderer implements GroupRenderer {
             strokeWidth: current.style.strokeWidth,
             cornerRadius: current.style.cornerRadius ?? 0
           })
+          // Keep flash-restore values in sync with the configured style
+          this.origStroke = current.style.stroke
+          this.origStrokeWidth = current.style.strokeWidth
         }
       }
     }
@@ -259,71 +263,38 @@ export class KonvaGroupRenderer implements GroupRenderer {
       }
     })
 
-    // On drag end: final snap + sync data model. Safety collision check
-    // for edge cases (multi-select, etc.) — flash red only if truly overlapping.
-    // In multi-select, also offset sibling shapes by the snap delta so they
-    // follow the bins.
+    // On drag end: final snap + sync data model.
+    // Multi-select: delegate to the engine's atomic finalizeMultiSelectDrag().
+    // Single-select: snap, collision-check, commit or revert locally.
     this.konvaGroup.on('dragend', () => {
       const selectedNodes = this.deps.getTransformer()?.nodes() ?? []
       const isMultiSelect = selectedNodes.length > 1
 
-      // If another bin already triggered a multi-select revert, skip entirely —
-      // our position has been restored and any further snap/collision work
-      // would introduce floating-point drift from centroid conversions.
-      if (isMultiSelect && this.deps.isMultiSelectReverted()) {
+      if (isMultiSelect) {
+        // Engine handles snap, collision, commit/revert atomically for all
+        // nodes in the selection. Idempotent — only the first bin's dragend
+        // triggers actual work; subsequent calls are no-ops.
+        this.deps.finalizeMultiSelectDrag()
         this.lastGoodPos = null
         return
       }
 
+      // Single-bin: snap + collision check
       const gridConfig = this.deps.getGridConfig()
-
       if (gridConfig.enabled) {
-        const preSnapX = this.konvaGroup.x()
-        const preSnapY = this.konvaGroup.y()
         this.snapToGrid(gridConfig.size)
-
-        // In multi-select, offset sibling shapes by the snap delta
-        if (isMultiSelect) {
-          const dx = this.konvaGroup.x() - preSnapX
-          const dy = this.konvaGroup.y() - preSnapY
-          if (dx !== 0 || dy !== 0) {
-            this.deps.applySnapDeltaToSiblings(dx, dy)
-          }
-        }
       }
 
       const pos = this.readPosition()
       const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
-
-      if (isMultiSelect) {
-        // Multi-select: check collision against non-selected groups only
-        // (selected siblings have stale data model positions). If any bin
-        // in the selection collides with a stationary group, revert the
-        // entire selection.
-        const selectedIds = this.deps.getSelectedGroupIds()
-        const collider = checkGroupCollision(
-          proposed,
-          this.groupId,
-          this.deps.getAllGroups(),
-          selectedIds
-        )
-        if (collider) {
-          this.deps.revertMultiSelectDrag()
-          this.flashCollision()
-          this.lastGoodPos = null
-          return
-        }
-      } else {
-        // Single-bin: check against all other groups
-        const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
-        if (collider && this.lastGoodPos) {
-          this.konvaGroup.position(this.lastGoodPos)
-          this.deps.getTransformer()?.forceUpdate()
-          this.flashCollision()
-          this.onCollisionRejected?.(this.groupId, 'move')
-          this.lastGoodPos = null
-          return
-        }
+      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+      if (collider && this.lastGoodPos) {
+        this.konvaGroup.position(this.lastGoodPos)
+        this.deps.getTransformer()?.forceUpdate()
+        this.flashCollision()
+        this.onCollisionRejected?.(this.groupId, 'move')
+        this.lastGoodPos = null
+        return
       }
 
       this.lastGoodPos = null
@@ -490,18 +461,29 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.deps.layer.batchDraw()
   }
 
-  /** Brief red flash on the group border to indicate a collision rejection. */
-  private flashCollision(): void {
+  /**
+   * Brief red flash on the group border to indicate a collision rejection.
+   * Cancels any pending flash timeout before starting a new one, and restores
+   * the stroke from the configured group style (not from current visual state,
+   * which may already be red from a previous flash).
+   */
+  flashCollision(): void {
     const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
     if (!bgRect) return
-    const origStroke = bgRect.stroke()
-    const origStrokeWidth = bgRect.strokeWidth()
+
+    // Cancel any pending restore so flashes don't stack
+    if (this.flashTimeout !== null) {
+      clearTimeout(this.flashTimeout)
+      this.flashTimeout = null
+    }
+
     bgRect.stroke('#ef4444')
     bgRect.strokeWidth(2)
     this.deps.layer.batchDraw()
-    setTimeout(() => {
-      bgRect.stroke(origStroke ?? '#666666')
-      bgRect.strokeWidth(origStrokeWidth ?? 1)
+    this.flashTimeout = setTimeout(() => {
+      this.flashTimeout = null
+      bgRect.stroke(this.origStroke)
+      bgRect.strokeWidth(this.origStrokeWidth)
       this.deps.layer.batchDraw()
     }, 300)
   }
