@@ -3,16 +3,15 @@ import { useUndoRedo } from '@/hooks/useUndoRedo'
 import type { LayoutEngine } from './interface'
 
 const MAX_UNDO = 50
-const DEBOUNCE_MS = 300
 
 /**
  * Engine-snapshot-based undo/redo.
  *
- * Captures undo snapshots at interaction boundaries:
- * - shapeMoved, shapeResized, groupMoved, groupResized fire once at the
- *   end of a drag/resize in both engines → push immediately.
- * - shapeCreated, shapeDeleted, groupChanged are discrete actions but may
- *   fire in rapid bursts (e.g. loadSnapshot) → push with short debounce.
+ * Captures undo snapshots on every engine mutation event. The
+ * `isUndoingRef` guard prevents undo/redo restores (which fire
+ * engine events during loadSnapshot) from being recorded as new
+ * mutations, and the JSON equality check deduplicates redundant
+ * pushes from burst events.
  *
  * Also syncs canUndo/canRedo/undo/redo to the useUndoRedo zustand store
  * so the Navbar and other distant consumers can read undo/redo state.
@@ -26,7 +25,6 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
   const undoStackRef = useRef<string[]>([])
   const redoStackRef = useRef<string[]>([])
   const isUndoingRef = useRef(false)
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
 
@@ -46,24 +44,12 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     syncCounts()
   }, [engine, syncCounts])
 
-  const debouncedPush = useCallback(() => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
-    debounceTimerRef.current = setTimeout(pushSnapshot, DEBOUNCE_MS)
-  }, [pushSnapshot])
-
   const undo = useCallback(() => {
     if (!engine || undoStackRef.current.length < 2) return
     isUndoingRef.current = true
     redoStackRef.current.push(undoStackRef.current.pop()!)
     const json = undoStackRef.current[undoStackRef.current.length - 1]
     engine.loadSnapshot(JSON.parse(json))
-    // Cancel any debounced push scheduled by loadSnapshot's events —
-    // without this, the debounce fires after isUndoingRef resets and
-    // treats the restore as a fresh mutation, clearing the redo stack.
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-      debounceTimerRef.current = null
-    }
     syncCounts()
     isUndoingRef.current = false
   }, [engine, syncCounts])
@@ -74,10 +60,6 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     undoStackRef.current.push(JSON.stringify(engine.toSnapshot()))
     const json = redoStackRef.current.pop()!
     engine.loadSnapshot(JSON.parse(json))
-    if (debounceTimerRef.current) {
-      clearTimeout(debounceTimerRef.current)
-      debounceTimerRef.current = null
-    }
     syncCounts()
     isUndoingRef.current = false
   }, [engine, syncCounts])
@@ -96,33 +78,27 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     syncCounts()
   }, [engine, syncCounts])
 
-  // Subscribe to engine events for undo snapshot capture
+  // Subscribe to engine events for undo snapshot capture.
+  // All events push synchronously — the isUndoingRef guard prevents
+  // undo/redo restores from being recorded, and JSON equality dedup
+  // handles any burst events (e.g. loadSnapshot firing multiple events).
   useEffect(() => {
     if (!engine) return
 
-    // Interaction-end events fire once per completed drag/resize.
-    // Push immediately — no debounce needed.
-    const interactionUnsubs = [
+    const unsubs = [
       engine.on('shapeMoved', pushSnapshot),
       engine.on('shapeResized', pushSnapshot),
       engine.on('groupMoved', pushSnapshot),
-      engine.on('groupResized', pushSnapshot)
-    ]
-
-    // Discrete/bulk events may fire in bursts (e.g. loadSnapshot removes
-    // then recreates everything). Debounce to coalesce into one snapshot.
-    const discreteUnsubs = [
-      engine.on('shapeCreated', debouncedPush),
-      engine.on('shapeDeleted', debouncedPush),
-      engine.on('groupChanged', debouncedPush)
+      engine.on('groupResized', pushSnapshot),
+      engine.on('shapeCreated', pushSnapshot),
+      engine.on('shapeDeleted', pushSnapshot),
+      engine.on('groupChanged', pushSnapshot)
     ]
 
     return () => {
-      interactionUnsubs.forEach((u) => u())
-      discreteUnsubs.forEach((u) => u())
-      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+      unsubs.forEach((u) => u())
     }
-  }, [engine, pushSnapshot, debouncedPush])
+  }, [engine, pushSnapshot])
 
   // Keyboard shortcuts: Ctrl+Z undo, Ctrl+Shift+Z / Ctrl+Y redo
   useEffect(() => {
