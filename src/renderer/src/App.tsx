@@ -47,7 +47,9 @@ function readBool(key: string, fallback: boolean): boolean {
 
 export default function App(): React.JSX.Element {
   const [mode, setMode] = useState<AppMode>(() => {
-    return (sessionStorage.getItem(APP_MODE_KEY) as AppMode) ?? 'layout'
+    const stored = sessionStorage.getItem(APP_MODE_KEY)
+    if (stored === 'layout' || stored === 'review') return stored
+    return 'layout'
   })
   const [activeTool, setActiveTool] = useState<ActiveTool>('select')
   const [engineType, setEngineType] = useState<EngineType>(() => {

@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useLayoutEngine } from './useLayoutEngine'
 import { useProject } from '@/hooks/useProject'
+import { useAppMode } from '@/hooks/useAppMode'
 import type { LayoutSnapshotData } from '../../../shared/types/project'
 import type { LayoutSnapshot } from './types'
 
@@ -82,6 +83,19 @@ export function useProjectEngineSync(): void {
   useEffect(() => {
     return registerBeforeSave(captureSnapshot)
   }, [registerBeforeSave, captureSnapshot])
+
+  // Flush snapshot immediately when leaving layout mode so that
+  // switching to review (or any other mode) never loses state.
+  const { mode } = useAppMode()
+  useEffect(() => {
+    if (mode !== 'layout') {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current)
+        syncTimerRef.current = null
+      }
+      captureSnapshot()
+    }
+  }, [mode, captureSnapshot])
 
   // Debounce-sync engine state to project store on mutations so
   // sessionStorage always has a recent layout (survives page refresh).

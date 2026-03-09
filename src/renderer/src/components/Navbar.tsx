@@ -27,7 +27,6 @@ import { useAppMode } from '@/hooks/useAppMode'
 import {
   SquareDashedIcon,
   BoxIcon,
-  FlaskConicalIcon,
   MousePointerIcon,
   SquareIcon,
   CircleIcon,
@@ -257,7 +256,7 @@ function ViewModeToggle() {
           setMode('layout')
           setActiveTool('select')
         } else {
-          setMode(value as 'review' | 'sandbox')
+          setMode(value as 'review')
           setActiveTool(null)
         }
       }}
@@ -269,10 +268,6 @@ function ViewModeToggle() {
       <ToggleGroupItem value="review" className="gap-1.5">
         <BoxIcon className="size-3.5" />
         Preview
-      </ToggleGroupItem>
-      <ToggleGroupItem value="sandbox" className="gap-1.5">
-        <FlaskConicalIcon className="size-3.5" />
-        Sandbox
       </ToggleGroupItem>
     </ToggleGroup>
   )
