@@ -199,8 +199,10 @@ export class FabricEngine implements LayoutEngine {
       height,
       backgroundColor: this.themeColors.background,
       uniformScaling: false,
-      // Native selection disabled — GestureRecognizer owns rubber-band (#226)
-      selection: false
+      selection: true,
+      selectionColor: 'rgba(96, 165, 250, 0.08)',
+      selectionBorderColor: '#60a5fa',
+      selectionLineWidth: 1
     })
 
     this.setupEventHandlers()
@@ -997,8 +999,8 @@ export class FabricEngine implements LayoutEngine {
 
     // Capture pre-drag/resize state for edge-anchoring and live collision
     this.canvas.on('mouse:down', (opt) => {
-      this.interacting = true
       const obj = opt.target
+      if (obj) this.interacting = true
       if (!obj) return
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {

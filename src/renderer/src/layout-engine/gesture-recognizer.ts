@@ -133,12 +133,15 @@ export class GestureRecognizer {
 
     if (hit) {
       // Press on a shape/group → dragReady (wait for threshold or release)
+      // Let event propagate so the engine can start native drag/resize
       this.mode = 'dragReady'
       this.startTargetId = hit.id
     } else {
       // Press on empty canvas → rubberBand candidate (wait for threshold)
+      // Stop propagation to prevent the engine's native rubber-band (Fabric)
       this.mode = 'dragReady'
       this.startTargetId = null
+      e.stopPropagation()
     }
   }
 
