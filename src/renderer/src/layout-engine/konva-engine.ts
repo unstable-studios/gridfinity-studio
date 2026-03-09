@@ -626,8 +626,25 @@ export class KonvaEngine implements LayoutEngine {
   /** Idempotent guard: ensures only one finalization per drag batch. */
   private multiDragFinalized = false
 
-  /** Capture pre-drag positions for all selected nodes. Called on dragstart. */
+  /** Guard: ensures only the first dragstart per batch captures positions. */
+  private preDragCaptured = false
+
+  /**
+   * Capture pre-drag positions for all selected nodes. Called on dragstart.
+   *
+   * Each node in the Transformer fires its own dragstart. If we recaptured
+   * on every one, later dragstart events could read positions that the
+   * Transformer already started moving — causing cumulative drift on revert.
+   * The guard ensures only the first dragstart captures; the microtask
+   * resets the guard after the synchronous dragstart batch completes.
+   */
   private capturePreDragPositions(): void {
+    if (this.preDragCaptured) return
+    this.preDragCaptured = true
+    queueMicrotask(() => {
+      this.preDragCaptured = false
+    })
+
     this.preDragPositions.clear()
     this.multiDragFinalized = false
     const nodes = this.transformer?.nodes() ?? []
