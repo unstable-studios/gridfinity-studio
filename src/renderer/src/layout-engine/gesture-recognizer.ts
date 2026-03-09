@@ -91,6 +91,7 @@ export class GestureRecognizer {
     }
     if (this.mode === 'rubberBand') {
       this.handler?.hideRubberBand()
+      this.handler?.setDragEnabled(true)
     }
     this.mode = 'idle'
     this.startTargetId = null
@@ -138,12 +139,12 @@ export class GestureRecognizer {
       this.startTargetId = hit.id
     } else {
       // Press on empty canvas → rubberBand candidate (wait for threshold)
-      // preventDefault suppresses compatibility mousedown (prevents Fabric's
-      // native rubber-band). stopPropagation prevents capture-phase leak.
+      // Don't stopPropagation here — the engine may need the event for
+      // control/handle detection (e.g., Fabric resize handles near edges).
+      // Fabric's native rubber-band is suppressed by toggling canvas.selection
+      // when we enter rubberBand mode.
       this.mode = 'dragReady'
       this.startTargetId = null
-      e.preventDefault()
-      e.stopPropagation()
     }
   }
 
@@ -169,6 +170,8 @@ export class GestureRecognizer {
         if (dist >= DRAG_THRESHOLD) {
           if (this.startTargetId === null && !this.handler.isInteracting()) {
             // Empty canvas drag (no engine interaction in progress) → rubber-band
+            // Suppress engine's native selection rect (Fabric canvas.selection)
+            this.handler.setDragEnabled(false)
             this.mode = 'rubberBand'
             this.updateRubberBand(e)
             e.preventDefault()
@@ -240,6 +243,7 @@ export class GestureRecognizer {
           this.handler.clearSelection()
         }
         this.handler.hideRubberBand()
+        this.handler.setDragEnabled(true)
         this.mode = 'idle'
         break
       }

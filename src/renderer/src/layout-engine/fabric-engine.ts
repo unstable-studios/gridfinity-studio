@@ -737,9 +737,11 @@ export class FabricEngine implements LayoutEngine {
     this.emitter.emit('viewportChanged', this.getViewport())
   }
 
-  setDragEnabled(): void {
-    // Fabric: GestureRecognizer uses pointer capture + stopPropagation during
-    // pan, so Fabric never sees those events. No need to toggle canvas state.
+  setDragEnabled(enabled: boolean): void {
+    if (this.disposed || !this.canvas) return
+    // Toggle canvas.selection to suppress Fabric's native rubber-band during
+    // GestureRecognizer-owned gestures (pan, rubber-band).
+    this.canvas.selection = enabled
   }
 
   objectAt(worldX: number, worldY: number): HitResult | null {
@@ -833,6 +835,7 @@ export class FabricEngine implements LayoutEngine {
       width: rect.width,
       height: rect.height
     })
+    this.rubberBandRect.setCoords()
     this.canvas.requestRenderAll()
   }
 
