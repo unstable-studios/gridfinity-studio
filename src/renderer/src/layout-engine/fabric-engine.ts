@@ -715,6 +715,10 @@ export class FabricEngine implements LayoutEngine {
     return this.interacting
   }
 
+  // Fabric handles click-to-select natively on pointerdown.
+  // GestureRecognizer must not duplicate this on pointerup.
+  readonly handlesNativeClickSelect = true
+
   // ─── Input Action Handler ─────────────────────────────────────────────────
 
   applyPan(dx: number, dy: number): void {
@@ -1008,6 +1012,30 @@ export class FabricEngine implements LayoutEngine {
       const obj = opt.target
       if (obj) this.interacting = true
       if (!obj) return
+
+      // ActiveSelection: capture pre-drag state for all group children
+      if (obj instanceof fabric.ActiveSelection) {
+        this.lastGoodPos.set('__activeSelection', { left: obj.left ?? 0, top: obj.top ?? 0 })
+        for (const child of obj.getObjects()) {
+          const gid = (child as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+          if (!gid) continue
+          const group = this.groupMap.get(gid)
+          const renderer = this.rendererMap.get(gid)
+          if (group && renderer) {
+            const pos = renderer.readPosition()
+            this.preDragState.set(gid, {
+              left: child.left ?? 0,
+              top: child.top ?? 0,
+              lowerLeftX: pos.x,
+              lowerLeftY: pos.y,
+              width: group.width,
+              height: group.height
+            })
+          }
+        }
+        return
+      }
+
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {
         const group = this.groupMap.get(groupId)
@@ -1031,6 +1059,12 @@ export class FabricEngine implements LayoutEngine {
       if (this.disposed) return
       const obj = e.target
       if (!obj) return
+
+      // Multi-select: commit all groups and shapes in the ActiveSelection
+      if (obj instanceof fabric.ActiveSelection) {
+        this.handleActiveSelectionModified(obj)
+        return
+      }
 
       const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
       if (shapeId) {
@@ -1160,6 +1194,94 @@ export class FabricEngine implements LayoutEngine {
       this.lastGoodPos.delete(groupId)
       this.emitter.emit('groupMoved', { id: groupId, x: group.x, y: group.y })
     }
+  }
+
+  /**
+   * Handle object:modified for an ActiveSelection (multi-select drag).
+   * Commits all group positions and shape positions atomically.
+   * Live collision prevention in object:moving should have already blocked
+   * overlapping moves, but we do a safety check and revert if needed.
+   */
+  private handleActiveSelectionModified(sel: fabric.ActiveSelection): void {
+    const children = sel.getObjects()
+
+    // Collect selected group IDs for collision exclusion
+    const selectedGroupIds = new Set<string>()
+    for (const child of children) {
+      const gid = (child as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (gid) selectedGroupIds.add(gid)
+    }
+
+    // Safety collision check — should rarely trigger since object:moving prevents it
+    let hasCollision = false
+    for (const child of children) {
+      const gid = (child as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (!gid) continue
+      const group = this.groupMap.get(gid)
+      const renderer = this.rendererMap.get(gid)
+      if (!group || !renderer) continue
+
+      const pos = renderer.readPosition()
+      const proposed = { x: pos.x, y: pos.y, width: group.width, height: group.height }
+      if (checkGroupCollision(proposed, gid, this.getAllGroups(), selectedGroupIds)) {
+        hasCollision = true
+        break
+      }
+    }
+
+    if (hasCollision) {
+      // Revert the entire selection to pre-drag position
+      const savedSelPos = this.lastGoodPos.get('__activeSelection')
+      if (savedSelPos) {
+        sel.set({ left: savedSelPos.left, top: savedSelPos.top })
+        sel.setCoords()
+        this.canvas?.requestRenderAll()
+      }
+      // Flash collision on all group renderers
+      for (const gid of selectedGroupIds) {
+        const renderer = this.rendererMap.get(gid)
+        if (renderer) this.flashCollision(renderer)
+      }
+      // Clean up
+      for (const gid of selectedGroupIds) {
+        this.preDragState.delete(gid)
+      }
+      this.lastGoodPos.delete('__activeSelection')
+      return
+    }
+
+    // No collision — commit all positions
+    for (const child of children) {
+      const gid = (child as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+      if (gid) {
+        const group = this.groupMap.get(gid)
+        const renderer = this.rendererMap.get(gid)
+        if (group && renderer) {
+          const pos = renderer.readPosition()
+          group.x = pos.x
+          group.y = pos.y
+          this.emitter.emit('groupMoved', { id: gid, x: pos.x, y: pos.y })
+        }
+        this.preDragState.delete(gid)
+        continue
+      }
+
+      const shapeId = (child as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
+      if (shapeId) {
+        // World position for shapes inside ActiveSelection
+        const matrix = child.calcTransformMatrix()
+        const worldX = matrix[4]
+        const worldY = matrix[5]
+        const data = this.shapeMap.get(shapeId)
+        if (data) {
+          data.x = worldX
+          data.y = worldY
+        }
+        this.emitter.emit('shapeMoved', { id: shapeId, x: worldX, y: worldY })
+      }
+    }
+
+    this.lastGoodPos.delete('__activeSelection')
   }
 
   /** Create or update a non-scaling overlay rect showing grid-snapped resize preview. */
@@ -1295,38 +1417,80 @@ export class FabricEngine implements LayoutEngine {
       const gridEnabled = this.gridConfig.enabled
       const size = this.gridConfig.size
 
-      // Multi-select (ActiveSelection): snap based on first group's lower-left corner.
-      // Using the frame center would cause half-grid snapping when the combined
-      // frame width is an odd number of grid units.
+      // Multi-select (ActiveSelection): snap based on first group's lower-left corner,
+      // then collision-check all groups against non-selected groups.
       if (obj instanceof fabric.ActiveSelection) {
-        if (!gridEnabled) return
         const children = obj.getObjects()
-        const firstGroupObj = children.find(
-          (o) => (o as unknown as Record<string, unknown>)[GROUP_DATA_KEY]
-        )
-        if (firstGroupObj) {
-          const gid = (firstGroupObj as unknown as Record<string, unknown>)[
-            GROUP_DATA_KEY
-          ] as string
-          const group = this.groupMap.get(gid)
-          if (group) {
-            // Child left/top is relative to ActiveSelection center.
-            // World centroid = selectionCenter + childOffset
-            const worldCentroidX = (obj.left ?? 0) + (firstGroupObj.left ?? 0)
-            const worldCentroidY = (obj.top ?? 0) + (firstGroupObj.top ?? 0)
-            const lowerLeftX = worldCentroidX - group.width / 2
-            const lowerLeftY = worldCentroidY + group.height / 2
-            const dx = Math.round(lowerLeftX / size) * size - lowerLeftX
-            const dy = Math.round(lowerLeftY / size) * size - lowerLeftY
-            obj.set({ left: (obj.left ?? 0) + dx, top: (obj.top ?? 0) + dy })
+
+        if (gridEnabled) {
+          const firstGroupObj = children.find(
+            (o) => (o as unknown as Record<string, unknown>)[GROUP_DATA_KEY]
+          )
+          if (firstGroupObj) {
+            const gid = (firstGroupObj as unknown as Record<string, unknown>)[
+              GROUP_DATA_KEY
+            ] as string
+            const group = this.groupMap.get(gid)
+            if (group) {
+              // Child left/top is relative to ActiveSelection center.
+              // World centroid = selectionCenter + childOffset
+              const worldCentroidX = (obj.left ?? 0) + (firstGroupObj.left ?? 0)
+              const worldCentroidY = (obj.top ?? 0) + (firstGroupObj.top ?? 0)
+              const lowerLeftX = worldCentroidX - group.width / 2
+              const lowerLeftY = worldCentroidY + group.height / 2
+              const dx = Math.round(lowerLeftX / size) * size - lowerLeftX
+              const dy = Math.round(lowerLeftY / size) * size - lowerLeftY
+              obj.set({ left: (obj.left ?? 0) + dx, top: (obj.top ?? 0) + dy })
+            }
+          } else {
+            // No groups — snap frame center
+            obj.set({
+              left: Math.round((obj.left ?? 0) / size) * size,
+              top: Math.round((obj.top ?? 0) / size) * size
+            })
           }
-        } else {
-          // No groups — snap frame center
-          obj.set({
-            left: Math.round((obj.left ?? 0) / size) * size,
-            top: Math.round((obj.top ?? 0) / size) * size
-          })
         }
+
+        // Live collision prevention for multi-select:
+        // Check each group in the selection against non-selected groups.
+        const selectedGroupIds = new Set<string>()
+        for (const child of children) {
+          const gid = (child as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+          if (gid) selectedGroupIds.add(gid)
+        }
+
+        let hasCollision = false
+        for (const child of children) {
+          const gid = (child as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
+          if (!gid) continue
+          const group = this.groupMap.get(gid)
+          if (!group) continue
+
+          // World centroid = selection center + child offset
+          const worldCX = (obj.left ?? 0) + (child.left ?? 0)
+          const worldCY = (obj.top ?? 0) + (child.top ?? 0)
+          const lowerLeftX = worldCX - group.width / 2
+          const lowerLeftY = worldCY + group.height / 2
+
+          const proposed = {
+            x: lowerLeftX,
+            y: lowerLeftY,
+            width: group.width,
+            height: group.height
+          }
+          if (checkGroupCollision(proposed, gid, this.getAllGroups(), selectedGroupIds)) {
+            hasCollision = true
+            break
+          }
+        }
+
+        const lastGood = this.lastGoodPos.get('__activeSelection')
+        if (hasCollision && lastGood) {
+          obj.set({ left: lastGood.left, top: lastGood.top })
+        } else {
+          this.lastGoodPos.set('__activeSelection', { left: obj.left ?? 0, top: obj.top ?? 0 })
+        }
+
         obj.setCoords()
         return
       }

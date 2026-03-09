@@ -223,7 +223,14 @@ export class GestureRecognizer {
 
       case 'dragReady': {
         // Pointer released without exceeding drag threshold → click
-        if (this.startTargetId) {
+        // If the engine handles click-select natively (e.g., Fabric), skip
+        // object clicks to avoid double-processing. Still handle empty-canvas
+        // clicks for deselection.
+        if (this.handler.handlesNativeClickSelect) {
+          if (!this.startTargetId && !this.startShift) {
+            this.handler.clearSelection()
+          }
+        } else if (this.startTargetId) {
           // Click on a shape/group
           if (this.startShift) {
             // Shift-click: toggle selection

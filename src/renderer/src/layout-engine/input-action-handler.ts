@@ -86,4 +86,12 @@ export interface InputActionHandler {
 
   /** Whether the engine is currently handling an interaction (drag, resize, transform). */
   isInteracting(): boolean
+
+  /**
+   * Whether the engine handles click-to-select natively (e.g., Fabric.js
+   * selects on pointerdown). When true, the GestureRecognizer skips its
+   * own click-select handling to avoid double-processing conflicts.
+   * Rubber-band selection is still handled by the GestureRecognizer.
+   */
+  handlesNativeClickSelect?: boolean
 }
