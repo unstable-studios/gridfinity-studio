@@ -19,8 +19,9 @@ function AppContent(): React.JSX.Element {
     return <WelcomeScreen />
   }
 
-  const content = (
-    <>
+  // Always mount the engine provider so state survives mode switches
+  return (
+    <LayoutEngineProvider engineType={engineType}>
       {/* Navbar: solid bar at top */}
       <Navbar />
       {/* Canvas fills remaining space; sidebar floats above it */}
@@ -28,11 +29,8 @@ function AppContent(): React.JSX.Element {
         <Viewport />
         <Sidebar />
       </div>
-    </>
+    </LayoutEngineProvider>
   )
-
-  // Always mount the engine provider so state survives mode switches
-  return <LayoutEngineProvider engineType={engineType}>{content}</LayoutEngineProvider>
 }
 
 const APP_MODE_KEY = 'gfstudio:appMode'

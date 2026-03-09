@@ -57,6 +57,13 @@ interface ProjectState {
   // Layout snapshot (synced from engine)
   setLayoutSnapshot: (snapshot: LayoutSnapshotData) => void
 
+  /**
+   * Register a callback that runs before every save operation.
+   * Used by useProjectEngineSync to capture the engine snapshot into the project.
+   * Returns an unsubscribe function.
+   */
+  registerBeforeSave: (cb: () => void) => () => void
+
   // Bake results
   setBakeResult: (binId: string, result: BakeResult | null) => void
   clearAllBakeResults: () => void
@@ -85,6 +92,10 @@ function loadSession(): SessionData {
 function saveSession(state: SessionData): void {
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(state))
 }
+
+// ─── Before-save callbacks ───────────────────────────────────
+
+const beforeSaveCallbacks = new Set<() => void>()
 
 // ─── Store ──────────────────────────────────────────────────
 
@@ -124,7 +135,15 @@ const useProjectStore = create<ProjectState>()((set, get) => {
 
     // ── File operations ──
 
+    registerBeforeSave: (cb) => {
+      beforeSaveCallbacks.add(cb)
+      return () => {
+        beforeSaveCallbacks.delete(cb)
+      }
+    },
+
     saveProject: async (targetPath) => {
+      for (const cb of beforeSaveCallbacks) cb()
       const state = get()
       if (!state.project) {
         set({ error: 'No project to save' })
@@ -151,6 +170,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     },
 
     saveProjectAs: async () => {
+      for (const cb of beforeSaveCallbacks) cb()
       const state = get()
       if (!state.project) {
         set({ error: 'No project to save' })

@@ -1244,12 +1244,8 @@ export class FabricEngine implements LayoutEngine {
             }
           }
         }
-      } else if (gridEnabled) {
-        // Snap shape center to grid
-        const left = Math.round((obj.left ?? 0) / size) * size
-        const top = Math.round((obj.top ?? 0) / size) * size
-        obj.set({ left, top })
       }
+      // Shapes do not snap to the bin grid — they move freely.
       obj.setCoords()
     })
   }

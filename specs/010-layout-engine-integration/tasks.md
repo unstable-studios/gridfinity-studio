@@ -36,11 +36,11 @@
 
 ## Phase 3: Drawing Tools
 
-- [ ] T021: Create `DrawingToolLayer` component — transparent DOM overlay active when tool is selected. Captures pointer events, converts to world coordinates via `engine.getViewport()`.
-- [ ] T022: Implement rectangle tool — click-drag to define corners, preview as temporary engine shape, release to place. Calls `engine.addShape({ type: 'rect', ... })`. Assigns to containing group if placed inside a bin.
-- [ ] T023: Implement circle tool — click for center, drag for radius preview, release to place. Creates `{ type: 'circle', radiusX, radiusY }`.
-- [ ] T024: Implement polygon tool — multi-click vertex placement, close-snap detection, double-click/Enter to finish. Creates `{ type: 'polygon', points }`.
-- [ ] T025: Wire pocket metadata — shapes created inside a bin group get `metadata: { pocket: { depth, clearance } }` with defaults computed from bin height.
+- [x] T021: Create `DrawingToolLayer` component — transparent DOM overlay active when tool is selected. Captures pointer events, converts to world coordinates via `engine.getViewport()`.
+- [x] T022: Implement rectangle tool — click-drag to define corners, preview as temporary engine shape, release to place. Calls `engine.addShape({ type: 'rect', ... })`. Assigns to containing group if placed inside a bin.
+- [x] T023: Implement circle tool — click for center, drag for radius preview, release to place. Creates `{ type: 'circle', radiusX, radiusY }`.
+- [x] T024: Implement polygon tool — multi-click vertex placement, close-snap detection, double-click/Enter to finish. Creates `{ type: 'polygon', points }`.
+- [x] T025: Wire pocket metadata — shapes created inside a bin group get `metadata: { pocket: { depth, clearance } }` with defaults computed from bin height.
 - [ ] T026: Smoke test — draw all shape types, verify they appear in engine, are selectable, belong to correct group, survive save/load.
 
 ## Phase 4: CSG Pipeline Adapter
@@ -80,7 +80,7 @@
 |-------|-------|--------|
 | 1 | T001–T011 | Done (except T011 smoke test) |
 | 2 | T012–T020 | Partially done (T012-T014, T016-T017) |
-| 3 | T021–T026 | Not started |
+| 3 | T021–T026 | T021-T025 done, T026 smoke test remaining |
 | 4 | T027–T032 | Not started |
 | 5 | T033–T038 | Partially done (T033-T035, T037) |
 | 6 | T039–T048 | Done (except T047 CLAUDE.md, T048 final) |
