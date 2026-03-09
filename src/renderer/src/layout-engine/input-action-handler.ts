@@ -63,6 +63,9 @@ export interface InputActionHandler {
   /** Remove IDs from the current selection. */
   removeFromSelection(ids: string[]): void
 
+  /** Return the currently selected IDs. */
+  getSelectedIds(): string[]
+
   /** Clear all selection. */
   clearSelection(): void
 

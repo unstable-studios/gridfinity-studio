@@ -1089,7 +1089,14 @@ export class FabricEngine implements LayoutEngine {
         width: saved.width,
         height: saved.height
       }
-      const anchored = computeEdgeAnchor(originalBounds, scaleX, scaleY, centroidX, centroidY, gs)
+      const anchored = computeEdgeAnchor(
+        originalBounds,
+        scaleX,
+        scaleY,
+        centroidX,
+        centroidY,
+        this.gridConfig.enabled ? gs : 1
+      )
       const finalX = anchored.x
       const finalY = anchored.y
       const newW = anchored.width
@@ -1176,7 +1183,14 @@ export class FabricEngine implements LayoutEngine {
       width: saved.width,
       height: saved.height
     }
-    const overlayAnchored = computeEdgeAnchor(originalBounds, sx, sy, cx, cy, gs)
+    const overlayAnchored = computeEdgeAnchor(
+      originalBounds,
+      sx,
+      sy,
+      cx,
+      cy,
+      this.gridConfig.enabled ? gs : 1
+    )
     const snapW = overlayAnchored.width
     const snapH = overlayAnchored.height
     const overlayLeft = overlayAnchored.x

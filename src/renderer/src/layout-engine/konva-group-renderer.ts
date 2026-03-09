@@ -300,7 +300,14 @@ export class KonvaGroupRenderer implements GroupRenderer {
       // Edge-anchor + grid quantization using shared math
       const centroidX = this.konvaGroup.x()
       const centroidY = this.konvaGroup.y()
-      const anchored = computeEdgeAnchor(orig, sx, sy, centroidX, centroidY, gs)
+      const anchored = computeEdgeAnchor(
+        orig,
+        sx,
+        sy,
+        centroidX,
+        centroidY,
+        gridConfig.enabled ? gs : 1
+      )
       const finalX = anchored.x
       const finalY = anchored.y
       const newW = anchored.width
@@ -392,7 +399,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
     const cy = this.konvaGroup.y()
 
     // Edge-anchor + grid quantization using shared math
-    const overlayAnchored = computeEdgeAnchor(orig, sx, sy, cx, cy, gs)
+    const overlayAnchored = computeEdgeAnchor(orig, sx, sy, cx, cy, gridConfig.enabled ? gs : 1)
     const snapW = overlayAnchored.width
     const snapH = overlayAnchored.height
     const overlayLeft = overlayAnchored.x

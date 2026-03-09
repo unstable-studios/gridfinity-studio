@@ -42,6 +42,9 @@ export class GestureRecognizer {
   /** Whether shift was held at gesture start */
   private startShift = false
 
+  /** Active pointer ID for pointer capture release in cancel(). */
+  private activePointerId: number | null = null
+
   // Bound listener references for removal
   private readonly onPointerDown = this.handlePointerDown.bind(this)
   private readonly onPointerMove = this.handlePointerMove.bind(this)
@@ -93,6 +96,10 @@ export class GestureRecognizer {
       this.handler?.hideRubberBand()
       this.handler?.setDragEnabled(true)
     }
+    if (this.activePointerId !== null) {
+      this.container?.releasePointerCapture(this.activePointerId)
+      this.activePointerId = null
+    }
     this.mode = 'idle'
     this.startTargetId = null
   }
@@ -112,6 +119,7 @@ export class GestureRecognizer {
       this.lastScreenX = e.clientX
       this.lastScreenY = e.clientY
       this.handler.setDragEnabled(false)
+      this.activePointerId = e.pointerId
       this.container?.setPointerCapture(e.pointerId)
       e.preventDefault()
       e.stopPropagation()
@@ -172,6 +180,8 @@ export class GestureRecognizer {
             // Empty canvas drag (no engine interaction in progress) → rubber-band
             // Suppress engine's native selection rect (Fabric canvas.selection)
             this.handler.setDragEnabled(false)
+            this.activePointerId = e.pointerId
+            this.container?.setPointerCapture(e.pointerId)
             this.mode = 'rubberBand'
             this.updateRubberBand(e)
             e.preventDefault()
@@ -202,7 +212,10 @@ export class GestureRecognizer {
       case 'panning': {
         this.handler.setDragEnabled(true)
         this.mode = 'idle'
-        this.container?.releasePointerCapture(e.pointerId)
+        if (this.activePointerId !== null) {
+          this.container?.releasePointerCapture(this.activePointerId)
+          this.activePointerId = null
+        }
         e.preventDefault()
         e.stopPropagation()
         break
@@ -214,7 +227,12 @@ export class GestureRecognizer {
           // Click on a shape/group
           if (this.startShift) {
             // Shift-click: toggle selection
-            this.handler.addToSelection([this.startTargetId])
+            const selected = this.handler.getSelectedIds()
+            if (selected.includes(this.startTargetId)) {
+              this.handler.removeFromSelection([this.startTargetId])
+            } else {
+              this.handler.addToSelection([this.startTargetId])
+            }
           } else {
             this.handler.selectIds([this.startTargetId])
           }
@@ -244,7 +262,13 @@ export class GestureRecognizer {
         }
         this.handler.hideRubberBand()
         this.handler.setDragEnabled(true)
+        if (this.activePointerId !== null) {
+          this.container?.releasePointerCapture(this.activePointerId)
+          this.activePointerId = null
+        }
         this.mode = 'idle'
+        e.preventDefault()
+        e.stopPropagation()
         break
       }
     }

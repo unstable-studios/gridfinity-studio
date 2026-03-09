@@ -119,6 +119,7 @@ export class KonvaEngine implements LayoutEngine {
   private resizeObserver: ResizeObserver | null = null
   private emitter = mitt<EngineEventMap>()
   private interacting = false
+  private _dragEnabled = true
   private transformer: Konva.Transformer | null = null
 
   // Internal state maps
@@ -864,7 +865,8 @@ export class KonvaEngine implements LayoutEngine {
   }
 
   setDragEnabled(enabled: boolean): void {
-    if (this.disposed) return
+    if (this.disposed || this._dragEnabled === enabled) return
+    this._dragEnabled = enabled
     for (const node of this.konvaMap.values()) {
       node.draggable(enabled)
     }
@@ -883,7 +885,7 @@ export class KonvaEngine implements LayoutEngine {
     const node = this.stage.getIntersection({ x: screenX, y: screenY })
     if (!node) return null
 
-    // Walk up to find a tagged node
+    // Walk up to find a tagged node or Transformer
     let current: Konva.Node | null = node
     while (current) {
       const name = current.name()
@@ -897,6 +899,17 @@ export class KonvaEngine implements LayoutEngine {
         const parentId = current.parent.id()
         if (this.rendererMap.has(parentId)) {
           return { type: 'group', id: parentId }
+        }
+      }
+      // Transformer anchors: resolve to the first transformed node
+      if (current instanceof Konva.Transformer) {
+        const nodes = current.nodes()
+        if (nodes.length > 0) {
+          const primary = nodes[0]
+          const pName = primary.name()
+          if (pName === 'shape' || pName === 'group') {
+            return { type: pName === 'shape' ? 'shape' : 'group', id: primary.id() }
+          }
         }
       }
       current = current.parent
