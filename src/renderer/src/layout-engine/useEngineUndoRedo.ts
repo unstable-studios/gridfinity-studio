@@ -121,12 +121,12 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
 
       const mod = e.metaKey || e.ctrlKey
 
-      if (mod && e.key === 'z' && !e.shiftKey) {
+      if (mod && e.code === 'KeyZ' && !e.shiftKey) {
         e.preventDefault()
         undo()
         return
       }
-      if (mod && (e.key === 'Z' || e.key === 'y') && (e.shiftKey || e.key === 'y')) {
+      if (mod && ((e.code === 'KeyZ' && e.shiftKey) || e.code === 'KeyY')) {
         e.preventDefault()
         redo()
       }
