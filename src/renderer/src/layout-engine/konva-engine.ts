@@ -24,6 +24,27 @@ const GRID_EXTENT = 10000
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
+/**
+ * Compute the bounding-box center of a polygon's points.
+ * Used to set Konva.Line offset so that x,y = bbox center, matching
+ * Fabric's originX/Y:'center' convention (which uses bbox center,
+ * NOT geometric centroid).
+ */
+function polygonBboxCenter(points: { x: number; y: number }[]): { x: number; y: number } {
+  if (points.length === 0) return { x: 0, y: 0 }
+  let minX = Infinity
+  let maxX = -Infinity
+  let minY = Infinity
+  let maxY = -Infinity
+  for (const p of points) {
+    if (p.x < minX) minX = p.x
+    if (p.x > maxX) maxX = p.x
+    if (p.y < minY) minY = p.y
+    if (p.y > maxY) maxY = p.y
+  }
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }
+}
+
 function layoutShapeToKonva(shape: LayoutShape): Konva.Shape {
   let node: Konva.Shape
 
@@ -45,12 +66,17 @@ function layoutShapeToKonva(shape: LayoutShape): Konva.Shape {
         radiusY: shape.radiusY
       })
       break
-    case 'polygon':
+    case 'polygon': {
+      // Offset so x,y = bbox center (matches Fabric's originX/Y:'center')
+      const c = polygonBboxCenter(shape.points)
       node = new Konva.Line({
         points: shape.points.flatMap((p) => [p.x, p.y]),
-        closed: true
+        closed: true,
+        offsetX: c.x,
+        offsetY: c.y
       })
       break
+    }
     case 'svgPath':
       node = new Konva.Path({
         data: shape.pathData
