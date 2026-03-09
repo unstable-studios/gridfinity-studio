@@ -162,19 +162,17 @@ export class GestureRecognizer {
         const dy = e.clientY - this.startScreenY
         const dist = Math.sqrt(dx * dx + dy * dy)
         if (dist >= DRAG_THRESHOLD) {
-          if (this.startTargetId === null) {
-            // Empty canvas drag → rubber-band selection
+          if (this.startTargetId === null && !this.handler.isInteracting()) {
+            // Empty canvas drag (no engine interaction in progress) → rubber-band
             this.mode = 'rubberBand'
-            // Let the first rubberBandMove show the overlay
             this.updateRubberBand(e)
             e.preventDefault()
             e.stopPropagation()
           } else {
-            // Object drag → let the engine handle it natively
-            // (Fabric ActiveSelection / Konva Transformer)
+            // Object drag or engine-initiated interaction (resize/transform)
+            // → let the engine handle it natively
             this.mode = 'idle'
             this.startTargetId = null
-            // Don't stop propagation — engine needs the events
           }
         }
         break

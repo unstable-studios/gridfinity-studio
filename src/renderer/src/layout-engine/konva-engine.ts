@@ -736,6 +736,8 @@ export class KonvaEngine implements LayoutEngine {
   }
 
   setViewportInsets(insets: ViewportInsets): void {
+    const prev = this.insets
+    if (prev.left === insets.left && prev.bottom === insets.bottom) return
     this.insets = insets
     if (this.stage && !this.disposed) {
       this.centerOrigin()

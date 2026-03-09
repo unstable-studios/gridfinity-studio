@@ -78,4 +78,9 @@ export interface InputActionHandler {
 
   /** Convert screen-space (client) coordinates to world-space. */
   screenToWorld(screenX: number, screenY: number): { x: number; y: number }
+
+  // ─── Interaction State ──────────────────────────────────────────────────────
+
+  /** Whether the engine is currently handling an interaction (drag, resize, transform). */
+  isInteracting(): boolean
 }

@@ -199,10 +199,8 @@ export class FabricEngine implements LayoutEngine {
       height,
       backgroundColor: this.themeColors.background,
       uniformScaling: false,
-      selection: true,
-      selectionColor: 'rgba(96, 165, 250, 0.08)',
-      selectionBorderColor: '#60a5fa',
-      selectionLineWidth: 1
+      // Native selection disabled — GestureRecognizer owns rubber-band (#226)
+      selection: false
     })
 
     this.setupEventHandlers()
@@ -599,6 +597,8 @@ export class FabricEngine implements LayoutEngine {
   }
 
   setViewportInsets(insets: ViewportInsets): void {
+    const prev = this.insets
+    if (prev.left === insets.left && prev.bottom === insets.bottom) return
     this.insets = insets
     // Re-center with new insets
     if (this.canvas && !this.disposed) {
@@ -735,13 +735,9 @@ export class FabricEngine implements LayoutEngine {
     this.emitter.emit('viewportChanged', this.getViewport())
   }
 
-  setDragEnabled(enabled: boolean): void {
-    if (this.disposed || !this.canvas) return
-    this.canvas.selection = enabled
-    if (enabled) {
-      // Flush pointer-target cache after panning
-      this.canvas.setViewportTransform(this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0])
-    }
+  setDragEnabled(): void {
+    // Fabric: GestureRecognizer uses pointer capture + stopPropagation during
+    // pan, so Fabric never sees those events. No need to toggle canvas state.
   }
 
   objectAt(worldX: number, worldY: number): HitResult | null {
