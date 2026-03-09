@@ -278,15 +278,24 @@ export class KonvaGroupRenderer implements GroupRenderer {
       }
 
       const pos = this.readPosition()
-      const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
-      const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
-      if (collider && this.lastGoodPos) {
-        this.konvaGroup.position(this.lastGoodPos)
-        this.deps.getTransformer()?.forceUpdate()
-        this.flashCollision()
-        this.onCollisionRejected?.(this.groupId, 'move')
-        this.lastGoodPos = null
-        return
+
+      // Skip collision detection during multi-select: getAllGroups() reads
+      // from the data model which still has pre-drag positions for sibling
+      // bins. Adjacent bins that moved together would false-positive as
+      // overlapping. Since all bins move by the same delta and snap by the
+      // same delta, relative positions are preserved and collisions can't
+      // be introduced by a uniform translation.
+      if (!isMultiSelect) {
+        const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+        const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
+        if (collider && this.lastGoodPos) {
+          this.konvaGroup.position(this.lastGoodPos)
+          this.deps.getTransformer()?.forceUpdate()
+          this.flashCollision()
+          this.onCollisionRejected?.(this.groupId, 'move')
+          this.lastGoodPos = null
+          return
+        }
       }
 
       this.lastGoodPos = null
