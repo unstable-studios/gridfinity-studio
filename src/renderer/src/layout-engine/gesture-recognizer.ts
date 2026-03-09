@@ -121,7 +121,8 @@ export class GestureRecognizer {
     if (e.button !== 0) return
 
     // Hit-test to determine what's under the pointer
-    const world = this.handler.screenToWorld(e.clientX, e.clientY)
+    const sc = this.toContainerCoords(e.clientX, e.clientY)
+    const world = this.handler.screenToWorld(sc.x, sc.y)
     const hit = this.handler.objectAt(world.x, world.y)
 
     this.startScreenX = e.clientX
@@ -245,7 +246,8 @@ export class GestureRecognizer {
   private handleWheel(e: WheelEvent): void {
     if (!this.handler) return
     e.preventDefault()
-    this.handler.applyZoom(e.deltaY, e.clientX, e.clientY)
+    const sc = this.toContainerCoords(e.clientX, e.clientY)
+    this.handler.applyZoom(e.deltaY, sc.x, sc.y)
   }
 
   private handleBlur(): void {
@@ -261,6 +263,17 @@ export class GestureRecognizer {
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
 
+  /**
+   * Convert viewport-relative clientX/clientY to container-relative coordinates.
+   * DOM events report positions relative to the browser viewport, but engines
+   * expect coordinates relative to their container element.
+   */
+  private toContainerCoords(clientX: number, clientY: number): { x: number; y: number } {
+    if (!this.container) return { x: clientX, y: clientY }
+    const rect = this.container.getBoundingClientRect()
+    return { x: clientX - rect.left, y: clientY - rect.top }
+  }
+
   /** Check if this event should trigger a pan gesture. */
   private isPanTrigger(e: PointerEvent): boolean {
     // Middle-click (button 1)
@@ -272,13 +285,15 @@ export class GestureRecognizer {
 
   /** Compute the world-space rubber-band rectangle. */
   private computeRubberBandRect(
-    currentScreenX: number,
-    currentScreenY: number
+    currentClientX: number,
+    currentClientY: number
   ): { x: number; y: number; width: number; height: number } {
     if (!this.handler) return { x: 0, y: 0, width: 0, height: 0 }
 
-    const start = this.handler.screenToWorld(this.startScreenX, this.startScreenY)
-    const end = this.handler.screenToWorld(currentScreenX, currentScreenY)
+    const startSc = this.toContainerCoords(this.startScreenX, this.startScreenY)
+    const endSc = this.toContainerCoords(currentClientX, currentClientY)
+    const start = this.handler.screenToWorld(startSc.x, startSc.y)
+    const end = this.handler.screenToWorld(endSc.x, endSc.y)
 
     const x = Math.min(start.x, end.x)
     const y = Math.min(start.y, end.y)
