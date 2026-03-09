@@ -20,6 +20,10 @@ export interface KonvaGroupRendererDeps {
    * the first call per batch applies; subsequent calls are ignored.
    */
   applySnapDeltaToSiblings(dx: number, dy: number): void
+  /** Return the IDs of all groups currently in the Transformer selection. */
+  getSelectedGroupIds(): Set<string>
+  /** Revert all nodes in the Transformer selection to their pre-drag positions. */
+  revertMultiSelectDrag(): void
 }
 
 /**
@@ -278,15 +282,28 @@ export class KonvaGroupRenderer implements GroupRenderer {
       }
 
       const pos = this.readPosition()
+      const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
 
-      // Skip collision detection during multi-select: getAllGroups() reads
-      // from the data model which still has pre-drag positions for sibling
-      // bins. Adjacent bins that moved together would false-positive as
-      // overlapping. Since all bins move by the same delta and snap by the
-      // same delta, relative positions are preserved and collisions can't
-      // be introduced by a uniform translation.
-      if (!isMultiSelect) {
-        const proposed = { x: pos.x, y: pos.y, width: this.width, height: this.height }
+      if (isMultiSelect) {
+        // Multi-select: check collision against non-selected groups only
+        // (selected siblings have stale data model positions). If any bin
+        // in the selection collides with a stationary group, revert the
+        // entire selection.
+        const selectedIds = this.deps.getSelectedGroupIds()
+        const collider = checkGroupCollision(
+          proposed,
+          this.groupId,
+          this.deps.getAllGroups(),
+          selectedIds
+        )
+        if (collider) {
+          this.deps.revertMultiSelectDrag()
+          this.flashCollision()
+          this.lastGoodPos = null
+          return
+        }
+      } else {
+        // Single-bin: check against all other groups
         const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
         if (collider && this.lastGoodPos) {
           this.konvaGroup.position(this.lastGoodPos)

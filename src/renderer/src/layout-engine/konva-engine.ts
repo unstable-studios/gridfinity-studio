@@ -452,7 +452,9 @@ export class KonvaEngine implements LayoutEngine {
         getGridConfig: () => this.gridConfig,
         getTransformer: () => this.transformer,
         getAllGroups: () => this.getAllGroups(),
-        applySnapDeltaToSiblings: (dx, dy) => this.applySnapDeltaToSiblings(dx, dy)
+        applySnapDeltaToSiblings: (dx, dy) => this.applySnapDeltaToSiblings(dx, dy),
+        getSelectedGroupIds: () => this.getSelectedGroupIds(),
+        revertMultiSelectDrag: () => this.revertMultiSelectDrag()
       },
       (id, x, y) => {
         const g = this.groupMap.get(id)
@@ -484,6 +486,11 @@ export class KonvaEngine implements LayoutEngine {
       }
     )
     this.rendererMap.set(group.id, renderer)
+
+    // Capture pre-drag positions for all selected nodes when any group starts dragging
+    renderer.konvaGroup.on('dragstart', () => {
+      this.capturePreDragPositions()
+    })
 
     // Move children into group (positions relative to group centroid)
     const centroidX = group.x + group.width / 2
@@ -612,10 +619,26 @@ export class KonvaEngine implements LayoutEngine {
     return Array.from(this.groupMap.keys()).map((id) => this.getGroup(id)!)
   }
 
-  // ─── Multi-Select Snap Compensation ─────────────────────────────────────────
+  // ─── Multi-Select Drag Support ──────────────────────────────────────────────
 
   /** Guard: prevents multiple bins from applying the same snap delta to shapes. */
   private snapDeltaApplied = false
+
+  /** Pre-drag positions for all nodes in the selection, keyed by node ID. */
+  private preDragPositions = new Map<string, { x: number; y: number }>()
+
+  /** Guard: prevents multiple bins from triggering revert. */
+  private multiSelectReverted = false
+
+  /** Capture pre-drag positions for all selected nodes. Called from setupDragTracking. */
+  private capturePreDragPositions(): void {
+    this.preDragPositions.clear()
+    this.multiSelectReverted = false
+    const nodes = this.transformer?.nodes() ?? []
+    for (const node of nodes) {
+      this.preDragPositions.set(node.id(), { x: node.x(), y: node.y() })
+    }
+  }
 
   /**
    * Offset all non-group (shape) nodes in the Transformer selection by the
@@ -647,6 +670,34 @@ export class KonvaEngine implements LayoutEngine {
         data.y = node.y()
       }
       this.emitter.emit('shapeMoved', { id, x: node.x(), y: node.y() })
+    }
+
+    this.transformer?.forceUpdate()
+    this.mainLayer?.batchDraw()
+  }
+
+  /** Return the IDs of all groups in the current Transformer selection. */
+  private getSelectedGroupIds(): Set<string> {
+    const ids = new Set<string>()
+    const nodes = this.transformer?.nodes() ?? []
+    for (const node of nodes) {
+      if (node.name() === 'group') ids.add(node.id())
+    }
+    return ids
+  }
+
+  /**
+   * Revert all nodes in the Transformer selection to their pre-drag positions.
+   * Idempotent per synchronous batch — only the first call applies.
+   */
+  private revertMultiSelectDrag(): void {
+    if (this.multiSelectReverted) return
+    this.multiSelectReverted = true
+
+    const nodes = this.transformer?.nodes() ?? []
+    for (const node of nodes) {
+      const pre = this.preDragPositions.get(node.id())
+      if (pre) node.position(pre)
     }
 
     this.transformer?.forceUpdate()
