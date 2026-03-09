@@ -8,6 +8,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppMode } from '@/hooks/useAppMode'
+import { useProject } from '@/hooks/useProject'
 import { useLayoutEngineContext, useEngineState } from '@/layout-engine'
 import type { LayoutEngine } from '@/layout-engine'
 import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/types'
@@ -122,12 +123,13 @@ function findContainingBinGroup(
 }
 
 function pocketMetadata(
-  bin: (LayoutGroup & { metadata: BinMetadata }) | null
+  bin: (LayoutGroup & { metadata: BinMetadata }) | null,
+  unitHeight: number
 ): Record<string, unknown> | undefined {
   if (!bin) return undefined
   return {
     pocket: {
-      depth: computeDefaultPocketDepth(bin.metadata.heightUnits, 7),
+      depth: computeDefaultPocketDepth(bin.metadata.heightUnits, unitHeight),
       clearance: 0.25
     }
   }
@@ -147,7 +149,7 @@ const INITIAL_STATE: DrawingState = {
   polygonNearClose: false
 }
 
-const CLOSE_SNAP_DISTANCE = 10
+const CLOSE_SNAP_DISTANCE_PX = 10
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
@@ -155,6 +157,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   const { activeTool, setActiveTool } = useAppMode()
   const { engine } = useLayoutEngineContext()
   const { viewport } = useEngineState()
+  const unitHeight = useProject((s) => s.project?.gridfinity.unitHeight ?? 7)
 
   // Reset polygon state when switching away from polygon tool.
   const prevToolRef = useRef(activeTool)
@@ -221,7 +224,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         points: relativePoints,
         ...baseShapeProps(),
         groupId: bin?.id ?? null,
-        metadata: { ...pocketMetadata(bin), name }
+        metadata: { ...pocketMetadata(bin, unitHeight), name }
       })
       engine.select([id])
       setState(INITIAL_STATE)
@@ -232,7 +235,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         finishingRef.current = false
       })
     },
-    [engine, setActiveTool]
+    [engine, setActiveTool, unitHeight]
   )
 
   // ─── Escape / Enter for polygon ──────────────────────────────────────────
@@ -303,11 +306,12 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         setState((prev) => {
           const verts = prev.polygonVertices
 
-          // Close-snap
+          // Close-snap (screen-space threshold for consistent UX across zoom levels)
           if (verts.length >= 3) {
             const first = verts[0]
             const dist = Math.sqrt((snapped.x - first.x) ** 2 + (snapped.y - first.y) ** 2)
-            if (dist < CLOSE_SNAP_DISTANCE) {
+            const threshold = CLOSE_SNAP_DISTANCE_PX / viewport.zoom
+            if (dist < threshold) {
               queueMicrotask(() => finishPolygon(verts))
               return prev
             }
@@ -323,7 +327,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         })
       }
     },
-    [engine, activeTool, finishPolygon]
+    [engine, activeTool, finishPolygon, viewport.zoom]
   )
 
   const handlePointerMove = useCallback(
@@ -368,7 +372,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           if (prev.polygonVertices.length >= 3) {
             const first = prev.polygonVertices[0]
             const dist = Math.sqrt((snapped.x - first.x) ** 2 + (snapped.y - first.y) ** 2)
-            nearClose = dist < CLOSE_SNAP_DISTANCE
+            const threshold = CLOSE_SNAP_DISTANCE_PX / viewport.zoom
+            nearClose = dist < threshold
           }
           return {
             ...prev,
@@ -378,7 +383,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         })
       }
     },
-    [engine, activeTool]
+    [engine, activeTool, viewport.zoom]
   )
 
   const handlePointerUp = useCallback(
@@ -416,7 +421,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             height: h,
             ...baseShapeProps(),
             groupId: bin?.id ?? null,
-            metadata: { ...pocketMetadata(bin), name }
+            metadata: { ...pocketMetadata(bin, unitHeight), name }
           })
           engine.select([id])
           setActiveTool('select')
@@ -438,7 +443,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             radiusY: radius,
             ...baseShapeProps(),
             groupId: bin?.id ?? null,
-            metadata: { ...pocketMetadata(bin), name }
+            metadata: { ...pocketMetadata(bin, unitHeight), name }
           })
           engine.select([id])
           setActiveTool('select')
@@ -447,7 +452,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
       dragStartRef.current = null
     },
-    [engine, activeTool, setActiveTool]
+    [engine, activeTool, setActiveTool, unitHeight]
   )
 
   // ─── Render ────────────────────────────────────────────────────────────────
