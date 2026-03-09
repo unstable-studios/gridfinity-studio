@@ -454,7 +454,8 @@ export class KonvaEngine implements LayoutEngine {
         getAllGroups: () => this.getAllGroups(),
         applySnapDeltaToSiblings: (dx, dy) => this.applySnapDeltaToSiblings(dx, dy),
         getSelectedGroupIds: () => this.getSelectedGroupIds(),
-        revertMultiSelectDrag: () => this.revertMultiSelectDrag()
+        revertMultiSelectDrag: () => this.revertMultiSelectDrag(),
+        isMultiSelectReverted: () => this.multiSelectReverted
       },
       (id, x, y) => {
         const g = this.groupMap.get(id)

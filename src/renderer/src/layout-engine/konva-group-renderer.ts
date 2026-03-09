@@ -24,6 +24,8 @@ export interface KonvaGroupRendererDeps {
   getSelectedGroupIds(): Set<string>
   /** Revert all nodes in the Transformer selection to their pre-drag positions. */
   revertMultiSelectDrag(): void
+  /** Whether the current multi-select drag has already been reverted. */
+  isMultiSelectReverted(): boolean
 }
 
 /**
@@ -262,9 +264,18 @@ export class KonvaGroupRenderer implements GroupRenderer {
     // In multi-select, also offset sibling shapes by the snap delta so they
     // follow the bins.
     this.konvaGroup.on('dragend', () => {
-      const gridConfig = this.deps.getGridConfig()
       const selectedNodes = this.deps.getTransformer()?.nodes() ?? []
       const isMultiSelect = selectedNodes.length > 1
+
+      // If another bin already triggered a multi-select revert, skip entirely —
+      // our position has been restored and any further snap/collision work
+      // would introduce floating-point drift from centroid conversions.
+      if (isMultiSelect && this.deps.isMultiSelectReverted()) {
+        this.lastGoodPos = null
+        return
+      }
+
+      const gridConfig = this.deps.getGridConfig()
 
       if (gridConfig.enabled) {
         const preSnapX = this.konvaGroup.x()
