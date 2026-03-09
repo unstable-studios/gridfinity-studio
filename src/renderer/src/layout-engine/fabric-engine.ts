@@ -15,6 +15,8 @@ import type {
 import { registerEngine } from './create-engine'
 import { FabricGroupRenderer } from './fabric-group-renderer'
 import { checkGroupCollision } from './collision'
+import type { HitResult } from './input-action-handler'
+import { computeEdgeAnchor } from './input-math'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -205,7 +207,6 @@ export class FabricEngine implements LayoutEngine {
 
     this.setupEventHandlers()
     this.drawGrid()
-    this.setupPanZoom()
     this.setupSnapToGrid()
 
     // Center origin in the visible (unoccluded) area of the viewport
@@ -510,11 +511,22 @@ export class FabricEngine implements LayoutEngine {
     this.emitter.emit('selectionChanged', { ids: [...ids] })
   }
 
+  selectIds(ids: string[]): void {
+    this.select(ids)
+  }
+
   addToSelection(ids: string[]): void {
     if (this.disposed || !this.canvas) return
     const current = this.getSelectedIds()
     const merged = [...new Set([...current, ...ids])]
     this.select(merged)
+  }
+
+  removeFromSelection(ids: string[]): void {
+    if (this.disposed || !this.canvas) return
+    const current = this.getSelectedIds()
+    const remaining = current.filter((id) => !ids.includes(id))
+    this.select(remaining)
   }
 
   clearSelection(): void {
@@ -587,6 +599,8 @@ export class FabricEngine implements LayoutEngine {
   }
 
   setViewportInsets(insets: ViewportInsets): void {
+    const prev = this.insets
+    if (prev.left === insets.left && prev.bottom === insets.bottom) return
     this.insets = insets
     // Re-center with new insets
     if (this.canvas && !this.disposed) {
@@ -699,6 +713,137 @@ export class FabricEngine implements LayoutEngine {
 
   isInteracting(): boolean {
     return this.interacting
+  }
+
+  // ─── Input Action Handler ─────────────────────────────────────────────────
+
+  applyPan(dx: number, dy: number): void {
+    if (this.disposed || !this.canvas) return
+    const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
+    vpt[4] += dx
+    vpt[5] += dy
+    this.canvas.setViewportTransform(vpt)
+    this.canvas.requestRenderAll()
+    this.emitter.emit('viewportChanged', this.getViewport())
+  }
+
+  applyZoom(delta: number, centerX: number, centerY: number): void {
+    if (this.disposed || !this.canvas) return
+    let zoom = this.canvas.getZoom()
+    zoom *= 0.999 ** delta
+    zoom = Math.min(Math.max(zoom, 0.1), 10)
+    this.canvas.zoomToPoint(new fabric.Point(centerX, centerY), zoom)
+    this.canvas.requestRenderAll()
+    this.emitter.emit('viewportChanged', this.getViewport())
+  }
+
+  setDragEnabled(enabled: boolean): void {
+    if (this.disposed || !this.canvas) return
+    // Toggle canvas.selection to suppress Fabric's native rubber-band during
+    // GestureRecognizer-owned gestures (pan, rubber-band).
+    this.canvas.selection = enabled
+  }
+
+  objectAt(worldX: number, worldY: number): HitResult | null {
+    if (!this.canvas) return null
+    const point = new fabric.Point(worldX, worldY)
+    const objects = this.canvas.getObjects()
+    // Iterate in reverse for topmost-first hit order
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i]
+      if (!obj.evented) continue
+      if (obj.containsPoint(point)) {
+        const rec = obj as unknown as Record<string, unknown>
+        const groupId = rec[GROUP_DATA_KEY] as string | undefined
+        if (groupId) return { type: 'group', id: groupId }
+        const shapeId = rec[SHAPE_DATA_KEY] as string | undefined
+        if (shapeId) return { type: 'shape', id: shapeId }
+      }
+    }
+    return null
+  }
+
+  objectsInRect(rect: { x: number; y: number; width: number; height: number }): HitResult[] {
+    if (!this.canvas) return []
+    const hits: HitResult[] = []
+
+    for (const obj of this.canvas.getObjects()) {
+      const rec = obj as unknown as Record<string, unknown>
+      const groupId = rec[GROUP_DATA_KEY] as string | undefined
+      const shapeId = rec[SHAPE_DATA_KEY] as string | undefined
+      if (!groupId && !shapeId) continue
+
+      const coords = obj.aCoords
+      if (!coords) continue
+      const xs = [coords.tl.x, coords.tr.x, coords.bl.x, coords.br.x]
+      const ys = [coords.tl.y, coords.tr.y, coords.bl.y, coords.br.y]
+      const objMinX = Math.min(...xs)
+      const objMaxX = Math.max(...xs)
+      const objMinY = Math.min(...ys)
+      const objMaxY = Math.max(...ys)
+
+      // AABB overlap test
+      if (
+        objMinX < rect.x + rect.width &&
+        objMaxX > rect.x &&
+        objMinY < rect.y + rect.height &&
+        objMaxY > rect.y
+      ) {
+        if (groupId) {
+          hits.push({ type: 'group', id: groupId })
+        } else if (shapeId) {
+          hits.push({ type: 'shape', id: shapeId })
+        }
+      }
+    }
+
+    return hits
+  }
+
+  screenToWorld(screenX: number, screenY: number): { x: number; y: number } {
+    if (!this.canvas) return { x: screenX, y: screenY }
+    const vpt = this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0]
+    const zoom = vpt[0]
+    return {
+      x: (screenX - vpt[4]) / zoom,
+      y: (screenY - vpt[5]) / zoom
+    }
+  }
+
+  private rubberBandRect: fabric.Rect | null = null
+
+  showRubberBand(rect: { x: number; y: number; width: number; height: number }): void {
+    if (!this.canvas) return
+    if (!this.rubberBandRect) {
+      this.rubberBandRect = new fabric.Rect({
+        fill: 'rgba(100, 150, 255, 0.1)',
+        stroke: 'rgba(100, 150, 255, 0.6)',
+        strokeWidth: 1,
+        strokeUniform: true,
+        strokeDashArray: [4, 4],
+        originX: 'left',
+        originY: 'top',
+        selectable: false,
+        evented: false,
+        excludeFromExport: true
+      })
+      this.canvas.add(this.rubberBandRect)
+    }
+    this.rubberBandRect.set({
+      left: rect.x,
+      top: rect.y,
+      width: rect.width,
+      height: rect.height
+    })
+    this.rubberBandRect.setCoords()
+    this.canvas.requestRenderAll()
+  }
+
+  hideRubberBand(): void {
+    if (!this.canvas || !this.rubberBandRect) return
+    this.canvas.remove(this.rubberBandRect)
+    this.rubberBandRect = null
+    this.canvas.requestRenderAll()
   }
 
   // ─── Private: Viewport centering ────────────────────────────────────────────
@@ -860,8 +1005,8 @@ export class FabricEngine implements LayoutEngine {
 
     // Capture pre-drag/resize state for edge-anchoring and live collision
     this.canvas.on('mouse:down', (opt) => {
-      this.interacting = true
       const obj = opt.target
+      if (obj) this.interacting = true
       if (!obj) return
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
       if (groupId) {
@@ -932,45 +1077,30 @@ export class FabricEngine implements LayoutEngine {
     const wasResized = Math.abs(scaleX - 1) > 0.001 || Math.abs(scaleY - 1) > 0.001
 
     if (wasResized && saved) {
-      // Compute new dimensions from scale
-      let newW = group.width * scaleX
-      let newH = group.height * scaleY
-      if (this.gridConfig.enabled) {
-        newW = Math.max(gs, Math.round(newW / gs) * gs)
-        newH = Math.max(gs, Math.round(newH / gs) * gs)
-      }
-
       // Reset scale to 1 — we commit actual dimensions
       obj.set({ scaleX: 1, scaleY: 1 })
 
-      // Determine which edges were anchored by comparing the Fabric object's
-      // post-scale visual bounds to the original on-grid bounds.
+      // Edge-anchor + grid quantization using shared math
       const centroidX = obj.left ?? 0
       const centroidY = obj.top ?? 0
-      const visualLeft = centroidX - (group.width * scaleX) / 2
-      const visualRight = centroidX + (group.width * scaleX) / 2
-      const visualTop = centroidY - (group.height * scaleY) / 2
-      const visualBottom = centroidY + (group.height * scaleY) / 2
-
-      const origLeft = saved.lowerLeftX
-      const origRight = saved.lowerLeftX + saved.width
-      const origTop = saved.lowerLeftY - saved.height
-      const origBottom = saved.lowerLeftY
-
-      // Derive new lower-left from anchored edges (already on-grid)
-      let finalX: number
-      if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
-        finalX = origLeft
-      } else {
-        finalX = origRight - newW
+      const originalBounds = {
+        x: saved.lowerLeftX,
+        y: saved.lowerLeftY,
+        width: saved.width,
+        height: saved.height
       }
-
-      let finalY: number
-      if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
-        finalY = origTop + newH
-      } else {
-        finalY = origBottom
-      }
+      const anchored = computeEdgeAnchor(
+        originalBounds,
+        scaleX,
+        scaleY,
+        centroidX,
+        centroidY,
+        this.gridConfig.enabled ? gs : 1
+      )
+      const finalX = anchored.x
+      const finalY = anchored.y
+      const newW = anchored.width
+      const newH = anchored.height
 
       // Collision check
       const proposed = { x: finalX, y: finalY, width: newW, height: newH }
@@ -1046,45 +1176,32 @@ export class FabricEngine implements LayoutEngine {
     const cy = obj.top ?? 0
     const gs = this.gridConfig.size
 
-    // Grid-quantized dimensions
-    let snapW = group.width * sx
-    let snapH = group.height * sy
-    if (this.gridConfig.enabled) {
-      snapW = Math.max(gs, Math.round(snapW / gs) * gs)
-      snapH = Math.max(gs, Math.round(snapH / gs) * gs)
+    // Edge-anchor + grid quantization using shared math
+    const originalBounds = {
+      x: saved.lowerLeftX,
+      y: saved.lowerLeftY,
+      width: saved.width,
+      height: saved.height
     }
-
-    // Edge-anchor: detect which edges are stationary
-    const visualLeft = cx - (group.width * sx) / 2
-    const visualRight = cx + (group.width * sx) / 2
-    const visualTop = cy - (group.height * sy) / 2
-    const visualBottom = cy + (group.height * sy) / 2
-
-    const origLeft = saved.lowerLeftX
-    const origRight = saved.lowerLeftX + saved.width
-    const origTop = saved.lowerLeftY - saved.height
-    const origBottom = saved.lowerLeftY
-
-    let overlayLeft: number
-    if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
-      overlayLeft = origLeft
-    } else {
-      overlayLeft = origRight - snapW
-    }
-
-    let overlayTop: number
-    if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
-      overlayTop = origTop
-    } else {
-      overlayTop = origBottom - snapH
-    }
+    const overlayAnchored = computeEdgeAnchor(
+      originalBounds,
+      sx,
+      sy,
+      cx,
+      cy,
+      this.gridConfig.enabled ? gs : 1
+    )
+    const snapW = overlayAnchored.width
+    const snapH = overlayAnchored.height
+    const overlayLeft = overlayAnchored.x
+    const overlayTop = overlayAnchored.y - overlayAnchored.height // lower-left y → top-left y
 
     // Overlay uses center origin — convert from top-left
     const overlayCX = overlayLeft + snapW / 2
     const overlayCY = overlayTop + snapH / 2
 
-    // Check if snapped dimensions would collide (lower-left y = overlayTop + snapH)
-    const proposed = { x: overlayLeft, y: overlayTop + snapH, width: snapW, height: snapH }
+    // Check if snapped dimensions would collide
+    const proposed = { x: overlayAnchored.x, y: overlayAnchored.y, width: snapW, height: snapH }
     const wouldCollide = checkGroupCollision(proposed, groupId, this.getAllGroups())
 
     if (!this.resizeOverlay) {
@@ -1253,58 +1370,7 @@ export class FabricEngine implements LayoutEngine {
   // ─── Private: Pan & Zoom ────────────────────────────────────────────────────
   // TODO(#226): Extract pan/zoom/drag into a shared input manager
 
-  private setupPanZoom(): void {
-    if (!this.canvas) return
-    let isPanning = false
-    let lastX = 0
-    let lastY = 0
-
-    this.canvas.on('mouse:down', (opt) => {
-      const e = opt.e as MouseEvent
-      if (e.altKey || e.button === 1) {
-        isPanning = true
-        lastX = e.clientX
-        lastY = e.clientY
-        if (this.canvas) this.canvas.selection = false
-        e.preventDefault()
-      }
-    })
-
-    this.canvas.on('mouse:move', (opt) => {
-      if (!isPanning || !this.canvas) return
-      const e = opt.e as MouseEvent
-      const vpt = this.canvas.viewportTransform
-      if (!vpt) return
-      vpt[4] += e.clientX - lastX
-      vpt[5] += e.clientY - lastY
-      lastX = e.clientX
-      lastY = e.clientY
-      this.canvas.setViewportTransform(vpt)
-    })
-
-    this.canvas.on('mouse:up', () => {
-      if (isPanning && this.canvas) {
-        isPanning = false
-        this.canvas.selection = true
-        this.canvas.setViewportTransform(this.canvas.viewportTransform ?? [1, 0, 0, 1, 0, 0])
-        const vp = this.getViewport()
-        this.emitter.emit('viewportChanged', vp)
-      }
-    })
-
-    this.canvas.on('mouse:wheel', (opt) => {
-      if (!this.canvas) return
-      const e = opt.e as WheelEvent
-      let zoom = this.canvas.getZoom()
-      zoom *= 0.999 ** e.deltaY
-      zoom = Math.min(Math.max(zoom, 0.1), 10)
-      this.canvas.zoomToPoint(new fabric.Point(e.offsetX, e.offsetY), zoom)
-      e.preventDefault()
-      e.stopPropagation()
-      const vp = this.getViewport()
-      this.emitter.emit('viewportChanged', vp)
-    })
-  }
+  // setupPanZoom removed — pan/zoom now handled by GestureRecognizer (#226)
 }
 
 // Auto-register

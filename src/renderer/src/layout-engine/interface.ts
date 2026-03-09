@@ -9,6 +9,7 @@ import type {
   EngineEventMap,
   GroupDecoration
 } from './types'
+import type { HitResult } from './input-action-handler'
 
 export interface LayoutEngine {
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
@@ -38,7 +39,10 @@ export interface LayoutEngine {
 
   // ─── Selection ──────────────────────────────────────────────────────────────
   select(ids: string[]): void
+  /** Alias for select() — used by InputActionHandler. */
+  selectIds(ids: string[]): void
   addToSelection(ids: string[]): void
+  removeFromSelection(ids: string[]): void
   clearSelection(): void
   getSelectedIds(): string[]
 
@@ -80,4 +84,45 @@ export interface LayoutEngine {
 
   // ─── Interaction State ─────────────────────────────────────────────────────
   isInteracting(): boolean
+
+  // ─── Input Action Handler Methods ───────────────────────────────────────────
+
+  /** Translate the viewport by a screen-space pixel delta. */
+  applyPan(dx: number, dy: number): void
+
+  /**
+   * Scale the viewport centered on the given screen-space point.
+   * `delta` is the raw wheel deltaY; the handler applies the
+   * zoom curve and clamping (0.1x–10x).
+   */
+  applyZoom(delta: number, centerX: number, centerY: number): void
+
+  /**
+   * Enable or disable the engine's internal drag handling.
+   * Called by the gesture recognizer to suppress drags during pan.
+   */
+  setDragEnabled(enabled: boolean): void
+
+  /**
+   * Return the topmost shape or group at the given world-space point,
+   * or null if the point is on empty canvas.
+   */
+  objectAt(worldX: number, worldY: number): HitResult | null
+
+  /**
+   * Return all shapes and groups whose bounding boxes intersect
+   * the given world-space rectangle.
+   */
+  objectsInRect(rect: { x: number; y: number; width: number; height: number }): HitResult[]
+
+  /** Convert screen-space (client) coordinates to world-space. */
+  screenToWorld(screenX: number, screenY: number): { x: number; y: number }
+
+  // ─── Rubber-Band Overlay ──────────────────────────────────────────────────
+
+  /** Show a selection rectangle at the given world-space bounds. */
+  showRubberBand(rect: { x: number; y: number; width: number; height: number }): void
+
+  /** Remove the rubber-band overlay. */
+  hideRubberBand(): void
 }

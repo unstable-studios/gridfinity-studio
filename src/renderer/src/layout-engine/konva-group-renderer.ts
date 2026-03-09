@@ -2,6 +2,7 @@ import Konva from 'konva'
 import type { GroupRenderer } from './group-renderer'
 import type { LayoutGroup, GroupDecoration, GridConfig } from './types'
 import { checkGroupCollision } from './collision'
+import { snapLowerLeft, computeEdgeAnchor } from './input-math'
 
 /**
  * Dependencies injected from the KonvaEngine.
@@ -201,11 +202,13 @@ export class KonvaGroupRenderer implements GroupRenderer {
     const halfH = this.height / 2
     const lowerLeftX = this.konvaGroup.x() - halfW
     const lowerLeftY = this.konvaGroup.y() + halfH
+    const snapped = snapLowerLeft(lowerLeftX, lowerLeftY, gridSize)
     this.konvaGroup.position({
-      x: Math.round(lowerLeftX / gridSize) * gridSize + halfW,
-      y: Math.round(lowerLeftY / gridSize) * gridSize - halfH
+      x: snapped.x + halfW,
+      y: snapped.y - halfH
     })
     this.deps.getTransformer()?.forceUpdate()
+    this.deps.layer.batchDraw()
   }
 
   destroy(): void {
@@ -294,43 +297,21 @@ export class KonvaGroupRenderer implements GroupRenderer {
       const sx = this.konvaGroup.scaleX()
       const sy = this.konvaGroup.scaleY()
 
-      // Compute new dimensions (grid-quantized)
-      let newW = this.width * sx
-      let newH = this.height * sy
-      if (gridConfig.enabled) {
-        newW = Math.max(gs, Math.round(newW / gs) * gs)
-        newH = Math.max(gs, Math.round(newH / gs) * gs)
-      }
-
-      // Determine which edges were anchored by comparing the Transformer's
-      // visual result to the original bounds. The anchored edge barely moved.
+      // Edge-anchor + grid quantization using shared math
       const centroidX = this.konvaGroup.x()
       const centroidY = this.konvaGroup.y()
-      const visualLeft = centroidX - (this.width * sx) / 2
-      const visualRight = centroidX + (this.width * sx) / 2
-      const visualTop = centroidY - (this.height * sy) / 2
-      const visualBottom = centroidY + (this.height * sy) / 2
-
-      const origLeft = orig.x
-      const origRight = orig.x + orig.width
-      const origTop = orig.y - orig.height // top in screen coords (smaller y)
-      const origBottom = orig.y // lower-left y = bottom in screen coords
-
-      // Derive new lower-left from anchored edges (already on-grid)
-      let finalX: number
-      if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
-        finalX = origLeft // left edge anchored
-      } else {
-        finalX = origRight - newW // right edge anchored
-      }
-
-      let finalY: number
-      if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
-        // Top edge anchored → bottom (lower-left y) = top + newH
-        finalY = origTop + newH
-      } else {
-        finalY = origBottom // bottom edge anchored
-      }
+      const anchored = computeEdgeAnchor(
+        orig,
+        sx,
+        sy,
+        centroidX,
+        centroidY,
+        gridConfig.enabled ? gs : 1
+      )
+      const finalX = anchored.x
+      const finalY = anchored.y
+      const newW = anchored.width
+      const newH = anchored.height
 
       // Reset scale
       this.konvaGroup.scaleX(1)
@@ -417,42 +398,15 @@ export class KonvaGroupRenderer implements GroupRenderer {
     const cx = this.konvaGroup.x()
     const cy = this.konvaGroup.y()
 
-    // Raw scaled dimensions, grid-quantized
-    let snapW = this.width * sx
-    let snapH = this.height * sy
-    if (gridConfig.enabled) {
-      snapW = Math.max(gs, Math.round(snapW / gs) * gs)
-      snapH = Math.max(gs, Math.round(snapH / gs) * gs)
-    }
-
-    // Edge-anchor: detect which edges are stationary by comparing visual
-    // bounds to the original on-grid bounds, then derive overlay position.
-    const visualLeft = cx - (this.width * sx) / 2
-    const visualRight = cx + (this.width * sx) / 2
-    const visualTop = cy - (this.height * sy) / 2
-    const visualBottom = cy + (this.height * sy) / 2
-
-    const origLeft = orig.x
-    const origRight = orig.x + orig.width
-    const origTop = orig.y - orig.height
-    const origBottom = orig.y
-
-    let overlayLeft: number
-    if (Math.abs(visualLeft - origLeft) < Math.abs(visualRight - origRight)) {
-      overlayLeft = origLeft
-    } else {
-      overlayLeft = origRight - snapW
-    }
-
-    let overlayTop: number
-    if (Math.abs(visualTop - origTop) < Math.abs(visualBottom - origBottom)) {
-      overlayTop = origTop
-    } else {
-      overlayTop = origBottom - snapH
-    }
+    // Edge-anchor + grid quantization using shared math
+    const overlayAnchored = computeEdgeAnchor(orig, sx, sy, cx, cy, gridConfig.enabled ? gs : 1)
+    const snapW = overlayAnchored.width
+    const snapH = overlayAnchored.height
+    const overlayLeft = overlayAnchored.x
+    const overlayTop = overlayAnchored.y - overlayAnchored.height // lower-left y → top-left y
 
     // Check if snapped dimensions would collide
-    const proposed = { x: overlayLeft, y: overlayTop + snapH, width: snapW, height: snapH }
+    const proposed = { x: overlayAnchored.x, y: overlayAnchored.y, width: snapW, height: snapH }
     const wouldCollide = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())
 
     this.resizeOverlay.setAttrs({

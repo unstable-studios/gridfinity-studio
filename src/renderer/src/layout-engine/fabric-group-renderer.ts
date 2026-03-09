@@ -1,6 +1,7 @@
 import * as fabric from 'fabric'
 import type { GroupRenderer } from './group-renderer'
 import type { LayoutGroup, GroupDecoration } from './types'
+import { snapLowerLeft } from './input-math'
 
 /**
  * Fabric.js implementation of GroupRenderer.
@@ -205,9 +206,8 @@ export class FabricGroupRenderer implements GroupRenderer {
     const halfH = this.height / 2
     const lowerLeftX = (this.fabricGroup.left ?? 0) - halfW
     const lowerLeftY = (this.fabricGroup.top ?? 0) + halfH
-    const snappedX = Math.round(lowerLeftX / gridSize) * gridSize
-    const snappedY = Math.round(lowerLeftY / gridSize) * gridSize
-    this.fabricGroup.set({ left: snappedX + halfW, top: snappedY - halfH })
+    const snapped = snapLowerLeft(lowerLeftX, lowerLeftY, gridSize)
+    this.fabricGroup.set({ left: snapped.x + halfW, top: snapped.y - halfH })
     this.fabricGroup.setCoords()
   }
 
