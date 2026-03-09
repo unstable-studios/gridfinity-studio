@@ -4,6 +4,18 @@ import type { LayoutEngine } from './interface'
 
 const MAX_UNDO = 50
 
+export interface UndoEntry {
+  json: string
+  label: string
+}
+
+export interface UndoRedoDebugState {
+  undoStack: UndoEntry[]
+  redoStack: UndoEntry[]
+  /** Index of the current state within the undo stack (top of stack). */
+  cursor: number
+}
+
 /**
  * Engine-snapshot-based undo/redo.
  *
@@ -21,35 +33,49 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
   redo: () => void
   canUndo: boolean
   canRedo: boolean
+  debugState: UndoRedoDebugState
 } {
-  const undoStackRef = useRef<string[]>([])
-  const redoStackRef = useRef<string[]>([])
+  const undoStackRef = useRef<UndoEntry[]>([])
+  const redoStackRef = useRef<UndoEntry[]>([])
   const isUndoingRef = useRef(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
+  const [debugState, setDebugState] = useState<UndoRedoDebugState>({
+    undoStack: [],
+    redoStack: [],
+    cursor: -1
+  })
 
   const syncCounts = useCallback(() => {
     setCanUndo(undoStackRef.current.length >= 2)
     setCanRedo(redoStackRef.current.length > 0)
+    setDebugState({
+      undoStack: [...undoStackRef.current],
+      redoStack: [...redoStackRef.current],
+      cursor: undoStackRef.current.length - 1
+    })
   }, [])
 
-  const pushSnapshot = useCallback(() => {
-    if (!engine || isUndoingRef.current) return
-    const json = JSON.stringify(engine.toSnapshot())
-    const stack = undoStackRef.current
-    if (stack[stack.length - 1] === json) return
-    stack.push(json)
-    if (stack.length > MAX_UNDO) stack.shift()
-    redoStackRef.current = []
-    syncCounts()
-  }, [engine, syncCounts])
+  const pushSnapshot = useCallback(
+    (label: string) => {
+      if (!engine || isUndoingRef.current) return
+      const json = JSON.stringify(engine.toSnapshot())
+      const stack = undoStackRef.current
+      if (stack.length > 0 && stack[stack.length - 1].json === json) return
+      stack.push({ json, label })
+      if (stack.length > MAX_UNDO) stack.shift()
+      redoStackRef.current = []
+      syncCounts()
+    },
+    [engine, syncCounts]
+  )
 
   const undo = useCallback(() => {
     if (!engine || undoStackRef.current.length < 2) return
     isUndoingRef.current = true
     redoStackRef.current.push(undoStackRef.current.pop()!)
-    const json = undoStackRef.current[undoStackRef.current.length - 1]
-    engine.loadSnapshot(JSON.parse(json))
+    const entry = undoStackRef.current[undoStackRef.current.length - 1]
+    engine.loadSnapshot(JSON.parse(entry.json))
     syncCounts()
     isUndoingRef.current = false
   }, [engine, syncCounts])
@@ -57,9 +83,11 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
   const redo = useCallback(() => {
     if (!engine || redoStackRef.current.length === 0) return
     isUndoingRef.current = true
-    undoStackRef.current.push(JSON.stringify(engine.toSnapshot()))
-    const json = redoStackRef.current.pop()!
-    engine.loadSnapshot(JSON.parse(json))
+    const currentJson = JSON.stringify(engine.toSnapshot())
+    const currentLabel = undoStackRef.current[undoStackRef.current.length - 1]?.label ?? 'unknown'
+    undoStackRef.current.push({ json: currentJson, label: currentLabel })
+    const entry = redoStackRef.current.pop()!
+    engine.loadSnapshot(JSON.parse(entry.json))
     syncCounts()
     isUndoingRef.current = false
   }, [engine, syncCounts])
@@ -73,7 +101,7 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
   useEffect(() => {
     if (!engine) return
     const baseline = JSON.stringify(engine.toSnapshot())
-    undoStackRef.current = [baseline]
+    undoStackRef.current = [{ json: baseline, label: 'initial' }]
     redoStackRef.current = []
     syncCounts()
   }, [engine, syncCounts])
@@ -86,13 +114,13 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     if (!engine) return
 
     const unsubs = [
-      engine.on('shapeMoved', pushSnapshot),
-      engine.on('shapeResized', pushSnapshot),
-      engine.on('groupMoved', pushSnapshot),
-      engine.on('groupResized', pushSnapshot),
-      engine.on('shapeCreated', pushSnapshot),
-      engine.on('shapeDeleted', pushSnapshot),
-      engine.on('groupChanged', pushSnapshot)
+      engine.on('shapeMoved', () => pushSnapshot('shapeMoved')),
+      engine.on('shapeResized', () => pushSnapshot('shapeResized')),
+      engine.on('groupMoved', () => pushSnapshot('groupMoved')),
+      engine.on('groupResized', () => pushSnapshot('groupResized')),
+      engine.on('shapeCreated', () => pushSnapshot('shapeCreated')),
+      engine.on('shapeDeleted', () => pushSnapshot('shapeDeleted')),
+      engine.on('groupChanged', () => pushSnapshot('groupChanged'))
     ]
 
     return () => {
@@ -122,5 +150,5 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     return () => window.removeEventListener('keydown', handler)
   }, [engine, undo, redo])
 
-  return { undo, redo, canUndo, canRedo }
+  return { undo, redo, canUndo, canRedo, debugState }
 }
