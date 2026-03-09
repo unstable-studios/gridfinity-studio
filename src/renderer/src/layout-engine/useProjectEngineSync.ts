@@ -1,7 +1,6 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useLayoutEngine } from './useLayoutEngine'
 import { useProject } from '@/hooks/useProject'
-import { useAppMode } from '@/hooks/useAppMode'
 import type { LayoutSnapshotData } from '../../../shared/types/project'
 import type { LayoutSnapshot } from './types'
 
@@ -25,16 +24,14 @@ function isValidSnapshot(data: unknown): data is LayoutSnapshot {
   return true
 }
 
-const SYNC_DEBOUNCE_MS = 1000
-
 /**
  * Syncs the layout engine snapshot with the project store.
  *
  * Responsibilities:
  * - Before save: captures engine.toSnapshot() → project.layoutSnapshot
  *   via registerBeforeSave, so any save path gets current engine state.
- * - On mutation: debounce-syncs the snapshot to the project store so that
- *   sessionStorage always has a recent layout (survives page refresh).
+ * - On mutation: immediately syncs the snapshot to the project store so
+ *   sessionStorage always has the latest layout (survives page refresh).
  * - On mutation: marks the project as modified (isModified = true) so
  *   the "Unsaved" badge shows. Suppressed during project load to avoid
  *   false positives.
@@ -45,7 +42,6 @@ export function useProjectEngineSync(): void {
   const { setLayoutSnapshot, registerBeforeSave } = useProject()
   const project = useProject((s) => s.project)
   const loadedProjectRef = useRef<string | null>(null)
-  const syncTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // True during engine.loadSnapshot() calls triggered by project load.
   // Engine events fire synchronously during loadSnapshot, so this ref
@@ -84,35 +80,19 @@ export function useProjectEngineSync(): void {
     return registerBeforeSave(captureSnapshot)
   }, [registerBeforeSave, captureSnapshot])
 
-  // Flush snapshot immediately when leaving layout mode so that
-  // switching to review (or any other mode) never loses state.
-  const { mode } = useAppMode()
-  useEffect(() => {
-    if (mode !== 'layout') {
-      if (syncTimerRef.current) {
-        clearTimeout(syncTimerRef.current)
-        syncTimerRef.current = null
-      }
-      captureSnapshot()
-    }
-  }, [mode, captureSnapshot])
-
-  // Debounce-sync engine state to project store on mutations so
-  // sessionStorage always has a recent layout (survives page refresh).
-  // Also mark project as modified unless we're restoring from a file load.
+  // Sync engine state to project store on every mutation so sessionStorage
+  // is always current. Also mark project as modified unless we're restoring
+  // from a file load. No debounce — the isRestoringRef guard prevents
+  // burst writes during loadSnapshot, and captureSnapshot is cheap
+  // (serializes engine state to zustand store).
   useEffect(() => {
     if (!engine) return
 
     const onMutation = (): void => {
-      // Mark as modified for user-initiated changes (not during project load).
-      // Undo/redo also marks modified — the state differs from the saved file.
       if (!isRestoringRef.current) {
         useProject.setState({ isModified: true })
       }
-
-      // Debounce the session snapshot sync
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
-      syncTimerRef.current = setTimeout(captureSnapshot, SYNC_DEBOUNCE_MS)
+      captureSnapshot()
     }
 
     const unsubs = [
@@ -127,7 +107,6 @@ export function useProjectEngineSync(): void {
 
     return () => {
       unsubs.forEach((u) => u())
-      if (syncTimerRef.current) clearTimeout(syncTimerRef.current)
     }
   }, [engine, captureSnapshot])
 }
