@@ -436,12 +436,31 @@ export class FabricEngine implements LayoutEngine {
 
     if (!group || !renderer || !obj || !shape) return
 
+    // Compute world-space position before removing from canvas
+    const matrix = obj.calcTransformMatrix()
+    const worldX = matrix[4]
+    const worldY = matrix[5]
+
     this.canvas?.remove(obj)
-    // group.add() calls enterGroup which converts canvas-space → group-local
-    renderer.fabricGroup.add(obj)
-    // Do NOT triggerLayout — FitContentLayout would resize the bin to encompass
-    // the shape. The bin's dimensions are fixed; just refresh control handles.
-    renderer.fabricGroup.setCoords()
+
+    // Convert world position to group-local coordinates (relative to centroid)
+    const gMatrix = renderer.fabricGroup.calcTransformMatrix()
+    const inv = fabric.util.invertTransform(gMatrix)
+    const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
+    obj.set({ left: localPt.x, top: localPt.y })
+    obj.setCoords()
+
+    // Bypass group.add() which calls enterGroup + FitContentLayout, corrupting
+    // the bin's fixed dimensions. Instead push directly onto _objects like
+    // decorations do (see FabricGroupRenderer.setDecorations).
+    const internalObjects = (renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] })
+      ._objects
+    obj._set('parent', renderer.fabricGroup)
+    obj._set('group', renderer.fabricGroup)
+    obj._set('canvas', this.canvas!)
+    internalObjects.push(obj)
+
+    renderer.fabricGroup.set('dirty', true)
 
     group.childIds = [...group.childIds, shapeId]
     shape.groupId = groupId
@@ -464,12 +483,20 @@ export class FabricEngine implements LayoutEngine {
     const matrix = obj.calcTransformMatrix()
     const point = new fabric.Point(matrix[4], matrix[5])
 
-    renderer.fabricGroup.remove(obj)
+    // Bypass group.remove() which triggers FitContentLayout recalculation.
+    // Splice directly from _objects to preserve the bin's fixed dimensions.
+    const internalObjects = (renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] })
+      ._objects
+    const idx = internalObjects.indexOf(obj)
+    if (idx !== -1) internalObjects.splice(idx, 1)
+    obj._set('parent', undefined)
+    obj._set('group', undefined)
+
     obj.set({ left: point.x, top: point.y })
     obj.setCoords()
     this.canvas?.add(obj)
-    // Refresh group control handles without recalculating bounds
-    renderer.fabricGroup.setCoords()
+
+    renderer.fabricGroup.set('dirty', true)
 
     group.childIds = group.childIds.filter((id) => id !== shapeId)
     shape.groupId = null
