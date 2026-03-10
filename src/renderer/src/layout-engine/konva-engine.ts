@@ -14,6 +14,7 @@ import type {
 } from './types'
 import { registerEngine } from './create-engine'
 import { KonvaGroupRenderer } from './konva-group-renderer'
+import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
@@ -451,7 +452,8 @@ export class KonvaEngine implements LayoutEngine {
         layer: this.mainLayer,
         getGridConfig: () => this.gridConfig,
         getTransformer: () => this.transformer,
-        getAllGroups: () => this.getAllGroups()
+        getAllGroups: () => this.getAllGroups(),
+        finalizeMultiSelectDrag: () => this.finalizeMultiSelectDrag()
       },
       (id, x, y) => {
         const g = this.groupMap.get(id)
@@ -483,6 +485,11 @@ export class KonvaEngine implements LayoutEngine {
       }
     )
     this.rendererMap.set(group.id, renderer)
+
+    // Capture pre-drag positions for all selected nodes when any group starts dragging
+    renderer.konvaGroup.on('dragstart', () => {
+      this.capturePreDragPositions()
+    })
 
     // Move children into group (positions relative to group centroid)
     const centroidX = group.x + group.width / 2
@@ -609,6 +616,162 @@ export class KonvaEngine implements LayoutEngine {
 
   getAllGroups(): LayoutGroup[] {
     return Array.from(this.groupMap.keys()).map((id) => this.getGroup(id)!)
+  }
+
+  // ─── Multi-Select Drag Support ──────────────────────────────────────────────
+
+  /** Pre-drag positions for all nodes in the selection, keyed by node ID. */
+  private preDragPositions = new Map<string, { x: number; y: number }>()
+
+  /** Idempotent guard: ensures only one finalization per drag batch. */
+  private multiDragFinalized = false
+
+  /** Guard: ensures only the first dragstart per batch captures positions. */
+  private preDragCaptured = false
+
+  /**
+   * Capture pre-drag positions for all selected nodes. Called on dragstart.
+   *
+   * Each node in the Transformer fires its own dragstart. If we recaptured
+   * on every one, later dragstart events could read positions that the
+   * Transformer already started moving — causing cumulative drift on revert.
+   * The guard ensures only the first dragstart captures; the microtask
+   * resets the guard after the synchronous dragstart batch completes.
+   */
+  private capturePreDragPositions(): void {
+    if (this.preDragCaptured) return
+    this.preDragCaptured = true
+    queueMicrotask(() => {
+      this.preDragCaptured = false
+    })
+
+    this.preDragPositions.clear()
+    this.multiDragFinalized = false
+    const nodes = this.transformer?.nodes() ?? []
+    for (const node of nodes) {
+      this.preDragPositions.set(node.id(), { x: node.x(), y: node.y() })
+    }
+  }
+
+  /**
+   * Atomically finalize a multi-select drag: snap, collision-check, then
+   * either commit all data model changes or revert the entire selection.
+   *
+   * Called from each group renderer's dragend — idempotent, only the first
+   * call per drag batch does actual work.
+   *
+   * Sequence:
+   * 1. Snap the first group to grid, compute the snap delta
+   * 2. Apply that delta to all other selected groups (positions only, no data model)
+   * 3. Check collision for every group against non-selected groups
+   * 4. Collision → revert all nodes to pre-drag positions, flash red
+   * 5. No collision → update data model (groupMap + shapeMap), emit events
+   */
+  private finalizeMultiSelectDrag(): void {
+    if (this.multiDragFinalized) return
+    this.multiDragFinalized = true
+
+    const nodes = this.transformer?.nodes() ?? []
+    if (nodes.length <= 1) return
+
+    const gridConfig = this.gridConfig
+
+    // Collect selected group IDs for collision exclusion
+    const selectedIds = new Set<string>()
+    for (const node of nodes) {
+      if (node.name() === 'group') selectedIds.add(node.id())
+    }
+
+    // Step 1: Snap the first group and compute delta
+    let snapDx = 0
+    let snapDy = 0
+    if (gridConfig.enabled) {
+      for (const node of nodes) {
+        if (node.name() !== 'group') continue
+        const renderer = this.rendererMap.get(node.id())
+        if (!renderer) continue
+        const preSnapX = node.x()
+        const preSnapY = node.y()
+        renderer.snapToGrid(gridConfig.size)
+        snapDx = node.x() - preSnapX
+        snapDy = node.y() - preSnapY
+        break // only use the first group to compute delta
+      }
+    }
+
+    // Step 2: Apply snap delta to all OTHER selected groups (Konva positions only, no data model).
+    // Skip shapes — they are children of group Konva nodes and move with their parent.
+    if (snapDx !== 0 || snapDy !== 0) {
+      let firstGroup = true
+      for (const node of nodes) {
+        if (node.name() !== 'group') continue // skip shapes (they move with parent)
+        if (firstGroup) {
+          firstGroup = false
+          continue // skip the already-snapped group
+        }
+        node.position({ x: node.x() + snapDx, y: node.y() + snapDy })
+      }
+      this.transformer?.forceUpdate()
+      this.mainLayer?.batchDraw()
+    }
+
+    // Step 3: Check collision for ALL groups in selection
+    let hasCollision = false
+    for (const node of nodes) {
+      if (node.name() !== 'group') continue
+      const renderer = this.rendererMap.get(node.id())
+      if (!renderer) continue
+      const pos = renderer.readPosition()
+      const group = this.groupMap.get(node.id())
+      if (!group) continue
+
+      const proposed = { x: pos.x, y: pos.y, width: group.width, height: group.height }
+      if (checkGroupCollision(proposed, node.id(), this.getAllGroups(), selectedIds)) {
+        hasCollision = true
+        break
+      }
+    }
+
+    // Step 4: Collision → revert all nodes to pre-drag, flash, done
+    if (hasCollision) {
+      for (const node of nodes) {
+        const pre = this.preDragPositions.get(node.id())
+        if (pre) node.position(pre)
+      }
+      this.transformer?.forceUpdate()
+      this.mainLayer?.batchDraw()
+
+      // Flash collision on all group renderers and emit events
+      for (const node of nodes) {
+        if (node.name() !== 'group') continue
+        this.rendererMap.get(node.id())?.flashCollision()
+        this.emitter.emit('collisionRejected', { id: node.id(), reason: 'move' })
+      }
+      return
+    }
+
+    // Step 5: No collision → commit all data model updates, emit events
+    for (const node of nodes) {
+      const id = node.id()
+      if (node.name() === 'group') {
+        const renderer = this.rendererMap.get(id)
+        if (!renderer) continue
+        const pos = renderer.readPosition()
+        const g = this.groupMap.get(id)
+        if (g) {
+          g.x = pos.x
+          g.y = pos.y
+        }
+        this.emitter.emit('groupMoved', { id, x: pos.x, y: pos.y })
+      } else {
+        const data = this.shapeMap.get(id)
+        if (data) {
+          data.x = node.x()
+          data.y = node.y()
+        }
+        this.emitter.emit('shapeMoved', { id, x: node.x(), y: node.y() })
+      }
+    }
   }
 
   // ─── Selection ──────────────────────────────────────────────────────────────

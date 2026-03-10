@@ -48,10 +48,12 @@ function aabbOverlap(a: AABB, b: AABB): boolean {
 export function checkGroupCollision(
   proposed: AABB,
   groupId: string,
-  allGroups: LayoutGroup[]
+  allGroups: LayoutGroup[],
+  excludeIds?: Set<string>
 ): string | null {
   for (const other of allGroups) {
     if (other.id === groupId) continue
+    if (excludeIds?.has(other.id)) continue
     if (aabbOverlap(proposed, other)) return other.id
   }
   return null
