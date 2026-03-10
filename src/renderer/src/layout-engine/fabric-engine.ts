@@ -436,20 +436,8 @@ export class FabricEngine implements LayoutEngine {
 
     if (!group || !renderer || !obj || !shape) return
 
-    // Capture world-space position before removing from canvas
-    const matrix = obj.calcTransformMatrix()
-    const worldX = matrix[4]
-    const worldY = matrix[5]
-
     this.canvas?.remove(obj)
-
-    // Convert world position to group-local coordinates
-    const gMatrix = renderer.fabricGroup.calcTransformMatrix()
-    const inv = fabric.util.invertTransform(gMatrix)
-    const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
-    obj.set({ left: localPt.x, top: localPt.y })
-    obj.setCoords()
-
+    // group.add() calls enterGroup which converts canvas-space → group-local
     renderer.fabricGroup.add(obj)
 
     // Recalculate group bounds; restore centroid position after
