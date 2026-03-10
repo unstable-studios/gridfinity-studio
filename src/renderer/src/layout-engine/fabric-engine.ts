@@ -436,8 +436,31 @@ export class FabricEngine implements LayoutEngine {
 
     if (!group || !renderer || !obj || !shape) return
 
+    // Capture world-space position before removing from canvas
+    const matrix = obj.calcTransformMatrix()
+    const worldX = matrix[4]
+    const worldY = matrix[5]
+
     this.canvas?.remove(obj)
+
+    // Convert world position to group-local coordinates
+    const gMatrix = renderer.fabricGroup.calcTransformMatrix()
+    const inv = fabric.util.invertTransform(gMatrix)
+    const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
+    obj.set({ left: localPt.x, top: localPt.y })
+    obj.setCoords()
+
     renderer.fabricGroup.add(obj)
+
+    // Recalculate group bounds; restore centroid position after
+    renderer.fabricGroup.triggerLayout()
+    const halfW = renderer.fabricGroup.width! / 2
+    const halfH = renderer.fabricGroup.height! / 2
+    renderer.fabricGroup.set({
+      left: group.x + halfW,
+      top: group.y - halfH
+    })
+    renderer.fabricGroup.setCoords()
 
     group.childIds = [...group.childIds, shapeId]
     shape.groupId = groupId
@@ -464,6 +487,16 @@ export class FabricEngine implements LayoutEngine {
     obj.set({ left: point.x, top: point.y })
     obj.setCoords()
     this.canvas?.add(obj)
+
+    // Recalculate group bounds after child removal; restore centroid position
+    renderer.fabricGroup.triggerLayout()
+    const halfW = renderer.fabricGroup.width! / 2
+    const halfH = renderer.fabricGroup.height! / 2
+    renderer.fabricGroup.set({
+      left: group.x + halfW,
+      top: group.y - halfH
+    })
+    renderer.fabricGroup.setCoords()
 
     group.childIds = group.childIds.filter((id) => id !== shapeId)
     shape.groupId = null
