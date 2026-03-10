@@ -365,16 +365,24 @@ export class FabricEngine implements LayoutEngine {
     // Tag for reverse lookup in event handlers
     ;(renderer.fabricGroup as unknown as Record<string, unknown>)[GROUP_DATA_KEY] = group.id
 
-    // Move children into group
+    // Move children into group — bypass group.add()/enterGroup to avoid
+    // FitContentLayout corrupting the bin's fixed dimensions.
+    // Shape coords from the snapshot are already in group-local space.
+    const internalObjects = (renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] })
+      ._objects
     for (const childId of group.childIds) {
       const obj = this.fabricMap.get(childId)
       if (obj) {
         this.canvas.remove(obj)
-        renderer.fabricGroup.add(obj)
+        obj._set('parent', renderer.fabricGroup)
+        obj._set('group', renderer.fabricGroup)
+        obj._set('canvas', this.canvas)
+        internalObjects.push(obj)
       }
       const shape = this.shapeMap.get(childId)
       if (shape) shape.groupId = group.id
     }
+    renderer.fabricGroup.set('dirty', true)
 
     this.canvas.add(renderer.fabricGroup)
     this.canvas.requestRenderAll()
