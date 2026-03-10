@@ -439,15 +439,8 @@ export class FabricEngine implements LayoutEngine {
     this.canvas?.remove(obj)
     // group.add() calls enterGroup which converts canvas-space → group-local
     renderer.fabricGroup.add(obj)
-
-    // Recalculate group bounds; restore centroid position after
-    renderer.fabricGroup.triggerLayout()
-    const halfW = renderer.fabricGroup.width! / 2
-    const halfH = renderer.fabricGroup.height! / 2
-    renderer.fabricGroup.set({
-      left: group.x + halfW,
-      top: group.y - halfH
-    })
+    // Do NOT triggerLayout — FitContentLayout would resize the bin to encompass
+    // the shape. The bin's dimensions are fixed; just refresh control handles.
     renderer.fabricGroup.setCoords()
 
     group.childIds = [...group.childIds, shapeId]
@@ -475,15 +468,7 @@ export class FabricEngine implements LayoutEngine {
     obj.set({ left: point.x, top: point.y })
     obj.setCoords()
     this.canvas?.add(obj)
-
-    // Recalculate group bounds after child removal; restore centroid position
-    renderer.fabricGroup.triggerLayout()
-    const halfW = renderer.fabricGroup.width! / 2
-    const halfH = renderer.fabricGroup.height! / 2
-    renderer.fabricGroup.set({
-      left: group.x + halfW,
-      top: group.y - halfH
-    })
+    // Refresh group control handles without recalculating bounds
     renderer.fabricGroup.setCoords()
 
     group.childIds = group.childIds.filter((id) => id !== shapeId)
