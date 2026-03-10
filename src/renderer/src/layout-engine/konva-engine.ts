@@ -661,8 +661,8 @@ export class KonvaEngine implements LayoutEngine {
    * call per drag batch does actual work.
    *
    * Sequence:
-   * 1. Snap the first group to grid, compute delta
-   * 2. Apply delta to all other Konva nodes (positions only, no data model)
+   * 1. Snap the first group to grid, compute the snap delta
+   * 2. Apply that delta to all other selected groups (positions only, no data model)
    * 3. Check collision for every group against non-selected groups
    * 4. Collision → revert all nodes to pre-drag positions, flash red
    * 5. No collision → update data model (groupMap + shapeMap), emit events
@@ -699,11 +699,13 @@ export class KonvaEngine implements LayoutEngine {
       }
     }
 
-    // Step 2: Apply delta to all OTHER nodes (Konva positions only, no data model)
+    // Step 2: Apply snap delta to all OTHER selected groups (Konva positions only, no data model).
+    // Skip shapes — they are children of group Konva nodes and move with their parent.
     if (snapDx !== 0 || snapDy !== 0) {
       let firstGroup = true
       for (const node of nodes) {
-        if (node.name() === 'group' && firstGroup) {
+        if (node.name() !== 'group') continue // skip shapes (they move with parent)
+        if (firstGroup) {
           firstGroup = false
           continue // skip the already-snapped group
         }
@@ -739,10 +741,11 @@ export class KonvaEngine implements LayoutEngine {
       this.transformer?.forceUpdate()
       this.mainLayer?.batchDraw()
 
-      // Flash collision on all group renderers in the selection
+      // Flash collision on all group renderers and emit events
       for (const node of nodes) {
         if (node.name() !== 'group') continue
         this.rendererMap.get(node.id())?.flashCollision()
+        this.emitter.emit('collisionRejected', { id: node.id(), reason: 'move' })
       }
       return
     }
