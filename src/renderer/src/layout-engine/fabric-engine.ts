@@ -17,6 +17,7 @@ import { FabricGroupRenderer } from './fabric-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
 import { computeEdgeAnchor } from './input-math'
+import { findContainingBinGroup } from './containment'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,8 @@ export class FabricEngine implements LayoutEngine {
     gridOrigin: DEFAULT_GRID_ORIGIN
   }
   private insets: ViewportInsets = {}
+  /** Currently highlighted group ID during shape drag (for drop-target feedback). */
+  private highlightedGroupId: string | null = null
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -1081,6 +1084,9 @@ export class FabricEngine implements LayoutEngine {
           if ('radiusY' in shape) resizePayload.radiusY = shape.radiusY
           this.emitter.emit('shapeResized', resizePayload)
         }
+
+        // Evaluate shape-to-bin reassignment based on world-space centroid
+        this.evaluateShapeReassignment(shapeId, obj)
       }
 
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
@@ -1282,6 +1288,51 @@ export class FabricEngine implements LayoutEngine {
     }
 
     this.lastGoodPos.delete('__activeSelection')
+  }
+
+  /**
+   * Evaluate whether a shape should be reassigned to a different bin (or unassigned)
+   * based on its world-space centroid after a drag ends.
+   */
+  private evaluateShapeReassignment(shapeId: string, obj: fabric.FabricObject): void {
+    // Clear any drag highlight
+    if (this.highlightedGroupId) {
+      this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+      this.highlightedGroupId = null
+    }
+
+    const data = this.shapeMap.get(shapeId)
+    if (!data) return
+
+    // Compute world-space centroid of the shape
+    const matrix = obj.calcTransformMatrix()
+    const worldX = matrix[4]
+    const worldY = matrix[5]
+
+    // Find which bin contains the shape's centroid
+    const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+    const targetGroupId = targetBin?.id ?? null
+    const currentGroupId = data.groupId
+
+    // No change needed
+    if (targetGroupId === currentGroupId) return
+
+    // Remove from old group
+    if (currentGroupId) {
+      this.removeFromGroup(shapeId)
+    }
+
+    // Add to new group
+    if (targetGroupId) {
+      this.addToGroup(shapeId, targetGroupId)
+    }
+
+    // Emit reassignment event and tick
+    this.emitter.emit('shapeReassigned', {
+      shapeId,
+      oldGroupId: currentGroupId,
+      newGroupId: targetGroupId
+    })
   }
 
   /** Create or update a non-scaling overlay rect showing grid-snapped resize preview. */
@@ -1528,6 +1579,27 @@ export class FabricEngine implements LayoutEngine {
       }
       // Shapes do not snap to the bin grid — they move freely.
       obj.setCoords()
+
+      // Highlight the target bin during shape drag (drop-target feedback)
+      const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
+      if (shapeId) {
+        const matrix = obj.calcTransformMatrix()
+        const worldX = matrix[4]
+        const worldY = matrix[5]
+        const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+        const targetId = targetBin?.id ?? null
+        if (targetId !== this.highlightedGroupId) {
+          // Unhighlight previous
+          if (this.highlightedGroupId) {
+            this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+          }
+          // Highlight new
+          if (targetId) {
+            this.rendererMap.get(targetId)?.highlight()
+          }
+          this.highlightedGroupId = targetId
+        }
+      }
     })
   }
 

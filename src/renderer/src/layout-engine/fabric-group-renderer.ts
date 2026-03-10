@@ -20,11 +20,16 @@ export class FabricGroupRenderer implements GroupRenderer {
   private width: number
   private height: number
   private canvas: fabric.Canvas
+  private origStroke: string
+  private origStrokeWidth: number
+  private highlighted = false
 
   constructor(group: LayoutGroup, canvas: fabric.Canvas) {
     this.canvas = canvas
     this.width = group.width
     this.height = group.height
+    this.origStroke = group.style.stroke
+    this.origStrokeWidth = group.style.strokeWidth
 
     const bgRect = new fabric.Rect({
       left: -group.width / 2,
@@ -209,6 +214,30 @@ export class FabricGroupRenderer implements GroupRenderer {
     const snapped = snapLowerLeft(lowerLeftX, lowerLeftY, gridSize)
     this.fabricGroup.set({ left: snapped.x + halfW, top: snapped.y - halfH })
     this.fabricGroup.setCoords()
+  }
+
+  /** Highlight this group as a drop target during shape drag. */
+  highlight(): void {
+    if (this.highlighted) return
+    this.highlighted = true
+    const bgRect = this.fabricGroup
+      .getObjects()
+      .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+    if (!bgRect) return
+    bgRect.set({ stroke: '#3b82f6', strokeWidth: 2 })
+    this.canvas.requestRenderAll()
+  }
+
+  /** Remove drop-target highlight, restoring original stroke. */
+  unhighlight(): void {
+    if (!this.highlighted) return
+    this.highlighted = false
+    const bgRect = this.fabricGroup
+      .getObjects()
+      .find((o) => (o as unknown as Record<string, unknown>).__groupBg)
+    if (!bgRect) return
+    bgRect.set({ stroke: this.origStroke, strokeWidth: this.origStrokeWidth })
+    this.canvas.requestRenderAll()
   }
 
   destroy(): void {

@@ -461,6 +461,24 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.deps.layer.batchDraw()
   }
 
+  /** Highlight this group as a drop target during shape drag. */
+  highlight(): void {
+    const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
+    if (!bgRect) return
+    bgRect.stroke('#3b82f6')
+    bgRect.strokeWidth(2)
+    this.deps.layer.batchDraw()
+  }
+
+  /** Remove drop-target highlight, restoring original stroke. */
+  unhighlight(): void {
+    const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
+    if (!bgRect) return
+    bgRect.stroke(this.origStroke)
+    bgRect.strokeWidth(this.origStrokeWidth)
+    this.deps.layer.batchDraw()
+  }
+
   /**
    * Brief red flash on the group border to indicate a collision rejection.
    * Cancels any pending flash timeout before starting a new one, and restores

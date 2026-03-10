@@ -16,6 +16,7 @@ import { registerEngine } from './create-engine'
 import { KonvaGroupRenderer } from './konva-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
+import { findContainingBinGroup } from './containment'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,8 @@ export class KonvaEngine implements LayoutEngine {
   private bgRect: Konva.Rect | null = null
   private gridBgRect: Konva.Rect | null = null
   private insets: ViewportInsets = {}
+  /** Currently highlighted group ID during shape drag (for drop-target feedback). */
+  private highlightedGroupId: string | null = null
 
   // Pan/zoom, click-select, and rubber-band now handled by GestureRecognizer (#226)
 
@@ -253,6 +256,29 @@ export class KonvaEngine implements LayoutEngine {
 
     // Shapes move freely — no grid snap (only bins snap to the bin grid).
 
+    // Highlight target bin during shape drag (drop-target feedback)
+    node.on('dragmove', () => {
+      if ((this.transformer?.nodes().length ?? 0) > 1) return // skip multi-select
+      const absPos = node.getAbsolutePosition()
+      const stage = this.stage
+      if (!stage) return
+      const stagePos = stage.position()
+      const scale = stage.scaleX()
+      const worldX = (absPos.x - stagePos.x) / scale
+      const worldY = (absPos.y - stagePos.y) / scale
+      const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+      const targetId = targetBin?.id ?? null
+      if (targetId !== this.highlightedGroupId) {
+        if (this.highlightedGroupId) {
+          this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+        }
+        if (targetId) {
+          this.rendererMap.get(targetId)?.highlight()
+        }
+        this.highlightedGroupId = targetId
+      }
+    })
+
     node.on('dragend', () => {
       const data = this.shapeMap.get(shape.id)
       if (data) {
@@ -260,6 +286,9 @@ export class KonvaEngine implements LayoutEngine {
         data.y = node.y()
       }
       this.emitter.emit('shapeMoved', { id: shape.id, x: node.x(), y: node.y() })
+
+      // Evaluate shape-to-bin reassignment based on world-space centroid
+      this.evaluateShapeReassignment(shape.id, node)
     })
 
     // Rects and ellipses: reset scale live so they stay crisp and corner radii don't distort.
@@ -772,6 +801,59 @@ export class KonvaEngine implements LayoutEngine {
         this.emitter.emit('shapeMoved', { id, x: node.x(), y: node.y() })
       }
     }
+  }
+
+  /**
+   * Evaluate whether a shape should be reassigned to a different bin (or unassigned)
+   * based on its world-space centroid after a drag ends.
+   */
+  private evaluateShapeReassignment(shapeId: string, node: Konva.Shape): void {
+    // Clear any drag highlight
+    if (this.highlightedGroupId) {
+      this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+      this.highlightedGroupId = null
+    }
+
+    // Skip during multi-select drag
+    if ((this.transformer?.nodes().length ?? 0) > 1) return
+
+    const data = this.shapeMap.get(shapeId)
+    if (!data) return
+
+    // Compute world-space centroid — use absolute position to handle grouped shapes
+    const absPos = node.getAbsolutePosition()
+    const stage = this.stage
+    if (!stage) return
+    // Convert from stage (screen) coordinates to world coordinates
+    const stagePos = stage.position()
+    const scale = stage.scaleX()
+    const worldX = (absPos.x - stagePos.x) / scale
+    const worldY = (absPos.y - stagePos.y) / scale
+
+    // Find which bin contains the shape's centroid
+    const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+    const targetGroupId = targetBin?.id ?? null
+    const currentGroupId = data.groupId
+
+    // No change needed
+    if (targetGroupId === currentGroupId) return
+
+    // Remove from old group
+    if (currentGroupId) {
+      this.removeFromGroup(shapeId)
+    }
+
+    // Add to new group
+    if (targetGroupId) {
+      this.addToGroup(shapeId, targetGroupId)
+    }
+
+    // Emit reassignment event
+    this.emitter.emit('shapeReassigned', {
+      shapeId,
+      oldGroupId: currentGroupId,
+      newGroupId: targetGroupId
+    })
   }
 
   // ─── Selection ──────────────────────────────────────────────────────────────
