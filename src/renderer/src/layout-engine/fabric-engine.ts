@@ -17,6 +17,7 @@ import { FabricGroupRenderer } from './fabric-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
 import { computeEdgeAnchor } from './input-math'
+import { findContainingBinGroup } from './containment'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -183,6 +184,16 @@ export class FabricEngine implements LayoutEngine {
     gridOrigin: DEFAULT_GRID_ORIGIN
   }
   private insets: ViewportInsets = {}
+  /** Currently highlighted group ID during shape drag (for drop-target feedback). */
+  private highlightedGroupId: string | null = null
+  /**
+   * Suppresses the shape branch of `object:modified` while we're reparenting a
+   * shape. Fabric's `canvas.remove`/`canvas.add` of the active object internally
+   * calls `_discardActiveObject` → `_finalizeCurrentTransform`, which fires
+   * `object:modified` again and would re-enter `evaluateShapeReassignment`
+   * before `shape.groupId` is updated, double-pushing into `group.childIds`.
+   */
+  private reassigningShape = false
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -362,16 +373,24 @@ export class FabricEngine implements LayoutEngine {
     // Tag for reverse lookup in event handlers
     ;(renderer.fabricGroup as unknown as Record<string, unknown>)[GROUP_DATA_KEY] = group.id
 
-    // Move children into group
+    // Move children into group — bypass group.add()/enterGroup to avoid
+    // FitContentLayout corrupting the bin's fixed dimensions.
+    // Shape coords from the snapshot are already in group-local space.
+    const internalObjects = (renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] })
+      ._objects
     for (const childId of group.childIds) {
       const obj = this.fabricMap.get(childId)
       if (obj) {
         this.canvas.remove(obj)
-        renderer.fabricGroup.add(obj)
+        obj._set('parent', renderer.fabricGroup)
+        obj._set('group', renderer.fabricGroup)
+        obj._set('canvas', this.canvas)
+        internalObjects.push(obj)
       }
       const shape = this.shapeMap.get(childId)
       if (shape) shape.groupId = group.id
     }
+    renderer.fabricGroup.set('dirty', true)
 
     this.canvas.add(renderer.fabricGroup)
     this.canvas.requestRenderAll()
@@ -425,7 +444,7 @@ export class FabricEngine implements LayoutEngine {
   }
 
   addToGroup(shapeId: string, groupId: string): void {
-    if (this.disposed) return
+    if (this.disposed || !this.canvas) return
     const group = this.groupMap.get(groupId)
     const renderer = this.rendererMap.get(groupId)
     const obj = this.fabricMap.get(shapeId)
@@ -433,17 +452,46 @@ export class FabricEngine implements LayoutEngine {
 
     if (!group || !renderer || !obj || !shape) return
 
-    this.canvas?.remove(obj)
-    renderer.fabricGroup.add(obj)
+    // Compute world-space position before removing from canvas
+    const matrix = obj.calcTransformMatrix()
+    const worldX = matrix[4]
+    const worldY = matrix[5]
 
-    group.childIds = [...group.childIds, shapeId]
-    shape.groupId = groupId
+    this.reassigningShape = true
+    try {
+      this.canvas.remove(obj)
 
-    this.canvas?.requestRenderAll()
+      // Convert world position to group-local coordinates (relative to centroid)
+      const gMatrix = renderer.fabricGroup.calcTransformMatrix()
+      const inv = fabric.util.invertTransform(gMatrix)
+      const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
+      obj.set({ left: localPt.x, top: localPt.y })
+      obj.setCoords()
+
+      // Bypass group.add() which calls enterGroup + FitContentLayout, corrupting
+      // the bin's fixed dimensions. Instead push directly onto _objects like
+      // decorations do (see FabricGroupRenderer.setDecorations).
+      const internalObjects = (
+        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+      )._objects
+      obj._set('parent', renderer.fabricGroup)
+      obj._set('group', renderer.fabricGroup)
+      obj._set('canvas', this.canvas)
+      internalObjects.push(obj)
+
+      renderer.fabricGroup.set('dirty', true)
+
+      group.childIds = [...group.childIds, shapeId]
+      shape.groupId = groupId
+
+      this.canvas.requestRenderAll()
+    } finally {
+      this.reassigningShape = false
+    }
   }
 
   removeFromGroup(shapeId: string): void {
-    if (this.disposed) return
+    if (this.disposed || !this.canvas) return
     const shape = this.shapeMap.get(shapeId)
     if (!shape?.groupId) return
 
@@ -457,15 +505,31 @@ export class FabricEngine implements LayoutEngine {
     const matrix = obj.calcTransformMatrix()
     const point = new fabric.Point(matrix[4], matrix[5])
 
-    renderer.fabricGroup.remove(obj)
-    obj.set({ left: point.x, top: point.y })
-    obj.setCoords()
-    this.canvas?.add(obj)
+    this.reassigningShape = true
+    try {
+      // Bypass group.remove() which triggers FitContentLayout recalculation.
+      // Splice directly from _objects to preserve the bin's fixed dimensions.
+      const internalObjects = (
+        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+      )._objects
+      const idx = internalObjects.indexOf(obj)
+      if (idx !== -1) internalObjects.splice(idx, 1)
+      obj._set('parent', undefined)
+      obj._set('group', undefined)
 
-    group.childIds = group.childIds.filter((id) => id !== shapeId)
-    shape.groupId = null
+      obj.set({ left: point.x, top: point.y })
+      obj.setCoords()
+      this.canvas.add(obj)
 
-    this.canvas?.requestRenderAll()
+      renderer.fabricGroup.set('dirty', true)
+
+      group.childIds = group.childIds.filter((id) => id !== shapeId)
+      shape.groupId = null
+
+      this.canvas.requestRenderAll()
+    } finally {
+      this.reassigningShape = false
+    }
   }
 
   setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void {
@@ -1067,7 +1131,13 @@ export class FabricEngine implements LayoutEngine {
       }
 
       const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
-      if (shapeId) {
+      if (shapeId && !this.reassigningShape) {
+        // Evaluate reassignment first so any reparenting happens before we
+        // snapshot the new position. Otherwise the undo entry pushed by
+        // shapeMoved captures a state with the old groupId at the new
+        // position, and Cmd+Z lands the user in that intermediate state.
+        this.evaluateShapeReassignment(shapeId, obj)
+
         this.emitter.emit('shapeMoved', { id: shapeId, x: obj.left ?? 0, y: obj.top ?? 0 })
 
         // Emit shapeResized with current dimensions
@@ -1282,6 +1352,51 @@ export class FabricEngine implements LayoutEngine {
     }
 
     this.lastGoodPos.delete('__activeSelection')
+  }
+
+  /**
+   * Evaluate whether a shape should be reassigned to a different bin (or unassigned)
+   * based on its world-space centroid after a drag ends.
+   */
+  private evaluateShapeReassignment(shapeId: string, obj: fabric.FabricObject): void {
+    // Clear any drag highlight
+    if (this.highlightedGroupId) {
+      this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+      this.highlightedGroupId = null
+    }
+
+    const data = this.shapeMap.get(shapeId)
+    if (!data) return
+
+    // Compute world-space centroid of the shape
+    const matrix = obj.calcTransformMatrix()
+    const worldX = matrix[4]
+    const worldY = matrix[5]
+
+    // Find which bin contains the shape's centroid
+    const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+    const targetGroupId = targetBin?.id ?? null
+    const currentGroupId = data.groupId
+
+    // No change needed
+    if (targetGroupId === currentGroupId) return
+
+    // Remove from old group
+    if (currentGroupId) {
+      this.removeFromGroup(shapeId)
+    }
+
+    // Add to new group
+    if (targetGroupId) {
+      this.addToGroup(shapeId, targetGroupId)
+    }
+
+    // Emit reassignment event and tick
+    this.emitter.emit('shapeReassigned', {
+      shapeId,
+      oldGroupId: currentGroupId,
+      newGroupId: targetGroupId
+    })
   }
 
   /** Create or update a non-scaling overlay rect showing grid-snapped resize preview. */
@@ -1528,6 +1643,27 @@ export class FabricEngine implements LayoutEngine {
       }
       // Shapes do not snap to the bin grid — they move freely.
       obj.setCoords()
+
+      // Highlight the target bin during shape drag (drop-target feedback)
+      const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
+      if (shapeId) {
+        const matrix = obj.calcTransformMatrix()
+        const worldX = matrix[4]
+        const worldY = matrix[5]
+        const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+        const targetId = targetBin?.id ?? null
+        if (targetId !== this.highlightedGroupId) {
+          // Unhighlight previous
+          if (this.highlightedGroupId) {
+            this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+          }
+          // Highlight new
+          if (targetId) {
+            this.rendererMap.get(targetId)?.highlight()
+          }
+          this.highlightedGroupId = targetId
+        }
+      }
     })
   }
 

@@ -198,5 +198,6 @@ export type EngineEventMap = {
   groupMoved: { id: string; x: number; y: number }
   groupResized: { id: string; width: number; height: number }
   collisionRejected: { id: string; reason: 'move' | 'resize' }
+  shapeReassigned: { shapeId: string; oldGroupId: string | null; newGroupId: string | null }
   viewportChanged: { panX: number; panY: number; zoom: number }
 }

@@ -12,7 +12,7 @@ import { useProject } from '@/hooks/useProject'
 import { useLayoutEngineContext, useEngineState } from '@/layout-engine'
 import type { LayoutEngine } from '@/layout-engine'
 import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/types'
-import { isBinGroup } from '@/layout-engine/types'
+import { findContainingBinGroup } from '@/layout-engine/containment'
 import { computeDefaultPocketDepth } from '../../../shared/types/project'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
@@ -101,25 +101,12 @@ function nextShapeName(engine: LayoutEngine, type: string): string {
 // ─── Bin hit testing ────────────────────────────────────────────────────────
 
 /** Find the bin group containing a world-space point, if any. */
-function findContainingBinGroup(
+function findBinAtPoint(
   engine: LayoutEngine,
   worldX: number,
   worldY: number
 ): (LayoutGroup & { metadata: BinMetadata }) | null {
-  const groups = engine.getAllGroups()
-  for (const group of groups) {
-    if (!isBinGroup(group)) continue
-    // Lower-left corner convention: group extends rightward (+x) and upward (-y)
-    if (
-      worldX >= group.x &&
-      worldX <= group.x + group.width &&
-      worldY <= group.y &&
-      worldY >= group.y - group.height
-    ) {
-      return group
-    }
-  }
-  return null
+  return findContainingBinGroup(engine.getAllGroups(), worldX, worldY)
 }
 
 function pocketMetadata(
@@ -160,16 +147,18 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   const unitHeight = useProject((s) => s.project?.gridfinity.unitHeight ?? 7)
 
   // Reset polygon state when switching away from polygon tool.
+
   const prevToolRef = useRef(activeTool)
   const [state, setState] = useState<DrawingState>(INITIAL_STATE)
-  // eslint-disable-next-line react-hooks/refs -- prevToolRef tracks prop transitions during render (React docs pattern)
+
+  /* eslint-disable react-hooks/refs -- intentional previous-value tracking pattern */
   if (prevToolRef.current !== activeTool) {
-    // eslint-disable-next-line react-hooks/refs -- writing tracked prop value
     prevToolRef.current = activeTool
     if (activeTool !== 'polygon' && state !== INITIAL_STATE) {
       setState(INITIAL_STATE)
     }
   }
+  /* eslint-enable react-hooks/refs */
 
   // Refs for drag state (rect/circle) — not rendered, so ref is fine
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
@@ -212,7 +201,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length
       const relativePoints = pts.map((p) => ({ x: p.x - cx, y: p.y - cy }))
 
-      const bin = findContainingBinGroup(engine, cx, cy)
+      const bin = findBinAtPoint(engine, cx, cy)
       const id = crypto.randomUUID()
       const name = nextShapeName(engine, 'polygon')
 
@@ -409,7 +398,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           const y = Math.min(start.y, snapped.y)
           const cx = x + w / 2
           const cy = y + h / 2
-          const bin = findContainingBinGroup(engine, cx, cy)
+          const bin = findBinAtPoint(engine, cx, cy)
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'rect')
           engine.addShape({
@@ -431,7 +420,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         const dy = snapped.y - start.y
         const radius = Math.sqrt(dx * dx + dy * dy)
         if (radius > 2) {
-          const bin = findContainingBinGroup(engine, start.x, start.y)
+          const bin = findBinAtPoint(engine, start.x, start.y)
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'circle')
           engine.addShape({

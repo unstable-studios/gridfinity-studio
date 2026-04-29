@@ -16,6 +16,7 @@ import { registerEngine } from './create-engine'
 import { KonvaGroupRenderer } from './konva-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
+import { findContainingBinGroup } from './containment'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -137,6 +138,8 @@ export class KonvaEngine implements LayoutEngine {
   private bgRect: Konva.Rect | null = null
   private gridBgRect: Konva.Rect | null = null
   private insets: ViewportInsets = {}
+  /** Currently highlighted group ID during shape drag (for drop-target feedback). */
+  private highlightedGroupId: string | null = null
 
   // Pan/zoom, click-select, and rubber-band now handled by GestureRecognizer (#226)
 
@@ -253,7 +256,36 @@ export class KonvaEngine implements LayoutEngine {
 
     // Shapes move freely — no grid snap (only bins snap to the bin grid).
 
+    // Highlight target bin during shape drag (drop-target feedback)
+    node.on('dragmove', () => {
+      if ((this.transformer?.nodes().length ?? 0) > 1) return // skip multi-select
+      const absPos = node.getAbsolutePosition()
+      const stage = this.stage
+      if (!stage) return
+      const stagePos = stage.position()
+      const scale = stage.scaleX()
+      const worldX = (absPos.x - stagePos.x) / scale
+      const worldY = (absPos.y - stagePos.y) / scale
+      const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+      const targetId = targetBin?.id ?? null
+      if (targetId !== this.highlightedGroupId) {
+        if (this.highlightedGroupId) {
+          this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+        }
+        if (targetId) {
+          this.rendererMap.get(targetId)?.highlight()
+        }
+        this.highlightedGroupId = targetId
+      }
+    })
+
     node.on('dragend', () => {
+      // Evaluate reassignment first so any reparenting happens before we
+      // snapshot the new position. Otherwise the undo entry pushed by
+      // shapeMoved captures a state with the old groupId at the new
+      // position, and Cmd+Z lands the user in that intermediate state.
+      this.evaluateShapeReassignment(shape.id, node)
+
       const data = this.shapeMap.get(shape.id)
       if (data) {
         data.x = node.x()
@@ -555,7 +587,7 @@ export class KonvaEngine implements LayoutEngine {
   }
 
   addToGroup(shapeId: string, groupId: string): void {
-    if (this.disposed) return
+    if (this.disposed || !this.stage) return
     const group = this.groupMap.get(groupId)
     const renderer = this.rendererMap.get(groupId)
     const node = this.konvaMap.get(shapeId)
@@ -563,10 +595,22 @@ export class KonvaEngine implements LayoutEngine {
 
     if (!group || !renderer || !node || !shape) return
 
-    const absX = node.x()
-    const absY = node.y()
+    // Compute world position via getAbsolutePosition (screen-space) and undo
+    // the stage transform. Reading node.x()/y() directly is unsafe when the
+    // shape was just moved out of another group: removeFromGroup can leave
+    // the node's local position in a coord space that depends on parentage
+    // history. getAbsolutePosition() always reports the current screen pos.
+    const absPos = node.getAbsolutePosition()
+    const stageScale = this.stage.scaleX()
+    const stagePos = this.stage.position()
+    const worldX = (absPos.x - stagePos.x) / stageScale
+    const worldY = (absPos.y - stagePos.y) / stageScale
+
     node.moveTo(renderer.konvaGroup)
-    node.position({ x: absX - renderer.konvaGroup.x(), y: absY - renderer.konvaGroup.y() })
+    // konvaGroup lives in mainLayer (world-space) coords; the node's new
+    // local position is world minus the group's centroid.
+    const groupPos = renderer.konvaGroup.position()
+    node.position({ x: worldX - groupPos.x, y: worldY - groupPos.y })
 
     group.childIds = [...group.childIds, shapeId]
     shape.groupId = groupId
@@ -575,7 +619,7 @@ export class KonvaEngine implements LayoutEngine {
   }
 
   removeFromGroup(shapeId: string): void {
-    if (this.disposed || !this.mainLayer) return
+    if (this.disposed || !this.mainLayer || !this.stage) return
     const shape = this.shapeMap.get(shapeId)
     if (!shape?.groupId) return
 
@@ -585,9 +629,18 @@ export class KonvaEngine implements LayoutEngine {
 
     if (!group || !renderer || !node) return
 
+    // Convert screen-space getAbsolutePosition() → world (mainLayer-local).
+    // Setting node.position(absPos) directly would leave the node at the
+    // raw screen coords inside mainLayer, which is wrong whenever the stage
+    // has any zoom or pan applied.
     const absPos = node.getAbsolutePosition()
+    const stageScale = this.stage.scaleX()
+    const stagePos = this.stage.position()
+    const worldX = (absPos.x - stagePos.x) / stageScale
+    const worldY = (absPos.y - stagePos.y) / stageScale
+
     node.moveTo(this.mainLayer)
-    node.position(absPos)
+    node.position({ x: worldX, y: worldY })
 
     group.childIds = group.childIds.filter((id) => id !== shapeId)
     shape.groupId = null
@@ -772,6 +825,59 @@ export class KonvaEngine implements LayoutEngine {
         this.emitter.emit('shapeMoved', { id, x: node.x(), y: node.y() })
       }
     }
+  }
+
+  /**
+   * Evaluate whether a shape should be reassigned to a different bin (or unassigned)
+   * based on its world-space centroid after a drag ends.
+   */
+  private evaluateShapeReassignment(shapeId: string, node: Konva.Shape): void {
+    // Clear any drag highlight
+    if (this.highlightedGroupId) {
+      this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+      this.highlightedGroupId = null
+    }
+
+    // Skip during multi-select drag
+    if ((this.transformer?.nodes().length ?? 0) > 1) return
+
+    const data = this.shapeMap.get(shapeId)
+    if (!data) return
+
+    // Compute world-space centroid — use absolute position to handle grouped shapes
+    const absPos = node.getAbsolutePosition()
+    const stage = this.stage
+    if (!stage) return
+    // Convert from stage (screen) coordinates to world coordinates
+    const stagePos = stage.position()
+    const scale = stage.scaleX()
+    const worldX = (absPos.x - stagePos.x) / scale
+    const worldY = (absPos.y - stagePos.y) / scale
+
+    // Find which bin contains the shape's centroid
+    const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)
+    const targetGroupId = targetBin?.id ?? null
+    const currentGroupId = data.groupId
+
+    // No change needed
+    if (targetGroupId === currentGroupId) return
+
+    // Remove from old group
+    if (currentGroupId) {
+      this.removeFromGroup(shapeId)
+    }
+
+    // Add to new group
+    if (targetGroupId) {
+      this.addToGroup(shapeId, targetGroupId)
+    }
+
+    // Emit reassignment event
+    this.emitter.emit('shapeReassigned', {
+      shapeId,
+      oldGroupId: currentGroupId,
+      newGroupId: targetGroupId
+    })
   }
 
   // ─── Selection ──────────────────────────────────────────────────────────────
