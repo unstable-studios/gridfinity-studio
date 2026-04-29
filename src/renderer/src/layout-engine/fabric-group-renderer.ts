@@ -98,6 +98,13 @@ export class FabricGroupRenderer implements GroupRenderer {
       this.triggerLayoutSafe()
     }
 
+    if (patch.style !== undefined) {
+      // Keep canonical stroke/width in sync so flashCollision and unhighlight
+      // restore the latest style, not the value captured at construction.
+      this.origStroke = current.style.stroke
+      this.origStrokeWidth = current.style.strokeWidth
+    }
+
     // Set centroid position AFTER triggerLayout so it doesn't get overridden
     if (
       patch.x !== undefined ||

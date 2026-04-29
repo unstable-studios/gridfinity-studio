@@ -444,7 +444,7 @@ export class FabricEngine implements LayoutEngine {
   }
 
   addToGroup(shapeId: string, groupId: string): void {
-    if (this.disposed) return
+    if (this.disposed || !this.canvas) return
     const group = this.groupMap.get(groupId)
     const renderer = this.rendererMap.get(groupId)
     const obj = this.fabricMap.get(shapeId)
@@ -459,7 +459,7 @@ export class FabricEngine implements LayoutEngine {
 
     this.reassigningShape = true
     try {
-      this.canvas?.remove(obj)
+      this.canvas.remove(obj)
 
       // Convert world position to group-local coordinates (relative to centroid)
       const gMatrix = renderer.fabricGroup.calcTransformMatrix()
@@ -476,7 +476,7 @@ export class FabricEngine implements LayoutEngine {
       )._objects
       obj._set('parent', renderer.fabricGroup)
       obj._set('group', renderer.fabricGroup)
-      obj._set('canvas', this.canvas!)
+      obj._set('canvas', this.canvas)
       internalObjects.push(obj)
 
       renderer.fabricGroup.set('dirty', true)
@@ -484,14 +484,14 @@ export class FabricEngine implements LayoutEngine {
       group.childIds = [...group.childIds, shapeId]
       shape.groupId = groupId
 
-      this.canvas?.requestRenderAll()
+      this.canvas.requestRenderAll()
     } finally {
       this.reassigningShape = false
     }
   }
 
   removeFromGroup(shapeId: string): void {
-    if (this.disposed) return
+    if (this.disposed || !this.canvas) return
     const shape = this.shapeMap.get(shapeId)
     if (!shape?.groupId) return
 
@@ -519,14 +519,14 @@ export class FabricEngine implements LayoutEngine {
 
       obj.set({ left: point.x, top: point.y })
       obj.setCoords()
-      this.canvas?.add(obj)
+      this.canvas.add(obj)
 
       renderer.fabricGroup.set('dirty', true)
 
       group.childIds = group.childIds.filter((id) => id !== shapeId)
       shape.groupId = null
 
-      this.canvas?.requestRenderAll()
+      this.canvas.requestRenderAll()
     } finally {
       this.reassigningShape = false
     }
