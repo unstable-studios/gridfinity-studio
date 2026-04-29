@@ -44,7 +44,7 @@
 
 - [X] T006 [US1] Add shape drag-end reassignment logic to Fabric engine in `src/renderer/src/layout-engine/fabric-engine.ts` — in the `object:modified` handler, after detecting a shape (via `SHAPE_DATA_KEY`), compute the shape's world-space centroid, call `findContainingBinGroup`, and if the target group differs from current `shape.groupId`, call `removeFromGroup` (if currently grouped) then `addToGroup` (if target bin exists). Emit `groupChanged` event and increment tick. Skip if object is an ActiveSelection (multi-select guard per FR-009).
 - [X] T007 [US1] Add shape drag-end reassignment logic to Konva engine in `src/renderer/src/layout-engine/konva-engine.ts` — in the shape `dragend` handler (inside `addShape`), compute the shape's world-space position (use `node.getAbsolutePosition()` if grouped, `node.position()` if ungrouped), call `findContainingBinGroup`, and if the target group differs from current `shape.groupId`, call `removeFromGroup`/`addToGroup` as needed. Emit `groupChanged` event and increment tick. Skip if `transformer?.nodes().length > 1` (multi-select guard).
-- [ ] T008 [US1] Smoke test: run `pnpm dev`, create a bin, draw a rectangle outside it, drag the rectangle into the bin, verify sidebar updates and no visual jump. Test on both Fabric and Konva engines.
+- [X] T008 [US1] Smoke test: run `pnpm dev`, create a bin, draw a rectangle outside it, drag the rectangle into the bin, verify sidebar updates and no visual jump. Test on both Fabric and Konva engines.
 
 **Checkpoint**: Drag-in works on both engines. Shapes can be assigned to bins by dragging.
 
@@ -60,7 +60,7 @@
 
 - [X] T009 [US2] Verify drag-out works in Fabric engine — the reassignment logic from T006 should already handle this case (target bin is null, current groupId is set → `removeFromGroup` is called). If not, add the null-target path to `src/renderer/src/layout-engine/fabric-engine.ts`.
 - [X] T010 [US2] Verify drag-out works in Konva engine — the reassignment logic from T007 should already handle this case. If not, add the null-target path to `src/renderer/src/layout-engine/konva-engine.ts`.
-- [ ] T011 [US2] Smoke test: run `pnpm dev`, create a bin with a shape inside it, drag the shape outside, verify sidebar updates and no visual jump. Also verify dragging within the same bin causes no change. Test on both engines.
+- [X] T011 [US2] Smoke test: run `pnpm dev`, create a bin with a shape inside it, drag the shape outside, verify sidebar updates and no visual jump. Also verify dragging within the same bin causes no change. Test on both engines.
 
 **Checkpoint**: Drag-in and drag-out both work. Shapes can move freely between grouped and ungrouped states.
 
@@ -75,7 +75,7 @@
 ### Implementation for User Story 3
 
 - [X] T012 [US3] Verify bin-to-bin transfer works in both engines — the reassignment logic from T006/T007 should handle this (old groupId differs from new groupId → `removeFromGroup` then `addToGroup`). If coordinate conversion causes a visual jump during bin-to-bin transfer, fix the world-space position preservation in `src/renderer/src/layout-engine/fabric-engine.ts` and `src/renderer/src/layout-engine/konva-engine.ts`.
-- [ ] T013 [US3] Smoke test: run `pnpm dev`, create two adjacent bins, draw a shape in the first, drag it into the second, verify sidebar updates and no visual jump. Test on both engines.
+- [X] T013 [US3] Smoke test: run `pnpm dev`, create two adjacent bins, draw a shape in the first, drag it into the second, verify sidebar updates and no visual jump. Test on both engines.
 
 **Checkpoint**: All three reassignment paths work (in, out, between). Core feature complete.
 
@@ -92,7 +92,7 @@
 - [X] T014 [US4] Add drag-move highlight logic to Fabric engine in `src/renderer/src/layout-engine/fabric-engine.ts` — in the `object:moving` handler, when the moved object is a shape (not a group or ActiveSelection), compute its world-space centroid, call `findContainingBinGroup`, and highlight/unhighlight the target bin renderer. Track the currently highlighted group ID to avoid redundant updates. Clear highlight when centroid is outside all bins.
 - [X] T015 [US4] Add drag-move highlight logic to Konva engine in `src/renderer/src/layout-engine/konva-engine.ts` — in the shape's `dragmove` handler (add one inside `addShape`), compute world-space position, call `findContainingBinGroup`, and highlight/unhighlight the target bin renderer. Track currently highlighted group ID. Clear highlight when centroid leaves all bins.
 - [X] T016 [US4] Ensure highlight is cleared on drag end in both engines — after reassignment logic in T006/T007, call `unhighlight()` on any currently highlighted renderer and reset the tracked highlight ID. This prevents stale highlights if the user drops the shape.
-- [ ] T017 [US4] Smoke test: run `pnpm dev`, drag a shape across multiple bins, verify highlight appears on the bin under the centroid, transfers between bins, and disappears when over empty canvas. Test on both engines.
+- [X] T017 [US4] Smoke test: run `pnpm dev`, drag a shape across multiple bins, verify highlight appears on the bin under the centroid, transfers between bins, and disappears when over empty canvas. Test on both engines.
 
 **Checkpoint**: Full feature complete — drag assignment with real-time visual feedback on both engines.
 
@@ -104,8 +104,8 @@
 
 - [X] T018 Verify undo/redo works for all reassignment scenarios — drag in, drag out, drag between. The existing snapshot-based undo should capture groupId/childIds changes automatically. If not, ensure a snapshot is taken before reassignment in `src/renderer/src/layout-engine/fabric-engine.ts` and `src/renderer/src/layout-engine/konva-engine.ts`.
 - [X] T019 Add tie-breaking logic to `findContainingBinGroup` in `src/renderer/src/layout-engine/containment.ts` — if a point is inside multiple bins (defensive edge case), return the bin whose center is closest to the point instead of the first match.
-- [ ] T020 Run full quickstart.md validation — execute all 6 scenarios from `specs/013-shape-drag-assignment/quickstart.md` on both engines and verify expected outcomes.
-- [ ] T021 Update CLAUDE.md recent changes section to document shape-to-bin drag assignment feature
+- [X] T020 Run full quickstart.md validation — execute all 6 scenarios from `specs/013-shape-drag-assignment/quickstart.md` on both engines and verify expected outcomes.
+- [X] T021 Update CLAUDE.md recent changes section to document shape-to-bin drag assignment feature
 
 ---
 
