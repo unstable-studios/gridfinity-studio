@@ -35,7 +35,7 @@
 
 ## New Event
 
-### groupChanged (addition to EngineEventMap)
+### shapeReassigned (addition to EngineEventMap)
 
 | Field      | Type           | Description                         |
 | ---------- | -------------- | ----------------------------------- |

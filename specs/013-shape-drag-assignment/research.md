@@ -61,8 +61,8 @@ Single-shape drag reassignment is the intended behavior per spec (FR-009).
 
 ## R6: Event Emission
 
-**Decision**: Add `groupChanged` event to `EngineEventMap` for sidebar reactivity.
+**Decision**: Add `shapeReassigned` event to `EngineEventMap` for sidebar reactivity.
 
-**Rationale**: The existing `shapeMoved` event fires on position change but doesn't indicate group membership change. A distinct `groupChanged` event with `{ shapeId, oldGroupId, newGroupId }` allows the sidebar (and any future consumers) to react specifically to reassignment. The tick counter increment already triggers `useSyncExternalStore` re-renders.
+**Rationale**: The existing `shapeMoved` event fires on position change but doesn't indicate group membership change. A distinct `shapeReassigned` event with `{ shapeId, oldGroupId, newGroupId }` allows the sidebar (and any future consumers) to react specifically to reassignment. The tick counter increment already triggers `useSyncExternalStore` re-renders.
 
 **Alternatives considered**: Relying solely on tick increment without a specific event. Viable but less informative — a dedicated event is cleaner for debugging and future extensibility.

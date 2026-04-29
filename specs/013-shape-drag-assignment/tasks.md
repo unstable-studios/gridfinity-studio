@@ -30,7 +30,7 @@
 - [X] T004 [P] Add `highlight()` and `unhighlight()` methods to `FabricGroupRenderer` in `src/renderer/src/layout-engine/fabric-group-renderer.ts` — modify `__groupBg` stroke to blue (`#3b82f6`) with increased width on highlight, restore original stroke/width on unhighlight
 - [X] T005 [P] Add `highlight()` and `unhighlight()` methods to `KonvaGroupRenderer` in `src/renderer/src/layout-engine/konva-group-renderer.ts` — same visual behavior as Fabric, using stored `origStroke`/`origStrokeWidth` for restore
 
-**Checkpoint**: Foundation ready — highlight/unhighlight available on both renderers, containment utility extracted, groupChanged event defined
+**Checkpoint**: Foundation ready — highlight/unhighlight available on both renderers, containment utility extracted, shapeReassigned event defined
 
 ---
 
@@ -42,8 +42,8 @@
 
 ### Implementation for User Story 1
 
-- [X] T006 [US1] Add shape drag-end reassignment logic to Fabric engine in `src/renderer/src/layout-engine/fabric-engine.ts` — in the `object:modified` handler, after detecting a shape (via `SHAPE_DATA_KEY`), compute the shape's world-space centroid, call `findContainingBinGroup`, and if the target group differs from current `shape.groupId`, call `removeFromGroup` (if currently grouped) then `addToGroup` (if target bin exists). Emit `groupChanged` event and increment tick. Skip if object is an ActiveSelection (multi-select guard per FR-009).
-- [X] T007 [US1] Add shape drag-end reassignment logic to Konva engine in `src/renderer/src/layout-engine/konva-engine.ts` — in the shape `dragend` handler (inside `addShape`), compute the shape's world-space position (use `node.getAbsolutePosition()` if grouped, `node.position()` if ungrouped), call `findContainingBinGroup`, and if the target group differs from current `shape.groupId`, call `removeFromGroup`/`addToGroup` as needed. Emit `groupChanged` event and increment tick. Skip if `transformer?.nodes().length > 1` (multi-select guard).
+- [X] T006 [US1] Add shape drag-end reassignment logic to Fabric engine in `src/renderer/src/layout-engine/fabric-engine.ts` — in the `object:modified` handler, after detecting a shape (via `SHAPE_DATA_KEY`), compute the shape's world-space centroid, call `findContainingBinGroup`, and if the target group differs from current `shape.groupId`, call `removeFromGroup` (if currently grouped) then `addToGroup` (if target bin exists). Emit `shapeReassigned` event and increment tick. Skip if object is an ActiveSelection (multi-select guard per FR-009).
+- [X] T007 [US1] Add shape drag-end reassignment logic to Konva engine in `src/renderer/src/layout-engine/konva-engine.ts` — in the shape `dragend` handler (inside `addShape`), compute the shape's world-space position (use `node.getAbsolutePosition()` if grouped, `node.position()` if ungrouped), call `findContainingBinGroup`, and if the target group differs from current `shape.groupId`, call `removeFromGroup`/`addToGroup` as needed. Emit `shapeReassigned` event and increment tick. Skip if `transformer?.nodes().length > 1` (multi-select guard).
 - [X] T008 [US1] Smoke test: run `pnpm dev`, create a bin, draw a rectangle outside it, drag the rectangle into the bin, verify sidebar updates and no visual jump. Test on both Fabric and Konva engines.
 
 **Checkpoint**: Drag-in works on both engines. Shapes can be assigned to bins by dragging.

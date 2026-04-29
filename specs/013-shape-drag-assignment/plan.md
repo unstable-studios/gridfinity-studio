@@ -65,7 +65,7 @@ src/renderer/src/layout-engine/
 ├── fabric-group-renderer.ts # MODIFY — add highlight/unhighlight methods
 ├── konva-group-renderer.ts  # MODIFY — add highlight/unhighlight methods
 ├── interface.ts             # No changes needed — addToGroup/removeFromGroup already exist
-└── types.ts                 # MODIFY — add groupChanged event to EngineEventMap
+└── types.ts                 # MODIFY — add shapeReassigned event to EngineEventMap
 
 src/renderer/src/components/
 ├── DrawingToolLayer.tsx     # MODIFY — replace inline findContainingBinGroup with import from containment.ts
@@ -89,7 +89,7 @@ Shape drag starts
                         ──→ compare with current shape.groupId
                         ──→ if different: removeFromGroup (if needed) + addToGroup (if needed)
                         ──→ clear any highlight
-                        ──→ emit groupChanged event
+                        ──→ emit shapeReassigned event
                         ──→ tick++ (triggers sidebar reactivity)
 ```
 
