@@ -35,6 +35,15 @@ export interface GroupRenderer {
    */
   snapToGrid(gridSize: number): void
 
+  /**
+   * Highlight as a drop target during shape drag. Idempotent: a second call
+   * while already highlighted is a no-op.
+   */
+  highlight(): void
+
+  /** Restore the original stroke after highlight(). Idempotent. */
+  unhighlight(): void
+
   /** Remove from canvas/layer and clean up all native objects. */
   destroy(): void
 }

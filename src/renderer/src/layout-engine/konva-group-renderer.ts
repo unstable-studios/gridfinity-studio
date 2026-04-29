@@ -52,6 +52,8 @@ export class KonvaGroupRenderer implements GroupRenderer {
   private origStroke: string
   /** Original stroke width from the group style, for reliable flash restore. */
   private origStrokeWidth: number
+  /** Whether this group is currently highlighted as a drop target. */
+  private highlighted = false
   /** Snapshot of bounds before a resize starts, for edge-anchoring. */
   private preResizeBounds: { x: number; y: number; width: number; height: number } | null = null
   /** Non-scaling overlay rect shown during resize as ghost preview. */
@@ -463,8 +465,10 @@ export class KonvaGroupRenderer implements GroupRenderer {
 
   /** Highlight this group as a drop target during shape drag. */
   highlight(): void {
+    if (this.highlighted) return
     const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
     if (!bgRect) return
+    this.highlighted = true
     bgRect.stroke('#3b82f6')
     bgRect.strokeWidth(2)
     this.deps.layer.batchDraw()
@@ -472,8 +476,10 @@ export class KonvaGroupRenderer implements GroupRenderer {
 
   /** Remove drop-target highlight, restoring original stroke. */
   unhighlight(): void {
+    if (!this.highlighted) return
     const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
     if (!bgRect) return
+    this.highlighted = false
     bgRect.stroke(this.origStroke)
     bgRect.strokeWidth(this.origStrokeWidth)
     this.deps.layer.batchDraw()
