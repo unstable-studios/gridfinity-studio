@@ -1132,6 +1132,12 @@ export class FabricEngine implements LayoutEngine {
 
       const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
       if (shapeId && !this.reassigningShape) {
+        // Evaluate reassignment first so any reparenting happens before we
+        // snapshot the new position. Otherwise the undo entry pushed by
+        // shapeMoved captures a state with the old groupId at the new
+        // position, and Cmd+Z lands the user in that intermediate state.
+        this.evaluateShapeReassignment(shapeId, obj)
+
         this.emitter.emit('shapeMoved', { id: shapeId, x: obj.left ?? 0, y: obj.top ?? 0 })
 
         // Emit shapeResized with current dimensions
@@ -1145,9 +1151,6 @@ export class FabricEngine implements LayoutEngine {
           if ('radiusY' in shape) resizePayload.radiusY = shape.radiusY
           this.emitter.emit('shapeResized', resizePayload)
         }
-
-        // Evaluate shape-to-bin reassignment based on world-space centroid
-        this.evaluateShapeReassignment(shapeId, obj)
       }
 
       const groupId = (obj as unknown as Record<string, unknown>)[GROUP_DATA_KEY] as string
