@@ -186,6 +186,14 @@ export class FabricEngine implements LayoutEngine {
   private insets: ViewportInsets = {}
   /** Currently highlighted group ID during shape drag (for drop-target feedback). */
   private highlightedGroupId: string | null = null
+  /**
+   * Suppresses the shape branch of `object:modified` while we're reparenting a
+   * shape. Fabric's `canvas.remove`/`canvas.add` of the active object internally
+   * calls `_discardActiveObject` → `_finalizeCurrentTransform`, which fires
+   * `object:modified` again and would re-enter `evaluateShapeReassignment`
+   * before `shape.groupId` is updated, double-pushing into `group.childIds`.
+   */
+  private reassigningShape = false
 
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -449,31 +457,37 @@ export class FabricEngine implements LayoutEngine {
     const worldX = matrix[4]
     const worldY = matrix[5]
 
-    this.canvas?.remove(obj)
+    this.reassigningShape = true
+    try {
+      this.canvas?.remove(obj)
 
-    // Convert world position to group-local coordinates (relative to centroid)
-    const gMatrix = renderer.fabricGroup.calcTransformMatrix()
-    const inv = fabric.util.invertTransform(gMatrix)
-    const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
-    obj.set({ left: localPt.x, top: localPt.y })
-    obj.setCoords()
+      // Convert world position to group-local coordinates (relative to centroid)
+      const gMatrix = renderer.fabricGroup.calcTransformMatrix()
+      const inv = fabric.util.invertTransform(gMatrix)
+      const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
+      obj.set({ left: localPt.x, top: localPt.y })
+      obj.setCoords()
 
-    // Bypass group.add() which calls enterGroup + FitContentLayout, corrupting
-    // the bin's fixed dimensions. Instead push directly onto _objects like
-    // decorations do (see FabricGroupRenderer.setDecorations).
-    const internalObjects = (renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] })
-      ._objects
-    obj._set('parent', renderer.fabricGroup)
-    obj._set('group', renderer.fabricGroup)
-    obj._set('canvas', this.canvas!)
-    internalObjects.push(obj)
+      // Bypass group.add() which calls enterGroup + FitContentLayout, corrupting
+      // the bin's fixed dimensions. Instead push directly onto _objects like
+      // decorations do (see FabricGroupRenderer.setDecorations).
+      const internalObjects = (
+        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+      )._objects
+      obj._set('parent', renderer.fabricGroup)
+      obj._set('group', renderer.fabricGroup)
+      obj._set('canvas', this.canvas!)
+      internalObjects.push(obj)
 
-    renderer.fabricGroup.set('dirty', true)
+      renderer.fabricGroup.set('dirty', true)
 
-    group.childIds = [...group.childIds, shapeId]
-    shape.groupId = groupId
+      group.childIds = [...group.childIds, shapeId]
+      shape.groupId = groupId
 
-    this.canvas?.requestRenderAll()
+      this.canvas?.requestRenderAll()
+    } finally {
+      this.reassigningShape = false
+    }
   }
 
   removeFromGroup(shapeId: string): void {
@@ -491,25 +505,31 @@ export class FabricEngine implements LayoutEngine {
     const matrix = obj.calcTransformMatrix()
     const point = new fabric.Point(matrix[4], matrix[5])
 
-    // Bypass group.remove() which triggers FitContentLayout recalculation.
-    // Splice directly from _objects to preserve the bin's fixed dimensions.
-    const internalObjects = (renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] })
-      ._objects
-    const idx = internalObjects.indexOf(obj)
-    if (idx !== -1) internalObjects.splice(idx, 1)
-    obj._set('parent', undefined)
-    obj._set('group', undefined)
+    this.reassigningShape = true
+    try {
+      // Bypass group.remove() which triggers FitContentLayout recalculation.
+      // Splice directly from _objects to preserve the bin's fixed dimensions.
+      const internalObjects = (
+        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+      )._objects
+      const idx = internalObjects.indexOf(obj)
+      if (idx !== -1) internalObjects.splice(idx, 1)
+      obj._set('parent', undefined)
+      obj._set('group', undefined)
 
-    obj.set({ left: point.x, top: point.y })
-    obj.setCoords()
-    this.canvas?.add(obj)
+      obj.set({ left: point.x, top: point.y })
+      obj.setCoords()
+      this.canvas?.add(obj)
 
-    renderer.fabricGroup.set('dirty', true)
+      renderer.fabricGroup.set('dirty', true)
 
-    group.childIds = group.childIds.filter((id) => id !== shapeId)
-    shape.groupId = null
+      group.childIds = group.childIds.filter((id) => id !== shapeId)
+      shape.groupId = null
 
-    this.canvas?.requestRenderAll()
+      this.canvas?.requestRenderAll()
+    } finally {
+      this.reassigningShape = false
+    }
   }
 
   setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void {
@@ -1111,7 +1131,7 @@ export class FabricEngine implements LayoutEngine {
       }
 
       const shapeId = (obj as unknown as Record<string, unknown>)[SHAPE_DATA_KEY] as string
-      if (shapeId) {
+      if (shapeId && !this.reassigningShape) {
         this.emitter.emit('shapeMoved', { id: shapeId, x: obj.left ?? 0, y: obj.top ?? 0 })
 
         // Emit shapeResized with current dimensions
