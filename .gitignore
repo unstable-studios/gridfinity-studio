@@ -45,6 +45,9 @@ vite.svg
 .claude/*
 !.claude/commands/
 
+### Playwright MCP testing artifacts
+.playwright-mcp/
+
 ### act (local GitHub Actions)
 act-*.log
 

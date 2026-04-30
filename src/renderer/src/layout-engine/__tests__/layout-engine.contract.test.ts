@@ -259,6 +259,92 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
       expect(snap2.x).toBeCloseTo(126, 0)
       expect(snap2.y).toBeCloseTo(84, 0)
     })
+
+    // Helper for issue #279 / #281 / #285: compute a child shape's world
+    // position from its (parent-relative) stored coords.
+    const childWorld = (shape: LayoutShape, group: LayoutGroup): { x: number; y: number } => ({
+      x: group.x + group.width / 2 + shape.x,
+      y: group.y - group.height / 2 + shape.y
+    })
+
+    it('C26 (#279): createGroup with already-existing children preserves their world position', () => {
+      // Bin spans world (84..168, -84..84) → centroid (126, 0).
+      const bin = makeGroup({
+        id: 'bin',
+        x: 84,
+        y: 84,
+        width: 84,
+        height: 84,
+        childIds: []
+      })
+      // Place the rect at world (110, -10) — clearly inside the bin.
+      const rect = makeRect({ id: 'r1', x: 110, y: -10, width: 30, height: 30 })
+
+      engine.addShape(rect)
+      engine.createGroup({ ...bin, childIds: ['r1'] })
+
+      const stored = engine.getShape('r1')!
+      const updatedBin = engine.getGroup('bin')!
+      const world = childWorld(stored, updatedBin)
+      expect(world.x).toBeCloseTo(110, 0)
+      expect(world.y).toBeCloseTo(-10, 0)
+      expect(stored.groupId).toBe('bin')
+    })
+
+    it('C27 (#281): updateGroup({ width, height }) preserves child world position', () => {
+      const bin = makeGroup({ id: 'bin', x: 0, y: 84, width: 84, height: 84 })
+      // Shape at world (40, 40) inside the bin — local (-2, -2) since centroid is (42, 42).
+      const rect = makeRect({ id: 'r1', x: -2, y: -2, width: 20, height: 20, groupId: 'bin' })
+
+      engine.createGroup({ ...bin, childIds: ['r1'] })
+      engine.addShape(rect)
+
+      const before = engine.getShape('r1')!
+      const beforeBin = engine.getGroup('bin')!
+      const beforeWorld = childWorld(before, beforeBin)
+
+      // Grow the bin from 84×84 to 168×168 (lower-left anchored)
+      engine.updateGroup('bin', { width: 168, height: 168 })
+
+      const after = engine.getShape('r1')!
+      const afterBin = engine.getGroup('bin')!
+      const afterWorld = childWorld(after, afterBin)
+      expect(afterWorld.x).toBeCloseTo(beforeWorld.x, 0)
+      expect(afterWorld.y).toBeCloseTo(beforeWorld.y, 0)
+      // Bin's lower-left didn't move; only width/height grew.
+      expect(afterBin.x).toBe(0)
+      expect(afterBin.y).toBe(84)
+      expect(afterBin.width).toBe(168)
+      expect(afterBin.height).toBe(168)
+    })
+
+    it('C28 (#285): toSnapshot → loadSnapshot round-trip preserves grouped shape coords', () => {
+      const bin = makeGroup({ id: 'bin', x: 0, y: 84, width: 84, height: 84 })
+      const rect = makeRect({ id: 'r1', x: -2, y: -2, width: 20, height: 20, groupId: 'bin' })
+
+      engine.createGroup({ ...bin, childIds: ['r1'] })
+      engine.addShape(rect)
+
+      const initial = engine.toSnapshot()
+
+      // Three round-trips — pre-fix this would drift by the bin's centroid
+      // magnitude on each Fabric loadSnapshot.
+      let snapshot = initial
+      for (let i = 0; i < 3; i++) {
+        engine.loadSnapshot(snapshot)
+        snapshot = engine.toSnapshot()
+      }
+
+      const finalBin = snapshot.groups.find((g) => g.id === 'bin')!
+      const finalRect = snapshot.shapes.find((s) => s.id === 'r1')!
+      expect(finalBin.x).toBeCloseTo(0, 0)
+      expect(finalBin.y).toBeCloseTo(84, 0)
+      expect(finalBin.width).toBe(84)
+      expect(finalBin.height).toBe(84)
+      expect(finalRect.x).toBeCloseTo(-2, 0)
+      expect(finalRect.y).toBeCloseTo(-2, 0)
+      expect(finalRect.groupId).toBe('bin')
+    })
   })
 
   // ─── C9-C11: Selection ──────────────────────────────────────────────────────
