@@ -54,11 +54,30 @@ function shapeToPocketVertices(shape: LayoutShape): Float32Array | null {
       return verts
     }
     case 'polygon': {
-      if (shape.points.length < 3) return null
-      const verts = new Float32Array(shape.points.length * 2)
-      for (let i = 0; i < shape.points.length; i++) {
-        verts[i * 2] = shape.points[i].x
-        verts[i * 2 + 1] = shape.points[i].y
+      const pts = shape.points
+      if (pts.length < 3) return null
+      // Manifold's CrossSection treats CCW polygons as filled regions and
+      // CW polygons as inverted ("everything outside"). Our editor lets the
+      // user click vertices in either direction; if a polygon ends up CW in
+      // math coords (≈ CCW on screen, since editor y is screen-down), the
+      // cutter solid would engulf the whole bin and subtraction would
+      // delete every visible part of the geometry.
+      //
+      // Detect winding via shoelace (positive = CCW in math y-up) and
+      // reverse the order when needed so the pocket is always a valid
+      // filled region.
+      let area2 = 0
+      for (let i = 0; i < pts.length; i++) {
+        const a = pts[i]
+        const b = pts[(i + 1) % pts.length]
+        area2 += a.x * b.y - b.x * a.y
+      }
+      const reverse = area2 < 0
+      const verts = new Float32Array(pts.length * 2)
+      for (let i = 0; i < pts.length; i++) {
+        const src = reverse ? pts[pts.length - 1 - i] : pts[i]
+        verts[i * 2] = src.x
+        verts[i * 2 + 1] = src.y
       }
       return verts
     }
