@@ -551,7 +551,25 @@ export class KonvaEngine implements LayoutEngine {
     const renderer = this.rendererMap.get(id)
     if (!renderer) return
 
+    // Lower-left is anchored across width/height changes, so the bin's
+    // centroid moves by (deltaW/2, -deltaH/2). Children are rendered relative
+    // to the centroid, so without compensation they drift by the same
+    // amount. Compensate here so every resize path (sidebar, programmatic,
+    // user-handle drag) preserves child world position.
+    const deltaW = (patch.width ?? group.width) - group.width
+    const deltaH = (patch.height ?? group.height) - group.height
+    const dx = -deltaW / 2
+    const dy = deltaH / 2
+
     Object.assign(group, patch, { id })
+
+    if (dx !== 0 || dy !== 0) {
+      for (const child of renderer.konvaGroup.getChildren()) {
+        if (child.hasName('__groupBg') || child.hasName('__binArtwork')) continue
+        child.position({ x: child.x() + dx, y: child.y() + dy })
+      }
+    }
+
     renderer.update(patch, group)
     this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
   }

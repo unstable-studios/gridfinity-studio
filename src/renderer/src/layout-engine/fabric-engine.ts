@@ -377,12 +377,25 @@ export class FabricEngine implements LayoutEngine {
     ;(renderer.fabricGroup as unknown as Record<string, unknown>)[GROUP_DATA_KEY] = group.id
 
     // Move children into group — bypass group.add()/enterGroup to avoid
-    // FitContentLayout corrupting the bin's fixed dimensions.
-    // Shape coords from the snapshot are already in group-local space.
+    // FitContentLayout corrupting the bin's fixed dimensions. Children that
+    // already exist on the canvas (e.g. addShape was called before
+    // createGroup) carry world coords on obj.left/top and must be converted
+    // to group-local before reparenting; skipping the conversion would shift
+    // them by the bin's centroid (issue #279). For the snapshot-restore
+    // path, grouped children aren't in fabricMap yet, so this loop is a
+    // no-op and addShape later attaches them at their already-local coords.
     for (const childId of group.childIds) {
       const obj = this.fabricMap.get(childId)
       if (obj) {
+        const matrix = obj.calcTransformMatrix()
+        const worldX = matrix[4]
+        const worldY = matrix[5]
         this.canvas.remove(obj)
+        const gMatrix = renderer.fabricGroup.calcTransformMatrix()
+        const inv = fabric.util.invertTransform(gMatrix)
+        const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
+        obj.set({ left: localPt.x, top: localPt.y })
+        obj.setCoords()
         renderer.attachChild(obj)
       }
       const shape = this.shapeMap.get(childId)
@@ -401,7 +414,32 @@ export class FabricEngine implements LayoutEngine {
     const renderer = this.rendererMap.get(id)
     if (!renderer) return
 
+    // Lower-left is anchored across width/height changes, so the bin's
+    // centroid moves by (deltaW/2, -deltaH/2). Children are rendered relative
+    // to the centroid, so without compensation they drift by the same amount
+    // — which is what `Sidebar.handleUpdateBinMetadata` was producing and
+    // what the user-handle resize handler had to correct on its own.
+    // Compensate here so every resize path preserves child world position.
+    const deltaW = (patch.width ?? group.width) - group.width
+    const deltaH = (patch.height ?? group.height) - group.height
+    const dx = -deltaW / 2
+    const dy = deltaH / 2
+
     Object.assign(group, patch, { id })
+
+    if (dx !== 0 || dy !== 0) {
+      const internalObjects = (
+        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+      )._objects
+      for (const child of internalObjects) {
+        const rec = child as unknown as Record<string, unknown>
+        if (rec[SHAPE_DATA_KEY]) {
+          child.set({ left: (child.left ?? 0) + dx, top: (child.top ?? 0) + dy })
+          child.setCoords()
+        }
+      }
+    }
+
     renderer.update(patch, group)
     this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
   }
