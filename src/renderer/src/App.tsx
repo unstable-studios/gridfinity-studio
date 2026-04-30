@@ -6,10 +6,22 @@ import WelcomeScreen from '@/components/WelcomeScreen'
 import { ThemeProvider } from '@unstable-studios/ui'
 import { AppModeCtx, useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
+import { useBinBaker } from '@/hooks/useBinBaker'
 import { ReviewPrefsCtx } from '@/hooks/useReviewPrefs'
 import { LayoutEngineProvider } from '@/layout-engine'
 import type { AppMode, ActiveTool } from '@/hooks/useAppMode'
 import type { EngineType } from '@/layout-engine'
+
+/**
+ * Inside LayoutEngineProvider so the bake loop has access to the engine.
+ * Only bakes while the user is in Preview mode — saves CPU during editing.
+ * Renders nothing.
+ */
+function BakeLoop(): null {
+  const { mode } = useAppMode()
+  useBinBaker(mode === 'review')
+  return null
+}
 
 function AppContent(): React.JSX.Element {
   const { project } = useProject()
@@ -22,6 +34,7 @@ function AppContent(): React.JSX.Element {
   // Always mount the engine provider so state survives mode switches
   return (
     <LayoutEngineProvider engineType={engineType}>
+      <BakeLoop />
       {/* Navbar: solid bar at top */}
       <Navbar />
       {/* Canvas fills remaining space; sidebar floats above it */}

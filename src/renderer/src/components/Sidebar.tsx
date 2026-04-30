@@ -12,6 +12,7 @@ import {
   isBinGroup
 } from '@/layout-engine'
 import type { BinMetadata, LayoutGroup } from '@/layout-engine'
+import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
@@ -22,11 +23,7 @@ export default function Sidebar(): React.JSX.Element {
       ref={sidebarRef}
       className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto"
     >
-      {mode === 'layout' ? (
-        <LayoutSidebar />
-      ) : (
-        <div className="text-xs text-zinc-500">Preview mode — coming soon.</div>
-      )}
+      {mode === 'layout' ? <LayoutSidebar /> : <PreviewSidebar />}
     </aside>
   )
 }
@@ -284,6 +281,132 @@ function LayoutSidebar(): React.JSX.Element {
           Delete Selected
         </Button>
       )}
+    </div>
+  )
+}
+
+// ─── Preview Sidebar ────────────────────────────────────────
+
+function PreviewSidebar(): React.JSX.Element {
+  const engine = useLayoutEngine()
+  const { tick } = useEngineState()
+  const bakeResults = useProject((s) => s.bakeResults)
+  const bakeStatus = useProject((s) => s.bakeStatus)
+  const exportSTL = useProject((s) => s.exportSTL)
+  const export3MF = useProject((s) => s.export3MF)
+  const filePath = useProject((s) => s.filePath)
+  const projectName = useMemo(() => {
+    if (!filePath) return 'Untitled Project'
+    return (
+      filePath
+        .split(/[\\/]/)
+        .pop()
+        ?.replace(/\.gfstudio$/i, '') ?? 'Untitled Project'
+    )
+  }, [filePath])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
+
+  const totalBins = bins.length
+  // Export only when every bin has finished its latest bake successfully — no
+  // partial / stale / errored exports.
+  const allReady = totalBins > 0 && bins.every((b) => bakeStatus.get(b.id) === 'ready')
+  const anyError = bins.some((b) => bakeStatus.get(b.id) === 'error')
+  const totalWarnings = useMemo(() => {
+    let n = 0
+    for (const r of bakeResults.values()) n += r.warnings.length
+    return n
+  }, [bakeResults])
+
+  const handleExportSTL = async (): Promise<void> => {
+    const placements = placementsFromGroups(bins)
+    const data = await buildSTLArrayBuffer(bakeResults, placements)
+    if (data) await exportSTL(data, `${projectName}.stl`)
+  }
+  const handleExport3MF = async (): Promise<void> => {
+    const placements = placementsFromGroups(bins)
+    const data = await build3MFArrayBuffer(bakeResults, projectName, placements)
+    if (data) await export3MF(data, `${projectName}.3mf`)
+  }
+
+  return (
+    <div className="space-y-4">
+      <ProjectNameHeader />
+
+      <SidebarSection title={`Bins (${totalBins})`}>
+        {totalBins === 0 ? (
+          <p className="text-xs text-zinc-500">Switch to Design mode and add a bin to start.</p>
+        ) : (
+          <div className="space-y-1">
+            {bins.map((bin) => {
+              const status = bakeStatus.get(bin.id) ?? 'baking'
+              const meta = bin.metadata as BinMetadata
+              const pip =
+                status === 'ready'
+                  ? { className: 'text-[10px] text-emerald-500', label: '● ready' }
+                  : status === 'error'
+                    ? { className: 'text-[10px] text-red-500', label: '⚠ error' }
+                    : {
+                        className: 'text-[10px] text-amber-500 animate-pulse',
+                        label: '◌ baking…'
+                      }
+              return (
+                <div
+                  key={bin.id}
+                  className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 bg-zinc-100/60 dark:bg-zinc-800/60"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium truncate text-zinc-800 dark:text-zinc-200">
+                      {meta.name ?? 'Bin'}
+                    </p>
+                    <p className="text-[10px] text-zinc-500">
+                      {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
+                    </p>
+                  </div>
+                  <span className={pip.className}>{pip.label}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </SidebarSection>
+
+      {anyError && (
+        <p className="text-[10px] text-red-500">
+          Bake failed for one or more bins — see console for details.
+        </p>
+      )}
+
+      {totalWarnings > 0 && (
+        <p className="text-[10px] text-amber-500">
+          {totalWarnings} warning{totalWarnings === 1 ? '' : 's'} — see console
+        </p>
+      )}
+
+      <SidebarSection title="Export">
+        <div className="space-y-2">
+          <Button
+            variant="default"
+            className="w-full"
+            disabled={!allReady}
+            onClick={() => void handleExport3MF()}
+          >
+            Export 3MF…
+          </Button>
+          <Button
+            variant="outline"
+            className="w-full"
+            disabled={!allReady}
+            onClick={() => void handleExportSTL()}
+          >
+            Export STL…
+          </Button>
+          {!allReady && totalBins > 0 && (
+            <p className="text-[10px] text-zinc-500">Wait for bake to complete.</p>
+          )}
+        </div>
+      </SidebarSection>
     </div>
   )
 }

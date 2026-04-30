@@ -15,8 +15,10 @@ node_modules/
 ### Build outputs
 dist/
 out/
-build/
 release/
+
+# `build/` is electron-builder's *source* directory (icons, entitlements) —
+# keep it tracked. The output directory is `dist/` above.
 
 ### Logs and caches
 npm-debug.log*

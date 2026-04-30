@@ -19,12 +19,24 @@ import type {
   LayoutSnapshotData
 } from '../../../shared/types/project'
 import type { MeshDataWithNormals } from '../../../shared/types/worker'
+import { downloadBlob } from '../lib/download-blob'
 
 export interface BakeResult {
   mesh: MeshDataWithNormals
   timestamp: number
   warnings: string[]
 }
+
+/**
+ * Per-bin bake state.
+ * - `baking`: a bake is currently in flight; any cached `bakeResults` entry
+ *   for this bin is stale and should not be exported.
+ * - `ready`: the latest bake completed successfully; `bakeResults` has the
+ *   matching mesh.
+ * - `error`: the latest bake failed; UI should surface the failure and not
+ *   export.
+ */
+export type BakeStatus = 'baking' | 'ready' | 'error'
 
 // ─── Store shape ────────────────────────────────────────────
 
@@ -35,6 +47,12 @@ interface ProjectState {
   error: string | null
   recentProjects: string[]
   bakeResults: Map<string, BakeResult>
+  /**
+   * Bake state per bin. Distinct from `bakeResults`: a bin can be in `baking`
+   * while still having a (now-stale) entry in `bakeResults`. Export gating
+   * and the Preview sidebar's status pip read from this map.
+   */
+  bakeStatus: Map<string, BakeStatus>
 
   // Project metadata mutations
   updateSettings: (patch: Partial<GlobalSettings>) => void
@@ -48,8 +66,8 @@ interface ProjectState {
   loadRecentProjects: () => Promise<void>
 
   // Export operations
-  exportSTL: (stlData: ArrayBuffer) => Promise<boolean>
-  export3MF: (data: ArrayBuffer) => Promise<boolean>
+  exportSTL: (stlData: ArrayBuffer, suggestedFilename?: string) => Promise<boolean>
+  export3MF: (data: ArrayBuffer, suggestedFilename?: string) => Promise<boolean>
   exportBatch: (
     files: Array<{ filename: string; data: ArrayBuffer }>
   ) => Promise<{ success: boolean; exported: number }>
@@ -66,6 +84,7 @@ interface ProjectState {
 
   // Bake results
   setBakeResult: (binId: string, result: BakeResult | null) => void
+  setBakeStatus: (binId: string, status: BakeStatus | null) => void
   clearAllBakeResults: () => void
 }
 
@@ -110,6 +129,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     error: null,
     recentProjects: [],
     bakeResults: new Map(),
+    bakeStatus: new Map(),
 
     // ── Settings mutations ──
 
@@ -209,7 +229,8 @@ const useProjectStore = create<ProjectState>()((set, get) => {
             filePath: result.data.filePath,
             isModified: false,
             error: null,
-            bakeResults: new Map()
+            bakeResults: new Map(),
+            bakeStatus: new Map()
           })
           return true
         } else {
@@ -236,7 +257,8 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         filePath: null,
         isModified: true,
         error: null,
-        bakeResults: new Map()
+        bakeResults: new Map(),
+        bakeStatus: new Map()
       })
     },
 
@@ -253,7 +275,15 @@ const useProjectStore = create<ProjectState>()((set, get) => {
 
     // ── Export operations ──
 
-    exportSTL: async (stlData) => {
+    exportSTL: async (stlData, suggestedFilename) => {
+      // Browser fallback: when the Electron preload bridge isn't present
+      // (e.g. running the renderer at localhost:5173 directly), fall back
+      // to a blob download so the export still works for testing.
+      if (typeof window === 'undefined' || !window.api?.export?.stl) {
+        downloadBlob(stlData, suggestedFilename ?? 'gridfinity-bin.stl', 'model/stl')
+        set({ error: null })
+        return true
+      }
       try {
         const result = await window.api.export.stl(stlData)
         if (result.success) {
@@ -268,7 +298,12 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       }
     },
 
-    export3MF: async (data) => {
+    export3MF: async (data, suggestedFilename) => {
+      if (typeof window === 'undefined' || !window.api?.export?.threemf) {
+        downloadBlob(data, suggestedFilename ?? 'gridfinity-bin.3mf', 'model/3mf')
+        set({ error: null })
+        return true
+      }
       try {
         const result = await window.api.export.threemf(data)
         if (result.success) {
@@ -322,8 +357,20 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       })
     },
 
+    setBakeStatus: (binId, status) => {
+      set((state) => {
+        const next = new Map(state.bakeStatus)
+        if (status) {
+          next.set(binId, status)
+        } else {
+          next.delete(binId)
+        }
+        return { bakeStatus: next }
+      })
+    },
+
     clearAllBakeResults: () => {
-      set({ bakeResults: new Map() })
+      set({ bakeResults: new Map(), bakeStatus: new Map() })
     }
   }
 })

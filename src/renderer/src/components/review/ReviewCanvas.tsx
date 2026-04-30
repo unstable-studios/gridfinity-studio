@@ -6,6 +6,7 @@ import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 import { useTheme } from '@unstable-studios/ui'
 import { resolveColors, type CanvasThemeColors } from '@/lib/theme-config'
 import type { BakeResult } from '@/hooks/useProject'
+import { useLayoutEngine, useEngineState } from '@/layout-engine'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
@@ -95,15 +96,12 @@ function ReviewScene({
       />
 
       {bakeResults.size > 0 ? (
-        [...bakeResults.values()].map((result, i) => (
-          <BakedMeshPreview
-            key={i}
-            mesh={result.mesh}
-            debugColors={debugColors}
-            wireframe={wireframe}
-            meshColor={colors.meshColor}
-          />
-        ))
+        <BakedBins
+          bakeResults={bakeResults}
+          debugColors={debugColors}
+          wireframe={wireframe}
+          meshColor={colors.meshColor}
+        />
       ) : (
         <EmptyState color={colors.emptyState} />
       )}
@@ -112,6 +110,63 @@ function ReviewScene({
         <planeGeometry args={[200, 200]} />
         <meshStandardMaterial color={colors.reviewFloor} roughness={1} />
       </mesh>
+    </>
+  )
+}
+
+/**
+ * Lays out each baked bin in 3D at the same position as its 2D layout — so
+ * the Preview matches what the user designed in Layout mode. Without this,
+ * every bin's mesh renders at (0, 0, 0) and they all stack.
+ *
+ * We re-read group positions from the engine (gated on `tick`) rather than
+ * caching per-bake, so moving a bin in Layout mode is reflected on the next
+ * Preview switch.
+ */
+function BakedBins({
+  bakeResults,
+  debugColors,
+  wireframe,
+  meshColor
+}: {
+  bakeResults: Map<string, BakeResult>
+  debugColors: boolean
+  wireframe: boolean
+  meshColor: string
+}): React.JSX.Element {
+  const engine = useLayoutEngine()
+  const { tick } = useEngineState()
+
+  const placements = useMemo(() => {
+    const out: Array<{ id: string; mesh: BakedMeshData; position: [number, number, number] }> = []
+    for (const [binId, result] of bakeResults) {
+      const group = engine?.getGroup(binId)
+      if (!group) continue
+      // Editor lower-left (x, y) → centroid (x + w/2, y - h/2).
+      // 3D scene: place each bin's CSG-centered mesh at this centroid in
+      // the XZ plane so the 3D layout mirrors the 2D layout. Editor +y is
+      // screen-down; mapping straight to +z in 3D keeps the relative
+      // arrangement intact (downward in 2D = away in 3D).
+      const cx = group.x + group.width / 2
+      const cz = group.y - group.height / 2
+      out.push({ id: binId, mesh: result.mesh, position: [cx, 0, cz] })
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bakeResults, engine, tick])
+
+  return (
+    <>
+      {placements.map(({ id, mesh, position }) => (
+        <BakedMeshPreview
+          key={id}
+          mesh={mesh}
+          debugColors={debugColors}
+          wireframe={wireframe}
+          meshColor={meshColor}
+          position={position}
+        />
+      ))}
     </>
   )
 }
