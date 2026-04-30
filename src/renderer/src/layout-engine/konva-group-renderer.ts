@@ -384,8 +384,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
       const dy = preCentroidY - postCentroidY
       if (dx !== 0 || dy !== 0) {
         for (const child of this.konvaGroup.getChildren()) {
-          const name = child.name()
-          if (name === '__groupBg' || name === '__binArtwork') continue
+          if (child.hasName('__groupBg') || child.hasName('__binArtwork')) continue
           child.position({ x: child.x() + dx, y: child.y() + dy })
         }
       }

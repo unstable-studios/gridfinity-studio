@@ -294,10 +294,11 @@ export class FabricGroupRenderer implements GroupRenderer {
     for (let i = internalObjects.length - 1; i >= 0; i--) {
       const o = internalObjects[i] as unknown as Record<string, unknown>
       if (o.__binArtwork || o.__layoutShapeId) {
-        removed.unshift(internalObjects[i])
+        removed.push(internalObjects[i])
         internalObjects.splice(i, 1)
       }
     }
+    removed.reverse()
 
     this.fabricGroup.triggerLayout()
 
