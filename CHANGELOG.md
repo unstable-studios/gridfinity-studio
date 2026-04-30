@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.7.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.6.0...v1.7.0) (2026-04-30)
+
+
+### Features
+
+* **core:** shape-to-bin assignment via drag ([#240](https://github.com/unstable-studios/gridfinity-studio/issues/240)) ([#270](https://github.com/unstable-studios/gridfinity-studio/issues/270)) ([78de8b7](https://github.com/unstable-studios/gridfinity-studio/commit/78de8b7509a2282db64047be5b5329be2a2774cc))
+* **core:** wire bake loop and STL/3MF export — MVP path is now live ([#287](https://github.com/unstable-studios/gridfinity-studio/issues/287)) ([78fc0a9](https://github.com/unstable-studios/gridfinity-studio/commit/78fc0a938b2b68c223f94c28ed8f69456cc2da08))
+* decouple input handling from rendering engines ([#226](https://github.com/unstable-studios/gridfinity-studio/issues/226)) ([#257](https://github.com/unstable-studios/gridfinity-studio/issues/257)) ([a376087](https://github.com/unstable-studios/gridfinity-studio/commit/a376087a3e13b7a49d596cd6973cb18bf1ca7451))
+* layout engine abstraction with Fabric + Konva adapters ([#228](https://github.com/unstable-studios/gridfinity-studio/issues/228)) ([b237c76](https://github.com/unstable-studios/gridfinity-studio/commit/b237c76c2070ac7f66300c72403ca62751885378))
+* layout engine integration (clean slate) ([#233](https://github.com/unstable-studios/gridfinity-studio/issues/233)) ([c00de77](https://github.com/unstable-studios/gridfinity-studio/commit/c00de77fb0276d8bcfd9ab1ae5fad0a6732a5a5c))
+* **ui:** bin artwork, GroupRenderer encapsulation, viewport improvements ([#245](https://github.com/unstable-studios/gridfinity-studio/issues/245)) ([24cb475](https://github.com/unstable-studios/gridfinity-studio/commit/24cb47577f50b6a6fa75ecefb5f9d2a1cab8b612))
+* **ui:** bin footprint, grid picker, new project dialog ([#218](https://github.com/unstable-studios/gridfinity-studio/issues/218)) ([d111c7a](https://github.com/unstable-studios/gridfinity-studio/commit/d111c7a8c870e1fcbe718b4b589163b4a596224b))
+* **ui:** canvas interactions polish & unsaved indicator ([#216](https://github.com/unstable-studios/gridfinity-studio/issues/216)) ([02f1cfc](https://github.com/unstable-studios/gridfinity-studio/commit/02f1cfcc2f96d6103f8afe82d671e131e03fe63b))
+* **ui:** drag-to-resize bins with collision detection (T018/T019) ([#248](https://github.com/unstable-studios/gridfinity-studio/issues/248)) ([29e2857](https://github.com/unstable-studios/gridfinity-studio/commit/29e285790fa10ef7edfb79303fdbee42febeeac2))
+* **ui:** drawing tools — rectangle, circle, polygon (T021–T025) ([#254](https://github.com/unstable-studios/gridfinity-studio/issues/254)) ([00588f0](https://github.com/unstable-studios/gridfinity-studio/commit/00588f076306cea26fd9d70182847d7a31ff45f0))
+* **ui:** sidebar overhaul — project header, context menus, pocket warning ([#215](https://github.com/unstable-studios/gridfinity-studio/issues/215)) ([b7a50b4](https://github.com/unstable-studios/gridfinity-studio/commit/b7a50b4d1199aa55954a54c94604cc5c943e3177))
+
+
+### Bug Fixes
+
+* **core:** bypass enterGroup in Fabric addShape for grouped snapshots ([#284](https://github.com/unstable-studios/gridfinity-studio/issues/284)) ([dd2386c](https://github.com/unstable-studios/gridfinity-studio/commit/dd2386c30239a3734e8f019e5134d70f1fdb86ea))
+* **core:** Konva multi-drag snap — shapes follow bin snap ([#264](https://github.com/unstable-studios/gridfinity-studio/issues/264)) ([5f4a2f0](https://github.com/unstable-studios/gridfinity-studio/commit/5f4a2f02d37e4c9a695c7014c06a2f0b42a15b48))
+* **core:** normalize polygon pocket winding so CCW-on-screen draws still cut ([#294](https://github.com/unstable-studios/gridfinity-studio/issues/294)) ([6963bf8](https://github.com/unstable-studios/gridfinity-studio/commit/6963bf845739ac5d9bdc3c23c61d1af289306c0c))
+* **core:** normalize polygon position across Fabric/Konva engines ([#256](https://github.com/unstable-studios/gridfinity-studio/issues/256)) ([7964740](https://github.com/unstable-studios/gridfinity-studio/commit/79647402665d9127979d09162d43abffebe0e205))
+* **core:** preserve child shape positions when bin is resized ([#280](https://github.com/unstable-studios/gridfinity-studio/issues/280)) ([00925dd](https://github.com/unstable-studios/gridfinity-studio/commit/00925ddcb246e0a3cfbfa7c293e39e6313841edb))
+* **core:** preserve child world position across createGroup and updateGroup resize ([#286](https://github.com/unstable-studios/gridfinity-studio/issues/286)) ([9124116](https://github.com/unstable-studios/gridfinity-studio/commit/9124116daec726b5999041e076be2fa84d3d07eb))
+* **core:** redo only restoring one step forward ([#263](https://github.com/unstable-studios/gridfinity-studio/issues/263)) ([b86902b](https://github.com/unstable-studios/gridfinity-studio/commit/b86902b6a5844304e59d4e09ff7834ff4af14a13))
+* **deps:** add lockfile-include-tarball-url for GPR compatibility ([#244](https://github.com/unstable-studios/gridfinity-studio/issues/244)) ([21b6ef9](https://github.com/unstable-studios/gridfinity-studio/commit/21b6ef9b569fd47c0f6a55788875ae216d115b88))
+
+
+### Documentation
+
+* add adapter-based modularity as constitutional principle VII ([#243](https://github.com/unstable-studios/gridfinity-studio/issues/243)) ([324dbd6](https://github.com/unstable-studios/gridfinity-studio/commit/324dbd660971d808484cab1e40f0bfb80e9b2d38))
+
+
+### Refactoring
+
+* canvas interaction layer normalization and consolidation ([#219](https://github.com/unstable-studios/gridfinity-studio/issues/219)) ([dbc856b](https://github.com/unstable-studios/gridfinity-studio/commit/dbc856b4ddcb0940097d1ec1a73619a8904c549a))
+* quick wins batch ([#230](https://github.com/unstable-studios/gridfinity-studio/issues/230), [#232](https://github.com/unstable-studios/gridfinity-studio/issues/232), [#246](https://github.com/unstable-studios/gridfinity-studio/issues/246), [#247](https://github.com/unstable-studios/gridfinity-studio/issues/247), [#231](https://github.com/unstable-studios/gridfinity-studio/issues/231)) ([#250](https://github.com/unstable-studios/gridfinity-studio/issues/250)) ([aa8d87f](https://github.com/unstable-studios/gridfinity-studio/commit/aa8d87fa6319a4619aa5db6ab13f50aaa8c3e413))
+
 ## [1.6.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.5.0...v1.6.0) (2026-03-06)
 
 
