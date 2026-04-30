@@ -277,7 +277,22 @@ export class FabricEngine implements LayoutEngine {
     this.fabricMap.set(shape.id, obj)
 
     if (shape.groupId && this.rendererMap.has(shape.groupId)) {
-      this.rendererMap.get(shape.groupId)!.fabricGroup.add(obj)
+      // Bypass fabric.Group.add() for the same reason createGroup and addToGroup
+      // do: it calls enterGroup which converts obj.left/top from world space to
+      // group-local. Snapshot-stored shape.x/y for grouped shapes is *already*
+      // group-local, so going through enterGroup double-converts and shifts the
+      // shape by exactly the group centroid on every snapshot round-trip
+      // (engine toggle, save/load). It also kicks FitContentLayout which
+      // distorts the bin's fixed bbox.
+      const renderer = this.rendererMap.get(shape.groupId)!
+      const internalObjects = (
+        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+      )._objects
+      obj._set('parent', renderer.fabricGroup)
+      obj._set('group', renderer.fabricGroup)
+      if (this.canvas) obj._set('canvas', this.canvas)
+      internalObjects.push(obj)
+      renderer.fabricGroup.set('dirty', true)
     } else {
       this.canvas?.add(obj)
     }
