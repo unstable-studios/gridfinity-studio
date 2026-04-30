@@ -282,23 +282,28 @@ export class FabricGroupRenderer implements GroupRenderer {
 
   /**
    * triggerLayout() recalculates group bounds from children via FitContentLayout.
-   * Decorations must be temporarily removed so they don't inflate bounds.
+   * Decorations and user-shape children must be temporarily removed so they
+   * don't inflate bounds (decorations) or get their left/top rewritten to fit
+   * the new bbox (user shapes — which would corrupt their position relative
+   * to the bin centroid).
    */
   private triggerLayoutSafe(): void {
     const internalObjects = this.getInternalObjects()
-    const decorations: fabric.FabricObject[] = []
+    const removed: fabric.FabricObject[] = []
 
     for (let i = internalObjects.length - 1; i >= 0; i--) {
-      if ((internalObjects[i] as unknown as Record<string, unknown>).__binArtwork) {
-        decorations.push(internalObjects[i])
+      const o = internalObjects[i] as unknown as Record<string, unknown>
+      if (o.__binArtwork || o.__layoutShapeId) {
+        removed.push(internalObjects[i])
         internalObjects.splice(i, 1)
       }
     }
+    removed.reverse()
 
     this.fabricGroup.triggerLayout()
 
-    for (const dec of decorations) {
-      internalObjects.push(dec)
+    for (const obj of removed) {
+      internalObjects.push(obj)
     }
   }
 }
