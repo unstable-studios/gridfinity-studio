@@ -44,17 +44,31 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build macOS
+      # build:mac/win/linux in package.json chain `electron-vite build &&
+      # electron-builder ...`. pnpm cannot forward CLI flags through that
+      # chain — they get dropped — so we invoke the two commands directly.
+      # GH_TOKEN is set so electron-builder's tag-context "implicit publish"
+      # path doesn't crash on a missing token even though we pass --publish=never.
+      - name: Compile renderer + main
+        run: pnpm electron-vite build
+
+      - name: Package macOS
         if: matrix.os == 'macos-latest'
-        run: pnpm run build:mac -- --publish=never
+        run: pnpm electron-builder --mac --publish=never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Windows
+      - name: Package Windows
         if: matrix.os == 'windows-latest'
-        run: pnpm run build:win -- --publish=never
+        run: pnpm electron-builder --win --publish=never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Linux
+      - name: Package Linux
         if: matrix.os == 'ubuntu-latest'
-        run: pnpm run build:linux -- --publish=never
+        run: pnpm electron-builder --linux --publish=never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v7
