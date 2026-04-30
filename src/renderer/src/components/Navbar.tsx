@@ -24,6 +24,7 @@ import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
+import { buildSTLArrayBuffer, build3MFArrayBuffer } from '@/lib/export-baked'
 import {
   SquareDashedIcon,
   BoxIcon,
@@ -118,13 +119,35 @@ function AppMenubar({
   onOpenPreferences: () => void
   onNewProject: () => void
 }) {
-  const { project, saveProject, saveProjectAs, loadProject, recentProjects, loadRecentProjects } =
-    useProject()
+  const {
+    project,
+    saveProject,
+    saveProjectAs,
+    loadProject,
+    recentProjects,
+    loadRecentProjects,
+    bakeResults,
+    exportSTL,
+    export3MF
+  } = useProject()
   const { undo, redo, canUndo, canRedo } = useUndoRedo()
+  const projectName = useProjectName()
 
   useEffect(() => {
     loadRecentProjects()
   }, [loadRecentProjects])
+
+  const hasBakedMeshes = bakeResults.size > 0
+
+  const handleExportSTL = useCallback(async () => {
+    const data = await buildSTLArrayBuffer(bakeResults)
+    if (data) await exportSTL(data)
+  }, [bakeResults, exportSTL])
+
+  const handleExport3MF = useCallback(async () => {
+    const data = await build3MFArrayBuffer(bakeResults, projectName)
+    if (data) await export3MF(data)
+  }, [bakeResults, export3MF, projectName])
 
   // File keyboard shortcuts (undo/redo handled by useEngineUndoRedo)
   const handleFileKeys = useCallback(
@@ -194,7 +217,13 @@ function AppMenubar({
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem disabled>Import...</MenubarItem>
-          <MenubarItem disabled>Export...</MenubarItem>
+          <MenubarSub>
+            <MenubarSubTrigger disabled={!hasBakedMeshes}>Export</MenubarSubTrigger>
+            <MenubarSubContent>
+              <MenubarItem onSelect={() => void handleExportSTL()}>STL...</MenubarItem>
+              <MenubarItem onSelect={() => void handleExport3MF()}>3MF...</MenubarItem>
+            </MenubarSubContent>
+          </MenubarSub>
         </MenubarContent>
       </MenubarMenu>
 
