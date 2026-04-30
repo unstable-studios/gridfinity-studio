@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.0...v1.7.1) (2026-04-30)
+
+
+### Miscellaneous
+
+* release 1.7.1 ([#302](https://github.com/unstable-studios/gridfinity-studio/issues/302)) ([c0846a1](https://github.com/unstable-studios/gridfinity-studio/commit/c0846a1dd36b51565b88b7ccc5c3c2bf13fc1fee))
+
 ## [1.7.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.6.0...v1.7.0) (2026-04-30)
 
 
