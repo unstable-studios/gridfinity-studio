@@ -205,6 +205,10 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const id = crypto.randomUUID()
       const name = nextShapeName(engine, 'polygon')
 
+      // Create ungrouped at world coords, then reparent via addToGroup which
+      // handles world→local conversion. Passing groupId directly to addShape
+      // would treat x/y as already group-local and place the shape at the
+      // wrong position.
       engine.addShape({
         id,
         type: 'polygon',
@@ -212,9 +216,10 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         y: cy,
         points: relativePoints,
         ...baseShapeProps(),
-        groupId: bin?.id ?? null,
+        groupId: null,
         metadata: { ...pocketMetadata(bin, unitHeight), name }
       })
+      if (bin) engine.addToGroup(id, bin.id)
       engine.select([id])
       setState(INITIAL_STATE)
       setActiveTool('select')
@@ -409,9 +414,10 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             width: w,
             height: h,
             ...baseShapeProps(),
-            groupId: bin?.id ?? null,
+            groupId: null,
             metadata: { ...pocketMetadata(bin, unitHeight), name }
           })
+          if (bin) engine.addToGroup(id, bin.id)
           engine.select([id])
           setActiveTool('select')
         }
@@ -431,9 +437,10 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             radiusX: radius,
             radiusY: radius,
             ...baseShapeProps(),
-            groupId: bin?.id ?? null,
+            groupId: null,
             metadata: { ...pocketMetadata(bin, unitHeight), name }
           })
+          if (bin) engine.addToGroup(id, bin.id)
           engine.select([id])
           setActiveTool('select')
         }

@@ -251,6 +251,24 @@ export class FabricGroupRenderer implements GroupRenderer {
     this.canvas.remove(this.fabricGroup)
   }
 
+  /**
+   * Insert a Fabric object into this group's `_objects` array directly,
+   * bypassing `fabric.Group.add()`. Used by all paths that move shapes
+   * into a bin (createGroup, addToGroup, addShape) — `group.add()` calls
+   * `enterGroup` (world→local conversion) and `FitContentLayout` (bbox
+   * recompute), both of which corrupt our fixed-dimension bins or
+   * double-convert snapshot-loaded coords. The caller is responsible for
+   * setting `obj.left/top` to the correct group-local position before
+   * calling this.
+   */
+  attachChild(obj: fabric.FabricObject): void {
+    obj._set('parent', this.fabricGroup)
+    obj._set('group', this.fabricGroup)
+    obj._set('canvas', this.canvas)
+    this.getInternalObjects().push(obj)
+    this.fabricGroup.set('dirty', true)
+  }
+
   // ─── Private ──────────────────────────────────────────────────────────────────
 
   private getInternalObjects(): fabric.FabricObject[] {
