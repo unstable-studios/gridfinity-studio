@@ -51,3 +51,70 @@ export function findContainingBinGroup(
 
   return best
 }
+
+/** World-space AABB in screen-y-down coords (minY = top, maxY = bottom). */
+export interface ShapeAABB {
+  minX: number
+  minY: number
+  maxX: number
+  maxY: number
+}
+
+/**
+ * Find the best bin for a newly drawn shape, given its AABB.
+ *
+ * Centroid-only matching (findContainingBinGroup) misses cases where the
+ * user clearly draws "on top of" a bin but the centroid lands a hair past
+ * an edge — e.g. a rect that mostly covers the bin but extends slightly
+ * outside, or a circle whose first click started just outside the bin.
+ *
+ * Resolution:
+ * 1. Compute overlap area between the shape AABB and each bin AABB.
+ * 2. Drop bins with zero overlap.
+ * 3. Prefer the bin whose AABB contains the shape centroid (matches the
+ *    legacy strict-containment behavior for clear cases).
+ * 4. Otherwise return the bin with the largest overlap area.
+ */
+export function findBestBinForShape(
+  groups: LayoutGroup[],
+  shape: ShapeAABB
+): (LayoutGroup & { metadata: BinMetadata }) | null {
+  const cx = (shape.minX + shape.maxX) / 2
+  const cy = (shape.minY + shape.maxY) / 2
+
+  let bestByOverlap: { bin: LayoutGroup & { metadata: BinMetadata }; area: number } | null = null
+  let bestByCentroid: (LayoutGroup & { metadata: BinMetadata }) | null = null
+  let bestCentroidDist = Infinity
+
+  for (const group of groups) {
+    if (!isBinGroup(group)) continue
+
+    const binMinX = group.x
+    const binMaxX = group.x + group.width
+    const binMinY = group.y - group.height
+    const binMaxY = group.y
+
+    const ox = Math.max(0, Math.min(shape.maxX, binMaxX) - Math.max(shape.minX, binMinX))
+    const oy = Math.max(0, Math.min(shape.maxY, binMaxY) - Math.max(shape.minY, binMinY))
+    const area = ox * oy
+    if (area <= 0) continue
+
+    if (!bestByOverlap || area > bestByOverlap.area) {
+      bestByOverlap = { bin: group, area }
+    }
+
+    if (cx >= binMinX && cx <= binMaxX && cy >= binMinY && cy <= binMaxY) {
+      const bcx = (binMinX + binMaxX) / 2
+      const bcy = (binMinY + binMaxY) / 2
+      const dx = cx - bcx
+      const dy = cy - bcy
+      const dist = dx * dx + dy * dy
+      if (dist < bestCentroidDist) {
+        bestCentroidDist = dist
+        bestByCentroid = group
+      }
+    }
+  }
+
+  return bestByCentroid ?? bestByOverlap?.bin ?? null
+}

@@ -12,7 +12,7 @@ import { useProject } from '@/hooks/useProject'
 import { useLayoutEngineContext, useEngineState } from '@/layout-engine'
 import type { LayoutEngine } from '@/layout-engine'
 import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/types'
-import { findContainingBinGroup } from '@/layout-engine/containment'
+import { findBestBinForShape, type ShapeAABB } from '@/layout-engine/containment'
 import { computeDefaultPocketDepth } from '../../../shared/types/project'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
@@ -100,13 +100,17 @@ function nextShapeName(engine: LayoutEngine, type: string): string {
 
 // ─── Bin hit testing ────────────────────────────────────────────────────────
 
-/** Find the bin group containing a world-space point, if any. */
-function findBinAtPoint(
+/**
+ * Find the bin a newly drawn shape should be assigned to. Uses AABB overlap
+ * with a centroid-containment tiebreak so shapes whose centroid lands a hair
+ * outside a bin (snap-to-grid edge cases, drag started just outside) still
+ * get assigned when they visually cover the bin.
+ */
+function findBinForDrawnShape(
   engine: LayoutEngine,
-  worldX: number,
-  worldY: number
+  aabb: ShapeAABB
 ): (LayoutGroup & { metadata: BinMetadata }) | null {
-  return findContainingBinGroup(engine.getAllGroups(), worldX, worldY)
+  return findBestBinForShape(engine.getAllGroups(), aabb)
 }
 
 function pocketMetadata(
@@ -201,7 +205,17 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length
       const relativePoints = pts.map((p) => ({ x: p.x - cx, y: p.y - cy }))
 
-      const bin = findBinAtPoint(engine, cx, cy)
+      let minX = Infinity
+      let minY = Infinity
+      let maxX = -Infinity
+      let maxY = -Infinity
+      for (const p of pts) {
+        if (p.x < minX) minX = p.x
+        if (p.x > maxX) maxX = p.x
+        if (p.y < minY) minY = p.y
+        if (p.y > maxY) maxY = p.y
+      }
+      const bin = findBinForDrawnShape(engine, { minX, minY, maxX, maxY })
       const id = crypto.randomUUID()
       const name = nextShapeName(engine, 'polygon')
 
@@ -403,7 +417,12 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           const y = Math.min(start.y, snapped.y)
           const cx = x + w / 2
           const cy = y + h / 2
-          const bin = findBinAtPoint(engine, cx, cy)
+          const bin = findBinForDrawnShape(engine, {
+            minX: x,
+            minY: y,
+            maxX: x + w,
+            maxY: y + h
+          })
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'rect')
           engine.addShape({
@@ -426,7 +445,12 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         const dy = snapped.y - start.y
         const radius = Math.sqrt(dx * dx + dy * dy)
         if (radius > 2) {
-          const bin = findBinAtPoint(engine, start.x, start.y)
+          const bin = findBinForDrawnShape(engine, {
+            minX: start.x - radius,
+            minY: start.y - radius,
+            maxX: start.x + radius,
+            maxY: start.y + radius
+          })
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'circle')
           engine.addShape({
