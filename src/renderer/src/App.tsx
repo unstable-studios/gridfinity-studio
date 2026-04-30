@@ -14,10 +14,12 @@ import type { EngineType } from '@/layout-engine'
 
 /**
  * Inside LayoutEngineProvider so the bake loop has access to the engine.
+ * Only bakes while the user is in Preview mode — saves CPU during editing.
  * Renders nothing.
  */
 function BakeLoop(): null {
-  useBinBaker()
+  const { mode } = useAppMode()
+  useBinBaker(mode === 'review')
   return null
 }
 

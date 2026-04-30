@@ -117,8 +117,14 @@ function buildBinParams(
  * Re-evaluates on every engine mutation (via `tick`), debounces, and dispatches
  * one bake per bin. Per-bin in-flight gating prevents overlap; if a mutation
  * lands during a bake, the bin is rebaked once the in-flight one finishes.
+ *
+ * `enabled` gates whether new bakes are scheduled. The intended caller passes
+ * `mode === 'review'` so we don't burn CPU baking while the user is busy
+ * editing in Layout mode. In-flight bakes are not cancelled when the flag
+ * flips off — they complete and update `bakeResults` so Preview is immediately
+ * fresh on the next switch.
  */
-export function useBinBaker(): void {
+export function useBinBaker(enabled: boolean): void {
   const engine = useLayoutEngine()
   const { tick } = useEngineState()
   const { ready, bakePockets } = useGeometryWorker()
@@ -130,7 +136,7 @@ export function useBinBaker(): void {
   const lastSeenBinIdsRef = useRef<Set<string>>(new Set())
 
   useEffect(() => {
-    if (!engine || !ready) return
+    if (!engine || !ready || !enabled) return
 
     const handle = setTimeout(() => {
       const groups = engine.getAllGroups()
@@ -184,5 +190,5 @@ export function useBinBaker(): void {
     }, DEBOUNCE_MS)
 
     return () => clearTimeout(handle)
-  }, [tick, engine, ready, project?.gridfinity, bakePockets, setBakeResult])
+  }, [tick, engine, ready, enabled, project?.gridfinity, bakePockets, setBakeResult])
 }
