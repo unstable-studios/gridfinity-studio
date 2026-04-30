@@ -277,22 +277,10 @@ export class FabricEngine implements LayoutEngine {
     this.fabricMap.set(shape.id, obj)
 
     if (shape.groupId && this.rendererMap.has(shape.groupId)) {
-      // Bypass fabric.Group.add() for the same reason createGroup and addToGroup
-      // do: it calls enterGroup which converts obj.left/top from world space to
-      // group-local. Snapshot-stored shape.x/y for grouped shapes is *already*
-      // group-local, so going through enterGroup double-converts and shifts the
-      // shape by exactly the group centroid on every snapshot round-trip
-      // (engine toggle, save/load). It also kicks FitContentLayout which
-      // distorts the bin's fixed bbox.
-      const renderer = this.rendererMap.get(shape.groupId)!
-      const internalObjects = (
-        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
-      )._objects
-      obj._set('parent', renderer.fabricGroup)
-      obj._set('group', renderer.fabricGroup)
-      if (this.canvas) obj._set('canvas', this.canvas)
-      internalObjects.push(obj)
-      renderer.fabricGroup.set('dirty', true)
+      // shape.x/y is already group-local (snapshot semantics). attachChild
+      // bypasses fabric.Group.add() so we don't double-convert via
+      // enterGroup or kick FitContentLayout into corrupting the bin bbox.
+      this.rendererMap.get(shape.groupId)!.attachChild(obj)
     } else {
       this.canvas?.add(obj)
     }
@@ -391,21 +379,15 @@ export class FabricEngine implements LayoutEngine {
     // Move children into group — bypass group.add()/enterGroup to avoid
     // FitContentLayout corrupting the bin's fixed dimensions.
     // Shape coords from the snapshot are already in group-local space.
-    const internalObjects = (renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] })
-      ._objects
     for (const childId of group.childIds) {
       const obj = this.fabricMap.get(childId)
       if (obj) {
         this.canvas.remove(obj)
-        obj._set('parent', renderer.fabricGroup)
-        obj._set('group', renderer.fabricGroup)
-        obj._set('canvas', this.canvas)
-        internalObjects.push(obj)
+        renderer.attachChild(obj)
       }
       const shape = this.shapeMap.get(childId)
       if (shape) shape.groupId = group.id
     }
-    renderer.fabricGroup.set('dirty', true)
 
     this.canvas.add(renderer.fabricGroup)
     this.canvas.requestRenderAll()
@@ -483,18 +465,7 @@ export class FabricEngine implements LayoutEngine {
       obj.set({ left: localPt.x, top: localPt.y })
       obj.setCoords()
 
-      // Bypass group.add() which calls enterGroup + FitContentLayout, corrupting
-      // the bin's fixed dimensions. Instead push directly onto _objects like
-      // decorations do (see FabricGroupRenderer.setDecorations).
-      const internalObjects = (
-        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
-      )._objects
-      obj._set('parent', renderer.fabricGroup)
-      obj._set('group', renderer.fabricGroup)
-      obj._set('canvas', this.canvas)
-      internalObjects.push(obj)
-
-      renderer.fabricGroup.set('dirty', true)
+      renderer.attachChild(obj)
 
       group.childIds = [...group.childIds, shapeId]
       shape.groupId = groupId
