@@ -35,16 +35,24 @@ const DEFAULT_CLEARANCE = 0.25
  * Convert a 2D LayoutShape into pocket-local vertex array (Float32Array of
  * [x0,y0,x1,y1,...]). Coordinates are centered at the shape's origin (the
  * pocket's posX/posY positions the shape on the bin).
+ *
+ * Output is in math y-up convention (Manifold/CrossSection convention).
+ * Editor y is screen-y-down; for shapes built from editor input (polygon),
+ * flip y on the way out.
  */
 function shapeToPocketVertices(shape: LayoutShape): Float32Array | null {
   switch (shape.type) {
     case 'rect': {
       const hw = shape.width / 2
       const hh = shape.height / 2
-      // CCW from bottom-left in editor screen-y-down convention
+      // CCW in math y-up: bottom-left → bottom-right → top-right → top-left.
+      // Rect is symmetric, so the editor-y-flip we do for posY doesn't apply
+      // to its vertices.
       return new Float32Array([-hw, -hh, hw, -hh, hw, hh, -hw, hh])
     }
     case 'circle': {
+      // CCW in math y-up by construction (sin goes positive for small
+      // positive angles). Symmetric around origin so no editor-y flip.
       const verts = new Float32Array(CIRCLE_SEGMENTS * 2)
       for (let i = 0; i < CIRCLE_SEGMENTS; i++) {
         const angle = (i / CIRCLE_SEGMENTS) * Math.PI * 2
@@ -54,11 +62,29 @@ function shapeToPocketVertices(shape: LayoutShape): Float32Array | null {
       return verts
     }
     case 'polygon': {
-      if (shape.points.length < 3) return null
-      const verts = new Float32Array(shape.points.length * 2)
-      for (let i = 0; i < shape.points.length; i++) {
-        verts[i * 2] = shape.points[i].x
-        verts[i * 2 + 1] = shape.points[i].y
+      const pts = shape.points
+      if (pts.length < 3) return null
+      // Polygon vertices come from the editor (screen-y-down) — flip y on
+      // the way out so the polygon ends up in math y-up convention,
+      // matching the rect/circle output. Mirroring across X reverses
+      // winding, so reuse the post-flip vertices for the area test.
+      const flipped = pts.map((p) => ({ x: p.x, y: -p.y }))
+      let area2 = 0
+      for (let i = 0; i < flipped.length; i++) {
+        const a = flipped[i]
+        const b = flipped[(i + 1) % flipped.length]
+        area2 += a.x * b.y - b.x * a.y
+      }
+      // Manifold's CrossSection treats CW polygons as inverted ("everything
+      // outside"); subtracting that from the bin would wipe all visible
+      // geometry. Reverse iteration when the polygon comes out CW so the
+      // cutter is always a valid filled region.
+      const reverse = area2 < 0
+      const verts = new Float32Array(flipped.length * 2)
+      for (let i = 0; i < flipped.length; i++) {
+        const src = reverse ? flipped[flipped.length - 1 - i] : flipped[i]
+        verts[i * 2] = src.x
+        verts[i * 2 + 1] = src.y
       }
       return verts
     }
@@ -94,11 +120,14 @@ function buildBinParams(
       vertices: verts,
       depth,
       clearance,
-      // shape.x/y is bin-local since shape.groupId === bin.id. Editor uses
-      // y-down (screen) and so does the CSG builder's CrossSection (looking
-      // at the bin from above, +y = "down" the depth axis), so no flip.
+      // The CSG builder works in math y-up (positive cy = "back" of the bin
+      // in slicer convention), but the editor stores shape.y in screen-y-down
+      // convention (small y = "top of design"). Flip the Y sign at the
+      // boundary so a shape drawn at the top of the design lands at the
+      // back of the bin in 3D, not the front. Vertex Y is normalized
+      // separately in shapeToPocketVertices.
       posX: shape.x,
-      posY: shape.y,
+      posY: -shape.y,
       zTop: totalH
     })
   }
