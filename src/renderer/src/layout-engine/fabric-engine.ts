@@ -1233,6 +1233,27 @@ export class FabricEngine implements LayoutEngine {
         meta.depthUnits = Math.round(newH / gs)
       }
 
+      // Translate user-shape children so their world positions stay constant.
+      // The bin's centroid moves when the lower-left is preserved across a
+      // resize, so each child's local position (relative to centroid) needs
+      // to shift by the centroid delta to keep the child visually anchored.
+      const preCentroidX = saved.lowerLeftX + saved.width / 2
+      const preCentroidY = saved.lowerLeftY - saved.height / 2
+      const postCentroidX = finalX + newW / 2
+      const postCentroidY = finalY - newH / 2
+      const dx = preCentroidX - postCentroidX
+      const dy = preCentroidY - postCentroidY
+      const internalObjects = (
+        renderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+      )._objects
+      for (const child of internalObjects) {
+        const rec = child as unknown as Record<string, unknown>
+        if (rec[SHAPE_DATA_KEY]) {
+          child.set({ left: (child.left ?? 0) + dx, top: (child.top ?? 0) + dy })
+          child.setCoords()
+        }
+      }
+
       renderer.update({ x: finalX, y: finalY, width: newW, height: newH }, group)
       this.preDragState.delete(groupId)
       this.lastGoodPos.delete(groupId)

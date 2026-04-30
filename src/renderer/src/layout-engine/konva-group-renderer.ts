@@ -372,6 +372,24 @@ export class KonvaGroupRenderer implements GroupRenderer {
         bgRect.setAttrs({ x: -newW / 2, y: -newH / 2, width: newW, height: newH })
       }
 
+      // Translate user-shape children so their world positions stay constant.
+      // Lower-left is preserved across the resize, so the bin's centroid
+      // shifts; each child's local position (relative to centroid) needs to
+      // shift by the centroid delta to keep the child visually anchored.
+      const preCentroidX = orig.x + orig.width / 2
+      const preCentroidY = orig.y - orig.height / 2
+      const postCentroidX = finalX + newW / 2
+      const postCentroidY = finalY - newH / 2
+      const dx = preCentroidX - postCentroidX
+      const dy = preCentroidY - postCentroidY
+      if (dx !== 0 || dy !== 0) {
+        for (const child of this.konvaGroup.getChildren()) {
+          const name = child.name()
+          if (name === '__groupBg' || name === '__binArtwork') continue
+          child.position({ x: child.x() + dx, y: child.y() + dy })
+        }
+      }
+
       // Reposition centroid from the final lower-left
       this.konvaGroup.position({ x: finalX + newW / 2, y: finalY - newH / 2 })
 
