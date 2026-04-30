@@ -322,12 +322,12 @@ function PreviewSidebar(): React.JSX.Element {
   const handleExportSTL = async (): Promise<void> => {
     const placements = placementsFromGroups(bins)
     const data = await buildSTLArrayBuffer(bakeResults, placements)
-    if (data) await exportSTL(data)
+    if (data) await exportSTL(data, `${projectName}.stl`)
   }
   const handleExport3MF = async (): Promise<void> => {
     const placements = placementsFromGroups(bins)
     const data = await build3MFArrayBuffer(bakeResults, projectName, placements)
-    if (data) await export3MF(data)
+    if (data) await export3MF(data, `${projectName}.3mf`)
   }
 
   return (

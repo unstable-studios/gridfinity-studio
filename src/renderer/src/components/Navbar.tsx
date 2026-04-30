@@ -152,13 +152,13 @@ function AppMenubar({
   const handleExportSTL = useCallback(async () => {
     const placements = placementsFromGroups(bins)
     const data = await buildSTLArrayBuffer(bakeResults, placements)
-    if (data) await exportSTL(data)
-  }, [bakeResults, exportSTL, bins])
+    if (data) await exportSTL(data, `${projectName}.stl`)
+  }, [bakeResults, exportSTL, bins, projectName])
 
   const handleExport3MF = useCallback(async () => {
     const placements = placementsFromGroups(bins)
     const data = await build3MFArrayBuffer(bakeResults, projectName, placements)
-    if (data) await export3MF(data)
+    if (data) await export3MF(data, `${projectName}.3mf`)
   }, [bakeResults, export3MF, projectName, bins])
 
   // File keyboard shortcuts (undo/redo handled by useEngineUndoRedo)
