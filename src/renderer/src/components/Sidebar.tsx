@@ -12,7 +12,7 @@ import {
   isBinGroup
 } from '@/layout-engine'
 import type { BinMetadata, LayoutGroup } from '@/layout-engine'
-import { buildSTLArrayBuffer, build3MFArrayBuffer } from '@/lib/export-baked'
+import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
@@ -291,6 +291,7 @@ function PreviewSidebar(): React.JSX.Element {
   const engine = useLayoutEngine()
   const { tick } = useEngineState()
   const bakeResults = useProject((s) => s.bakeResults)
+  const bakeStatus = useProject((s) => s.bakeStatus)
   const exportSTL = useProject((s) => s.exportSTL)
   const export3MF = useProject((s) => s.export3MF)
   const filePath = useProject((s) => s.filePath)
@@ -308,8 +309,10 @@ function PreviewSidebar(): React.JSX.Element {
   const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
 
   const totalBins = bins.length
-  const bakedCount = bins.filter((b) => bakeResults.has(b.id)).length
-  const allReady = totalBins > 0 && bakedCount === totalBins
+  // Export only when every bin has finished its latest bake successfully — no
+  // partial / stale / errored exports.
+  const allReady = totalBins > 0 && bins.every((b) => bakeStatus.get(b.id) === 'ready')
+  const anyError = bins.some((b) => bakeStatus.get(b.id) === 'error')
   const totalWarnings = useMemo(() => {
     let n = 0
     for (const r of bakeResults.values()) n += r.warnings.length
@@ -317,11 +320,13 @@ function PreviewSidebar(): React.JSX.Element {
   }, [bakeResults])
 
   const handleExportSTL = async (): Promise<void> => {
-    const data = await buildSTLArrayBuffer(bakeResults)
+    const placements = placementsFromGroups(bins)
+    const data = await buildSTLArrayBuffer(bakeResults, placements)
     if (data) await exportSTL(data)
   }
   const handleExport3MF = async (): Promise<void> => {
-    const data = await build3MFArrayBuffer(bakeResults, projectName)
+    const placements = placementsFromGroups(bins)
+    const data = await build3MFArrayBuffer(bakeResults, projectName, placements)
     if (data) await export3MF(data)
   }
 
@@ -335,9 +340,17 @@ function PreviewSidebar(): React.JSX.Element {
         ) : (
           <div className="space-y-1">
             {bins.map((bin) => {
-              const baked = bakeResults.get(bin.id)
-              const status = baked ? 'ready' : 'baking'
+              const status = bakeStatus.get(bin.id) ?? 'baking'
               const meta = bin.metadata as BinMetadata
+              const pip =
+                status === 'ready'
+                  ? { className: 'text-[10px] text-emerald-500', label: '● ready' }
+                  : status === 'error'
+                    ? { className: 'text-[10px] text-red-500', label: '⚠ error' }
+                    : {
+                        className: 'text-[10px] text-amber-500 animate-pulse',
+                        label: '◌ baking…'
+                      }
               return (
                 <div
                   key={bin.id}
@@ -351,21 +364,19 @@ function PreviewSidebar(): React.JSX.Element {
                       {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                     </p>
                   </div>
-                  <span
-                    className={
-                      status === 'ready'
-                        ? 'text-[10px] text-emerald-500'
-                        : 'text-[10px] text-amber-500 animate-pulse'
-                    }
-                  >
-                    {status === 'ready' ? '● ready' : '◌ baking…'}
-                  </span>
+                  <span className={pip.className}>{pip.label}</span>
                 </div>
               )
             })}
           </div>
         )}
       </SidebarSection>
+
+      {anyError && (
+        <p className="text-[10px] text-red-500">
+          Bake failed for one or more bins — see console for details.
+        </p>
+      )}
 
       {totalWarnings > 0 && (
         <p className="text-[10px] text-amber-500">

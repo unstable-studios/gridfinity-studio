@@ -26,6 +26,17 @@ export interface BakeResult {
   warnings: string[]
 }
 
+/**
+ * Per-bin bake state.
+ * - `baking`: a bake is currently in flight; any cached `bakeResults` entry
+ *   for this bin is stale and should not be exported.
+ * - `ready`: the latest bake completed successfully; `bakeResults` has the
+ *   matching mesh.
+ * - `error`: the latest bake failed; UI should surface the failure and not
+ *   export.
+ */
+export type BakeStatus = 'baking' | 'ready' | 'error'
+
 // ─── Store shape ────────────────────────────────────────────
 
 interface ProjectState {
@@ -35,6 +46,12 @@ interface ProjectState {
   error: string | null
   recentProjects: string[]
   bakeResults: Map<string, BakeResult>
+  /**
+   * Bake state per bin. Distinct from `bakeResults`: a bin can be in `baking`
+   * while still having a (now-stale) entry in `bakeResults`. Export gating
+   * and the Preview sidebar's status pip read from this map.
+   */
+  bakeStatus: Map<string, BakeStatus>
 
   // Project metadata mutations
   updateSettings: (patch: Partial<GlobalSettings>) => void
@@ -66,6 +83,7 @@ interface ProjectState {
 
   // Bake results
   setBakeResult: (binId: string, result: BakeResult | null) => void
+  setBakeStatus: (binId: string, status: BakeStatus | null) => void
   clearAllBakeResults: () => void
 }
 
@@ -110,6 +128,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     error: null,
     recentProjects: [],
     bakeResults: new Map(),
+    bakeStatus: new Map(),
 
     // ── Settings mutations ──
 
@@ -209,7 +228,8 @@ const useProjectStore = create<ProjectState>()((set, get) => {
             filePath: result.data.filePath,
             isModified: false,
             error: null,
-            bakeResults: new Map()
+            bakeResults: new Map(),
+            bakeStatus: new Map()
           })
           return true
         } else {
@@ -236,7 +256,8 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         filePath: null,
         isModified: true,
         error: null,
-        bakeResults: new Map()
+        bakeResults: new Map(),
+        bakeStatus: new Map()
       })
     },
 
@@ -322,8 +343,20 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       })
     },
 
+    setBakeStatus: (binId, status) => {
+      set((state) => {
+        const next = new Map(state.bakeStatus)
+        if (status) {
+          next.set(binId, status)
+        } else {
+          next.delete(binId)
+        }
+        return { bakeStatus: next }
+      })
+    },
+
     clearAllBakeResults: () => {
-      set({ bakeResults: new Map() })
+      set({ bakeResults: new Map(), bakeStatus: new Map() })
     }
   }
 })

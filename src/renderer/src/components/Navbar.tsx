@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useMemo, useState } from 'react'
 import Logo from './Logo'
 import {
   Navbar as NavbarRoot,
@@ -24,7 +24,8 @@ import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
-import { buildSTLArrayBuffer, build3MFArrayBuffer } from '@/lib/export-baked'
+import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
+import { useLayoutEngine, useEngineState, isBinGroup } from '@/layout-engine'
 import {
   SquareDashedIcon,
   BoxIcon,
@@ -127,6 +128,7 @@ function AppMenubar({
     recentProjects,
     loadRecentProjects,
     bakeResults,
+    bakeStatus,
     exportSTL,
     export3MF
   } = useProject()
@@ -137,17 +139,27 @@ function AppMenubar({
     loadRecentProjects()
   }, [loadRecentProjects])
 
-  const hasBakedMeshes = bakeResults.size > 0
+  // Export only when every known bin has finished its latest bake successfully.
+  // bakeStatus is the source of truth — bakeResults can hold a stale mesh
+  // while a fresh bake is in flight.
+  const allReady = bakeStatus.size > 0 && [...bakeStatus.values()].every((s) => s === 'ready')
+
+  const engine = useLayoutEngine()
+  const { tick } = useEngineState()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
 
   const handleExportSTL = useCallback(async () => {
-    const data = await buildSTLArrayBuffer(bakeResults)
+    const placements = placementsFromGroups(bins)
+    const data = await buildSTLArrayBuffer(bakeResults, placements)
     if (data) await exportSTL(data)
-  }, [bakeResults, exportSTL])
+  }, [bakeResults, exportSTL, bins])
 
   const handleExport3MF = useCallback(async () => {
-    const data = await build3MFArrayBuffer(bakeResults, projectName)
+    const placements = placementsFromGroups(bins)
+    const data = await build3MFArrayBuffer(bakeResults, projectName, placements)
     if (data) await export3MF(data)
-  }, [bakeResults, export3MF, projectName])
+  }, [bakeResults, export3MF, projectName, bins])
 
   // File keyboard shortcuts (undo/redo handled by useEngineUndoRedo)
   const handleFileKeys = useCallback(
@@ -218,7 +230,7 @@ function AppMenubar({
           <MenubarSeparator />
           <MenubarItem disabled>Import...</MenubarItem>
           <MenubarSub>
-            <MenubarSubTrigger disabled={!hasBakedMeshes}>Export</MenubarSubTrigger>
+            <MenubarSubTrigger disabled={!allReady}>Export</MenubarSubTrigger>
             <MenubarSubContent>
               <MenubarItem onSelect={() => void handleExportSTL()}>STL...</MenubarItem>
               <MenubarItem onSelect={() => void handleExport3MF()}>3MF...</MenubarItem>
