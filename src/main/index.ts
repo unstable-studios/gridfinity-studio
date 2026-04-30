@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, screen } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater'
 import icon from '../../resources/icon.png?asset'
 import {
   saveProject,
@@ -179,6 +180,25 @@ app.whenReady().then(() => {
     // dock icon is clicked and there are no other windows open.
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  // Check for updates on launch and every hour after. electron-updater reads
+  // the `publish: github` block from electron-builder.yml, so no extra config
+  // needed. Disabled in dev so it doesn't try to fetch a release from GitHub
+  // every time we run pnpm dev.
+  if (!is.dev) {
+    autoUpdater.autoDownload = true
+    autoUpdater.autoInstallOnAppQuit = true
+    autoUpdater.on('error', (err) => {
+      console.error('[autoUpdater]', err)
+    })
+    void autoUpdater.checkForUpdatesAndNotify()
+    setInterval(
+      () => {
+        void autoUpdater.checkForUpdatesAndNotify()
+      },
+      60 * 60 * 1000
+    )
+  }
 })
 
 // Quit when all windows are closed, except on macOS. There, it's common
