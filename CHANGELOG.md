@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.5](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.4...v1.7.5) (2026-05-01)
+
+
+### Bug Fixes
+
+* **deps:** update dependency @unstable-studios/ui to v1 ([#325](https://github.com/unstable-studios/gridfinity-studio/issues/325)) ([a913ace](https://github.com/unstable-studios/gridfinity-studio/commit/a913acef35578f6c56d49a7ae4c4cb685673ee8a))
+* **deps:** update dependency lucide-react to v1 ([#326](https://github.com/unstable-studios/gridfinity-studio/issues/326)) ([0bc0b37](https://github.com/unstable-studios/gridfinity-studio/commit/0bc0b378704a6a0490d3d84cc4b95fb8fd3bf302))
+* load manifold.wasm via Vite asset URL so it works in Electron prod ([#329](https://github.com/unstable-studios/gridfinity-studio/issues/329)) ([192b9c6](https://github.com/unstable-studios/gridfinity-studio/commit/192b9c6e690665bea9cbe22c67b3435bcd628dfa))
+
 ## [1.7.4](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.3...v1.7.4) (2026-05-01)
 
 
