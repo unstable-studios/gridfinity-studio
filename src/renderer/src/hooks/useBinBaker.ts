@@ -179,13 +179,19 @@ export function useBinBaker(enabled: boolean): void {
   // Bin IDs we've previously baked, to detect deletions.
   const lastSeenBinIdsRef = useRef<Set<string>>(new Set())
   // Stable refs to the bake function and store setters so the closure inside
-  // the in-flight resolution path doesn't capture stale values.
+  // the in-flight resolution path doesn't capture stale values. Synced via
+  // useEffect (rather than during render) so the new react-hooks/refs rule
+  // is satisfied; the resolver runs asynchronously, so the small delay
+  // before refs update post-commit is fine.
   const bakePocketsRef = useRef(bakePockets)
   const setBakeResultRef = useRef(setBakeResult)
   const setBakeStatusRef = useRef(setBakeStatus)
-  bakePocketsRef.current = bakePockets
-  setBakeResultRef.current = setBakeResult
-  setBakeStatusRef.current = setBakeStatus
+
+  useEffect(() => {
+    bakePocketsRef.current = bakePockets
+    setBakeResultRef.current = setBakeResult
+    setBakeStatusRef.current = setBakeStatus
+  })
 
   useEffect(() => {
     if (!engine || !ready || !enabled) return
