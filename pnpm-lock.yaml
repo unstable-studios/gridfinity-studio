@@ -93,8 +93,8 @@ importers:
         specifier: ^10.2.0
         version: 10.3.0
       lucide-react:
-        specifier: ^0.577.0
-        version: 0.577.0(react@19.2.5)
+        specifier: ^1.0.0
+        version: 1.14.0(react@19.2.5)
       manifold-3d:
         specifier: ^3.3.2
         version: 3.4.1(@gltf-transform/core@4.3.0)(@gltf-transform/extensions@4.3.0)(@gltf-transform/functions@4.3.0)(esbuild-wasm@0.27.7)
@@ -4307,6 +4307,11 @@ packages:
     peerDependencies:
       react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
 
+  lucide-react@1.14.0:
+    resolution: {integrity: sha512-+1mdWcfSJVUsaTIjN9zoezmUhfXo5l0vP7ekBMPo3jcS/aIkxHnXqAPsByszMZx/Y8oQBRJxJx5xg+RH3urzxA==, tarball: https://registry.npmjs.org/lucide-react/-/lucide-react-1.14.0.tgz}
+    peerDependencies:
+      react: ^16.5.1 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
   maath@0.10.8:
     resolution: {integrity: sha512-tRvbDF0Pgqz+9XUa4jjfgAQ8/aPKmQdWXilFu2tMy4GWj4NOsx99HlULO4IeREfbO3a0sA145DZYyvXPkybm0g==, tarball: https://registry.npmjs.org/maath/-/maath-0.10.8.tgz}
     peerDependencies:
@@ -7870,7 +7875,7 @@ snapshots:
       sonner: 2.0.7(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       tailwind-merge: 3.5.0
       tailwindcss: 4.2.4
-      vitest: 4.1.5(@types/node@25.6.0)(@vitest/coverage-v8@4.1.5)(jsdom@26.1.0(canvas@3.2.3))(vite@7.3.2(@types/node@25.6.0)(jiti@2.6.1)(lightningcss@1.32.0))
+      vitest: 4.1.5(@types/node@25.6.0)(@vitest/coverage-v8@4.1.5)(jsdom@26.1.0(canvas@3.2.3))(vite@8.0.10(@types/node@25.6.0)(esbuild@0.27.7)(jiti@2.6.1))
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
@@ -10038,6 +10043,10 @@ snapshots:
       yallist: 4.0.0
 
   lucide-react@0.577.0(react@19.2.5):
+    dependencies:
+      react: 19.2.5
+
+  lucide-react@1.14.0(react@19.2.5):
     dependencies:
       react: 19.2.5
 
