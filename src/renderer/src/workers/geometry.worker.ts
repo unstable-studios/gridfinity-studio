@@ -1,5 +1,11 @@
 import type { WorkerRequest, WorkerResponse, MeshData } from '../../../shared/types/worker'
 import { buildBinCSG } from '../lib/bin-csg-builder'
+// Imported as a URL so Vite emits a hashed asset (manifold-XXXX.wasm) and
+// returns its URL — works in both dev (HTTP) and Electron production
+// (file:// protocol). A bare `/manifold.wasm` fails in production because
+// `self.location.origin` is empty under file://, leaving the path resolved
+// against filesystem root.
+import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url'
 
 // Worker globals
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,7 +22,7 @@ async function initManifold(): Promise<boolean> {
   try {
     const Module = (await import('manifold-3d')).default
     manifoldModule = await Module({
-      locateFile: () => new URL('/manifold.wasm', self.location.origin).href
+      locateFile: () => manifoldWasmUrl
     })
     manifoldModule.setup()
     console.log('[geometry.worker] Manifold WASM initialized successfully')
