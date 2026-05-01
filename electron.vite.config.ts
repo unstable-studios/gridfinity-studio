@@ -47,8 +47,11 @@ export default defineConfig({
         '@renderer': resolve('src/renderer/src'),
         '@': resolve(__dirname, 'src/renderer/src'),
         // manifold-3d conditionally imports Node's "module" builtin (guarded by
-        // ENVIRONMENT_IS_NODE) — stub it out so Vite doesn't externalize + warn
-        module: resolve(__dirname, 'src/renderer/src/lib/empty-module.ts')
+        // ENVIRONMENT_IS_NODE) — stub it out so Vite/rolldown doesn't
+        // externalize + warn. Both bare `module` and the `node:` prefixed
+        // form are aliased because rolldown treats them as distinct specifiers.
+        module: resolve(__dirname, 'src/renderer/src/lib/empty-module.ts'),
+        'node:module': resolve(__dirname, 'src/renderer/src/lib/empty-module.ts')
       }
     },
     optimizeDeps: {
