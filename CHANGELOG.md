@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.4](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.3...v1.7.4) (2026-05-01)
+
+
+### Bug Fixes
+
+* bump electron-builder to 26.9.0 + use node-linker=hoisted to fix asar dep packaging ([#322](https://github.com/unstable-studios/gridfinity-studio/issues/322)) ([b1a9059](https://github.com/unstable-studios/gridfinity-studio/commit/b1a9059d6b63c4db186f828180d7fdb1c2388bcc))
+
 ## [1.7.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.2...v1.7.3) (2026-05-01)
 
 
