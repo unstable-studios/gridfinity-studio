@@ -23,7 +23,11 @@ mac:
   extendInfo:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
+  # Notarize on CI when APPLE_TEAM_ID + APPLE_API_KEY* env vars are present.
+  # If they're missing (e.g. local dev build), electron-builder skips signing
+  # entirely and notarize is a no-op — so this stays compatible with unsigned
+  # local builds.
+  notarize: true
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
