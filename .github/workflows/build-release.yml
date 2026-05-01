@@ -70,12 +70,25 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # Only upload installer outputs — exclude dist/win-unpacked, dist/mac-arm64,
+      # etc., so the publish step's globs don't accidentally match unpacked
+      # binaries. if-no-files-found: warn because each runner only produces
+      # the artifacts for its own platform.
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v7
         with:
           name: dist-${{ matrix.os }}
-          path: dist/**
-          if-no-files-found: error
+          path: |
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*.zip.blockmap
+            dist/*-setup.exe
+            dist/*-setup.exe.blockmap
+            dist/*.AppImage
+            dist/*.deb
+            dist/*.snap
+            dist/latest*.yml
+          if-no-files-found: warn
           retention-days: 7
 
   publish:
@@ -83,6 +96,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
+      # upload-artifact strips the leading `dist/` prefix when path uses a
+      # wildcard, so artifact contents are flat. With merge-multiple the
+      # download lands files directly in the workflow workspace — patterns
+      # below match files in cwd, not under dist/.
       - name: Download artifacts
         uses: actions/download-artifact@v8
         with:
@@ -93,12 +110,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            **/dist/gridfinity-studio-*-setup.exe
-            **/dist/gridfinity-studio-*.dmg
-            **/dist/gridfinity-studio-*.AppImage
-            **/dist/*.deb
-            **/dist/*.snap
-            **/dist/latest*.yml
-            **/dist/*.blockmap
+            *-setup.exe
+            *-setup.exe.blockmap
+            *.dmg
+            *.dmg.blockmap
+            *.zip.blockmap
+            *.AppImage
+            *.deb
+            *.snap
+            latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
