@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.2...v1.7.3) (2026-05-01)
+
+
+### Bug Fixes
+
+* **deps:** update dependency three to ^0.184.0 ([#310](https://github.com/unstable-studios/gridfinity-studio/issues/310)) ([be45b76](https://github.com/unstable-studios/gridfinity-studio/commit/be45b76eba411e109e9c7e2f8c2affeba5fcbd46))
+* prep for React monorepo + TypeScript 6 bumps ([#316](https://github.com/unstable-studios/gridfinity-studio/issues/316)) ([f5079c5](https://github.com/unstable-studios/gridfinity-studio/commit/f5079c5fb544de94a423230293ec242abd2c4b00))
+
 ## [1.7.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.1...v1.7.2) (2026-05-01)
 
 
