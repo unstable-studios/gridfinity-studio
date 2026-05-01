@@ -480,32 +480,55 @@ export class FabricEngine implements LayoutEngine {
 
   addToGroup(shapeId: string, groupId: string): void {
     if (this.disposed || !this.canvas) return
-    const group = this.groupMap.get(groupId)
-    const renderer = this.rendererMap.get(groupId)
+    const newGroup = this.groupMap.get(groupId)
+    const newRenderer = this.rendererMap.get(groupId)
     const obj = this.fabricMap.get(shapeId)
     const shape = this.shapeMap.get(shapeId)
 
-    if (!group || !renderer || !obj || !shape) return
+    if (!newGroup || !newRenderer || !obj || !shape) return
+    if (shape.groupId === groupId) return
 
-    // Compute world-space position before removing from canvas
+    // Compute world-space position before reparenting
     const matrix = obj.calcTransformMatrix()
     const worldX = matrix[4]
     const worldY = matrix[5]
 
     this.reassigningShape = true
     try {
-      this.canvas.remove(obj)
+      // If currently in another group, splice the obj out of that fabric.Group's
+      // children and clear our childIds bookkeeping. Without this, reparenting
+      // from group A to group B would leave the shape listed in both groups'
+      // childIds (the visual moves, the bookkeeping doesn't).
+      if (shape.groupId) {
+        const oldGroup = this.groupMap.get(shape.groupId)
+        const oldRenderer = this.rendererMap.get(shape.groupId)
+        if (oldRenderer) {
+          const internalObjects = (
+            oldRenderer.fabricGroup as unknown as { _objects: fabric.FabricObject[] }
+          )._objects
+          const idx = internalObjects.indexOf(obj)
+          if (idx !== -1) internalObjects.splice(idx, 1)
+          obj._set('parent', undefined)
+          obj._set('group', undefined)
+          oldRenderer.fabricGroup.set('dirty', true)
+        }
+        if (oldGroup) {
+          oldGroup.childIds = oldGroup.childIds.filter((id) => id !== shapeId)
+        }
+      } else {
+        this.canvas.remove(obj)
+      }
 
       // Convert world position to group-local coordinates (relative to centroid)
-      const gMatrix = renderer.fabricGroup.calcTransformMatrix()
+      const gMatrix = newRenderer.fabricGroup.calcTransformMatrix()
       const inv = fabric.util.invertTransform(gMatrix)
       const localPt = fabric.util.transformPoint(new fabric.Point(worldX, worldY), inv)
       obj.set({ left: localPt.x, top: localPt.y })
       obj.setCoords()
 
-      renderer.attachChild(obj)
+      newRenderer.attachChild(obj)
 
-      group.childIds = [...group.childIds, shapeId]
+      newGroup.childIds = [...newGroup.childIds, shapeId]
       shape.groupId = groupId
 
       this.canvas.requestRenderAll()
