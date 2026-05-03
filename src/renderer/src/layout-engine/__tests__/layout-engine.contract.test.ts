@@ -598,6 +598,153 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
       expect(collider).toBe('b')
     })
   })
+
+  // ─── Hierarchy invariants ──────────────────────────────────────────────────
+
+  /**
+   * Asserts the inverse-mapping invariant: every shape's `groupId` matches
+   * exactly one group's `childIds` (or is null), and every entry in a group's
+   * `childIds` references a shape whose `groupId` points back at that group.
+   */
+  function assertHierarchyConsistent(eng: LayoutEngine): void {
+    const shapes = eng.getAllShapes()
+    const groups = eng.getAllGroups()
+    const shapeById = new Map(shapes.map((s) => [s.id, s]))
+    const groupById = new Map(groups.map((g) => [g.id, g]))
+
+    for (const shape of shapes) {
+      if (shape.groupId !== null) {
+        const parent = groupById.get(shape.groupId)
+        expect(parent, `shape ${shape.id} references missing group ${shape.groupId}`).toBeDefined()
+        expect(parent!.childIds, `group ${parent!.id}.childIds missing ${shape.id}`).toContain(
+          shape.id
+        )
+      }
+    }
+
+    for (const group of groups) {
+      // No duplicate childIds within a group
+      expect(new Set(group.childIds).size, `group ${group.id} has duplicate childIds`).toBe(
+        group.childIds.length
+      )
+
+      for (const childId of group.childIds) {
+        const child = shapeById.get(childId)
+        expect(child, `group ${group.id}.childIds → missing shape ${childId}`).toBeDefined()
+        expect(child!.groupId, `shape ${childId}.groupId does not point back at ${group.id}`).toBe(
+          group.id
+        )
+      }
+    }
+
+    // No shape appears in more than one group's childIds
+    const seen = new Set<string>()
+    for (const group of groups) {
+      for (const childId of group.childIds) {
+        expect(seen.has(childId), `${childId} listed in multiple groups`).toBe(false)
+        seen.add(childId)
+      }
+    }
+  }
+
+  describe('Hierarchy invariants', () => {
+    it('H1: empty engine is consistent', () => {
+      assertHierarchyConsistent(engine)
+    })
+
+    it('H2: lone shape with no group is consistent', () => {
+      engine.addShape(makeRect({ id: 's1' }))
+      assertHierarchyConsistent(engine)
+    })
+
+    it('H3: lone group with no children is consistent', () => {
+      engine.createGroup(makeGroup({ id: 'g1' }))
+      assertHierarchyConsistent(engine)
+    })
+
+    it('H4: createGroup with childIds populates inverse mapping', () => {
+      engine.addShape(makeRect({ id: 's1' }))
+      engine.addShape(makeCircle({ id: 's2' }))
+      engine.createGroup(makeGroup({ id: 'g1', childIds: ['s1', 's2'] }))
+      assertHierarchyConsistent(engine)
+    })
+
+    it('H5: addToGroup keeps invariants', () => {
+      engine.addShape(makeRect({ id: 's1' }))
+      engine.createGroup(makeGroup({ id: 'g1' }))
+      engine.addToGroup('s1', 'g1')
+      assertHierarchyConsistent(engine)
+    })
+
+    it('H6: removeFromGroup keeps invariants', () => {
+      engine.addShape(makeRect({ id: 's1' }))
+      engine.createGroup(makeGroup({ id: 'g1', childIds: ['s1'] }))
+      engine.removeFromGroup('s1')
+      assertHierarchyConsistent(engine)
+    })
+
+    it("H7: removeShape from a group cleans the parent's childIds", () => {
+      engine.addShape(makeRect({ id: 's1' }))
+      engine.createGroup(makeGroup({ id: 'g1', childIds: ['s1'] }))
+      engine.removeShape('s1')
+      assertHierarchyConsistent(engine)
+      const g = engine.getGroup('g1')!
+      expect(g.childIds).not.toContain('s1')
+    })
+
+    it('H8: removeGroup detaches children to top-level (consistent state)', () => {
+      engine.addShape(makeRect({ id: 's1' }))
+      engine.addShape(makeCircle({ id: 's2' }))
+      engine.createGroup(makeGroup({ id: 'g1', childIds: ['s1', 's2'] }))
+      engine.removeGroup('g1')
+      assertHierarchyConsistent(engine)
+      // Children survive but become top-level
+      expect(engine.getShape('s1')!.groupId).toBeNull()
+      expect(engine.getShape('s2')!.groupId).toBeNull()
+    })
+
+    it('H9: reparenting A → B keeps invariants (regression: childIds was leaking)', () => {
+      engine.addShape(makeRect({ id: 's1' }))
+      engine.createGroup(makeGroup({ id: 'a', x: 0, y: 100, width: 100, height: 100 }))
+      engine.createGroup(makeGroup({ id: 'b', x: 200, y: 100, width: 100, height: 100 }))
+      engine.addToGroup('s1', 'a')
+      engine.addToGroup('s1', 'b')
+      assertHierarchyConsistent(engine)
+      // Specifically: s1 must be in B's childIds, NOT in A's
+      expect(engine.getGroup('a')!.childIds).not.toContain('s1')
+      expect(engine.getGroup('b')!.childIds).toContain('s1')
+    })
+
+    it('H10: invariants hold after a randomized op sequence', () => {
+      // Deterministic pseudo-random sequence — a smoke fuzz that exercises a
+      // mix of ops and asserts the invariant after every step.
+      engine.createGroup(makeGroup({ id: 'g1', x: 0, y: 100, width: 100, height: 100 }))
+      engine.createGroup(makeGroup({ id: 'g2', x: 200, y: 100, width: 100, height: 100 }))
+
+      const ops: Array<() => void> = [
+        () => engine.addShape(makeRect({ id: 's1' })),
+        () => engine.addShape(makeCircle({ id: 's2' })),
+        () => engine.addShape(makeRect({ id: 's3' })),
+        () => engine.addToGroup('s1', 'g1'),
+        () => engine.addToGroup('s2', 'g1'),
+        () => engine.addToGroup('s3', 'g2'),
+        () => engine.addToGroup('s1', 'g2'), // A → B
+        () => engine.removeFromGroup('s2'),
+        () => engine.addToGroup('s2', 'g2'),
+        () => engine.removeShape('s3'),
+        () => engine.removeGroup('g1'),
+        () => engine.addShape(makeRect({ id: 's4' })),
+        () => engine.createGroup(makeGroup({ id: 'g3', x: 400, y: 100, width: 100, height: 100 })),
+        () => engine.addToGroup('s4', 'g3'),
+        () => engine.removeFromGroup('s4')
+      ]
+
+      for (const op of ops) {
+        op()
+        assertHierarchyConsistent(engine)
+      }
+    })
+  })
 })
 
 // ─── Cross-Engine Roundtrip Tests ─────────────────────────────────────────────
