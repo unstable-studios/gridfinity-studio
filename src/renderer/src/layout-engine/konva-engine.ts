@@ -606,12 +606,13 @@ export class KonvaEngine implements LayoutEngine {
 
   addToGroup(shapeId: string, groupId: string): void {
     if (this.disposed || !this.stage) return
-    const group = this.groupMap.get(groupId)
-    const renderer = this.rendererMap.get(groupId)
+    const newGroup = this.groupMap.get(groupId)
+    const newRenderer = this.rendererMap.get(groupId)
     const node = this.konvaMap.get(shapeId)
     const shape = this.shapeMap.get(shapeId)
 
-    if (!group || !renderer || !node || !shape) return
+    if (!newGroup || !newRenderer || !node || !shape) return
+    if (shape.groupId === groupId) return
 
     // Compute world position via getAbsolutePosition (screen-space) and undo
     // the stage transform. Reading node.x()/y() directly is unsafe when the
@@ -624,13 +625,23 @@ export class KonvaEngine implements LayoutEngine {
     const worldX = (absPos.x - stagePos.x) / stageScale
     const worldY = (absPos.y - stagePos.y) / stageScale
 
-    node.moveTo(renderer.konvaGroup)
+    // If currently in another group, drop our childIds bookkeeping for that
+    // group. node.moveTo() handles the visual reparenting; without this
+    // splice the shape would be listed in both groups' childIds.
+    if (shape.groupId) {
+      const oldGroup = this.groupMap.get(shape.groupId)
+      if (oldGroup) {
+        oldGroup.childIds = oldGroup.childIds.filter((id) => id !== shapeId)
+      }
+    }
+
+    node.moveTo(newRenderer.konvaGroup)
     // konvaGroup lives in mainLayer (world-space) coords; the node's new
     // local position is world minus the group's centroid.
-    const groupPos = renderer.konvaGroup.position()
+    const groupPos = newRenderer.konvaGroup.position()
     node.position({ x: worldX - groupPos.x, y: worldY - groupPos.y })
 
-    group.childIds = [...group.childIds, shapeId]
+    newGroup.childIds = [...newGroup.childIds, shapeId]
     shape.groupId = groupId
 
     this.mainLayer?.batchDraw()
