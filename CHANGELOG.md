@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.6](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.5...v1.7.6) (2026-05-03)
+
+
+### Bug Fixes
+
+* **core:** reparent between bins cleans up old group's childIds (+ T2 reparenting matrix) ([#334](https://github.com/unstable-studios/gridfinity-studio/issues/334)) ([6dae074](https://github.com/unstable-studios/gridfinity-studio/commit/6dae074bf5dfd303141079cdbdb0ed71a52ae909))
+
 ## [1.7.5](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.4...v1.7.5) (2026-05-01)
 
 
