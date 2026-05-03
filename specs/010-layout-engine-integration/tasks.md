@@ -30,8 +30,8 @@
   - [x] T015d: Simplify engine group methods to thin delegators
   - [x] T015e: Verify all contract tests pass (19 decoration + 42 engine contract)
 - [x] T017: Bin drag with grid snap — groups snap to grid via lower-left corner. Single-select snaps live in both engines. Fabric multi-select snaps live via ActiveSelection; Konva multi-select snaps on dragend (Transformer limitation).
-- [ ] T018: Bin resize — drag bin edges to change `widthUnits`/`depthUnits`. Grid-unit-quantized resize. (Sidebar resize works; drag-to-resize not yet implemented.)
-- [ ] T019: Bin collision detection — prevent bin overlaps during drag/resize.
+- [X] T018: Bin resize — drag bin edges to change `widthUnits`/`depthUnits`. Grid-unit-quantized resize. (Sidebar resize works; drag-to-resize not yet implemented.)
+- [X] T019: Bin collision detection — prevent bin overlaps during drag/resize.
 - [ ] T020: Smoke test — create bins via grid picker, bins render with correct Gridfinity styling, drag/resize bins, collision rejection works, bins persist across save/load.
 
 ## Phase 3: Drawing Tools
@@ -45,19 +45,19 @@
 
 ## Phase 4: CSG Pipeline Adapter
 
-- [ ] T027: Create `layoutShapeToPocketSpec()` — converts `LayoutShape` geometry to `PocketSpec` (Float32Array vertices + depth + position relative to bin center). Handles rect, circle, polygon. SVG path and mesh import deferred.
-- [ ] T028: Create `layoutGroupToCSGBinParams()` — reads `BinMetadata` from `LayoutGroup.metadata` + global `GridfinityConfig` to produce `CSGBinParams`. Gathers child shapes as `PocketSpec[]`.
-- [ ] T029: Wire bake flow — engine-based BinBaker reads groups/shapes from engine, converts to CSGBinParams, sends to worker. Replaces old entity-based BinBaker (now deleted).
-- [ ] T030: Verify 3D preview — `ReviewCanvas` renders bake results. Updated to iterate bakeResults directly (no longer depends on old Bin type).
-- [ ] T031: Run existing CSG tests — `bin-generator.test.ts` tests the builder directly with `CSGBinParams`. Add a new test that goes LayoutShape → PocketSpec → CSGBinParams to verify the adapter.
-- [ ] T032: Verify export — STL and 3MF export reads from bake results. End-to-end: draw shapes → bake → export → inspect file.
+- [X] T027: Create `layoutShapeToPocketSpec()` — converts `LayoutShape` geometry to `PocketSpec` (Float32Array vertices + depth + position relative to bin center). Handles rect, circle, polygon. SVG path and mesh import deferred.
+- [X] T028: Create `layoutGroupToCSGBinParams()` — reads `BinMetadata` from `LayoutGroup.metadata` + global `GridfinityConfig` to produce `CSGBinParams`. Gathers child shapes as `PocketSpec[]`.
+- [X] T029: Wire bake flow — engine-based BinBaker reads groups/shapes from engine, converts to CSGBinParams, sends to worker. Replaces old entity-based BinBaker (now deleted).
+- [X] T030: Verify 3D preview — `ReviewCanvas` renders bake results. Updated to iterate bakeResults directly (no longer depends on old Bin type).
+- [X] T031: Run existing CSG tests — `bin-generator.test.ts` tests the builder directly with `CSGBinParams`. Add a new test that goes LayoutShape → PocketSpec → CSGBinParams to verify the adapter.
+- [X] T032: Verify export — STL and 3MF export reads from bake results. End-to-end: draw shapes → bake → export → inspect file.
 
 ## Phase 5: Sidebar Rebuild
 
 - [x] T033: Sidebar reads from engine — shape list reads `engine.getAllShapes()`, group list reads `engine.getAllGroups()`. Subscribe to engine events for live updates.
 - [x] T034: Shape property editing — editing position in sidebar calls `engine.updateShape(id, patch)`.
 - [x] T035: Bin property editing — editing bin W/D/H and lip in sidebar calls `engine.updateGroup(id, patch)` with updated BinMetadata.
-- [ ] T036: Shape-to-bin assignment — when a shape is dragged into/out of a bin, call `engine.addToGroup()`/`engine.removeFromGroup()`. Sidebar reflects group membership.
+- [X] T036: Shape-to-bin assignment — when a shape is dragged into/out of a bin, call `engine.addToGroup()`/`engine.removeFromGroup()`. Sidebar reflects group membership.
 - [x] T037: Delete key — delete selected shapes/groups. Already wired in LayoutViewport and Sidebar.
 - [ ] T038: Smoke test — select shape in canvas, sidebar shows its properties. Edit properties, canvas updates. Same for bins. Delete works.
 
@@ -71,7 +71,7 @@
 - [x] T044: Delete old tests — entity-mutations, store-operations, selection, entity-integration, auto-wrap, collision, snap, extrude tests.
 - [x] T045: Clean up imports — removed all dead imports. Typecheck + lint pass.
 - [x] T046: Update project validator — simplified to validate layoutSnapshot structure, removed entity/bin validation.
-- [ ] T047: Update CLAUDE.md — new architecture description, removed components, updated data flow.
+- [X] T047: Update CLAUDE.md — new architecture description, removed components, updated data flow.
 - [ ] T048: Final verification — run full test suite, typecheck, lint. Interactive smoke test.
 
 ## Summary
