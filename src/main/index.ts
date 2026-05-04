@@ -3,6 +3,7 @@ import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
+import log from 'electron-log/main'
 import icon from '../../resources/icon.png?asset'
 import {
   saveProject,
@@ -186,10 +187,21 @@ app.whenReady().then(() => {
   // needed. Disabled in dev so it doesn't try to fetch a release from GitHub
   // every time we run pnpm dev.
   if (!is.dev) {
+    // Route electron-updater's internal logs through electron-log so they
+    // land in ~/Library/Logs/gridfinity-studio/main.log on macOS (platform
+    // equivalent elsewhere). Without this, autoUpdater falls back to
+    // console.log which is invisible in a packaged Mac app launched from
+    // Finder/Spotlight. Only the updater logger and our explicit log.error
+    // calls below go through the file — other console.* in main still go to
+    // stdout.
+    log.initialize()
+    log.transports.file.level = 'info'
+    autoUpdater.logger = log
+
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
     autoUpdater.on('error', (err) => {
-      console.error('[autoUpdater]', err)
+      log.error('[autoUpdater]', err)
     })
     void autoUpdater.checkForUpdatesAndNotify()
     setInterval(
