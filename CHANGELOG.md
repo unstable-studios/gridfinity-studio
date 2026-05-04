@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.6...v1.8.0) (2026-05-04)
+
+
+### Features
+
+* **core:** route autoUpdater logs through electron-log ([#339](https://github.com/unstable-studios/gridfinity-studio/issues/339)) ([53689a5](https://github.com/unstable-studios/gridfinity-studio/commit/53689a595cb2a78c47f75087fb18e0530abafa6f))
+
 ## [1.7.6](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.5...v1.7.6) (2026-05-03)
 
 
