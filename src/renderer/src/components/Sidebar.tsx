@@ -11,8 +11,12 @@ import {
   useEngineState,
   isBinGroup
 } from '@/layout-engine'
-import type { BinMetadata, LayoutGroup } from '@/layout-engine'
+import type { BinMetadata, LayoutGroup, LayoutShape, LayoutEngine } from '@/layout-engine'
 import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
+import { computeDefaultPocketDepth, DEFAULT_GRIDFINITY_CONFIG } from '../../../shared/types/project'
+
+/** Depth threshold (mm) below the bin's max safe depth at which we warn. */
+const DEPTH_WARN_MARGIN = 2
 
 export default function Sidebar(): React.JSX.Element {
   const { mode } = useAppMode()
@@ -267,6 +271,7 @@ function LayoutSidebar(): React.JSX.Element {
               precision={1}
               onChange={(v) => engine?.updateShape(selectedShape.id, { y: v })}
             />
+            {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
           </div>
         </SidebarSection>
       )}
@@ -440,6 +445,86 @@ function SidebarSection({
         {title}
       </p>
       {children}
+    </div>
+  )
+}
+
+// ─── Shape depth field ──────────────────────────────────────
+
+/**
+ * Per-shape pocket depth control. Auto-toggle defaults to the bin's
+ * computed default (interior cavity height); switching off lets the user
+ * override with a specific value, capped at the safe maximum and warning
+ * when within DEPTH_WARN_MARGIN of that maximum.
+ *
+ * Hidden when the shape isn't grouped to a bin — depth has no meaning for
+ * top-level shapes that don't get baked.
+ */
+function ShapeDepthField({
+  shape,
+  engine
+}: {
+  shape: LayoutShape
+  engine: LayoutEngine
+}): React.JSX.Element | null {
+  const project = useProject((s) => s.project)
+  const config = project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
+
+  if (!shape.groupId) return null
+  const bin = engine.getGroup(shape.groupId)
+  if (!bin || !isBinGroup(bin)) return null
+
+  const maxSafe = computeDefaultPocketDepth(bin.metadata.heightUnits, config.unitHeight)
+  const meta = (shape.metadata ?? {}) as Record<string, unknown>
+  const pocket = (meta.pocket as { depth?: number | null; clearance?: number } | undefined) ?? {}
+  const isAuto = pocket.depth === undefined || pocket.depth === null
+  const effectiveDepth = isAuto ? maxSafe : pocket.depth!
+  const nearMax = !isAuto && effectiveDepth >= maxSafe - DEPTH_WARN_MARGIN
+
+  const writeDepth = (next: number | null): void => {
+    const nextMeta = {
+      ...meta,
+      pocket: {
+        clearance: pocket.clearance ?? 0.25,
+        ...(next === null ? {} : { depth: next })
+      }
+    }
+    engine.updateShape(shape.id, { metadata: nextMeta })
+  }
+
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center justify-between">
+        <span className="text-zinc-500">Depth</span>
+        <label className="flex items-center gap-1 text-zinc-500 cursor-pointer">
+          <span>Auto</span>
+          <Switch
+            checked={isAuto}
+            onCheckedChange={(checked) => writeDepth(checked ? null : maxSafe)}
+          />
+        </label>
+      </div>
+      {!isAuto && (
+        <NumericInput
+          label="mm"
+          value={effectiveDepth}
+          step={0.5}
+          fineStep={0.1}
+          precision={1}
+          min={0.1}
+          max={maxSafe}
+          onChange={(v) => writeDepth(v)}
+        />
+      )}
+      {nearMax && (
+        <div className="flex items-start gap-1 text-amber-600 dark:text-amber-400 text-[10px] leading-tight">
+          <span aria-hidden="true">⚠</span>
+          <span>
+            Within {DEPTH_WARN_MARGIN}mm of bin floor ({maxSafe.toFixed(1)}mm max). Print may be
+            fragile.
+          </span>
+        </div>
+      )}
     </div>
   )
 }
