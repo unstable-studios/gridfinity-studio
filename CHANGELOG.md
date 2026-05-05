@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.8.0...v1.9.0) (2026-05-05)
+
+
+### Features
+
+* **ui:** surface auto-update status in the Help menu ([#344](https://github.com/unstable-studios/gridfinity-studio/issues/344)) ([4488224](https://github.com/unstable-studios/gridfinity-studio/commit/448822450f7b03f972e51d5df3990aa85d9b30ce))
+
 ## [1.8.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.7.6...v1.8.0) (2026-05-04)
 
 
