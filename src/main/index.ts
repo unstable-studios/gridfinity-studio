@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import log from 'electron-log/main'
+import { IDLE_STATE, UPDATE_CHANNELS, type UpdateState } from '../shared/types/updates'
 import icon from '../../resources/icon.png?asset'
 import {
   saveProject,
@@ -174,6 +175,25 @@ app.whenReady().then(() => {
     return exportBatch(win, files)
   })
 
+  // Update IPC: renderer can read current state and trigger install. Register
+  // BEFORE createWindow() so the renderer's mount-time getState() call can't
+  // race ahead of `ipcMain.handle` and reject.
+  let updateState: UpdateState = IDLE_STATE
+  const broadcast = (next: UpdateState): void => {
+    updateState = next
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send(UPDATE_CHANNELS.state, next)
+    }
+  }
+  ipcMain.handle(UPDATE_CHANNELS.getState, () => updateState)
+  ipcMain.handle(UPDATE_CHANNELS.installNow, () => {
+    // Guard: only valid when an update is staged AND we're in a real packaged
+    // build. Calling quitAndInstall outside those conditions would be a
+    // surprising restart triggered by an exposed IPC channel.
+    if (is.dev || updateState.kind !== 'downloaded') return
+    autoUpdater.quitAndInstall(false, true)
+  })
+
   createWindow()
 
   app.on('activate', function () {
@@ -200,9 +220,24 @@ app.whenReady().then(() => {
 
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
+
+    autoUpdater.on('checking-for-update', () => broadcast({ kind: 'checking' }))
+    autoUpdater.on('update-not-available', () => broadcast(IDLE_STATE))
+    autoUpdater.on('update-available', (info) => {
+      broadcast({ kind: 'downloading', version: info.version, progress: 0 })
+    })
+    autoUpdater.on('download-progress', (info) => {
+      const version = updateState.kind === 'downloading' ? updateState.version : ''
+      broadcast({ kind: 'downloading', version, progress: info.percent })
+    })
+    autoUpdater.on('update-downloaded', (info) => {
+      broadcast({ kind: 'downloaded', version: info.version })
+    })
     autoUpdater.on('error', (err) => {
       log.error('[autoUpdater]', err)
+      broadcast({ kind: 'error', message: err.message ?? String(err) })
     })
+
     void autoUpdater.checkForUpdatesAndNotify()
     setInterval(
       () => {

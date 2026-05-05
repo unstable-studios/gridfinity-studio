@@ -24,6 +24,8 @@ import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
+import { useAppUpdate } from '@/hooks/useAppUpdate'
+import type { UpdateState } from '../../../shared/types/updates'
 import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
 import { useLayoutEngine, useEngineState, isBinGroup } from '@/layout-engine'
 import {
@@ -134,6 +136,7 @@ function AppMenubar({
   } = useProject()
   const { undo, redo, canUndo, canRedo } = useUndoRedo()
   const projectName = useProjectName()
+  const { state: updateState, installNow } = useAppUpdate()
 
   useEffect(() => {
     loadRecentProjects()
@@ -266,7 +269,10 @@ function AppMenubar({
 
       {/* ── Help ── */}
       <MenubarMenu>
-        <MenubarTrigger>Help</MenubarTrigger>
+        <MenubarTrigger className="relative">
+          Help
+          <UpdateBadge state={updateState} />
+        </MenubarTrigger>
         <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
           <MenubarItem onSelect={() => window.open(GITHUB_REPO, '_blank')}>
             Documentation
@@ -278,6 +284,7 @@ function AppMenubar({
           <MenubarItem disabled className="opacity-80 cursor-default">
             Version {__APP_VERSION__}
           </MenubarItem>
+          <UpdateStatusMenuItem state={updateState} onInstallNow={installNow} />
         </MenubarContent>
       </MenubarMenu>
     </Menubar>
@@ -367,5 +374,90 @@ function ToolBar() {
         </ToggleGroupItem>
       ))}
     </ToggleGroup>
+  )
+}
+
+// ─── Update status helpers ──────────────────────────────────────────────────
+
+/**
+ * Decorative dot on the Help menu trigger when an update is downloading,
+ * ready, or errored. Hidden from screen readers — the actual textual status
+ * lives inside the menu (UpdateStatusMenuItem) and in an sr-only label here.
+ */
+function badgeStyle(state: UpdateState): { color: string; srLabel: string } | null {
+  switch (state.kind) {
+    case 'downloading':
+      return { color: 'bg-blue-500', srLabel: 'Update downloading' }
+    case 'downloaded':
+      return { color: 'bg-green-500', srLabel: 'Update ready to install' }
+    case 'error':
+      return { color: 'bg-red-500', srLabel: 'Update check failed' }
+    default:
+      return null
+  }
+}
+
+function UpdateBadge({ state }: { state: UpdateState }): React.JSX.Element | null {
+  const style = badgeStyle(state)
+  if (!style) return null
+  return (
+    <>
+      <span
+        aria-hidden="true"
+        className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${style.color}`}
+      />
+      <span className="sr-only">{style.srLabel}</span>
+    </>
+  )
+}
+
+function UpdateStatusMenuItem({
+  state,
+  onInstallNow
+}: {
+  state: UpdateState
+  onInstallNow: () => void
+}): React.JSX.Element | null {
+  if (state.kind === 'idle') return null
+
+  if (state.kind === 'checking') {
+    return (
+      <MenubarItem disabled className="opacity-70 cursor-default text-xs">
+        Checking for updates…
+      </MenubarItem>
+    )
+  }
+
+  if (state.kind === 'downloading') {
+    const pct = Math.max(0, Math.min(100, Math.round(state.progress)))
+    const label = state.version
+      ? `Downloading v${state.version}… ${pct}%`
+      : `Downloading update… ${pct}%`
+    return (
+      <MenubarItem disabled className="opacity-70 cursor-default text-xs">
+        {label}
+      </MenubarItem>
+    )
+  }
+
+  if (state.kind === 'downloaded') {
+    return (
+      <MenubarItem
+        onSelect={(e) => {
+          e.preventDefault()
+          onInstallNow()
+        }}
+        className="text-xs text-green-600 dark:text-green-400 font-medium"
+      >
+        v{state.version} ready — Restart to apply
+      </MenubarItem>
+    )
+  }
+
+  // error
+  return (
+    <MenubarItem disabled className="opacity-70 cursor-default text-xs text-red-500">
+      Update check failed
+    </MenubarItem>
   )
 }

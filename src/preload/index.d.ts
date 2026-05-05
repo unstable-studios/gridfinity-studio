@@ -1,5 +1,12 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { ProjectData } from '../shared/types/project'
+import type { UpdateState } from '../shared/types/updates'
+
+interface UpdatesAPI {
+  getState: () => Promise<UpdateState>
+  onStateChange: (handler: (state: UpdateState) => void) => () => void
+  installNow: () => Promise<void>
+}
 
 interface ProjectAPI {
   save: (
@@ -31,6 +38,7 @@ declare global {
     api: {
       project: ProjectAPI
       export: ExportAPI
+      updates: UpdatesAPI
     }
   }
 }
