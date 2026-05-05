@@ -13,6 +13,7 @@ import {
 } from '@/layout-engine'
 import type { UndoRedoDebugState } from '@/layout-engine/useEngineUndoRedo'
 import DrawingToolLayer from './DrawingToolLayer'
+import ShapeTooltip from './ShapeTooltip'
 import HintCard from './HintCard'
 
 const MOD_KEY = navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'
@@ -153,6 +154,7 @@ export default function Viewport(): React.JSX.Element {
         <LayoutEngineCanvas />
         {mode === 'layout' && <LayoutViewport />}
         {mode === 'layout' && <DrawingToolLayer />}
+        {mode === 'layout' && <ShapeTooltip />}
       </div>
       <div className={mode === 'review' ? 'h-full' : 'hidden'}>
         <ReviewCanvas bakeResults={bakeResults} baseUnit={baseUnit} />
