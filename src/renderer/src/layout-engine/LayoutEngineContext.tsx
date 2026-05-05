@@ -1,11 +1,13 @@
 import { useContext, useEffect, useRef, useState, useCallback } from 'react'
 import { useTheme } from '@unstable-studios/ui'
 import { resolveColors } from '@/lib/theme-config'
+import { useProject } from '@/hooks/useProject'
 import type { EngineType } from './create-engine'
 import { createLayoutEngine } from './create-engine'
 import type { LayoutEngine } from './interface'
 import { LayoutEngineCtx } from './engine-context'
 import { GestureRecognizer } from './gesture-recognizer'
+import { DEFAULT_GRIDFINITY_CONFIG } from '../../../shared/types/project'
 // Import adapters to trigger self-registration
 import './fabric-engine'
 import './konva-engine'
@@ -33,6 +35,9 @@ export function LayoutEngineProvider({
     transient: ReturnType<LayoutEngine['getTransientState']>
   } | null>(null)
   const { resolvedTheme } = useTheme()
+  const unitHeight = useProject(
+    (s) => s.project?.gridfinity.unitHeight ?? DEFAULT_GRIDFINITY_CONFIG.unitHeight
+  )
 
   useEffect(() => {
     const container = containerRef.current
@@ -49,6 +54,9 @@ export function LayoutEngineProvider({
       gridOrigin:
         resolvedTheme === 'light' ? 'rgba(100, 100, 120, 0.4)' : 'rgba(113, 113, 122, 0.35)'
     })
+
+    // Sync unitHeight so depth-based shape opacity reflects the project config.
+    newEngine.setUnitHeight(unitHeight)
 
     // Derive sidebar inset from measured sidebar element, fallback to 0
     const sidebar = sidebarRef.current
@@ -113,6 +121,12 @@ export function LayoutEngineProvider({
         resolvedTheme === 'light' ? 'rgba(100, 100, 120, 0.4)' : 'rgba(113, 113, 122, 0.35)'
     })
   }, [resolvedTheme, engineState.engine])
+
+  // Push unitHeight changes (rare — only when the user changes Gridfinity
+  // preset/config) into the engine so depth-based opacity stays accurate.
+  useEffect(() => {
+    engineState.engine?.setUnitHeight(unitHeight)
+  }, [unitHeight, engineState.engine])
 
   const handleSetEngineType = useCallback((type: EngineType) => {
     setEngineState((prev) => {

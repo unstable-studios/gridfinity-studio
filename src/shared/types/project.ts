@@ -178,6 +178,30 @@ export function computeDefaultPocketDepth(heightUnits: number, unitHeight: numbe
   return Math.max(0.1, Math.round(depth * 10) / 10)
 }
 
+/**
+ * Map a pocket's depth (mm) to a render-time opacity in [0.5, 1.0].
+ *
+ *   depth ≈ 0    → 0.50 (very faint)
+ *   depth = max  → 1.00 (full)
+ *
+ * `null`/`undefined` (auto) returns 1.0 — the default IS the max safe depth,
+ * so visually the shape sits at the deeper end of the spectrum.
+ *
+ * Used by the layout engine's shape renderers to give an at-a-glance
+ * visual cue for relative pocket depths.
+ */
+export function depthToOpacity(
+  depth: number | null | undefined,
+  heightUnits: number,
+  unitHeight: number
+): number {
+  if (depth === null || depth === undefined) return 1
+  const max = computeDefaultPocketDepth(heightUnits, unitHeight)
+  if (max <= 0) return 1
+  const ratio = Math.max(0, Math.min(1, depth / max))
+  return 0.5 + 0.5 * ratio
+}
+
 export const DEFAULT_GRIDFINITY_CONFIG: GridfinityConfig = GRIDFINITY_PRESETS.standard
 
 export function createEmptyProject(name: string = 'Untitled Project'): ProjectData {
