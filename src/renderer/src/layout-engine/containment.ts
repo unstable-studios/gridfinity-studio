@@ -5,7 +5,7 @@
  * world-space point using the lower-left corner coordinate convention.
  */
 
-import type { LayoutGroup, BinMetadata } from './types'
+import type { LayoutGroup, LayoutShape, BinMetadata } from './types'
 import { isBinGroup } from './types'
 
 /**
@@ -117,4 +117,34 @@ export function findBestBinForShape(
   }
 
   return bestByCentroid ?? bestByOverlap?.bin ?? null
+}
+
+/**
+ * Find children whose world centroid lies outside the bin's AABB. Used after
+ * a bin resize to evict shapes that no longer fit so they remain selectable
+ * (and don't bake pockets that extend past the bin's walls).
+ *
+ * Children store coords relative to the parent's centroid, so the world
+ * centroid is `(bin.x + bin.width/2 + shape.x, bin.y - bin.height/2 + shape.y)`.
+ *
+ * Edge inclusivity: a child centroid sitting exactly on the bin edge counts
+ * as inside (not evicted) — matches `findContainingBinGroup`'s convention.
+ */
+export function findChildrenOutsideBin(bin: LayoutGroup, children: LayoutShape[]): string[] {
+  const minX = bin.x
+  const maxX = bin.x + bin.width
+  const minY = bin.y - bin.height
+  const maxY = bin.y
+  const cxBin = bin.x + bin.width / 2
+  const cyBin = bin.y - bin.height / 2
+
+  const out: string[] = []
+  for (const child of children) {
+    const cx = cxBin + child.x
+    const cy = cyBin + child.y
+    if (cx < minX || cx > maxX || cy < minY || cy > maxY) {
+      out.push(child.id)
+    }
+  }
+  return out
 }

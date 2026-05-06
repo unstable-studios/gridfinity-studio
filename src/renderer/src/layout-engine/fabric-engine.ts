@@ -17,7 +17,7 @@ import { FabricGroupRenderer } from './fabric-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
 import { computeEdgeAnchor } from './input-math'
-import { findContainingBinGroup } from './containment'
+import { findContainingBinGroup, findChildrenOutsideBin } from './containment'
 import { depthToOpacity } from '../../../shared/types/project'
 import { isBinGroup } from './types'
 
@@ -470,7 +470,33 @@ export class FabricEngine implements LayoutEngine {
     }
 
     renderer.update(patch, group)
+
+    if (patch.width !== undefined || patch.height !== undefined) {
+      this.evictChildrenOutsideGroup(group)
+    }
+
     this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
+  }
+
+  /**
+   * After a group resize, detach any child shape whose world centroid lies
+   * outside the group's new AABB. Otherwise they'd remain parented but
+   * unselectable (hit-testing is gated by the parent group's AABB) and (for
+   * bins) would bake pockets that extend past the bin walls. Issue #297.
+   *
+   * Reads child coords via `getShape` (which derives them from the live
+   * fabric object) rather than `shapeMap`, since the in-place dx/dy
+   * compensation in resize paths doesn't write back to the shape map.
+   */
+  private evictChildrenOutsideGroup(group: LayoutGroup): void {
+    if (group.childIds.length === 0) return
+    const children = group.childIds
+      .map((cid) => this.getShape(cid))
+      .filter((s): s is LayoutShape => s !== undefined)
+    const toEvict = findChildrenOutsideBin(group, children)
+    for (const cid of toEvict) {
+      this.removeFromGroup(cid)
+    }
   }
 
   removeGroup(id: string): void {
@@ -1342,6 +1368,7 @@ export class FabricEngine implements LayoutEngine {
       }
 
       renderer.update({ x: finalX, y: finalY, width: newW, height: newH }, group)
+      this.evictChildrenOutsideGroup(group)
       this.preDragState.delete(groupId)
       this.lastGoodPos.delete(groupId)
       this.emitter.emit('groupResized', { id: groupId, width: newW, height: newH })

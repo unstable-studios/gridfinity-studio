@@ -345,6 +345,40 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
       expect(finalRect.y).toBeCloseTo(-2, 0)
       expect(finalRect.groupId).toBe('bin')
     })
+
+    it('C29 (#297): shrinking a bin past a child evicts the child to top-level', () => {
+      // Bin spans world x ∈ [0, 200], y ∈ [0, 200]. Centroid (100, 100).
+      // Child at world (180, 100) → local (80, 0). Inside the bin's right edge.
+      const bin = makeGroup({ id: 'bin', x: 0, y: 200, width: 200, height: 200 })
+      const rect = makeRect({ id: 'r1', x: 80, y: 0, width: 20, height: 20, groupId: 'bin' })
+
+      engine.createGroup({ ...bin, childIds: ['r1'] })
+      engine.addShape(rect)
+
+      // Shrink the bin to 100×200 — child's world centroid (180, 100) is now
+      // outside the new bin's right edge (which sits at x=100).
+      engine.updateGroup('bin', { width: 100 })
+
+      // Child should have been evicted to top-level.
+      const updated = engine.getShape('r1')!
+      expect(updated.groupId).toBeNull()
+      expect(engine.getGroup('bin')!.childIds).not.toContain('r1')
+    })
+
+    it('C30 (#297): shrinking a bin still containing the child keeps it parented', () => {
+      const bin = makeGroup({ id: 'bin', x: 0, y: 200, width: 200, height: 200 })
+      // Child at world (90, 100) → local (-10, 0). Well inside the new bin too.
+      const rect = makeRect({ id: 'r1', x: -10, y: 0, width: 20, height: 20, groupId: 'bin' })
+
+      engine.createGroup({ ...bin, childIds: ['r1'] })
+      engine.addShape(rect)
+
+      engine.updateGroup('bin', { width: 120 })
+
+      const updated = engine.getShape('r1')!
+      expect(updated.groupId).toBe('bin')
+      expect(engine.getGroup('bin')!.childIds).toContain('r1')
+    })
   })
 
   // ─── C9-C11: Selection ──────────────────────────────────────────────────────
