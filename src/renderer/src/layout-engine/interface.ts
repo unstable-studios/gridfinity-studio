@@ -79,6 +79,14 @@ export interface LayoutEngine {
   // ─── Theme ────────────────────────────────────────────────────────────────
   setThemeColors(colors: { background: string; grid: string; gridOrigin: string }): void
 
+  /**
+   * Update the project's `unitHeight` (mm per height unit). Used to derive
+   * each shape's render-time opacity from its pocket depth — see
+   * `depthToOpacity` in shared/types/project. Triggers a refresh of all
+   * grouped shapes' opacities.
+   */
+  setUnitHeight(mm: number): void
+
   // ─── Capabilities ──────────────────────────────────────────────────────────
   capabilities(): Set<string>
 

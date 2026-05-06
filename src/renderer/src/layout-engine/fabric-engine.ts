@@ -18,6 +18,8 @@ import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
 import { computeEdgeAnchor } from './input-math'
 import { findContainingBinGroup } from './containment'
+import { depthToOpacity } from '../../../shared/types/project'
+import { isBinGroup } from './types'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -184,6 +186,8 @@ export class FabricEngine implements LayoutEngine {
     gridOrigin: DEFAULT_GRID_ORIGIN
   }
   private insets: ViewportInsets = {}
+  /** mm per height unit — used to derive depth-based shape opacity. */
+  private unitHeight = 7
   /** Currently highlighted group ID during shape drag (for drop-target feedback). */
   private highlightedGroupId: string | null = null
   /**
@@ -275,6 +279,7 @@ export class FabricEngine implements LayoutEngine {
     const obj = layoutShapeToFabric(shape)
     this.shapeMap.set(shape.id, { ...shape })
     this.fabricMap.set(shape.id, obj)
+    this.applyDepthOpacity(shape, obj)
 
     if (shape.groupId && this.rendererMap.has(shape.groupId)) {
       // shape.x/y is already group-local (snapshot semantics). attachChild
@@ -287,6 +292,26 @@ export class FabricEngine implements LayoutEngine {
 
     this.canvas?.requestRenderAll()
     this.emitter.emit('shapeCreated', { shape: { ...shape } })
+  }
+
+  /**
+   * Sets the fabric object's `opacity` based on the shape's pocket depth
+   * relative to the bin's max safe depth. Auto (depth null/undef) → 1.0.
+   * Top-level shapes (no groupId) → 1.0.
+   */
+  private applyDepthOpacity(shape: LayoutShape, obj: fabric.FabricObject): void {
+    if (!shape.groupId) {
+      obj.set('opacity', 1)
+      return
+    }
+    const group = this.groupMap.get(shape.groupId)
+    if (!group || !isBinGroup(group)) {
+      obj.set('opacity', 1)
+      return
+    }
+    const meta = shape.metadata as { pocket?: { depth?: number | null } } | undefined
+    const opacity = depthToOpacity(meta?.pocket?.depth, group.metadata.heightUnits, this.unitHeight)
+    obj.set('opacity', opacity)
   }
 
   updateShape(id: string, patch: Partial<LayoutShape>): void {
@@ -320,6 +345,10 @@ export class FabricEngine implements LayoutEngine {
 
     if (patch.lockAspectRatio !== undefined) {
       obj.set('lockUniScaling', patch.lockAspectRatio)
+    }
+
+    if (patch.metadata !== undefined) {
+      this.applyDepthOpacity(updated, obj)
     }
 
     obj.setCoords()
@@ -732,6 +761,17 @@ export class FabricEngine implements LayoutEngine {
 
   getGridConfig(): GridConfig {
     return { ...this.gridConfig }
+  }
+
+  setUnitHeight(mm: number): void {
+    if (mm === this.unitHeight) return
+    this.unitHeight = mm
+    // Refresh opacities for every grouped shape since maxDepth changed.
+    for (const [id, shape] of this.shapeMap) {
+      const obj = this.fabricMap.get(id)
+      if (obj) this.applyDepthOpacity(shape, obj)
+    }
+    this.canvas?.requestRenderAll()
   }
 
   // ─── Theme ───────────────────────────────────────────────────────────────

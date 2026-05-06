@@ -17,6 +17,8 @@ import { KonvaGroupRenderer } from './konva-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
 import { findContainingBinGroup } from './containment'
+import { isBinGroup } from './types'
+import { depthToOpacity } from '../../../shared/types/project'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -138,6 +140,8 @@ export class KonvaEngine implements LayoutEngine {
   private bgRect: Konva.Rect | null = null
   private gridBgRect: Konva.Rect | null = null
   private insets: ViewportInsets = {}
+  /** mm per height unit — used to derive depth-based shape opacity. */
+  private unitHeight = 7
   /** Currently highlighted group ID during shape drag (for drop-target feedback). */
   private highlightedGroupId: string | null = null
 
@@ -362,6 +366,7 @@ export class KonvaEngine implements LayoutEngine {
       this.transformer?.moveToTop()
     }
 
+    this.applyDepthOpacity(shape, node)
     this.mainLayer.batchDraw()
     this.emitter.emit('shapeCreated', { shape: { ...shape } })
   }
@@ -399,6 +404,10 @@ export class KonvaEngine implements LayoutEngine {
 
     node.setAttrs(attrs)
 
+    if (patch.metadata !== undefined) {
+      this.applyDepthOpacity(updated, node)
+    }
+
     // If lockAspectRatio changed and this node is selected, update transformer
     if (patch.lockAspectRatio !== undefined && this.transformer) {
       const selectedIds = this.getSelectedIds()
@@ -411,6 +420,26 @@ export class KonvaEngine implements LayoutEngine {
     }
 
     this.mainLayer?.batchDraw()
+  }
+
+  /**
+   * Sets the konva node's `opacity` based on the shape's pocket depth
+   * relative to the bin's max safe depth. Auto (depth null/undef) → 1.0.
+   * Top-level shapes (no groupId) → 1.0.
+   */
+  private applyDepthOpacity(shape: LayoutShape, node: Konva.Shape): void {
+    if (!shape.groupId) {
+      node.opacity(1)
+      return
+    }
+    const group = this.groupMap.get(shape.groupId)
+    if (!group || !isBinGroup(group)) {
+      node.opacity(1)
+      return
+    }
+    const meta = shape.metadata as { pocket?: { depth?: number | null } } | undefined
+    const opacity = depthToOpacity(meta?.pocket?.depth, group.metadata.heightUnits, this.unitHeight)
+    node.opacity(opacity)
   }
 
   removeShape(id: string): void {
@@ -1055,6 +1084,17 @@ export class KonvaEngine implements LayoutEngine {
 
   getGridConfig(): GridConfig {
     return { ...this.gridConfig }
+  }
+
+  setUnitHeight(mm: number): void {
+    if (mm === this.unitHeight) return
+    this.unitHeight = mm
+    // Refresh opacities for every grouped shape since maxDepth changed.
+    for (const [id, shape] of this.shapeMap) {
+      const node = this.konvaMap.get(id)
+      if (node) this.applyDepthOpacity(shape, node)
+    }
+    this.mainLayer?.batchDraw()
   }
 
   // ─── Theme ───────────────────────────────────────────────────────────────
