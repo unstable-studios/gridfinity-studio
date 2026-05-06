@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.10.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.9.0...v1.10.0) (2026-05-06)
+
+
+### Features
+
+* **ui:** no-delay hover tooltip on canvas shapes ([#348](https://github.com/unstable-studios/gridfinity-studio/issues/348)) ([c0e0d3d](https://github.com/unstable-studios/gridfinity-studio/commit/c0e0d3d4d9c5cc142c1328bbcb7d3a9164559284))
+* **ui:** per-shape pocket depth control + numeric-input cleanup ([#346](https://github.com/unstable-studios/gridfinity-studio/issues/346)) ([02be577](https://github.com/unstable-studios/gridfinity-studio/commit/02be577f98b885fd295b47e8447587c6af6ea711))
+* **ui:** scale shape canvas opacity by pocket depth ([#347](https://github.com/unstable-studios/gridfinity-studio/issues/347)) ([722a4d7](https://github.com/unstable-studios/gridfinity-studio/commit/722a4d793f35759881ca64e10562a64a6386c2b3))
+
+
+### Bug Fixes
+
+* **core:** evict shapes whose centroid leaves a resized bin ([#350](https://github.com/unstable-studios/gridfinity-studio/issues/350)) ([81ee2b4](https://github.com/unstable-studios/gridfinity-studio/commit/81ee2b4377d748e12993e439f0dd5fe32cc7735c))
+
 ## [1.9.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.8.0...v1.9.0) (2026-05-05)
 
 
