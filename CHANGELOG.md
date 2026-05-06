@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.10.0...v1.10.1) (2026-05-06)
+
+
+### Bug Fixes
+
+* **core:** metadata changes ride a tick + Fabric tooltip finds grouped shapes ([#354](https://github.com/unstable-studios/gridfinity-studio/issues/354)) ([2baef1e](https://github.com/unstable-studios/gridfinity-studio/commit/2baef1e72414e3c553f9a725116f3457b9d8e94e))
+
 ## [1.10.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.9.0...v1.10.0) (2026-05-06)
 
 
