@@ -178,24 +178,6 @@ export function NumericInput({
     [editing, editText, step, fineStep, coarseStep, precision, apply, commitEdit]
   )
 
-  // ── Steppers ─────────────────────────────────────────────────
-
-  const increment = useCallback(
-    (e: React.MouseEvent) => {
-      const s = getStep(e, step, fineStep, coarseStep)
-      apply(value + s)
-    },
-    [step, fineStep, coarseStep, value, apply]
-  )
-
-  const decrement = useCallback(
-    (e: React.MouseEvent) => {
-      const s = getStep(e, step, fineStep, coarseStep)
-      apply(value - s)
-    },
-    [step, fineStep, coarseStep, value, apply]
-  )
-
   const displayValue = displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)
 
   return (
@@ -212,14 +194,16 @@ export function NumericInput({
         </span>
       )}
 
-      {/* Value area */}
+      {/* Value area — drag the label to scrub, scroll the input to step,
+          click to edit, arrow keys + Shift/Cmd for fine/coarse step. No
+          discrete spinner buttons by design. */}
       <div className="relative flex items-center">
         {editing ? (
           <input
             ref={inputRef}
             type="text"
             inputMode="decimal"
-            className="w-16 bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-mono text-xs text-right rounded px-1 py-0.5 outline-none ring-1 ring-blue-500"
+            className="w-20 bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-mono text-xs text-right rounded px-1.5 py-0.5 outline-none ring-1 ring-blue-500"
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             onBlur={commitEdit}
@@ -228,40 +212,12 @@ export function NumericInput({
         ) : (
           <button
             type="button"
-            className="w-16 bg-zinc-200/60 text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 font-mono text-xs text-right rounded px-1 py-0.5 hover:bg-zinc-300/60 dark:hover:bg-zinc-700/60 transition cursor-text"
+            className="w-20 bg-zinc-200/60 text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 font-mono text-xs text-right rounded px-1.5 py-0.5 hover:bg-zinc-300/60 dark:hover:bg-zinc-700/60 transition cursor-text"
             onClick={startEditing}
           >
             {displayValue}
             {suffix && <span className="text-zinc-500 ml-0.5">{suffix}</span>}
           </button>
-        )}
-
-        {/* Stepper arrows */}
-        {!editing && (
-          <div className="flex flex-col ml-0.5">
-            <button
-              type="button"
-              className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 leading-none px-0.5"
-              onClick={increment}
-              tabIndex={-1}
-              aria-label="Increment"
-            >
-              <svg width="8" height="5" viewBox="0 0 8 5" fill="currentColor">
-                <path d="M4 0L8 5H0z" />
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 leading-none px-0.5"
-              onClick={decrement}
-              tabIndex={-1}
-              aria-label="Decrement"
-            >
-              <svg width="8" height="5" viewBox="0 0 8 5" fill="currentColor">
-                <path d="M4 5L0 0h8z" />
-              </svg>
-            </button>
-          </div>
         )}
       </div>
     </div>

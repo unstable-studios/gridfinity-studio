@@ -8,12 +8,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppMode } from '@/hooks/useAppMode'
-import { useProject } from '@/hooks/useProject'
 import { useLayoutEngineContext, useEngineState } from '@/layout-engine'
 import type { LayoutEngine } from '@/layout-engine'
 import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/types'
 import { findBestBinForShape, type ShapeAABB } from '@/layout-engine/containment'
-import { computeDefaultPocketDepth } from '../../../shared/types/project'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
 
@@ -114,13 +112,15 @@ function findBinForDrawnShape(
 }
 
 function pocketMetadata(
-  bin: (LayoutGroup & { metadata: BinMetadata }) | null,
-  unitHeight: number
+  bin: (LayoutGroup & { metadata: BinMetadata }) | null
 ): Record<string, unknown> | undefined {
   if (!bin) return undefined
+  // Newly drawn shapes start in "auto" mode (depth === undefined). The bake
+  // loop falls back to computeDefaultPocketDepth via `?? computeDefault…`,
+  // so the produced geometry is identical, but the sidebar can distinguish
+  // a true user override from the historical default.
   return {
     pocket: {
-      depth: computeDefaultPocketDepth(bin.metadata.heightUnits, unitHeight),
       clearance: 0.25
     }
   }
@@ -148,7 +148,6 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   const { activeTool, setActiveTool } = useAppMode()
   const { engine } = useLayoutEngineContext()
   const { viewport } = useEngineState()
-  const unitHeight = useProject((s) => s.project?.gridfinity.unitHeight ?? 7)
 
   // Reset polygon state when switching away from polygon tool.
 
@@ -231,7 +230,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         points: relativePoints,
         ...baseShapeProps(),
         groupId: null,
-        metadata: { ...pocketMetadata(bin, unitHeight), name }
+        metadata: { ...pocketMetadata(bin), name }
       })
       if (bin) engine.addToGroup(id, bin.id)
       engine.select([id])
@@ -243,7 +242,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         finishingRef.current = false
       })
     },
-    [engine, setActiveTool, unitHeight]
+    [engine, setActiveTool]
   )
 
   // ─── Escape / Enter for polygon ──────────────────────────────────────────
@@ -434,7 +433,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             height: h,
             ...baseShapeProps(),
             groupId: null,
-            metadata: { ...pocketMetadata(bin, unitHeight), name }
+            metadata: { ...pocketMetadata(bin), name }
           })
           if (bin) engine.addToGroup(id, bin.id)
           engine.select([id])
@@ -462,7 +461,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
             radiusY: radius,
             ...baseShapeProps(),
             groupId: null,
-            metadata: { ...pocketMetadata(bin, unitHeight), name }
+            metadata: { ...pocketMetadata(bin), name }
           })
           if (bin) engine.addToGroup(id, bin.id)
           engine.select([id])
@@ -472,7 +471,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
       dragStartRef.current = null
     },
-    [engine, activeTool, setActiveTool, unitHeight]
+    [engine, activeTool, setActiveTool]
   )
 
   // ─── Render ────────────────────────────────────────────────────────────────
