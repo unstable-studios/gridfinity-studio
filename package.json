@@ -1,7 +1,7 @@
 {
   "name": "gridfinity-studio",
   "author": "Mike Hansen <mike@unstablestudios.com>",
-  "version": "1.10.0",
+  "version": "1.10.1",
   "description": "Gridfinity Studio is an Electron-based application for designing and managing Gridfinity modular storage systems.",
   "main": "./out/main/index.js",
   "scripts": {
