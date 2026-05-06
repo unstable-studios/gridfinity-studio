@@ -353,6 +353,21 @@ export class FabricEngine implements LayoutEngine {
 
     obj.setCoords()
     this.canvas?.requestRenderAll()
+
+    // Emit a generic update event for any patch that doesn't already have
+    // a more specific event (move/resize). React subscribers tick on this
+    // so the sidebar / tooltip pick up metadata changes (depth, name, …).
+    const isPositionOnly =
+      Object.keys(patch).length > 0 &&
+      Object.keys(patch).every((k) => k === 'x' || k === 'y' || k === 'id')
+    const isResizeOnly =
+      Object.keys(patch).length > 0 &&
+      Object.keys(patch).every(
+        (k) => k === 'width' || k === 'height' || k === 'radiusX' || k === 'radiusY' || k === 'id'
+      )
+    if (!isPositionOnly && !isResizeOnly) {
+      this.emitter.emit('shapeUpdated', { id })
+    }
   }
 
   removeShape(id: string): void {
@@ -928,17 +943,27 @@ export class FabricEngine implements LayoutEngine {
   objectAt(worldX: number, worldY: number): HitResult | null {
     if (!this.canvas) return null
     const point = new fabric.Point(worldX, worldY)
+
+    // Shapes first — they render above bins. fabricMap covers every shape
+    // regardless of whether it's a top-level canvas object or a child of a
+    // bin's fabric.Group, so this catches grouped shapes too (which the
+    // canvas-level `getObjects()` walk would miss).
+    for (const [shapeId, obj] of this.fabricMap) {
+      if (!obj.evented) continue
+      if (obj.containsPoint(point)) {
+        return { type: 'shape', id: shapeId }
+      }
+    }
+
+    // Then groups — the bin background.
     const objects = this.canvas.getObjects()
-    // Iterate in reverse for topmost-first hit order
     for (let i = objects.length - 1; i >= 0; i--) {
       const obj = objects[i]
       if (!obj.evented) continue
-      if (obj.containsPoint(point)) {
-        const rec = obj as unknown as Record<string, unknown>
-        const groupId = rec[GROUP_DATA_KEY] as string | undefined
-        if (groupId) return { type: 'group', id: groupId }
-        const shapeId = rec[SHAPE_DATA_KEY] as string | undefined
-        if (shapeId) return { type: 'shape', id: shapeId }
+      const rec = obj as unknown as Record<string, unknown>
+      const groupId = rec[GROUP_DATA_KEY] as string | undefined
+      if (groupId && obj.containsPoint(point)) {
+        return { type: 'group', id: groupId }
       }
     }
     return null

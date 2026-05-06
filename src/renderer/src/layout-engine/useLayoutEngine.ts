@@ -45,6 +45,7 @@ export function useEngineState(): EngineState {
         'shapeMoved',
         'shapeResized',
         'shapeCreated',
+        'shapeUpdated',
         'shapeDeleted',
         'groupChanged',
         'groupMoved',
