@@ -420,6 +420,21 @@ export class KonvaEngine implements LayoutEngine {
     }
 
     this.mainLayer?.batchDraw()
+
+    // Emit a generic update event for any patch that doesn't already have
+    // a more specific event (move/resize). React subscribers tick on this
+    // so the sidebar / tooltip pick up metadata changes (depth, name, …).
+    const isPositionOnly =
+      Object.keys(patch).length > 0 &&
+      Object.keys(patch).every((k) => k === 'x' || k === 'y' || k === 'id')
+    const isResizeOnly =
+      Object.keys(patch).length > 0 &&
+      Object.keys(patch).every(
+        (k) => k === 'width' || k === 'height' || k === 'radiusX' || k === 'radiusY' || k === 'id'
+      )
+    if (!isPositionOnly && !isResizeOnly) {
+      this.emitter.emit('shapeUpdated', { id })
+    }
   }
 
   /**

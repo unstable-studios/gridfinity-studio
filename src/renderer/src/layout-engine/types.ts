@@ -194,6 +194,12 @@ export type EngineEventMap = {
   }
   shapeCreated: { shape: LayoutShape }
   shapeDeleted: { id: string }
+  /**
+   * Emitted by `updateShape` for any patch that doesn't fall under
+   * `shapeMoved` or `shapeResized` — primarily metadata mutations
+   * (depth, name, etc.). Subscribers can re-read engine data to refresh.
+   */
+  shapeUpdated: { id: string }
   groupChanged: { groupId: string; childIds: string[] }
   groupMoved: { id: string; x: number; y: number }
   groupResized: { id: string; width: number; height: number }
