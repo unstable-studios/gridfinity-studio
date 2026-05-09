@@ -75,11 +75,11 @@
     "zustand": "^5.0.11"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.4.3",
-    "@commitlint/config-conventional": "^20.4.3",
-    "@commitlint/cz-commitlint": "^20.4.3",
-    "@commitlint/prompt": "^20.4.3",
-    "@commitlint/prompt-cli": "^20.4.3",
+    "@commitlint/cli": "^21.0.0",
+    "@commitlint/config-conventional": "^21.0.0",
+    "@commitlint/cz-commitlint": "^21.0.0",
+    "@commitlint/prompt": "^21.0.0",
+    "@commitlint/prompt-cli": "^21.0.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@eslint/js": "^10.0.1",
     "@react-three/eslint-plugin": "^0.1.2",
