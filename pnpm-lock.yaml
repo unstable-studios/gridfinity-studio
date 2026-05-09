@@ -10,10 +10,10 @@ importers:
     dependencies:
       '@electron-toolkit/preload':
         specifier: ^3.0.2
-        version: 3.0.2(electron@42.0.0)
+        version: 3.0.2(electron@42.0.1)
       '@electron-toolkit/utils':
         specifier: ^4.0.0
-        version: 4.0.0(electron@42.0.0)
+        version: 4.0.0(electron@42.0.1)
       '@headlessui/react':
         specifier: ^2.2.9
         version: 2.2.10(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
@@ -173,7 +173,7 @@ importers:
         version: 4.3.1(@types/node@25.6.2)(typescript@6.0.3)
       electron:
         specifier: ^42.0.0
-        version: 42.0.0
+        version: 42.0.1
       electron-builder:
         specifier: ^26.9.1
         version: 26.9.1(electron-builder-squirrel-windows@26.9.1)
@@ -2979,8 +2979,8 @@ packages:
     resolution: {integrity: sha512-bO3y10YikuUwUuDUQRM4KfwNkKhnpVO7IPdbsrejwN9/AABJzzTQ4GeHwyzNSrVO+tEH3/Np255a3sVZpZDjvg==}
     engines: {node: '>=8.0.0'}
 
-  electron@42.0.0:
-    resolution: {integrity: sha512-in5jnW/Ywy3Rh3FPr4MR80exPEkywKYAmDJRZ/gIKlr8VXEi3zXgiAZbf0Si7KRccHTF2y8euVMRz7M6HqTjMA==}
+  electron@42.0.1:
+    resolution: {integrity: sha512-d8HnycE970DGESe91Nj30eonFBUcAI9EZ1TwUGJVzSAnJZdh0BkFEinAXjdklvDYst+bVDc8HsksCuqVLrnqdg==}
     engines: {node: '>= 22.12.0'}
     hasBin: true
 
@@ -5860,17 +5860,17 @@ snapshots:
 
   '@dimforge/rapier3d-compat@0.12.0': {}
 
-  '@electron-toolkit/preload@3.0.2(electron@42.0.0)':
+  '@electron-toolkit/preload@3.0.2(electron@42.0.1)':
     dependencies:
-      electron: 42.0.0
+      electron: 42.0.1
 
   '@electron-toolkit/tsconfig@2.0.0(@types/node@25.6.2)':
     dependencies:
       '@types/node': 25.6.2
 
-  '@electron-toolkit/utils@4.0.0(electron@42.0.0)':
+  '@electron-toolkit/utils@4.0.0(electron@42.0.1)':
     dependencies:
-      electron: 42.0.0
+      electron: 42.0.1
 
   '@electron/asar@3.4.1':
     dependencies:
@@ -8382,7 +8382,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@42.0.0:
+  electron@42.0.1:
     dependencies:
       '@electron/get': 5.0.0
       '@types/node': 24.12.3
