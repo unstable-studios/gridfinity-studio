@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "extensions": {
+    "github": {
+      "version": "1.0.5",
+      "source": "local",
+      "manifest_hash": "sha256:72a5e53c586714c757db44ab4e1c89a915b15dd05baf7e272e37fc3c84e5afae",
+      "enabled": true,
+      "priority": 10,
+      "registered_commands": {
+        "claude": [
+          "speckit.github.taskstoissues"
+        ]
+      },
+      "registered_skills": [],
+      "installed_at": "2026-11-22T20:32:33.810583+00:00"
+    }
+  }
+}

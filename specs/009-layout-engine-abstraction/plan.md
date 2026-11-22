@@ -45,7 +45,7 @@ specs/009-layout-engine-abstraction/
 ├── quickstart.md        # Phase 1 output
 ├── contracts/           # Phase 1 output
 │   └── layout-engine.md # Engine interface contract
-└── tasks.md             # Phase 2 output (via /speckit.tasks)
+└── tasks.md             # Phase 2 output (via /speckit-tasks)
 ```
 
 ### Source Code (repository root)

@@ -31,6 +31,6 @@
 
 ## Notes
 
-- All items pass validation. Spec is ready for `/speckit.plan`.
+- All items pass validation. Spec is ready for `/speckit-plan`.
 - The spec intentionally avoids naming specific TypeScript interfaces, file paths, or code patterns — those belong in the implementation plan.
 - "Unified interface" and "adapter" are used as domain concepts (like "API" or "plugin"), not implementation prescriptions.

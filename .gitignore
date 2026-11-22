@@ -46,6 +46,7 @@ vite.svg
 ### Claude Code
 .claude/*
 !.claude/commands/
+!.claude/skills/
 
 ### Playwright MCP testing artifacts
 .playwright-mcp/
