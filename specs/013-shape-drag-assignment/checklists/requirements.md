@@ -31,4 +31,4 @@
 
 ## Notes
 
-- All items pass validation. Spec is ready for `/speckit.plan` or `/speckit.tasks`.
+- All items pass validation. Spec is ready for `/speckit-plan` or `/speckit-tasks`.

@@ -31,6 +31,6 @@
 
 ## Notes
 
-- All items pass. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- All items pass. Spec is ready for `/speckit-clarify` or `/speckit-plan`.
 - The spec references "shared geometry utilities" and "z-layer constants" which are architectural concepts but described at the behavioral level (what they enable) rather than implementation level (how they're built).
 - Track A (data model) and Track B (interaction consolidation) are implicitly covered by the user stories rather than explicitly named as tracks — this keeps the spec stakeholder-friendly while the track structure can be introduced in the plan phase.

@@ -3,7 +3,7 @@
 **Branch**: `001-full-roadmap` | **Date**: 2026-03-04 | **Spec**: [spec.md](./spec.md)
 **Input**: All 36 open GitHub issues (#83–#120) organized into an 8-phase implementation plan
 
-**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
+**Note**: This template is filled in by the `/speckit-plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 
 ## Summary
 
@@ -50,7 +50,7 @@ specs/001-full-roadmap/
 ├── quickstart.md        # Phase 1: getting started guide
 ├── contracts/
 │   └── ipc-channels.md  # Phase 1: IPC and worker message contracts
-└── tasks.md             # Phase 2 output (via /speckit.tasks)
+└── tasks.md             # Phase 2 output (via /speckit-tasks)
 ```
 
 ### Source Code (repository root)
