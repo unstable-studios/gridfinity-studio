@@ -148,3 +148,7 @@ Concretely:
 - 013-shape-drag-assignment: Shape-to-bin assignment via drag. Centroid-based group membership evaluation on drag end. Real-time bin highlighting during shape drag. Extracted `findContainingBinGroup` into shared `containment.ts`. New `shapeReassigned` event.
 - 012-input-decoupling: GestureRecognizer + InputActionHandler interface. Engine-agnostic input processing for pan, zoom, rubber-band, click-select.
 - 010-layout-engine-integration: LayoutEngine is now source of truth for all 2D state. Project schema v0.5.0 with `layoutSnapshot`. Old entity/bin system fully removed. Drag-to-resize with collision detection, bin artwork decorations, snapshot-based undo/redo.
+
+## Spec Kit
+
+Spec Kit 1.4 commands are skills: `/speckit-specify`, `/speckit-plan`, `/speckit-tasks`, ... (`/speckit-git-*` and `/speckit-github-taskstoissues` from the git and github extensions). `/speckit-specify` creates the feature branch and records the feature in `.specify/feature.json` (not committed). To resume a feature in a fresh clone or worktree, set it once: `SPECIFY_FEATURE_DIRECTORY=specs/<NNN-name>` before the first `/speckit-*` command. Upgrade with `specify integration upgrade claude`.
