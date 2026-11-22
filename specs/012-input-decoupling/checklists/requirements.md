@@ -31,5 +31,5 @@
 
 ## Notes
 
-- All items pass validation. Spec is ready for `/speckit.clarify` or `/speckit.plan`.
+- All items pass validation. Spec is ready for `/speckit-clarify` or `/speckit-plan`.
 - Assumptions: The spec assumes the existing `collision.ts` shared module and `LayoutEngine` interface remain the stable foundation. The refactor is purely internal — no user-facing behavior changes.

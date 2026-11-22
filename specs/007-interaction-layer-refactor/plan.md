@@ -48,7 +48,7 @@ specs/007-interaction-layer-refactor/
 ├── quickstart.md        # Phase 1 output
 ├── checklists/
 │   └── requirements.md  # Spec quality checklist
-└── tasks.md             # Phase 2 output (via /speckit.tasks)
+└── tasks.md             # Phase 2 output (via /speckit-tasks)
 ```
 
 ### Source Code (repository root)
