@@ -36,7 +36,13 @@ export class BakeQueue<T> {
   }
 
   private start(id: string): void {
-    const pending = this.handlers.bake(id)
+    let pending: Promise<T> | null
+    try {
+      pending = this.handlers.bake(id)
+    } catch (error) {
+      this.handlers.onError(id, error)
+      return
+    }
     if (!pending) return
 
     const token = Symbol(id)
@@ -46,8 +52,11 @@ export class BakeQueue<T> {
     const settle = (report: () => void): void => {
       if (this.inFlight.get(id) !== token) return
       this.inFlight.delete(id)
-      report()
-      if (this.queued.delete(id)) this.start(id)
+      try {
+        report()
+      } finally {
+        if (this.queued.delete(id)) this.start(id)
+      }
     }
     pending.then(
       (result) => settle(() => this.handlers.onDone(id, result)),

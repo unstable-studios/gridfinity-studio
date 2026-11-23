@@ -117,4 +117,46 @@ describe('BakeQueue', () => {
     expect(bakes).toHaveLength(0)
     expect(log).toEqual([])
   })
+
+  it('reports a bake that cannot start as an error', async () => {
+    const log: string[] = []
+    const queue = new BakeQueue<string>({
+      bake: () => {
+        throw new Error('bad params')
+      },
+      onStart: (id) => log.push(`start ${id}`),
+      onDone: (id) => log.push(`done ${id}`),
+      onError: (id, error) => log.push(`error ${id} ${(error as Error).message}`)
+    })
+    queue.request('a')
+    await settled()
+    expect(log).toEqual(['error a bad params'])
+  })
+
+  it('still runs the waiting bake when the follow-up cannot start', async () => {
+    const log: string[] = []
+    const resolvers: Array<(value: string) => void> = []
+    let calls = 0
+    const queue = new BakeQueue<string>({
+      bake: () => {
+        calls++
+        if (calls === 2) throw new Error('bad params')
+        return new Promise<string>((resolve) => resolvers.push(resolve))
+      },
+      onStart: (id) => log.push(`start ${id}`),
+      onDone: (id, result) => log.push(`done ${id} ${result}`),
+      onError: (id, error) => log.push(`error ${id} ${(error as Error).message}`)
+    })
+    queue.request('a')
+    queue.request('a')
+    resolvers[0]('v1')
+    await settled()
+    expect(log).toEqual(['start a', 'done a v1', 'error a bad params'])
+
+    // The id is free again: the next request bakes.
+    queue.request('a')
+    resolvers[1]('v3')
+    await settled()
+    expect(log).toEqual(['start a', 'done a v1', 'error a bad params', 'start a', 'done a v3'])
+  })
 })
