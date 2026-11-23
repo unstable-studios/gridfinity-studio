@@ -69,7 +69,8 @@ export interface LayoutEngine {
 
   /**
    * Run several mutations as one change. Events raised inside `fn` are
-   * delivered after it returns, so listeners only see the final state.
+   * delivered after it returns, so a listener that reads the engine sees the
+   * final state. Each payload still describes its own mutation as it was made.
    */
   batch(fn: () => void): void
 

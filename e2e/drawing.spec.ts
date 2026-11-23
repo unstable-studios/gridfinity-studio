@@ -50,28 +50,41 @@ test('drawing a shape is one undo step and leaves no preview behind', async () =
   await page.mouse.move(421, 621)
   await page.mouse.move(420, 620)
   await expect(page.getByText(/^Depth: Auto/), 'the shape landed in the bin').toBeVisible()
-  await app.menu('Edit', /^Undo/)
-  await app.expectShapeCount(0)
-  await app.expectBinCount(1)
 
-  // Redo brings the pocket back inside the bin.
-  await app.menu('Edit', /^Redo/)
-  await app.expectShapeCount(1)
-  const redone = await app.save(join(app.dir, 'redone.gfstudio'))
-  const [bin] = redone.layoutSnapshot.groups
-  expect(redone.layoutSnapshot.shapes[0].groupId, 'redo keeps the pocket in its bin').toBe(bin.id)
-  expect(bin.childIds).toEqual([redone.layoutSnapshot.shapes[0].id])
-
-  // So does reloading the window, which restores the session copy.
+  // Reloading the window straight away restores the session copy, with the
+  // pocket still inside the bin.
   await page.reload()
   await app.expectBinCount(1)
   await app.expectShapeCount(1)
-  const reloadedPath = join(app.dir, 'reloaded.gfstudio')
-  await app.stubSaveDialog(reloadedPath)
+  const file = join(app.dir, 'pockets.gfstudio')
+  await app.stubSaveDialog(file)
   await app.menu('File', /^Save as/)
-  await expect.poll(() => readFile(reloadedPath, 'utf8').catch(() => '')).not.toBe('')
-  const reloaded = JSON.parse(await readFile(reloadedPath, 'utf8')) as SavedProject
-  expect(reloaded.layoutSnapshot).toEqual(redone.layoutSnapshot)
+  await expect.poll(() => readFile(file, 'utf8').catch(() => '')).not.toBe('')
+  const reloaded = JSON.parse(await readFile(file, 'utf8')) as SavedProject
+  const [bin] = reloaded.layoutSnapshot.groups
+  const [first] = reloaded.layoutSnapshot.shapes
+  expect(first.groupId, 'reload keeps the pocket in its bin').toBe(bin.id)
+  expect(bin.childIds).toEqual([first.id])
+
+  // A second pocket: one undo removes it, and redo brings it back inside
+  // the bin.
+  await app.selectTool('Rect')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(2)
+  await app.menu('Edit', /^Undo/)
+  await app.expectShapeCount(1)
+  await app.expectBinCount(1)
+  await openEditMenu()
+  await expect(undo, 'pocket in a bin: drawing is a single undo step').toBeDisabled()
+  await page.keyboard.press('Escape')
+  await app.menu('Edit', /^Redo/)
+  await app.expectShapeCount(2)
+  const redone = await app.save(file)
+  expect(
+    redone.layoutSnapshot.shapes.map((s) => s.groupId),
+    'redo keeps the pocket in its bin'
+  ).toEqual([bin.id, bin.id])
+  expect(redone.layoutSnapshot.groups[0].childIds).toHaveLength(2)
 
   expect(app.errors).toEqual([])
 })
