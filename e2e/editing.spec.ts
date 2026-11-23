@@ -82,6 +82,25 @@ test('edit bins and pockets', async () => {
     .soft(typeof shapeById(saved, pocketId).metadata?.pocket?.depth, 'explicit depth is saved')
     .toBe('number')
 
+  // A depth change is an edit like any other: it marks the project unsaved
+  // and can be undone and redone.
+  await page.mouse.click(pocketAt.x, pocketAt.y)
+  await page.getByRole('switch', { name: 'Auto' }).click()
+  await expect
+    .soft(page.getByText('Unsaved', { exact: true }), 'depth change is unsaved')
+    .toBeVisible()
+  saved = await app.save(file)
+  expect.soft(shapeById(saved, pocketId).metadata?.pocket?.depth ?? null, 'back on Auto').toBeNull()
+  await app.menu('Edit', /^Undo/)
+  saved = await app.save(file)
+  expect
+    .soft(typeof shapeById(saved, pocketId).metadata?.pocket?.depth, 'undo restores the depth')
+    .toBe('number')
+  await app.menu('Edit', /^Redo/)
+  saved = await app.save(file)
+  expect.soft(shapeById(saved, pocketId).metadata?.pocket?.depth ?? null, 'redo: Auto').toBeNull()
+  await app.menu('Edit', /^Undo/)
+
   // Drag the pocket out of the bin, then back in.
   const outside = toScreen({ x: bin.x + bin.width + 60, y: bin.y - bin.height - 60 })
   await app.drag(pocketAt, outside)

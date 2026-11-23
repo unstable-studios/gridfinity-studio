@@ -21,12 +21,16 @@ export interface LayoutEngine {
   // ─── Shape CRUD ─────────────────────────────────────────────────────────────
   addShape(shape: LayoutShape): void
   /**
-   * Change a shape's properties. Listeners are told to refresh, but this is
-   * not recorded as an undo step and does not reassign the shape's bin: use
-   * it for metadata and for live feedback while a value is being adjusted,
-   * and `translateShapes` for a finished move.
+   * Change a shape's properties. The change is one undo step.
+   *
+   * With `transient`, it is one step of an adjustment still in progress (a
+   * value being scrubbed): the shape updates for live feedback and nothing is
+   * recorded. Finish the adjustment with a call that is not transient.
+   *
+   * This never reassigns the shape's bin. Use `translateShapes` for a
+   * finished move.
    */
-  updateShape(id: string, patch: Partial<LayoutShape>): void
+  updateShape(id: string, patch: Partial<LayoutShape>, options?: { transient?: boolean }): void
   removeShape(id: string): void
   getShape(id: string): LayoutShape | undefined
   getAllShapes(): LayoutShape[]

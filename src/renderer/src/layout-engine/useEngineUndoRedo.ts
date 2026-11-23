@@ -95,6 +95,7 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
       engine.on('groupResized', () => pushSnapshot('groupResized')),
       engine.on('shapeCreated', () => pushSnapshot('shapeCreated')),
       engine.on('shapeDeleted', () => pushSnapshot('shapeDeleted')),
+      engine.on('shapeUpdated', () => pushSnapshot('shapeUpdated')),
       engine.on('groupChanged', () => pushSnapshot('groupChanged'))
     ]
 
