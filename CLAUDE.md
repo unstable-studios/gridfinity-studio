@@ -83,6 +83,7 @@ The `LayoutEngine` interface abstracts all 2D canvas operations. Konva is the on
 | `collision.ts` | AABB collision detection for drag/resize |
 | `arrange.ts` | Align and distribute math on world-space bounding boxes |
 | `arrange-target.ts` | What the current selection can be aligned to |
+| `position-frame.ts` | Converts a shape's stored position to canvas or bin-relative coordinates |
 | `bin-artwork.ts` | Generates bin decorations (grid lines, screw holes, magnet holes) |
 | `useLayoutEngine.ts` | React hook — reactive engine state via useSyncExternalStore |
 | `useProjectEngineSync.ts` | Syncs engine ↔ project store on save/load |

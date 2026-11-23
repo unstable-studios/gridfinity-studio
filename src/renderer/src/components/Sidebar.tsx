@@ -1,10 +1,13 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
 import { NumericInput } from '@/components/ui/numeric-input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
+import { frameOffset } from '@/layout-engine/position-frame'
+import type { PositionFrame } from '@/layout-engine/position-frame'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
@@ -59,6 +62,18 @@ function LayoutSidebar(): React.JSX.Element {
     if (selectedIds.length !== 1) return null
     return shapes.find((s) => s.id === selectedIds[0]) ?? null
   }, [selectedIds, shapes])
+
+  // X and Y are shown on the canvas unless the person asks for them relative
+  // to the bin. On the canvas the numbers keep their meaning when a shape
+  // moves into or out of a bin.
+  const [positionFrame, setPositionFrame] = useState<PositionFrame>('canvas')
+  const positionOffset = selectedShape
+    ? frameOffset(
+        selectedShape,
+        groups.find((g) => g.id === selectedShape.groupId),
+        positionFrame
+      )
+    : { x: 0, y: 0 }
 
   // Editing a shape's X or Y. Each step moves the shape for live feedback.
   // When the adjustment is finished the whole move is replayed as one change,
@@ -301,20 +316,40 @@ function LayoutSidebar(): React.JSX.Element {
               <span className="text-zinc-500">Type</span>
               <span className="text-zinc-300 font-mono">{selectedShape.type}</span>
             </div>
+            {selectedShape.groupId && (
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-500">Position on</span>
+                <ToggleGroup
+                  type="single"
+                  aria-label="Position on"
+                  value={positionFrame}
+                  onValueChange={(value) => {
+                    if (value) setPositionFrame(value as PositionFrame)
+                  }}
+                >
+                  <ToggleGroupItem value="canvas" className="px-2 py-0.5">
+                    Canvas
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="bin" className="px-2 py-0.5">
+                    Bin
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            )}
             <NumericInput
               label="X"
-              value={selectedShape.x}
+              value={selectedShape.x + positionOffset.x}
               step={1}
               precision={1}
-              onChange={(v) => editSelectedShapePosition({ x: v })}
+              onChange={(v) => editSelectedShapePosition({ x: v - positionOffset.x })}
               onCommit={commitPositionEdit}
             />
             <NumericInput
               label="Y"
-              value={selectedShape.y}
+              value={selectedShape.y + positionOffset.y}
               step={1}
               precision={1}
-              onChange={(v) => editSelectedShapePosition({ y: v })}
+              onChange={(v) => editSelectedShapePosition({ y: v - positionOffset.y })}
               onCommit={commitPositionEdit}
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
