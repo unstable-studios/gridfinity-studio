@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
+import { flushPendingCommits } from '@/lib/pending-commits'
 import { UndoRedoStack } from './undo-redo-stack'
 import type { UndoRedoDebugState } from './undo-redo-stack'
 import type { LayoutEngine } from './interface'
@@ -49,6 +50,8 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
 
   const undo = useCallback(() => {
     if (!engine) return
+    // An adjustment still waiting to be recorded becomes the step to undo.
+    flushPendingCommits()
     isUndoingRef.current = true
     const json = stackRef.current.undo()
     if (json) engine.loadSnapshot(JSON.parse(json))
@@ -58,6 +61,7 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
 
   const redo = useCallback(() => {
     if (!engine) return
+    flushPendingCommits()
     isUndoingRef.current = true
     const json = stackRef.current.redo()
     if (json) engine.loadSnapshot(JSON.parse(json))

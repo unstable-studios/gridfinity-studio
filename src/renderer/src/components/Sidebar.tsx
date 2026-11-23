@@ -521,7 +521,7 @@ function ShapeDepthField({
 }): React.JSX.Element | null {
   const project = useProject((s) => s.project)
   const config = project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
-  const adjustingIdRef = useRef<string | null>(null)
+  const adjustingRef = useRef<{ id: string; before: string } | null>(null)
 
   if (!shape.groupId) return null
   const bin = engine.getGroup(shape.groupId)
@@ -548,14 +548,16 @@ function ShapeDepthField({
   // Each step of a depth adjustment is shown live. The adjustment is
   // recorded once, when it ends, so it is a single undo step.
   const adjustDepth = (next: number): void => {
-    adjustingIdRef.current = shape.id
+    adjustingRef.current ??= { id: shape.id, before: JSON.stringify(shape.metadata) }
     writeDepth(next, { transient: true })
   }
   const commitDepth = (): void => {
-    const id = adjustingIdRef.current
-    adjustingIdRef.current = null
-    const current = id && engine.getShape(id)
-    if (current) engine.updateShape(current.id, { metadata: current.metadata })
+    const start = adjustingRef.current
+    adjustingRef.current = null
+    const current = start && engine.getShape(start.id)
+    // Ending where it began is not a change.
+    if (!start || !current || JSON.stringify(current.metadata) === start.before) return
+    engine.updateShape(current.id, { metadata: current.metadata })
   }
 
   return (

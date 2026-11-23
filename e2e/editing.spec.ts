@@ -83,7 +83,26 @@ test('edit bins and pockets', async () => {
     .toBe('number')
 
   // A depth change is an edit like any other: it marks the project unsaved
-  // and can be undone and redone.
+  // and can be undone and redone. First a typed depth.
+  const fullDepth = shapeById(saved, pocketId).metadata!.pocket!.depth as number
+  const depthField = page
+    .locator('aside')
+    .locator('xpath=.//span[normalize-space(.)="mm"]/following-sibling::div[1]')
+  await depthField.getByRole('button').click()
+  await depthField.locator('input').fill('5')
+  await depthField.locator('input').press('Enter')
+  await expect
+    .soft(page.getByText('Unsaved', { exact: true }), 'typed depth is unsaved')
+    .toBeVisible()
+  saved = await app.save(file)
+  expect.soft(shapeById(saved, pocketId).metadata?.pocket?.depth, 'typed depth is saved').toBe(5)
+  await app.menu('Edit', /^Undo/)
+  saved = await app.save(file)
+  expect
+    .soft(shapeById(saved, pocketId).metadata?.pocket?.depth, 'undo restores the depth before')
+    .toBe(fullDepth)
+
+  // Then the Auto switch. Undo cleared the selection, so select again.
   await page.mouse.click(pocketAt.x, pocketAt.y)
   await page.getByRole('switch', { name: 'Auto' }).click()
   await expect

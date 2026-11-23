@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import type { DisplayUnit } from '../../../../shared/types/units'
 import { formatDimension, parseDimension, unitLabel } from '../../../../shared/types/units'
+import { addPendingCommit } from '@/lib/pending-commits'
 
 export interface NumericInputProps {
   value: number
@@ -87,21 +88,30 @@ export function NumericInput({
     onCommitRef.current = onCommit
   })
   const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const withdrawPendingRef = useRef<(() => void) | null>(null)
   const commitNow = useCallback(() => {
     if (commitTimerRef.current) {
       clearTimeout(commitTimerRef.current)
       commitTimerRef.current = null
     }
+    withdrawPendingRef.current?.()
+    withdrawPendingRef.current = null
     onCommitRef.current?.()
   }, [])
   const commitSoon = useCallback(() => {
     if (commitTimerRef.current) clearTimeout(commitTimerRef.current)
     commitTimerRef.current = setTimeout(commitNow, STEP_COMMIT_DELAY_MS)
+    // Undo and redo finish a waiting burst first, so it is in the history
+    // they act on.
+    withdrawPendingRef.current ??= addPendingCommit(commitNow)
   }, [commitNow])
   useEffect(
     () => () => {
-      // Finish a pending burst if the field goes away first.
-      if (commitTimerRef.current) commitNow()
+      // Finish an adjustment that is still open if the field goes away first.
+      if (commitTimerRef.current || dragRef.current) {
+        dragRef.current = null
+        commitNow()
+      }
     },
     [commitNow]
   )
@@ -240,6 +250,8 @@ export function NumericInput({
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+          onLostPointerCapture={onPointerUp}
         >
           {label}
         </span>
