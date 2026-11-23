@@ -1,6 +1,6 @@
 import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 import { useTheme } from '@unstable-studios/ui'
@@ -37,6 +37,8 @@ interface SavedCamera {
 }
 
 const MAX_CAMERA_DISTANCE = 2000
+// Beyond the furthest orbit plus the floor, so zooming out never clips.
+const CAMERA_FAR = 10000
 const FLOOR_SIZE = 4000
 const FOG_NEAR = 500
 
@@ -49,6 +51,25 @@ function readSavedCamera(): SavedCamera | null {
   }
 }
 
+const meshHeights = new WeakMap<Float32Array, number>()
+
+/**
+ * Height of a baked mesh. Meshes are built z-up and rotated onto the floor,
+ * so mesh z is height. Cached per vertex buffer: bounds are recomputed on
+ * every engine change, and a bake result's buffer never changes.
+ */
+function meshHeight(positions: Float32Array): number {
+  let height = meshHeights.get(positions)
+  if (height === undefined) {
+    height = 0
+    for (let i = 2; i < positions.length; i += 3) {
+      if (positions[i] > height) height = positions[i]
+    }
+    meshHeights.set(positions, height)
+  }
+  return height
+}
+
 /** Bounding box of every placed bin, in scene coordinates. */
 function sceneBounds(placements: BinPlacement[]): Bounds3 | null {
   if (placements.length === 0) return null
@@ -59,10 +80,7 @@ function sceneBounds(placements: BinPlacement[]): Bounds3 | null {
     max[0] = Math.max(max[0], position[0] + width / 2)
     min[2] = Math.min(min[2], position[2] - depth / 2)
     max[2] = Math.max(max[2], position[2] + depth / 2)
-    // Meshes are built z-up and rotated onto the floor, so mesh z is height.
-    for (let i = 2; i < mesh.positions.length; i += 3) {
-      if (mesh.positions[i] > max[1]) max[1] = mesh.positions[i]
-    }
+    max[1] = Math.max(max[1], meshHeight(mesh.positions))
   }
   return { min, max }
 }
@@ -139,20 +157,27 @@ function ReviewScene({
 
   // Shift the projection so the scene centers in the area the sidebar does
   // not cover, instead of the middle of the whole canvas.
+  // Width of the canvas the sidebar covers. Kept in state for the view
+  // offset, and measured directly where an effect needs it before the state
+  // has caught up (the first framing).
+  const measureSidebarInset = useCallback((): number => {
+    const sidebar = sidebarRef.current
+    if (!sidebar) return 0
+    return Math.max(
+      0,
+      sidebar.getBoundingClientRect().right - gl.domElement.getBoundingClientRect().left
+    )
+  }, [sidebarRef, gl])
   const [sidebarInset, setSidebarInset] = useState(0)
   useEffect(() => {
     const sidebar = sidebarRef.current
     if (!sidebar) return
-    const measure = (): void => {
-      const inset =
-        sidebar.getBoundingClientRect().right - gl.domElement.getBoundingClientRect().left
-      setSidebarInset(Math.max(0, inset))
-    }
+    const measure = (): void => setSidebarInset(measureSidebarInset())
     measure()
     const observer = new ResizeObserver(measure)
     observer.observe(sidebar)
     return () => observer.disconnect()
-  }, [sidebarRef, gl, size.width, size.height])
+  }, [sidebarRef, measureSidebarInset, size.width, size.height])
 
   useEffect(() => {
     if (!(camera instanceof THREE.PerspectiveCamera) || size.width === 0) return
@@ -174,13 +199,13 @@ function ReviewScene({
       camera.position.set(...saved.pos)
       controls.target.set(...saved.target)
     } else {
-      const visibleAspect = Math.max(size.width - sidebarInset, 1) / size.height
+      const visibleAspect = Math.max(size.width - measureSidebarInset(), 1) / size.height
       const frame = frameBounds(bounds, camera.fov, visibleAspect)
       camera.position.set(...frame.position)
       controls.target.set(...frame.target)
     }
     controls.update()
-  }, [bounds, layoutKey, camera, size.width, size.height, sidebarInset])
+  }, [bounds, layoutKey, camera, size.width, size.height, measureSidebarInset])
 
   // Fog fades the floor into the background. Keep it well behind the model
   // so a large layout, framed from further away, is not fogged itself.
@@ -334,7 +359,7 @@ export default function ReviewCanvas({
   return (
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
-      camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: 2000 }}
+      camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: CAMERA_FAR }}
       dpr={[1, 1.75]}
       style={{ width: '100%', height: '100%' }}
       gl={{ antialias: true }}
