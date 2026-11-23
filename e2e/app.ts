@@ -12,6 +12,7 @@ export interface SavedShape {
   width?: number
   height?: number
   groupId: string | null
+  metadata?: { name?: string; pocket?: { depth?: number | null; clearance?: number } }
 }
 
 export interface SavedGroup {
