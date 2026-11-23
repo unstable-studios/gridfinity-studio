@@ -138,10 +138,10 @@ export function findBestBinForShape(
  * as inside (not evicted) — matches `findContainingBinGroup`'s convention.
  */
 export function findChildrenOutsideBin(bin: LayoutGroup, children: LayoutShape[]): string[] {
-  const minX = bin.x
-  const maxX = bin.x + bin.width
-  const minY = bin.y - bin.height
-  const maxY = bin.y
+  const minX = bin.x - EDGE_TOLERANCE
+  const maxX = bin.x + bin.width + EDGE_TOLERANCE
+  const minY = bin.y - bin.height - EDGE_TOLERANCE
+  const maxY = bin.y + EDGE_TOLERANCE
   const cxBin = bin.x + bin.width / 2
   const cyBin = bin.y - bin.height / 2
 
