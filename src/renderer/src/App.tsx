@@ -66,7 +66,7 @@ export default function App(): React.JSX.Element {
   })
   const [activeTool, setActiveTool] = useState<ActiveTool>('select')
   const [engineType, setEngineType] = useState<EngineType>(() => {
-    return (sessionStorage.getItem(ENGINE_TYPE_KEY) as EngineType) ?? 'fabric'
+    return (sessionStorage.getItem(ENGINE_TYPE_KEY) as EngineType) ?? 'konva'
   })
   const [debugColors, setDebugColors] = useState(() => readBool(DEBUG_COLORS_KEY, false))
   const [wireframe, setWireframe] = useState(() => readBool(WIREFRAME_KEY, false))
