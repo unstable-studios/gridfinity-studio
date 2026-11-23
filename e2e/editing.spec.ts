@@ -19,6 +19,29 @@ test('edit bins and pockets', async () => {
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
 
+  // The new bin is selected: its W, D and H fields sit side by side inside
+  // the sidebar, each clear of the next field's label.
+  const sizeFields = await page.evaluate(() => {
+    const sidebar = document.querySelector('aside')!
+    const fields = [...sidebar.querySelectorAll('button')]
+      .filter((b) => /^\d+u$/.test(b.textContent ?? ''))
+      .map((field) => {
+        const label = field.parentElement!.previousElementSibling!
+        return {
+          left: label.getBoundingClientRect().left,
+          right: field.getBoundingClientRect().right
+        }
+      })
+    return { fields, overflows: sidebar.scrollWidth > sidebar.clientWidth }
+  })
+  expect(sizeFields.fields, 'W, D and H fields').toHaveLength(3)
+  expect(sizeFields.overflows, 'sidebar does not scroll sideways').toBe(false)
+  for (let i = 1; i < sizeFields.fields.length; i++) {
+    expect(sizeFields.fields[i].left, 'size fields do not overlap').toBeGreaterThanOrEqual(
+      sizeFields.fields[i - 1].right
+    )
+  }
+
   // Calibrate world→screen from a rectangle drawn on empty canvas.
   const looseFrom = { x: 820, y: 180 }
   const looseTo = { x: 880, y: 230 }

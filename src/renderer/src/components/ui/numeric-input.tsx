@@ -181,7 +181,7 @@ export function NumericInput({
   const displayValue = displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)
 
   return (
-    <div className="flex items-center gap-1 text-xs" onWheel={onWheel}>
+    <div className="flex min-w-0 items-center gap-1 text-xs" onWheel={onWheel}>
       {/* Label / drag area */}
       {label && (
         <span
@@ -197,13 +197,13 @@ export function NumericInput({
       {/* Value area — drag the label to scrub, scroll the input to step,
           click to edit, arrow keys + Shift/Cmd for fine/coarse step. No
           discrete spinner buttons by design. */}
-      <div className="relative flex items-center">
+      <div className="relative flex min-w-0 items-center">
         {editing ? (
           <input
             ref={inputRef}
             type="text"
             inputMode="decimal"
-            className="w-20 bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-mono text-xs text-right rounded px-1.5 py-0.5 outline-none ring-1 ring-blue-500"
+            className="w-20 max-w-full bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-mono text-xs text-right rounded px-1.5 py-0.5 outline-none ring-1 ring-blue-500"
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
             onBlur={commitEdit}
@@ -212,7 +212,7 @@ export function NumericInput({
         ) : (
           <button
             type="button"
-            className="w-20 bg-zinc-200/60 text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 font-mono text-xs text-right rounded px-1.5 py-0.5 hover:bg-zinc-300/60 dark:hover:bg-zinc-700/60 transition cursor-text"
+            className="w-20 max-w-full bg-zinc-200/60 text-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 font-mono text-xs text-right rounded px-1.5 py-0.5 hover:bg-zinc-300/60 dark:hover:bg-zinc-700/60 transition cursor-text"
             onClick={startEditing}
           >
             {displayValue}
