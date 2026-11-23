@@ -3,6 +3,8 @@ import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
 import { NumericInput } from '@/components/ui/numeric-input'
+import ArrangeControls from './ArrangeControls'
+import { arrangeTarget } from '@/layout-engine/arrange-target'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
@@ -57,6 +59,14 @@ function LayoutSidebar(): React.JSX.Element {
     if (selectedIds.length !== 1) return null
     return shapes.find((s) => s.id === selectedIds[0]) ?? null
   }, [selectedIds, shapes])
+
+  // Which arrange buttons to offer. Follows shapes and groups so it is not
+  // measured again on every pan and zoom.
+  const arrange = useMemo(
+    () => (engine ? arrangeTarget(engine, selectedIds) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [engine, selectedIds, shapes, groups]
+  )
 
   const handleAddBin = (widthUnits: number, depthUnits: number): void => {
     if (!engine) return
@@ -273,6 +283,12 @@ function LayoutSidebar(): React.JSX.Element {
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
           </div>
+        </SidebarSection>
+      )}
+
+      {engine && arrange && (
+        <SidebarSection title="Arrange">
+          <ArrangeControls engine={engine} selectedIds={selectedIds} target={arrange} />
         </SidebarSection>
       )}
 

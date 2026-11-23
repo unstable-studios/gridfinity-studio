@@ -9,6 +9,8 @@ import type {
   GroupDecoration
 } from './types'
 import type { HitResult } from './input-action-handler'
+import type { ShapeAABB } from './containment'
+import type { ShapeMove } from './arrange'
 
 export interface LayoutEngine {
   // ─── Lifecycle ──────────────────────────────────────────────────────────────
@@ -22,6 +24,13 @@ export interface LayoutEngine {
   removeShape(id: string): void
   getShape(id: string): LayoutShape | undefined
   getAllShapes(): LayoutShape[]
+  /** World-space bounding box of a shape as drawn, including rotation. */
+  getShapeBounds(id: string): ShapeAABB | undefined
+  /**
+   * Move shapes by world-space offsets as one change. A shape whose center
+   * lands in a different bin, or outside every bin, is reassigned.
+   */
+  translateShapes(moves: ShapeMove[]): void
 
   // ─── Group Operations ───────────────────────────────────────────────────────
   createGroup(group: LayoutGroup): void
