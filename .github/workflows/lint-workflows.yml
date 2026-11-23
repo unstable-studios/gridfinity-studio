@@ -9,7 +9,7 @@ jobs:
   actionlint:
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Run actionlint
         uses: rhysd/actionlint@v1.7.12
