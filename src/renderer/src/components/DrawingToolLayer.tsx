@@ -165,7 +165,9 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
   // Refs for drag state (rect/circle) — not rendered, so ref is fine
   const dragStartRef = useRef<{ x: number; y: number } | null>(null)
-  const previewIdRef = useRef<string | null>(null)
+  // Rect/circle preview while dragging. Drawn in the overlay, never added to
+  // the engine, so it cannot reach undo history, the sidebar or a saved file.
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   // Guard against double finishPolygon calls (StrictMode)
   const finishingRef = useRef(false)
@@ -173,12 +175,9 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   // ─── Cleanup on tool switch ─────────────────────────────────────────────
 
   const cleanupPreview = useCallback(() => {
-    if (previewIdRef.current && engine) {
-      engine.removeShape(previewIdRef.current)
-    }
-    previewIdRef.current = null
     dragStartRef.current = null
-  }, [engine])
+    setDragPreview(null)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -276,38 +275,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
       if (activeTool === 'rectangle' || activeTool === 'circle') {
         dragStartRef.current = snapped
-        const id = `preview-${activeTool}-${crypto.randomUUID()}`
-        previewIdRef.current = id
-
-        if (activeTool === 'rectangle') {
-          engine.addShape({
-            id,
-            type: 'rect',
-            x: snapped.x,
-            y: snapped.y,
-            width: 0,
-            height: 0,
-            ...baseShapeProps(),
-            fill: PREVIEW_FILL,
-            stroke: PREVIEW_STROKE,
-            strokeWidth: PREVIEW_STROKE_WIDTH,
-            groupId: null
-          })
-        } else {
-          engine.addShape({
-            id,
-            type: 'circle',
-            x: snapped.x,
-            y: snapped.y,
-            radiusX: 0,
-            radiusY: 0,
-            ...baseShapeProps(),
-            fill: PREVIEW_FILL,
-            stroke: PREVIEW_STROKE,
-            strokeWidth: PREVIEW_STROKE_WIDTH,
-            groupId: null
-          })
-        }
+        setDragPreview({ start: snapped, current: snapped })
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
       } else if (activeTool === 'polygon') {
         setState((prev) => {
@@ -343,34 +311,11 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       if (!engine || !overlay) return
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
 
-      if (
-        (activeTool === 'rectangle' || activeTool === 'circle') &&
-        dragStartRef.current &&
-        previewIdRef.current
-      ) {
-        const snapped = snapShapePoint(world, e.shiftKey)
-        const start = dragStartRef.current
-
-        if (activeTool === 'rectangle') {
-          const x = Math.min(start.x, snapped.x)
-          const y = Math.min(start.y, snapped.y)
-          const w = Math.abs(snapped.x - start.x)
-          const h = Math.abs(snapped.y - start.y)
-          engine.updateShape(previewIdRef.current, {
-            x: x + w / 2,
-            y: y + h / 2,
-            width: w,
-            height: h
-          } as Partial<LayoutShape>)
-        } else {
-          const dx = snapped.x - start.x
-          const dy = snapped.y - start.y
-          const radius = Math.sqrt(dx * dx + dy * dy)
-          engine.updateShape(previewIdRef.current, {
-            radiusX: radius,
-            radiusY: radius
-          } as Partial<LayoutShape>)
-        }
+      if ((activeTool === 'rectangle' || activeTool === 'circle') && dragStartRef.current) {
+        setDragPreview({
+          start: dragStartRef.current,
+          current: snapShapePoint(world, e.shiftKey)
+        })
       } else if (activeTool === 'polygon') {
         const snapped = snapShapePoint(world, e.shiftKey)
         setState((prev) => {
@@ -398,15 +343,13 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const overlay = overlayRef.current
       if (!engine || !overlay) return
       if (activeTool !== 'rectangle' && activeTool !== 'circle') return
-      if (!dragStartRef.current || !previewIdRef.current) return
+      if (!dragStartRef.current) return
 
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
       const snapped = snapShapePoint(world, e.shiftKey)
       const start = dragStartRef.current
 
-      // Remove preview
-      engine.removeShape(previewIdRef.current)
-      previewIdRef.current = null
+      setDragPreview(null)
 
       if (activeTool === 'rectangle') {
         const w = Math.abs(snapped.x - start.x)
@@ -486,7 +429,12 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
+      onPointerCancel={cleanupPreview}
+      onLostPointerCapture={cleanupPreview}
     >
+      {dragPreview && (activeTool === 'rectangle' || activeTool === 'circle') && (
+        <DragPreviewSvg tool={activeTool} preview={dragPreview} viewport={viewport} />
+      )}
       {activeTool === 'polygon' && state.polygonVertices.length > 0 && (
         <PolygonPreviewSvg
           vertices={state.polygonVertices}
@@ -496,6 +444,53 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         />
       )}
     </div>
+  )
+}
+
+// ─── SVG Overlay for rect/circle drag preview ───────────────────────────────
+
+interface DragPreview {
+  start: { x: number; y: number }
+  current: { x: number; y: number }
+}
+
+function DragPreviewSvg({
+  tool,
+  preview,
+  viewport
+}: {
+  tool: 'rectangle' | 'circle'
+  preview: DragPreview
+  viewport: { panX: number; panY: number; zoom: number }
+}): React.JSX.Element {
+  const sx = (wx: number): number => wx * viewport.zoom - viewport.panX
+  const sy = (wy: number): number => wy * viewport.zoom - viewport.panY
+  const { start, current } = preview
+  const style = {
+    fill: PREVIEW_FILL,
+    stroke: PREVIEW_STROKE,
+    strokeWidth: PREVIEW_STROKE_WIDTH
+  }
+
+  return (
+    <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%">
+      {tool === 'rectangle' ? (
+        <rect
+          x={sx(Math.min(start.x, current.x))}
+          y={sy(Math.min(start.y, current.y))}
+          width={Math.abs(current.x - start.x) * viewport.zoom}
+          height={Math.abs(current.y - start.y) * viewport.zoom}
+          {...style}
+        />
+      ) : (
+        <circle
+          cx={sx(start.x)}
+          cy={sy(start.y)}
+          r={Math.hypot(current.x - start.x, current.y - start.y) * viewport.zoom}
+          {...style}
+        />
+      )}
+    </svg>
   )
 }
 
