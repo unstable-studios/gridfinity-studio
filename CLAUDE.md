@@ -14,6 +14,7 @@ pnpm dev              # Start dev server with hot reload
 pnpm build            # Typecheck + electron-vite build
 pnpm typecheck        # Run type checking (separate node + web passes)
 pnpm lint             # ESLint with cache
+pnpm test             # Vitest unit and contract tests
 pnpm format           # Prettier formatting
 pnpm build:mac        # macOS build
 pnpm build:linux      # Linux build
@@ -112,7 +113,7 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 
 ## Tech Stack
 
-- **Runtime**: Electron 39, Node v24, pnpm
+- **Runtime**: Electron 42, Node v24 (pinned by `devEngines.runtime`; pnpm downloads it and runs scripts with it), pnpm
 - **Frontend**: React 19, Tailwind CSS 4, Shadcn/ui, Headless UI
 - **2D Canvas**: Fabric.js v7 (imperative), Konva 10 (imperative) — swappable via LayoutEngine interface
 - **3D Preview**: Three.js via @react-three/fiber and @react-three/drei

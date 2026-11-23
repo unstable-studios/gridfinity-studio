@@ -99,6 +99,8 @@ feat(core): This is a very long commit message that exceeds the maximum characte
 
 ## Local Development
 
+Node 24 is pinned in `package.json` (`devEngines.runtime`). pnpm downloads it and uses it for every script, so run tools through `pnpm`, not a system `node`. Electron's binary download fails silently on Node 26.
+
 ```bash
 # Install dependencies
 pnpm install
@@ -108,6 +110,9 @@ pnpm dev
 
 # Run type checking
 pnpm typecheck
+
+# Run tests
+pnpm test
 
 # Format code
 pnpm format
