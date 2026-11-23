@@ -20,6 +20,13 @@ import type {
 } from '../../../shared/types/project'
 import type { MeshDataWithNormals } from '../../../shared/types/worker'
 import { downloadBlob } from '../lib/download-blob'
+import { fileName } from '../lib/file-errors'
+import {
+  notifyExported,
+  notifyExportFailed,
+  notifyOpenFailed,
+  notifySaveFailed
+} from '../lib/project-notices'
 
 export interface BakeResult {
   mesh: MeshDataWithNormals
@@ -44,7 +51,6 @@ interface ProjectState {
   project: ProjectData | null
   filePath: string | null
   isModified: boolean
-  error: string | null
   recentProjects: string[]
   bakeResults: Map<string, BakeResult>
   /**
@@ -126,7 +132,6 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     project: saved.project,
     filePath: saved.filePath,
     isModified: saved.isModified,
-    error: null,
     recentProjects: [],
     bakeResults: new Map(),
     bakeStatus: new Map(),
@@ -166,7 +171,6 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       for (const cb of beforeSaveCallbacks) cb()
       const state = get()
       if (!state.project) {
-        set({ error: 'No project to save' })
         return false
       }
       try {
@@ -175,16 +179,15 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         if (result.success) {
           set({
             filePath: result.data ?? state.filePath,
-            isModified: false,
-            error: null
+            isModified: false
           })
           return true
         } else {
-          set({ error: result.error ?? 'Failed to save project' })
+          if (result.reason !== 'cancelled') notifySaveFailed(result.reason, result.error)
           return false
         }
       } catch (err) {
-        set({ error: `Save error: ${err instanceof Error ? err.message : 'Unknown error'}` })
+        notifySaveFailed(undefined, err instanceof Error ? err.message : undefined)
         return false
       }
     },
@@ -193,7 +196,6 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       for (const cb of beforeSaveCallbacks) cb()
       const state = get()
       if (!state.project) {
-        set({ error: 'No project to save' })
         return false
       }
       try {
@@ -205,16 +207,15 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         if (result.success) {
           set({
             filePath: result.data ?? state.filePath,
-            isModified: false,
-            error: null
+            isModified: false
           })
           return true
         } else {
-          set({ error: result.error ?? 'Failed to save project' })
+          if (result.reason !== 'cancelled') notifySaveFailed(result.reason, result.error)
           return false
         }
       } catch (err) {
-        set({ error: `Save error: ${err instanceof Error ? err.message : 'Unknown error'}` })
+        notifySaveFailed(undefined, err instanceof Error ? err.message : undefined)
         return false
       }
     },
@@ -228,17 +229,16 @@ const useProjectStore = create<ProjectState>()((set, get) => {
             project,
             filePath: result.data.filePath,
             isModified: false,
-            error: null,
             bakeResults: new Map(),
             bakeStatus: new Map()
           })
           return true
         } else {
-          set({ error: result.error ?? 'Failed to load project' })
+          if (result.reason !== 'cancelled') notifyOpenFailed(result.reason, result.error)
           return false
         }
       } catch (err) {
-        set({ error: `Load error: ${err instanceof Error ? err.message : 'Unknown error'}` })
+        notifyOpenFailed(undefined, err instanceof Error ? err.message : undefined)
         return false
       }
     },
@@ -256,7 +256,6 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         project,
         filePath: null,
         isModified: true,
-        error: null,
         bakeResults: new Map(),
         bakeStatus: new Map()
       })
@@ -281,19 +280,18 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       // to a blob download so the export still works for testing.
       if (typeof window === 'undefined' || !window.api?.export?.stl) {
         downloadBlob(stlData, suggestedFilename ?? 'gridfinity-bin.stl', 'model/stl')
-        set({ error: null })
         return true
       }
       try {
         const result = await window.api.export.stl(stlData)
         if (result.success) {
-          set({ error: null })
+          if (result.data) notifyExported(fileName(result.data))
           return true
         }
-        set({ error: result.error ?? 'Failed to export STL' })
+        if (result.reason !== 'cancelled') notifyExportFailed(result.error)
         return false
       } catch (err) {
-        set({ error: `Export error: ${err instanceof Error ? err.message : 'Unknown error'}` })
+        notifyExportFailed(err instanceof Error ? err.message : undefined)
         return false
       }
     },
@@ -301,19 +299,18 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     export3MF: async (data, suggestedFilename) => {
       if (typeof window === 'undefined' || !window.api?.export?.threemf) {
         downloadBlob(data, suggestedFilename ?? 'gridfinity-bin.3mf', 'model/3mf')
-        set({ error: null })
         return true
       }
       try {
         const result = await window.api.export.threemf(data)
         if (result.success) {
-          set({ error: null })
+          if (result.data) notifyExported(fileName(result.data))
           return true
         }
-        set({ error: result.error ?? 'Failed to export 3MF' })
+        if (result.reason !== 'cancelled') notifyExportFailed(result.error)
         return false
       } catch (err) {
-        set({ error: `Export error: ${err instanceof Error ? err.message : 'Unknown error'}` })
+        notifyExportFailed(err instanceof Error ? err.message : undefined)
         return false
       }
     },
@@ -322,13 +319,13 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       try {
         const result = await window.api.export.batch(files)
         if (result.success) {
-          set({ error: null })
+          notifyExported(`${result.exported} file${result.exported === 1 ? '' : 's'}`)
           return { success: true, exported: result.exported }
         }
-        set({ error: result.error ?? 'Batch export failed' })
+        if (result.reason !== 'cancelled') notifyExportFailed(result.error)
         return { success: false, exported: result.exported }
       } catch (err) {
-        set({ error: `Export error: ${err instanceof Error ? err.message : 'Unknown error'}` })
+        notifyExportFailed(err instanceof Error ? err.message : undefined)
         return { success: false, exported: 0 }
       }
     },

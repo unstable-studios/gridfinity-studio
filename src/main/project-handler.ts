@@ -4,15 +4,7 @@ import { join } from 'path'
 import { createEmptyProject } from '../shared/types/project'
 import type { ProjectData } from '../shared/types/project'
 import { validateProject, formatValidationErrors } from '../shared/validation/project-validator'
-
-/**
- * Result of save/load operations
- */
-interface OperationResult<T = void> {
-  success: boolean
-  data?: T
-  error?: string
-}
+import type { OperationResult } from '../shared/types/results'
 
 /**
  * Maximum number of recent project paths to track
@@ -113,6 +105,7 @@ export async function saveProject(
     if (!validationResult.valid) {
       return {
         success: false,
+        reason: 'invalid',
         error: formatValidationErrors(validationResult.errors)
       }
     }
@@ -131,10 +124,7 @@ export async function saveProject(
       })
 
       if (result.canceled || !result.filePath) {
-        return {
-          success: false,
-          error: 'Save operation cancelled'
-        }
+        return { success: false, reason: 'cancelled' }
       }
 
       targetPath = result.filePath
@@ -161,7 +151,7 @@ export async function saveProject(
   } catch (error) {
     return {
       success: false,
-      error: `Failed to save project: ${error instanceof Error ? error.message : String(error)}`
+      error: error instanceof Error ? error.message : String(error)
     }
   }
 }
@@ -187,10 +177,7 @@ export async function loadProject(
       })
 
       if (result.canceled || result.filePaths.length === 0) {
-        return {
-          success: false,
-          error: 'Open operation cancelled'
-        }
+        return { success: false, reason: 'cancelled' }
       }
 
       targetPath = result.filePaths[0]
@@ -206,7 +193,8 @@ export async function loadProject(
     } catch (parseError) {
       return {
         success: false,
-        error: `Invalid JSON format: ${parseError instanceof Error ? parseError.message : String(parseError)}`
+        reason: 'invalid',
+        error: parseError instanceof Error ? parseError.message : String(parseError)
       }
     }
 
@@ -215,6 +203,7 @@ export async function loadProject(
     if (!validationResult.valid) {
       return {
         success: false,
+        reason: 'invalid',
         error: formatValidationErrors(validationResult.errors)
       }
     }
@@ -228,7 +217,7 @@ export async function loadProject(
   } catch (error) {
     return {
       success: false,
-      error: `Failed to load project: ${error instanceof Error ? error.message : String(error)}`
+      error: error instanceof Error ? error.message : String(error)
     }
   }
 }
