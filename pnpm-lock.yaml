@@ -178,7 +178,7 @@ importers:
         specifier: ^26.18.0
         version: 26.18.0(electron-builder-squirrel-windows@26.18.0)(supports-color@7.2.0)
       electron-builder-squirrel-windows:
-        specifier: 26.18.0
+        specifier: ^26.18.0
         version: 26.18.0(dmg-builder@26.18.0)(supports-color@7.2.0)
       electron-vite:
         specifier: ^6.0.0
