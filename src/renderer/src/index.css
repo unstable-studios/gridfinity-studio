@@ -1,6 +1,10 @@
 @import '@unstable-studios/ui/styles.css';
 @import 'tw-animate-css';
 
+/* Tailwind does not scan node_modules. Without this, classes used only inside
+   the UI package (bg-primary, border-input, ...) are never generated. */
+@source '../../../node_modules/@unstable-studios/ui/dist';
+
 /* App-specific oklch token overrides */
 :root {
   --background: oklch(1 0 0);
