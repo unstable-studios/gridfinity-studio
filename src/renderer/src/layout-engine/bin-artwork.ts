@@ -6,7 +6,7 @@
  * bin configuration at a glance on the 2D canvas.
  *
  * All positions are in **group-local coordinates** relative to the centroid
- * (matching how both Fabric and Konva position children within groups).
+ * (matching how the engine positions children within groups).
  */
 
 import type { GridfinityConfig } from '../../../shared/types/project'

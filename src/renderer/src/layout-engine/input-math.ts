@@ -1,7 +1,6 @@
 /**
  * Shared pure functions for layout engine input math.
  *
- * Extracted from both Fabric and Konva engines to eliminate duplication.
  * All functions are engine-agnostic — they operate on coordinates and
  * dimensions using the lower-left corner convention.
  */
@@ -70,7 +69,7 @@ export interface AnchoredResizeResult {
  * anchor; the opposite edge moves to accommodate the new size.
  *
  * The centroid must come from the engine's current object position
- * (Fabric: obj.left/top, Konva: group.x()/y()) — during a resize the
+ * (Konva: group.x()/y()) — during a resize the
  * engine shifts the centroid toward the dragged edge, making the
  * anchored edge's visual position stay close to its original.
  *

@@ -142,8 +142,8 @@ swapped, tested, or replaced independently.
 This principle applies to any component whose implementation is likely
 to evolve or where multiple viable libraries exist:
 
-- **Layout engine**: `LayoutEngine` interface with Fabric.js and Konva
-  adapters (established in 009/010).
+- **Layout engine**: `LayoutEngine` interface with a Konva adapter
+  (established in 009/010 with Fabric.js and Konva; Fabric.js removed).
 - **CSG/geometry pipeline**: adapter boundary between layout shapes and
   the Manifold-based builder.
 - **Future candidates**: 3D preview renderer, file format exporters,

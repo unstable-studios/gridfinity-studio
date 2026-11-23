@@ -1,39 +1,22 @@
-import { useContext, useEffect, useRef, useState, useCallback } from 'react'
+import { useContext, useEffect, useRef, useState } from 'react'
 import { useTheme } from '@unstable-studios/ui'
 import { resolveColors } from '@/lib/theme-config'
 import { useProject } from '@/hooks/useProject'
-import type { EngineType } from './create-engine'
 import { createLayoutEngine } from './create-engine'
 import type { LayoutEngine } from './interface'
 import { LayoutEngineCtx } from './engine-context'
 import { GestureRecognizer } from './gesture-recognizer'
 import { DEFAULT_GRIDFINITY_CONFIG } from '../../../shared/types/project'
-// Import adapters to trigger self-registration
-import './fabric-engine'
-import './konva-engine'
-
-interface LayoutEngineProviderProps {
-  children: React.ReactNode
-  defaultEngine?: EngineType
-  engineType?: EngineType
-}
 
 export function LayoutEngineProvider({
-  children,
-  defaultEngine = 'konva',
-  engineType: controlledType
-}: LayoutEngineProviderProps): React.JSX.Element {
-  const [engineState, setEngineState] = useState<{
-    engine: LayoutEngine | null
-    type: EngineType
-  }>({ engine: null, type: controlledType ?? defaultEngine })
+  children
+}: {
+  children: React.ReactNode
+}): React.JSX.Element {
+  const [engine, setEngine] = useState<LayoutEngine | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const sidebarRef = useRef<HTMLDivElement>(null)
   const gestureRef = useRef<GestureRecognizer | null>(null)
-  const pendingStateRef = useRef<{
-    snapshot: ReturnType<LayoutEngine['toSnapshot']>
-    transient: ReturnType<LayoutEngine['getTransientState']>
-  } | null>(null)
   const { resolvedTheme } = useTheme()
   const unitHeight = useProject(
     (s) => s.project?.gridfinity.unitHeight ?? DEFAULT_GRIDFINITY_CONFIG.unitHeight
@@ -43,7 +26,7 @@ export function LayoutEngineProvider({
     const container = containerRef.current
     if (!container) return
 
-    const newEngine = createLayoutEngine(engineState.type)
+    const newEngine = createLayoutEngine()
     newEngine.mount(container)
 
     // Apply theme colors
@@ -66,14 +49,6 @@ export function LayoutEngineProvider({
       newEngine.setViewportInsets({ left: rect.right - containerRect.left })
     }
 
-    // Apply pending state from an engine switch
-    const pending = pendingStateRef.current
-    if (pending) {
-      newEngine.loadSnapshot(pending.snapshot)
-      newEngine.setTransientState(pending.transient)
-      pendingStateRef.current = null
-    }
-
     // Initialize or update GestureRecognizer
     if (!gestureRef.current) {
       gestureRef.current = new GestureRecognizer()
@@ -81,24 +56,26 @@ export function LayoutEngineProvider({
     }
     gestureRef.current.setActionHandler(newEngine)
 
-    setEngineState((prev) => ({ ...prev, engine: newEngine }))
+    setEngine(newEngine)
 
     return () => {
-      newEngine.dispose()
+      // Dispose the recognizer first: cancelling an in-progress gesture
+      // calls back into the engine.
       if (gestureRef.current) {
         gestureRef.current.dispose()
         gestureRef.current = null
       }
-      setEngineState((prev) => (prev.engine === newEngine ? { ...prev, engine: null } : prev))
+      newEngine.dispose()
+      setEngine((prev) => (prev === newEngine ? null : prev))
     }
+    // Mount once; theme and unit height are pushed by the effects below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engineState.type])
+  }, [])
 
   // Re-measure sidebar inset when it resizes
   useEffect(() => {
     const sidebar = sidebarRef.current
     const container = containerRef.current
-    const engine = engineState.engine
     if (!sidebar || !container || !engine) return
 
     const observer = new ResizeObserver(() => {
@@ -108,53 +85,30 @@ export function LayoutEngineProvider({
     })
     observer.observe(sidebar)
     return () => observer.disconnect()
-  }, [engineState.engine])
+  }, [engine])
 
   // Update theme colors when theme changes
   useEffect(() => {
-    if (!engineState.engine) return
+    if (!engine) return
     const colors = resolveColors(resolvedTheme)
-    engineState.engine.setThemeColors({
+    engine.setThemeColors({
       background: colors.layoutBg,
       grid: colors.layoutGrid,
       gridOrigin:
         resolvedTheme === 'light' ? 'rgba(100, 100, 120, 0.4)' : 'rgba(113, 113, 122, 0.35)'
     })
-  }, [resolvedTheme, engineState.engine])
+  }, [resolvedTheme, engine])
 
   // Push unitHeight changes (rare — only when the user changes Gridfinity
   // preset/config) into the engine so depth-based opacity stays accurate.
   useEffect(() => {
-    engineState.engine?.setUnitHeight(unitHeight)
-  }, [unitHeight, engineState.engine])
-
-  const handleSetEngineType = useCallback((type: EngineType) => {
-    setEngineState((prev) => {
-      if (!prev.engine || prev.engine.isInteracting()) return prev
-
-      // Capture state before the effect tears down the old engine
-      pendingStateRef.current = {
-        snapshot: prev.engine.toSnapshot(),
-        transient: prev.engine.getTransientState()
-      }
-
-      return { ...prev, type }
-    })
-  }, [])
-
-  // Sync controlled engineType prop with internal state
-  useEffect(() => {
-    if (controlledType && controlledType !== engineState.type) {
-      handleSetEngineType(controlledType)
-    }
-  }, [controlledType, engineState.type, handleSetEngineType])
+    engine?.setUnitHeight(unitHeight)
+  }, [unitHeight, engine])
 
   return (
     <LayoutEngineCtx.Provider
       value={{
-        engine: engineState.engine,
-        engineType: engineState.type,
-        setEngineType: handleSetEngineType,
+        engine,
         containerRef,
         sidebarRef
       }}

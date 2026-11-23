@@ -1,6 +1,5 @@
 nodeLinker: hoisted
 allowBuilds:
-  canvas: true
   core-js: true
   electron: true
   electron-winstaller: true

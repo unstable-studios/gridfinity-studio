@@ -40,7 +40,6 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
 
   // ── New project, one bin ────────────────────────────────────────────────
   await page.getByRole('button', { name: 'New Project' }).click()
-  await page.getByRole('radio', { name: 'Konva', exact: true }).click()
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
   await app.expectBinCount(1)
 

@@ -1,5 +1,4 @@
 import { createContext, useContext } from 'react'
-import type { EngineType } from '@/layout-engine'
 
 export type AppMode = 'layout' | 'review'
 export type ActiveTool = 'select' | 'circle' | 'rectangle' | 'polygon' | null
@@ -9,17 +8,13 @@ export interface AppModeContext {
   setMode: (mode: AppMode) => void
   activeTool: ActiveTool
   setActiveTool: (tool: ActiveTool) => void
-  engineType: EngineType
-  setEngineType: (type: EngineType) => void
 }
 
 export const AppModeCtx = createContext<AppModeContext>({
   mode: 'layout',
   setMode: () => {},
   activeTool: 'select',
-  setActiveTool: () => {},
-  engineType: 'konva',
-  setEngineType: () => {}
+  setActiveTool: () => {}
 })
 
 export function useAppMode(): AppModeContext {

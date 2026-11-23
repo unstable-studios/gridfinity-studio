@@ -1,8 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Contract tests for setGroupDecorations — verifies that both engines
- * correctly render decorations without disturbing group position, size,
+ * Contract tests for setGroupDecorations — verifies that the engine
+ * correctly renders decorations without disturbing group position, size,
  * or children. These enforce the coordinate boundary invariants:
  *
  *   Public API (LayoutGroup) uses lower-left corner (x, y).
@@ -27,8 +27,6 @@ import type { LayoutGroup, GroupDecoration } from '../types'
 import { computeBinArtwork } from '../bin-artwork'
 import type { GridfinityConfig } from '../../../../shared/types/project'
 import { createLayoutEngine } from '../create-engine'
-import '../fabric-engine'
-import '../konva-engine'
 
 // ─── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -133,15 +131,13 @@ const EPSILON = 0.5
 
 // ─── Contract Tests ────────────────────────────────────────────────────────────
 
-const engineTypes = ['fabric', 'konva'] as const
-
-describe.each(engineTypes)('Decoration contract (%s)', (engineType) => {
+describe('Decoration contract', () => {
   let engine: LayoutEngine
   let container: HTMLDivElement
 
   beforeEach(() => {
     container = makeContainer()
-    engine = createLayoutEngine(engineType)
+    engine = createLayoutEngine()
     engine.mount(container)
   })
 
@@ -327,74 +323,5 @@ describe('computeBinArtwork coordinate invariants', () => {
     const artwork = computeBinArtwork(meta, DEFAULT_CONFIG)
     // 4 corners per cell × (3×2) cells × 2 hole types = 48
     expect(artwork.circles).toHaveLength(3 * 2 * 4 * 2)
-  })
-})
-
-// ─── Cross-Engine Decoration Parity ─────────────────────────────────────────
-
-describe('Cross-engine decoration parity', () => {
-  let container: HTMLDivElement
-
-  beforeEach(() => {
-    container = makeContainer()
-  })
-
-  afterEach(() => {
-    container.remove()
-  })
-
-  it('group position matches between engines after identical decoration sequence', () => {
-    const group = makeBinGroup()
-    const decorations = buildDecorations(
-      { widthUnits: 2, depthUnits: 2, hasLip: true },
-      DEFAULT_CONFIG
-    )
-
-    // Run on Fabric
-    const fabric = createLayoutEngine('fabric')
-    fabric.mount(container)
-    fabric.createGroup({ ...group })
-    fabric.setGroupDecorations('bin-1', decorations)
-    const fabricGroup = fabric.getGroup('bin-1')!
-    fabric.dispose()
-
-    // Run on Konva
-    const konva = createLayoutEngine('konva')
-    konva.mount(container)
-    konva.createGroup({ ...group })
-    konva.setGroupDecorations('bin-1', decorations)
-    const konvaGroup = konva.getGroup('bin-1')!
-    konva.dispose()
-
-    expect(fabricGroup.x).toBeCloseTo(konvaGroup.x, 0)
-    expect(fabricGroup.y).toBeCloseTo(konvaGroup.y, 0)
-    expect(fabricGroup.width).toBeCloseTo(konvaGroup.width, 0)
-    expect(fabricGroup.height).toBeCloseTo(konvaGroup.height, 0)
-  })
-
-  it('group position matches between engines after resize + decoration', () => {
-    const group = makeBinGroup()
-
-    const run = (type: 'fabric' | 'konva'): LayoutGroup => {
-      const eng = createLayoutEngine(type)
-      eng.mount(container)
-      eng.createGroup({ ...group })
-      eng.updateGroup('bin-1', { width: 126 })
-      eng.setGroupDecorations(
-        'bin-1',
-        buildDecorations({ widthUnits: 3, depthUnits: 2, hasLip: true }, DEFAULT_CONFIG)
-      )
-      const result = eng.getGroup('bin-1')!
-      eng.dispose()
-      return result
-    }
-
-    const fabricResult = run('fabric')
-    const konvaResult = run('konva')
-
-    expect(fabricResult.x).toBeCloseTo(konvaResult.x, 0)
-    expect(fabricResult.y).toBeCloseTo(konvaResult.y, 0)
-    expect(fabricResult.width).toBeCloseTo(konvaResult.width, 0)
-    expect(fabricResult.height).toBeCloseTo(konvaResult.height, 0)
   })
 })

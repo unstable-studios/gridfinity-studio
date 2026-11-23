@@ -5,7 +5,6 @@ import type {
   GridConfig,
   ViewportState,
   ViewportInsets,
-  TransientState,
   EngineEventMap,
   GroupDecoration
 } from './types'
@@ -71,10 +70,6 @@ export interface LayoutEngine {
   // ─── Serialization ─────────────────────────────────────────────────────────
   toSnapshot(): LayoutSnapshot
   loadSnapshot(snapshot: LayoutSnapshot): void
-
-  // ─── Transient State (for engine switching) ────────────────────────────────
-  getTransientState(): TransientState
-  setTransientState(state: TransientState): void
 
   // ─── Theme ────────────────────────────────────────────────────────────────
   setThemeColors(colors: { background: string; grid: string; gridOrigin: string }): void

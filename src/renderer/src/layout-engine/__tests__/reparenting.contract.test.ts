@@ -17,10 +17,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { LayoutEngine } from '../interface'
 import type { LayoutShape, LayoutGroup } from '../types'
 import { createLayoutEngine } from '../create-engine'
-// Import adapters to trigger self-registration
-import '../fabric-engine'
-import '../konva-engine'
-
 /**
  * Reparenting matrix contract tests.
  *
@@ -99,15 +95,13 @@ function readWorld(engine: LayoutEngine, shapeId: string): { x: number; y: numbe
 
 // ─── Per-engine matrix ─────────────────────────────────────────────────────
 
-const engineTypes = ['fabric', 'konva'] as const
-
-describe.each(engineTypes)('Reparenting matrix (%s)', (engineType) => {
+describe('Reparenting matrix', () => {
   let engine: LayoutEngine
   let container: HTMLDivElement
 
   beforeEach(() => {
     container = makeContainer()
-    engine = createLayoutEngine(engineType)
+    engine = createLayoutEngine()
     engine.mount(container)
   })
 
