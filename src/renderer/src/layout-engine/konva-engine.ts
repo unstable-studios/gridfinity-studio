@@ -8,11 +8,9 @@ import type {
   GridConfig,
   ViewportState,
   ViewportInsets,
-  TransientState,
   EngineEventMap,
   GroupDecoration
 } from './types'
-import { registerEngine } from './create-engine'
 import { KonvaGroupRenderer } from './konva-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
@@ -31,8 +29,8 @@ const GRID_EXTENT = 10000
 
 /**
  * Compute the bounding-box center of a polygon's points.
- * Used to set Konva.Line offset so that x,y = bbox center, matching
- * Fabric's originX/Y:'center' convention.
+ * Used to set Konva.Line offset so that x,y = bbox center, the same
+ * center convention rect and circle shapes use.
  */
 function polygonBboxCenter(points: { x: number; y: number }[]): { x: number; y: number } {
   if (points.length === 0) return { x: 0, y: 0 }
@@ -1199,21 +1197,6 @@ export class KonvaEngine implements LayoutEngine {
     }
   }
 
-  // ─── Transient State ────────────────────────────────────────────────────────
-
-  getTransientState(): TransientState {
-    return {
-      selectedIds: this.getSelectedIds(),
-      viewport: this.getViewport()
-    }
-  }
-
-  setTransientState(state: TransientState): void {
-    this.panTo(state.viewport.panX, state.viewport.panY)
-    this.zoomTo(state.viewport.zoom)
-    // Don't restore selection — transformer state doesn't survive engine switches cleanly
-  }
-
   // ─── Capabilities ───────────────────────────────────────────────────────────
 
   capabilities(): Set<string> {
@@ -1492,4 +1475,3 @@ export class KonvaEngine implements LayoutEngine {
 }
 
 // Auto-register
-registerEngine('konva', KonvaEngine)

@@ -66,7 +66,7 @@ export class GestureRecognizer {
     window.addEventListener('blur', this.onBlur)
   }
 
-  /** Swap the action handler (e.g., when switching engines). Cancels any in-progress gesture. */
+  /** Swap the action handler (e.g., when the engine remounts). Cancels any in-progress gesture. */
   setActionHandler(handler: InputActionHandler): void {
     this.cancel()
     this.handler = handler
@@ -148,9 +148,7 @@ export class GestureRecognizer {
     } else {
       // Press on empty canvas → rubberBand candidate (wait for threshold)
       // Don't stopPropagation here — the engine may need the event for
-      // control/handle detection (e.g., Fabric resize handles near edges).
-      // Fabric's native rubber-band is suppressed by toggling canvas.selection
-      // when we enter rubberBand mode.
+      // control/handle detection (resize handles near edges).
       this.mode = 'dragReady'
       this.startTargetId = null
     }
@@ -178,7 +176,7 @@ export class GestureRecognizer {
         if (dist >= DRAG_THRESHOLD) {
           if (this.startTargetId === null && !this.handler.isInteracting()) {
             // Empty canvas drag (no engine interaction in progress) → rubber-band
-            // Suppress engine's native selection rect (Fabric canvas.selection)
+            // Suppress the engine's own drag handling while rubber-banding
             this.handler.setDragEnabled(false)
             this.activePointerId = e.pointerId
             this.container?.setPointerCapture(e.pointerId)
@@ -223,14 +221,7 @@ export class GestureRecognizer {
 
       case 'dragReady': {
         // Pointer released without exceeding drag threshold → click
-        // If the engine handles click-select natively (e.g., Fabric), skip
-        // object clicks to avoid double-processing. Still handle empty-canvas
-        // clicks for deselection.
-        if (this.handler.handlesNativeClickSelect) {
-          if (!this.startTargetId && !this.startShift) {
-            this.handler.clearSelection()
-          }
-        } else if (this.startTargetId) {
+        if (this.startTargetId) {
           // Click on a shape/group
           if (this.startShift) {
             // Shift-click: toggle selection

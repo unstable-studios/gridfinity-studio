@@ -19,8 +19,6 @@ import type { LayoutShape, LayoutGroup } from '../types'
 import { createLayoutEngine } from '../create-engine'
 import { checkGroupCollision } from '../collision'
 // Import adapters to trigger self-registration
-import '../fabric-engine'
-import '../konva-engine'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -106,15 +104,13 @@ function makeGroup(overrides: Partial<LayoutGroup> = {}): LayoutGroup {
 
 // ─── Parameterized Contract Tests ───────────────────────────────────────────────
 
-const engineTypes = ['fabric', 'konva'] as const
-
-describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
+describe('LayoutEngine contract', () => {
   let engine: LayoutEngine
   let container: HTMLDivElement
 
   beforeEach(() => {
     container = makeContainer()
-    engine = createLayoutEngine(engineType)
+    engine = createLayoutEngine()
     engine.mount(container)
   })
 
@@ -221,15 +217,15 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
 
   describe('Group position stability', () => {
     it('C22: getAllGroups returns correct positions when multiple groups are selected', () => {
-      // When multiple groups are selected in Fabric, an ActiveSelection wraps
-      // them and changes their left/top to selection-relative coords. The engine
-      // must still return world-space positions from getGroup/getAllGroups.
+      // A canvas library may re-parent selected groups under a selection
+      // wrapper with selection-relative coords. The engine must still return
+      // world-space positions from getGroup/getAllGroups.
       const g1 = makeGroup({ id: 'g1', x: 0, y: 84, width: 84, height: 84 })
       const g2 = makeGroup({ id: 'g2', x: 126, y: 84, width: 84, height: 84 })
       engine.createGroup(g1)
       engine.createGroup(g2)
 
-      // Select both — in Fabric this creates an ActiveSelection
+      // Select both
       engine.select(['g1', 'g2'])
 
       const groups = engine.getAllGroups()
@@ -327,8 +323,8 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
 
       const initial = engine.toSnapshot()
 
-      // Three round-trips — pre-fix this would drift by the bin's centroid
-      // magnitude on each Fabric loadSnapshot.
+      // Three round-trips — a centroid/corner mix-up would drift by the
+      // bin's centroid magnitude on each loadSnapshot.
       let snapshot = initial
       for (let i = 0; i < 3; i++) {
         engine.loadSnapshot(snapshot)
@@ -559,7 +555,7 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
       // Each shape should only have LayoutShape keys
       for (const shape of snapshot.shapes) {
         const keys = Object.keys(shape)
-        // Must not contain fabric/konva internals
+        // Must not contain canvas-library internals
         expect(keys).not.toContain('_objects')
         expect(keys).not.toContain('canvas')
         expect(keys).not.toContain('__eventListeners')
@@ -778,116 +774,5 @@ describe.each(engineTypes)('LayoutEngine contract (%s)', (engineType) => {
         assertHierarchyConsistent(engine)
       }
     })
-  })
-})
-
-// ─── Cross-Engine Roundtrip Tests ─────────────────────────────────────────────
-
-describe('Cross-engine snapshot roundtrip', () => {
-  let container: HTMLDivElement
-
-  beforeEach(() => {
-    container = makeContainer()
-  })
-
-  afterEach(() => {
-    container.remove()
-  })
-
-  it('Fabric → Konva: snapshot preserves all shapes and groups', () => {
-    const fabricEngine = createLayoutEngine('fabric')
-    fabricEngine.mount(container)
-
-    fabricEngine.addShape(makeRect({ id: 'r1' }))
-    fabricEngine.addShape(makeCircle({ id: 'c1' }))
-    fabricEngine.addShape(makePolygon({ id: 'p1' }))
-    fabricEngine.createGroup(makeGroup({ id: 'g1', childIds: ['r1', 'c1'] }))
-
-    const snapshot = fabricEngine.toSnapshot()
-    fabricEngine.dispose()
-
-    // Load into Konva
-    const konvaEngine = createLayoutEngine('konva')
-    konvaEngine.mount(container)
-    konvaEngine.loadSnapshot(snapshot)
-
-    const shapes = konvaEngine.getAllShapes()
-    expect(shapes).toHaveLength(3)
-    expect(shapes.map((s) => s.id).sort()).toEqual(['c1', 'p1', 'r1'])
-
-    const groups = konvaEngine.getAllGroups()
-    expect(groups).toHaveLength(1)
-    expect(groups[0].id).toBe('g1')
-    expect(groups[0].childIds.sort()).toEqual(['c1', 'r1'])
-
-    konvaEngine.dispose()
-  })
-
-  it('Fabric → Konva → Fabric: polygon position preserved (bbox center convention)', () => {
-    // Asymmetric triangle: bbox center = (50, 40), centroid ≠ bbox center.
-    // Regression test for #252 — polygon drift when switching engines.
-    const fabricEngine = createLayoutEngine('fabric')
-    fabricEngine.mount(container)
-
-    fabricEngine.addShape(makePolygon({ id: 'asym', x: 200, y: 150 }))
-
-    const origShape = fabricEngine.getShape('asym')!
-    const origX = origShape.x
-    const origY = origShape.y
-
-    // Fabric → Konva
-    const snap1 = fabricEngine.toSnapshot()
-    fabricEngine.dispose()
-
-    const konvaEngine = createLayoutEngine('konva')
-    konvaEngine.mount(container)
-    konvaEngine.loadSnapshot(snap1)
-
-    const konvaShape = konvaEngine.getShape('asym')!
-    expect(konvaShape.x).toBeCloseTo(origX, 1)
-    expect(konvaShape.y).toBeCloseTo(origY, 1)
-
-    // Konva → Fabric
-    const snap2 = konvaEngine.toSnapshot()
-    konvaEngine.dispose()
-
-    const fabricEngine2 = createLayoutEngine('fabric')
-    fabricEngine2.mount(container)
-    fabricEngine2.loadSnapshot(snap2)
-
-    const finalShape = fabricEngine2.getShape('asym')!
-    expect(finalShape.x).toBeCloseTo(origX, 1)
-    expect(finalShape.y).toBeCloseTo(origY, 1)
-
-    fabricEngine2.dispose()
-  })
-
-  it('Konva → Fabric: snapshot preserves all shapes and groups', () => {
-    const konvaEngine = createLayoutEngine('konva')
-    konvaEngine.mount(container)
-
-    konvaEngine.addShape(makeRect({ id: 'r1' }))
-    konvaEngine.addShape(makeCircle({ id: 'c1' }))
-    konvaEngine.addShape(makePolygon({ id: 'p1' }))
-    konvaEngine.createGroup(makeGroup({ id: 'g1', childIds: ['r1', 'c1'] }))
-
-    const snapshot = konvaEngine.toSnapshot()
-    konvaEngine.dispose()
-
-    // Load into Fabric
-    const fabricEngine = createLayoutEngine('fabric')
-    fabricEngine.mount(container)
-    fabricEngine.loadSnapshot(snapshot)
-
-    const shapes = fabricEngine.getAllShapes()
-    expect(shapes).toHaveLength(3)
-    expect(shapes.map((s) => s.id).sort()).toEqual(['c1', 'p1', 'r1'])
-
-    const groups = fabricEngine.getAllGroups()
-    expect(groups).toHaveLength(1)
-    expect(groups[0].id).toBe('g1')
-    expect(groups[0].childIds.sort()).toEqual(['c1', 'r1'])
-
-    fabricEngine.dispose()
   })
 })

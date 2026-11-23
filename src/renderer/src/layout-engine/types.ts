@@ -164,13 +164,6 @@ export interface ViewportState {
   zoom: number
 }
 
-// ─── Transient State (for engine switching) ─────────────────────────────────
-
-export interface TransientState {
-  selectedIds: string[]
-  viewport: ViewportState
-}
-
 // ─── Snapshot (serialization) ───────────────────────────────────────────────
 
 export interface LayoutSnapshot {

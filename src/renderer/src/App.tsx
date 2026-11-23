@@ -10,7 +10,6 @@ import { useBinBaker } from '@/hooks/useBinBaker'
 import { ReviewPrefsCtx } from '@/hooks/useReviewPrefs'
 import { LayoutEngineProvider } from '@/layout-engine'
 import type { AppMode, ActiveTool } from '@/hooks/useAppMode'
-import type { EngineType } from '@/layout-engine'
 
 /**
  * Inside LayoutEngineProvider so the bake loop has access to the engine.
@@ -25,7 +24,6 @@ function BakeLoop(): null {
 
 function AppContent(): React.JSX.Element {
   const { project } = useProject()
-  const { engineType } = useAppMode()
 
   if (!project) {
     return <WelcomeScreen />
@@ -33,7 +31,7 @@ function AppContent(): React.JSX.Element {
 
   // Always mount the engine provider so state survives mode switches
   return (
-    <LayoutEngineProvider engineType={engineType}>
+    <LayoutEngineProvider>
       <BakeLoop />
       {/* Navbar: solid bar at top */}
       <Navbar />
@@ -47,7 +45,6 @@ function AppContent(): React.JSX.Element {
 }
 
 const APP_MODE_KEY = 'gfstudio:appMode'
-const ENGINE_TYPE_KEY = 'gfstudio:engineType'
 const DEBUG_COLORS_KEY = 'gfstudio:debugColors'
 const WIREFRAME_KEY = 'gfstudio:wireframe'
 
@@ -65,17 +62,11 @@ export default function App(): React.JSX.Element {
     return 'layout'
   })
   const [activeTool, setActiveTool] = useState<ActiveTool>('select')
-  const [engineType, setEngineType] = useState<EngineType>(() => {
-    return (sessionStorage.getItem(ENGINE_TYPE_KEY) as EngineType) ?? 'konva'
-  })
   const [debugColors, setDebugColors] = useState(() => readBool(DEBUG_COLORS_KEY, false))
   const [wireframe, setWireframe] = useState(() => readBool(WIREFRAME_KEY, false))
   useEffect(() => {
     sessionStorage.setItem(APP_MODE_KEY, mode)
   }, [mode])
-  useEffect(() => {
-    sessionStorage.setItem(ENGINE_TYPE_KEY, engineType)
-  }, [engineType])
   useEffect(() => {
     sessionStorage.setItem(DEBUG_COLORS_KEY, String(debugColors))
   }, [debugColors])
@@ -85,9 +76,7 @@ export default function App(): React.JSX.Element {
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-      <AppModeCtx.Provider
-        value={{ mode, setMode, activeTool, setActiveTool, engineType, setEngineType }}
-      >
+      <AppModeCtx.Provider value={{ mode, setMode, activeTool, setActiveTool }}>
         <ReviewPrefsCtx.Provider value={{ debugColors, setDebugColors, wireframe, setWireframe }}>
           <div className="flex h-screen flex-col bg-background text-foreground">
             <AppContent />

@@ -18,8 +18,6 @@ import type { LayoutEngine } from '../interface'
 import type { LayoutShape, LayoutGroup } from '../types'
 import { createLayoutEngine } from '../create-engine'
 // Import adapters to trigger self-registration
-import '../fabric-engine'
-import '../konva-engine'
 
 /**
  * Coordinate-system invariants for the LayoutEngine interface.
@@ -89,15 +87,13 @@ function childWorld(shape: LayoutShape, group: LayoutGroup): { x: number; y: num
 
 // ─── Per-engine contract ───────────────────────────────────────────────────
 
-const engineTypes = ['fabric', 'konva'] as const
-
-describe.each(engineTypes)('LayoutEngine coord invariants (%s)', (engineType) => {
+describe('LayoutEngine coord invariants', () => {
   let engine: LayoutEngine
   let container: HTMLDivElement
 
   beforeEach(() => {
     container = makeContainer()
-    engine = createLayoutEngine(engineType)
+    engine = createLayoutEngine()
     engine.mount(container)
   })
 

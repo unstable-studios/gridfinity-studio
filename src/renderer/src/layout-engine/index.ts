@@ -5,7 +5,6 @@ export type {
   LayoutSnapshot,
   GridConfig,
   ViewportState,
-  TransientState,
   EngineEventMap,
   BinMetadata,
   GroupDecoration,
@@ -19,8 +18,7 @@ export { snapLowerLeft, quantizeResize, computeEdgeAnchor } from './input-math'
 export type { Bounds, AnchoredResizeResult } from './input-math'
 export { computeBinArtwork } from './bin-artwork'
 export type { BinArtwork } from './bin-artwork'
-export { createLayoutEngine, registerEngine } from './create-engine'
-export type { EngineType } from './create-engine'
+export { createLayoutEngine } from './create-engine'
 export { LayoutEngineProvider, LayoutEngineCanvas } from './LayoutEngineContext'
 export { useLayoutEngineContext, useLayoutEngine, useEngineState } from './useLayoutEngine'
 export { useProjectEngineSync } from './useProjectEngineSync'

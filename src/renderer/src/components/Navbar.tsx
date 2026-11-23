@@ -101,7 +101,6 @@ export default function Navbar(): React.JSX.Element {
         <NavbarActions className="ml-auto gap-2">
           <ViewModeToggle />
           <ToolBar />
-          <EngineToggle />
           <ThemeToggle />
         </NavbarActions>
       </NavbarRoot>
@@ -316,27 +315,6 @@ function ViewModeToggle() {
       <ToggleGroupItem value="review" className="gap-1.5">
         <BoxIcon className="size-3.5" />
         Preview
-      </ToggleGroupItem>
-    </ToggleGroup>
-  )
-}
-
-function EngineToggle() {
-  const { engineType, setEngineType } = useAppMode()
-
-  return (
-    <ToggleGroup
-      type="single"
-      value={engineType}
-      onValueChange={(value) => {
-        if (value) setEngineType(value as 'fabric' | 'konva')
-      }}
-    >
-      <ToggleGroupItem value="fabric" className="gap-1 text-xs">
-        Fabric
-      </ToggleGroupItem>
-      <ToggleGroupItem value="konva" className="gap-1 text-xs">
-        Konva
       </ToggleGroupItem>
     </ToggleGroup>
   )

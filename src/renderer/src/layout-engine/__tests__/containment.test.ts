@@ -2,7 +2,7 @@
  * Pure-function tests for `findContainingBinGroup` and `findBestBinForShape`.
  *
  * Both helpers consume `LayoutGroup[]` directly (no engine), so these tests
- * exercise the math in isolation from any Fabric/Konva state. The lower-left
+ * exercise the math in isolation from any engine state. The lower-left
  * corner convention is the shared invariant under test:
  *   - group.x = leftmost world x
  *   - group.y = bottommost world y (largest screen-y)

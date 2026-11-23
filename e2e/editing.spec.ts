@@ -3,161 +3,156 @@ import { expect, test } from '@playwright/test'
 import { StudioApp, mappingFromDrawnRect } from './app'
 import type { SavedProject, SavedShape } from './app'
 
-const ENGINES = ['Konva', 'Fabric'] as const
-
 let app: StudioApp
 
 test.afterEach(async () => {
   await app.close()
 })
 
-for (const engine of ENGINES) {
-  test(`edit bins and pockets (${engine})`, async () => {
-    app = await StudioApp.launch()
-    const { page } = app
-    const file = join(app.dir, 'edit.gfstudio')
-    const shapeById = (p: SavedProject, id: string): SavedShape =>
-      p.layoutSnapshot.shapes.find((s) => s.id === id)!
+test('edit bins and pockets', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'edit.gfstudio')
+  const shapeById = (p: SavedProject, id: string): SavedShape =>
+    p.layoutSnapshot.shapes.find((s) => s.id === id)!
 
-    await page.getByRole('button', { name: 'New Project' }).click()
-    await page.getByRole('radio', { name: engine, exact: true }).click()
-    await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await page.getByRole('button', { name: 'New Project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
 
-    // Calibrate world→screen from a rectangle drawn on empty canvas.
-    const looseFrom = { x: 820, y: 180 }
-    const looseTo = { x: 880, y: 230 }
-    await app.selectTool('Rect')
-    await app.drag(looseFrom, looseTo)
-    let saved = await app.save(file)
-    const loose = saved.layoutSnapshot.shapes[0]
-    const toScreen = mappingFromDrawnRect(loose, looseFrom, looseTo)
-    let bin = saved.layoutSnapshot.groups[0]
+  // Calibrate world→screen from a rectangle drawn on empty canvas.
+  const looseFrom = { x: 820, y: 180 }
+  const looseTo = { x: 880, y: 230 }
+  await app.selectTool('Rect')
+  await app.drag(looseFrom, looseTo)
+  let saved = await app.save(file)
+  const loose = saved.layoutSnapshot.shapes[0]
+  const toScreen = mappingFromDrawnRect(loose, looseFrom, looseTo)
+  let bin = saved.layoutSnapshot.groups[0]
 
-    // Pocket inside the bin. Saved coordinates of a grouped shape are relative
-    // to its bin, so track the pocket's screen position from the drag itself.
-    const pocketFrom = toScreen({ x: bin.x + bin.width * 0.3, y: bin.y - bin.height * 0.7 })
-    const pocketTo = toScreen({ x: bin.x + bin.width * 0.6, y: bin.y - bin.height * 0.4 })
-    const pocketAt = { x: (pocketFrom.x + pocketTo.x) / 2, y: (pocketFrom.y + pocketTo.y) / 2 }
-    await app.selectTool('Rect')
-    await app.drag(pocketFrom, pocketTo)
-    saved = await app.save(file)
-    const pocketId = saved.layoutSnapshot.shapes.find((s) => s.id !== loose.id)!.id
-    let pocket = shapeById(saved, pocketId)
-    expect.soft(pocket.groupId, 'pocket drawn in bin belongs to bin').toBe(bin.id)
-    const pocketInBin = pocket
+  // Pocket inside the bin. Saved coordinates of a grouped shape are relative
+  // to its bin, so track the pocket's screen position from the drag itself.
+  const pocketFrom = toScreen({ x: bin.x + bin.width * 0.3, y: bin.y - bin.height * 0.7 })
+  const pocketTo = toScreen({ x: bin.x + bin.width * 0.6, y: bin.y - bin.height * 0.4 })
+  const pocketAt = { x: (pocketFrom.x + pocketTo.x) / 2, y: (pocketFrom.y + pocketTo.y) / 2 }
+  await app.selectTool('Rect')
+  await app.drag(pocketFrom, pocketTo)
+  saved = await app.save(file)
+  const pocketId = saved.layoutSnapshot.shapes.find((s) => s.id !== loose.id)!.id
+  let pocket = shapeById(saved, pocketId)
+  expect.soft(pocket.groupId, 'pocket drawn in bin belongs to bin').toBe(bin.id)
+  const pocketInBin = pocket
 
-    // Hover shows the tooltip with the pocket depth.
-    await page.mouse.move(pocketAt.x + 2, pocketAt.y + 2)
-    await page.mouse.move(pocketAt.x, pocketAt.y)
-    await expect.soft(page.getByText(/^Depth: (Auto|[\d.]+)/), 'hover tooltip').toBeVisible()
+  // Hover shows the tooltip with the pocket depth.
+  await page.mouse.move(pocketAt.x + 2, pocketAt.y + 2)
+  await page.mouse.move(pocketAt.x, pocketAt.y)
+  await expect.soft(page.getByText(/^Depth: (Auto|[\d.]+)/), 'hover tooltip').toBeVisible()
 
-    // Click selects it.
-    await page.mouse.click(pocketAt.x, pocketAt.y)
-    await expect.soft(page.getByText('Shape Properties'), 'click selects pocket').toBeVisible()
+  // Click selects it.
+  await page.mouse.click(pocketAt.x, pocketAt.y)
+  await expect.soft(page.getByText('Shape Properties'), 'click selects pocket').toBeVisible()
 
-    // Turning Auto off gives the pocket an explicit depth.
-    expect.soft(pocket.metadata?.pocket?.depth ?? null, 'depth starts on Auto').toBeNull()
-    await page.getByRole('switch', { name: 'Auto' }).click()
-    saved = await app.save(file)
-    expect
-      .soft(typeof shapeById(saved, pocketId).metadata?.pocket?.depth, 'explicit depth is saved')
-      .toBe('number')
+  // Turning Auto off gives the pocket an explicit depth.
+  expect.soft(pocket.metadata?.pocket?.depth ?? null, 'depth starts on Auto').toBeNull()
+  await page.getByRole('switch', { name: 'Auto' }).click()
+  saved = await app.save(file)
+  expect
+    .soft(typeof shapeById(saved, pocketId).metadata?.pocket?.depth, 'explicit depth is saved')
+    .toBe('number')
 
-    // Drag the pocket out of the bin, then back in.
-    const outside = toScreen({ x: bin.x + bin.width + 60, y: bin.y - bin.height - 60 })
-    await app.drag(pocketAt, outside)
-    saved = await app.save(file)
-    pocket = shapeById(saved, pocketId)
-    expect.soft(pocket.groupId, 'dragged out: unassigned').toBeNull()
-    expect
-      .soft(saved.layoutSnapshot.groups[0].childIds, 'dragged out: bin has no children')
-      .toEqual([])
+  // Drag the pocket out of the bin, then back in.
+  const outside = toScreen({ x: bin.x + bin.width + 60, y: bin.y - bin.height - 60 })
+  await app.drag(pocketAt, outside)
+  saved = await app.save(file)
+  pocket = shapeById(saved, pocketId)
+  expect.soft(pocket.groupId, 'dragged out: unassigned').toBeNull()
+  expect
+    .soft(saved.layoutSnapshot.groups[0].childIds, 'dragged out: bin has no children')
+    .toEqual([])
 
-    await app.drag(outside, pocketAt)
-    saved = await app.save(file)
-    pocket = shapeById(saved, pocketId)
-    expect.soft(pocket.groupId, 'dragged back in: assigned').toBe(bin.id)
-    expect.soft(pocket.x, 'back at its original place in the bin').toBeCloseTo(pocketInBin.x, 0)
+  await app.drag(outside, pocketAt)
+  saved = await app.save(file)
+  pocket = shapeById(saved, pocketId)
+  expect.soft(pocket.groupId, 'dragged back in: assigned').toBe(bin.id)
+  expect.soft(pocket.x, 'back at its original place in the bin').toBeCloseTo(pocketInBin.x, 0)
 
-    // Move the bin one grid unit right; it snaps and its pocket follows.
-    const grip = toScreen({ x: bin.x + bin.width * 0.1, y: bin.y - bin.height * 0.1 })
-    const unitPx = toScreen({ x: 42, y: 0 }).x - toScreen({ x: 0, y: 0 }).x
-    await app.drag(grip, { x: grip.x + unitPx, y: grip.y })
-    saved = await app.save(file)
-    const moved = saved.layoutSnapshot.groups[0]
-    expect.soft(moved.x - bin.x, 'bin moved one 42 mm unit').toBeCloseTo(42, 3)
-    expect.soft(moved.y, 'bin stayed on its row').toBeCloseTo(bin.y, 3)
-    const afterMove = shapeById(saved, pocketId)
-    expect.soft(afterMove.groupId, 'pocket still in bin').toBe(bin.id)
-    expect.soft(afterMove.x, 'pocket keeps its place in the bin').toBeCloseTo(pocket.x, 3)
-    await page.mouse.move(pocketAt.x + unitPx + 2, pocketAt.y + 2)
-    await page.mouse.move(pocketAt.x + unitPx, pocketAt.y)
-    await expect
-      .soft(page.getByText(/^Depth: (Auto|[\d.]+)/), 'pocket is drawn at moved bin')
-      .toBeVisible()
-    bin = moved
+  // Move the bin one grid unit right; it snaps and its pocket follows.
+  const grip = toScreen({ x: bin.x + bin.width * 0.1, y: bin.y - bin.height * 0.1 })
+  const unitPx = toScreen({ x: 42, y: 0 }).x - toScreen({ x: 0, y: 0 }).x
+  await app.drag(grip, { x: grip.x + unitPx, y: grip.y })
+  saved = await app.save(file)
+  const moved = saved.layoutSnapshot.groups[0]
+  expect.soft(moved.x - bin.x, 'bin moved one 42 mm unit').toBeCloseTo(42, 3)
+  expect.soft(moved.y, 'bin stayed on its row').toBeCloseTo(bin.y, 3)
+  const afterMove = shapeById(saved, pocketId)
+  expect.soft(afterMove.groupId, 'pocket still in bin').toBe(bin.id)
+  expect.soft(afterMove.x, 'pocket keeps its place in the bin').toBeCloseTo(pocket.x, 3)
+  await page.mouse.move(pocketAt.x + unitPx + 2, pocketAt.y + 2)
+  await page.mouse.move(pocketAt.x + unitPx, pocketAt.y)
+  await expect
+    .soft(page.getByText(/^Depth: (Auto|[\d.]+)/), 'pocket is drawn at moved bin')
+    .toBeVisible()
+  bin = moved
 
-    // Resize the selected bin from its properties.
-    await page.getByRole('button', { name: /^Bin 1/ }).click()
-    await page.getByRole('button', { name: '3×2', exact: true }).last().click()
-    saved = await app.save(file)
-    expect
-      .soft(saved.layoutSnapshot.groups[0].width, 'bin resized to 3 units wide')
-      .toBeCloseTo(126, 3)
-    expect
-      .soft(saved.layoutSnapshot.groups[0].x, 'resize keeps lower-left corner')
-      .toBeCloseTo(bin.x, 3)
-    expect.soft(shapeById(saved, pocketId).groupId, 'pocket survives resize').toBe(bin.id)
+  // Resize the selected bin from its properties.
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await page.getByRole('button', { name: '3×2', exact: true }).last().click()
+  saved = await app.save(file)
+  expect
+    .soft(saved.layoutSnapshot.groups[0].width, 'bin resized to 3 units wide')
+    .toBeCloseTo(126, 3)
+  expect
+    .soft(saved.layoutSnapshot.groups[0].x, 'resize keeps lower-left corner')
+    .toBeCloseTo(bin.x, 3)
+  expect.soft(shapeById(saved, pocketId).groupId, 'pocket survives resize').toBe(bin.id)
 
-    // Circle and polygon tools.
-    await app.selectTool('Circle')
-    await app.drag({ x: 950, y: 180 }, { x: 990, y: 220 })
-    await app.selectTool('Polygon')
-    for (const p of [
-      { x: 1050, y: 180 },
-      { x: 1110, y: 180 },
-      { x: 1080, y: 240 },
-      { x: 1050, y: 180 }
-    ]) {
-      await page.mouse.click(p.x, p.y)
-    }
-    saved = await app.save(file)
-    expect
-      .soft(saved.layoutSnapshot.shapes.map((s) => s.type).sort(), 'all shape tools')
-      .toEqual(['circle', 'polygon', 'rect', 'rect'])
+  // Circle and polygon tools.
+  await app.selectTool('Circle')
+  await app.drag({ x: 950, y: 180 }, { x: 990, y: 220 })
+  await app.selectTool('Polygon')
+  for (const p of [
+    { x: 1050, y: 180 },
+    { x: 1110, y: 180 },
+    { x: 1080, y: 240 },
+    { x: 1050, y: 180 }
+  ]) {
+    await page.mouse.click(p.x, p.y)
+  }
+  saved = await app.save(file)
+  expect
+    .soft(saved.layoutSnapshot.shapes.map((s) => s.type).sort(), 'all shape tools')
+    .toEqual(['circle', 'polygon', 'rect', 'rect'])
 
-    // Delete the loose rectangle with the keyboard.
-    await app.selectTool('Select')
-    await page.getByRole('button', { name: /^Rectangle 1/ }).click()
-    await page.keyboard.press('Delete')
-    saved = await app.save(file)
-    expect
-      .soft(
-        saved.layoutSnapshot.shapes.some((s) => s.id === loose.id),
-        'Delete removes shape'
-      )
-      .toBe(false)
+  // Delete the loose rectangle with the keyboard.
+  await app.selectTool('Select')
+  await page.getByRole('button', { name: /^Rectangle 1/ }).click()
+  await page.keyboard.press('Delete')
+  saved = await app.save(file)
+  expect
+    .soft(
+      saved.layoutSnapshot.shapes.some((s) => s.id === loose.id),
+      'Delete removes shape'
+    )
+    .toBe(false)
 
-    // A second bin never lands on top of the first.
-    await page.getByRole('button', { name: '1×1', exact: true }).first().click()
-    saved = await app.save(file)
-    expect.soft(saved.layoutSnapshot.groups, 'second bin added').toHaveLength(2)
-    const [a, b] = saved.layoutSnapshot.groups
-    const overlap =
-      a &&
-      b &&
-      a.x < b.x + b.width &&
-      b.x < a.x + a.width &&
-      a.y - a.height < b.y &&
-      b.y - b.height < a.y
-    expect.soft(overlap, 'bins do not overlap').toBe(false)
+  // A second bin never lands on top of the first.
+  await page.getByRole('button', { name: '1×1', exact: true }).first().click()
+  saved = await app.save(file)
+  expect.soft(saved.layoutSnapshot.groups, 'second bin added').toHaveLength(2)
+  const [a, b] = saved.layoutSnapshot.groups
+  const overlap =
+    a &&
+    b &&
+    a.x < b.x + b.width &&
+    b.x < a.x + a.width &&
+    a.y - a.height < b.y &&
+    b.y - b.height < a.y
+  expect.soft(overlap, 'bins do not overlap').toBe(false)
 
-    expect
-      .soft(
-        saved.layoutSnapshot.shapes.filter((s) => s.id.startsWith('preview-')),
-        'no preview shapes'
-      )
-      .toEqual([])
-    expect.soft(app.errors, 'no renderer errors').toEqual([])
-  })
-}
+  expect
+    .soft(
+      saved.layoutSnapshot.shapes.filter((s) => s.id.startsWith('preview-')),
+      'no preview shapes'
+    )
+    .toEqual([])
+  expect.soft(app.errors, 'no renderer errors').toEqual([])
+})

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Gridfinity Studio is a cross-platform Electron desktop application for designing Gridfinity modular storage systems. Users lay out bins on a 2D canvas (Fabric.js or Konva), draw pocket shapes inside them, and preview the result as 3D meshes via a CSG pipeline. Built with React, TypeScript, and Electron.
+Gridfinity Studio is a cross-platform Electron desktop application for designing Gridfinity modular storage systems. Users lay out bins on a 2D canvas (Konva), draw pocket shapes inside them, and preview the result as 3D meshes via a CSG pipeline. Built with React, TypeScript, and Electron.
 
 ## Commands
 
@@ -64,7 +64,7 @@ The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnaps
 ### Renderer Architecture
 
 - **App.tsx** — Root layout: Navbar (top) + Sidebar (left) + Viewport (main)
-- **Viewport.tsx** — 2D canvas powered by the active LayoutEngine (Fabric.js or Konva)
+- **Viewport.tsx** — 2D canvas powered by the LayoutEngine (Konva)
 - **LayoutEngineContext** — Provides the engine instance to the component tree
 - **useEngineState()** — Reactive engine state via `useSyncExternalStore` with tick-based mutation tracking
 - **useProject()** — Project metadata and file operations (Zustand)
@@ -72,15 +72,13 @@ The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnaps
 
 ### Layout Engine (`src/renderer/src/layout-engine/`)
 
-The `LayoutEngine` interface abstracts all 2D canvas operations. Two implementations exist:
+The `LayoutEngine` interface abstracts all 2D canvas operations. Konva is the only adapter; Fabric.js was removed after both passed the same contract and end-to-end tests.
 
 | File | Purpose |
 |------|---------|
 | `interface.ts` | Abstract LayoutEngine interface |
 | `types.ts` | LayoutShape, LayoutGroup, LayoutSnapshot, events |
-| `fabric-engine.ts` | Fabric.js v7 adapter (imperative) |
 | `konva-engine.ts` | Konva 10 adapter (imperative) |
-| `fabric-group-renderer.ts` | Fabric bin rendering (centroid positioning, decorations) |
 | `konva-group-renderer.ts` | Konva bin rendering (centroid positioning, decorations) |
 | `collision.ts` | AABB collision detection for drag/resize |
 | `bin-artwork.ts` | Generates bin decorations (grid lines, screw holes, magnet holes) |
@@ -117,7 +115,7 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 
 - **Runtime**: Electron 42, Node v24 (pinned by `devEngines.runtime`; pnpm downloads it and runs scripts with it), pnpm
 - **Frontend**: React 19, Tailwind CSS 4, Shadcn/ui, Headless UI
-- **2D Canvas**: Fabric.js v7 (imperative), Konva 10 (imperative) — swappable via LayoutEngine interface
+- **2D Canvas**: Konva 10 (imperative), behind the LayoutEngine interface
 - **3D Preview**: Three.js via @react-three/fiber and @react-three/drei
 - **CSG**: Manifold (WASM) for solid geometry, earcut for triangulation
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
@@ -144,7 +142,7 @@ Major subsystems must be decoupled from their implementation libraries through a
 - Adapters convert between the interface's data model and the library's internals at the boundary (e.g., lower-left corner ↔ centroid coordinate conversion in the layout engine).
 - Persisted data must be engine-agnostic — no library-specific artifacts in snapshots or project files.
 
-**Established pattern**: The `LayoutEngine` interface with Fabric.js and Konva adapters (009/010). Future candidates include the CSG/geometry pipeline, 3D preview renderer, file format exporters, and input handling layer.
+**Established pattern**: The `LayoutEngine` interface with its Konva adapter (009/010); `create-engine.ts` is the only file that names the adapter. Future candidates include the CSG/geometry pipeline, 3D preview renderer, file format exporters, and input handling layer.
 
 ### Integration-First Development
 
