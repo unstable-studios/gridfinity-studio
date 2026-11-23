@@ -67,6 +67,12 @@ export interface LayoutEngine {
     handler: (payload: EngineEventMap[K]) => void
   ): () => void
 
+  /**
+   * Run several mutations as one change. Events raised inside `fn` are
+   * delivered after it returns, so listeners only see the final state.
+   */
+  batch(fn: () => void): void
+
   // ─── Serialization ─────────────────────────────────────────────────────────
   toSnapshot(): LayoutSnapshot
   loadSnapshot(snapshot: LayoutSnapshot): void

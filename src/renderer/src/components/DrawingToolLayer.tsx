@@ -220,18 +220,20 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       // Create ungrouped at world coords, then reparent via addToGroup which
       // handles world→local conversion. Passing groupId directly to addShape
       // would treat x/y as already group-local and place the shape at the
-      // wrong position.
-      engine.addShape({
-        id,
-        type: 'polygon',
-        x: cx,
-        y: cy,
-        points: relativePoints,
-        ...baseShapeProps(),
-        groupId: null,
-        metadata: { ...pocketMetadata(bin), name }
+      // wrong position. Batched so creating and assigning is one undo step.
+      engine.batch(() => {
+        engine.addShape({
+          id,
+          type: 'polygon',
+          x: cx,
+          y: cy,
+          points: relativePoints,
+          ...baseShapeProps(),
+          groupId: null,
+          metadata: { ...pocketMetadata(bin), name }
+        })
+        if (bin) engine.addToGroup(id, bin.id)
       })
-      if (bin) engine.addToGroup(id, bin.id)
       engine.select([id])
       setState(INITIAL_STATE)
       setActiveTool('select')
@@ -367,18 +369,20 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           })
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'rect')
-          engine.addShape({
-            id,
-            type: 'rect',
-            x: cx,
-            y: cy,
-            width: w,
-            height: h,
-            ...baseShapeProps(),
-            groupId: null,
-            metadata: { ...pocketMetadata(bin), name }
+          engine.batch(() => {
+            engine.addShape({
+              id,
+              type: 'rect',
+              x: cx,
+              y: cy,
+              width: w,
+              height: h,
+              ...baseShapeProps(),
+              groupId: null,
+              metadata: { ...pocketMetadata(bin), name }
+            })
+            if (bin) engine.addToGroup(id, bin.id)
           })
-          if (bin) engine.addToGroup(id, bin.id)
           engine.select([id])
           setActiveTool('select')
         }
@@ -395,18 +399,20 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
           })
           const id = crypto.randomUUID()
           const name = nextShapeName(engine, 'circle')
-          engine.addShape({
-            id,
-            type: 'circle',
-            x: start.x,
-            y: start.y,
-            radiusX: radius,
-            radiusY: radius,
-            ...baseShapeProps(),
-            groupId: null,
-            metadata: { ...pocketMetadata(bin), name }
+          engine.batch(() => {
+            engine.addShape({
+              id,
+              type: 'circle',
+              x: start.x,
+              y: start.y,
+              radiusX: radius,
+              radiusY: radius,
+              ...baseShapeProps(),
+              groupId: null,
+              metadata: { ...pocketMetadata(bin), name }
+            })
+            if (bin) engine.addToGroup(id, bin.id)
           })
-          if (bin) engine.addToGroup(id, bin.id)
           engine.select([id])
           setActiveTool('select')
         }

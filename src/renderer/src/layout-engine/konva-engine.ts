@@ -120,6 +120,8 @@ export class KonvaEngine implements LayoutEngine {
   private disposed = false
   private resizeObserver: ResizeObserver | null = null
   private emitter = mitt<EngineEventMap>()
+  private batchDepth = 0
+  private batchedEvents: Array<() => void> = []
   private interacting = false
   private _dragEnabled = true
   private transformer: Konva.Transformer | null = null
@@ -282,18 +284,18 @@ export class KonvaEngine implements LayoutEngine {
     })
 
     node.on('dragend', () => {
-      // Evaluate reassignment first so any reparenting happens before we
-      // snapshot the new position. Otherwise the undo entry pushed by
-      // shapeMoved captures a state with the old groupId at the new
-      // position, and Cmd+Z lands the user in that intermediate state.
-      this.evaluateShapeReassignment(shape.id, node)
+      // One change: listeners see the shape at its new position and in its
+      // new bin together, so the move is a single undo step.
+      this.batch(() => {
+        this.evaluateShapeReassignment(shape.id, node)
 
-      const data = this.shapeMap.get(shape.id)
-      if (data) {
-        data.x = node.x()
-        data.y = node.y()
-      }
-      this.emitter.emit('shapeMoved', { id: shape.id, x: node.x(), y: node.y() })
+        const data = this.shapeMap.get(shape.id)
+        if (data) {
+          data.x = node.x()
+          data.y = node.y()
+        }
+        this.emit('shapeMoved', { id: shape.id, x: node.x(), y: node.y() })
+      })
     })
 
     // Rects and ellipses: reset scale live so they stay crisp and corner radii don't distort.
@@ -337,9 +339,9 @@ export class KonvaEngine implements LayoutEngine {
       data.rotation = node.rotation()
 
       if (data.type === 'rect') {
-        this.emitter.emit('shapeResized', { id: shape.id, width: data.width, height: data.height })
+        this.emit('shapeResized', { id: shape.id, width: data.width, height: data.height })
       } else if (data.type === 'circle') {
-        this.emitter.emit('shapeResized', {
+        this.emit('shapeResized', {
           id: shape.id,
           radiusX: data.radiusX,
           radiusY: data.radiusY
@@ -366,7 +368,7 @@ export class KonvaEngine implements LayoutEngine {
 
     this.applyDepthOpacity(shape, node)
     this.mainLayer.batchDraw()
-    this.emitter.emit('shapeCreated', { shape: { ...shape } })
+    this.emit('shapeCreated', { shape: { ...shape } })
   }
 
   updateShape(id: string, patch: Partial<LayoutShape>): void {
@@ -431,7 +433,7 @@ export class KonvaEngine implements LayoutEngine {
         (k) => k === 'width' || k === 'height' || k === 'radiusX' || k === 'radiusY' || k === 'id'
       )
     if (!isPositionOnly && !isResizeOnly) {
-      this.emitter.emit('shapeUpdated', { id })
+      this.emit('shapeUpdated', { id })
     }
   }
 
@@ -472,7 +474,7 @@ export class KonvaEngine implements LayoutEngine {
     this.shapeMap.delete(id)
     this.konvaMap.delete(id)
     this.mainLayer?.batchDraw()
-    this.emitter.emit('shapeDeleted', { id })
+    this.emit('shapeDeleted', { id })
   }
 
   getShape(id: string): LayoutShape | undefined {
@@ -535,7 +537,7 @@ export class KonvaEngine implements LayoutEngine {
           g.x = x
           g.y = y
         }
-        this.emitter.emit('groupMoved', { id, x, y })
+        this.emit('groupMoved', { id, x, y })
       },
       (id, x, y, width, height) => {
         const g = this.groupMap.get(id)
@@ -555,11 +557,11 @@ export class KonvaEngine implements LayoutEngine {
           // directly via this callback and doesn't go through updateGroup.
           this.evictChildrenOutsideGroup(g)
         }
-        this.emitter.emit('groupResized', { id, width, height })
-        this.emitter.emit('groupChanged', { groupId: id, childIds: [...(g?.childIds ?? [])] })
+        this.emit('groupResized', { id, width, height })
+        this.emit('groupChanged', { groupId: id, childIds: [...(g?.childIds ?? [])] })
       },
       (id, reason) => {
-        this.emitter.emit('collisionRejected', { id, reason })
+        this.emit('collisionRejected', { id, reason })
       }
     )
     this.rendererMap.set(group.id, renderer)
@@ -587,7 +589,7 @@ export class KonvaEngine implements LayoutEngine {
     this.mainLayer.add(renderer.konvaGroup)
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
-    this.emitter.emit('groupChanged', { groupId: group.id, childIds: [...group.childIds] })
+    this.emit('groupChanged', { groupId: group.id, childIds: [...group.childIds] })
   }
 
   updateGroup(id: string, patch: Partial<LayoutGroup>): void {
@@ -622,7 +624,7 @@ export class KonvaEngine implements LayoutEngine {
       this.evictChildrenOutsideGroup(group)
     }
 
-    this.emitter.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
+    this.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
   }
 
   /**
@@ -641,8 +643,9 @@ export class KonvaEngine implements LayoutEngine {
       .map((cid) => this.getShape(cid))
       .filter((s): s is LayoutShape => s !== undefined)
     const toEvict = findChildrenOutsideBin(group, children)
+    // The caller emits groupChanged for this group.
     for (const cid of toEvict) {
-      this.removeFromGroup(cid)
+      this.detachFromGroup(cid)
     }
   }
 
@@ -673,18 +676,38 @@ export class KonvaEngine implements LayoutEngine {
     this.rendererMap.delete(id)
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
-    this.emitter.emit('groupChanged', { groupId: id, childIds: [] })
+    this.emit('groupChanged', { groupId: id, childIds: [] })
   }
 
   addToGroup(shapeId: string, groupId: string): void {
-    if (this.disposed || !this.stage) return
+    const oldGroupId = this.shapeMap.get(shapeId)?.groupId ?? null
+    if (!this.attachToGroup(shapeId, groupId)) return
+    this.batch(() => {
+      if (oldGroupId) this.emitGroupChanged(oldGroupId)
+      this.emitGroupChanged(groupId)
+    })
+  }
+
+  removeFromGroup(shapeId: string): void {
+    const groupId = this.detachFromGroup(shapeId)
+    if (groupId) this.emitGroupChanged(groupId)
+  }
+
+  private emitGroupChanged(groupId: string): void {
+    const group = this.groupMap.get(groupId)
+    if (group) this.emit('groupChanged', { groupId, childIds: [...group.childIds] })
+  }
+
+  /** Move a shape into a group without emitting. Returns whether it moved. */
+  private attachToGroup(shapeId: string, groupId: string): boolean {
+    if (this.disposed || !this.stage) return false
     const newGroup = this.groupMap.get(groupId)
     const newRenderer = this.rendererMap.get(groupId)
     const node = this.konvaMap.get(shapeId)
     const shape = this.shapeMap.get(shapeId)
 
-    if (!newGroup || !newRenderer || !node || !shape) return
-    if (shape.groupId === groupId) return
+    if (!newGroup || !newRenderer || !node || !shape) return false
+    if (shape.groupId === groupId) return false
 
     // Compute world position via getAbsolutePosition (screen-space) and undo
     // the stage transform. Reading node.x()/y() directly is unsafe when the
@@ -717,18 +740,20 @@ export class KonvaEngine implements LayoutEngine {
     shape.groupId = groupId
 
     this.mainLayer?.batchDraw()
+    return true
   }
 
-  removeFromGroup(shapeId: string): void {
-    if (this.disposed || !this.mainLayer || !this.stage) return
+  /** Move a shape out of its group without emitting. Returns the group it left. */
+  private detachFromGroup(shapeId: string): string | null {
+    if (this.disposed || !this.mainLayer || !this.stage) return null
     const shape = this.shapeMap.get(shapeId)
-    if (!shape?.groupId) return
+    if (!shape?.groupId) return null
 
     const group = this.groupMap.get(shape.groupId)
     const renderer = this.rendererMap.get(shape.groupId)
     const node = this.konvaMap.get(shapeId)
 
-    if (!group || !renderer || !node) return
+    if (!group || !renderer || !node) return null
 
     // Convert screen-space getAbsolutePosition() → world (mainLayer-local).
     // Setting node.position(absPos) directly would leave the node at the
@@ -748,6 +773,7 @@ export class KonvaEngine implements LayoutEngine {
 
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
+    return group.id
   }
 
   setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void {
@@ -899,7 +925,7 @@ export class KonvaEngine implements LayoutEngine {
       for (const node of nodes) {
         if (node.name() !== 'group') continue
         this.rendererMap.get(node.id())?.flashCollision()
-        this.emitter.emit('collisionRejected', { id: node.id(), reason: 'move' })
+        this.emit('collisionRejected', { id: node.id(), reason: 'move' })
       }
       return
     }
@@ -916,14 +942,14 @@ export class KonvaEngine implements LayoutEngine {
           g.x = pos.x
           g.y = pos.y
         }
-        this.emitter.emit('groupMoved', { id, x: pos.x, y: pos.y })
+        this.emit('groupMoved', { id, x: pos.x, y: pos.y })
       } else {
         const data = this.shapeMap.get(id)
         if (data) {
           data.x = node.x()
           data.y = node.y()
         }
-        this.emitter.emit('shapeMoved', { id, x: node.x(), y: node.y() })
+        this.emit('shapeMoved', { id, x: node.x(), y: node.y() })
       }
     }
   }
@@ -963,18 +989,12 @@ export class KonvaEngine implements LayoutEngine {
     // No change needed
     if (targetGroupId === currentGroupId) return
 
-    // Remove from old group
-    if (currentGroupId) {
-      this.removeFromGroup(shapeId)
-    }
+    if (currentGroupId) this.detachFromGroup(shapeId)
+    if (targetGroupId) this.attachToGroup(shapeId, targetGroupId)
 
-    // Add to new group
-    if (targetGroupId) {
-      this.addToGroup(shapeId, targetGroupId)
-    }
-
-    // Emit reassignment event
-    this.emitter.emit('shapeReassigned', {
+    if (currentGroupId) this.emitGroupChanged(currentGroupId)
+    if (targetGroupId) this.emitGroupChanged(targetGroupId)
+    this.emit('shapeReassigned', {
       shapeId,
       oldGroupId: currentGroupId,
       newGroupId: targetGroupId
@@ -1018,7 +1038,7 @@ export class KonvaEngine implements LayoutEngine {
     }
 
     this.mainLayer?.batchDraw()
-    this.emitter.emit('selectionChanged', { ids: [...ids] })
+    this.emit('selectionChanged', { ids: [...ids] })
   }
 
   selectIds(ids: string[]): void {
@@ -1044,7 +1064,7 @@ export class KonvaEngine implements LayoutEngine {
     if (this.disposed || !this.transformer) return
     this.transformer.nodes([])
     this.mainLayer?.batchDraw()
-    this.emitter.emit('selectionChanged', { ids: [] })
+    this.emit('selectionChanged', { ids: [] })
   }
 
   getSelectedIds(): string[] {
@@ -1058,7 +1078,7 @@ export class KonvaEngine implements LayoutEngine {
     if (this.disposed || !this.stage) return
     this.stage.position({ x: -x, y: -y })
     this.stage.batchDraw()
-    this.emitter.emit('viewportChanged', {
+    this.emit('viewportChanged', {
       panX: x,
       panY: y,
       zoom: this.stage.scaleX()
@@ -1086,7 +1106,7 @@ export class KonvaEngine implements LayoutEngine {
 
     this.stage.batchDraw()
     const vp = this.getViewport()
-    this.emitter.emit('viewportChanged', vp)
+    this.emit('viewportChanged', vp)
   }
 
   resetView(): void {
@@ -1094,7 +1114,7 @@ export class KonvaEngine implements LayoutEngine {
     this.centerOrigin()
     this.stage.batchDraw()
     const vp = this.getViewport()
-    this.emitter.emit('viewportChanged', vp)
+    this.emit('viewportChanged', vp)
   }
 
   getViewport(): ViewportState {
@@ -1114,7 +1134,7 @@ export class KonvaEngine implements LayoutEngine {
       this.centerOrigin()
       this.stage.batchDraw()
       const vp = this.getViewport()
-      this.emitter.emit('viewportChanged', vp)
+      this.emit('viewportChanged', vp)
     }
   }
 
@@ -1158,6 +1178,28 @@ export class KonvaEngine implements LayoutEngine {
   ): () => void {
     this.emitter.on(event, handler)
     return () => this.emitter.off(event, handler)
+  }
+
+  batch(fn: () => void): void {
+    this.batchDepth++
+    try {
+      fn()
+    } finally {
+      this.batchDepth--
+      if (this.batchDepth === 0) {
+        const events = this.batchedEvents
+        this.batchedEvents = []
+        for (const fire of events) fire()
+      }
+    }
+  }
+
+  private emit<K extends keyof EngineEventMap>(event: K, payload: EngineEventMap[K]): void {
+    if (this.batchDepth > 0) {
+      this.batchedEvents.push(() => this.emitter.emit(event, payload))
+    } else {
+      this.emitter.emit(event, payload)
+    }
   }
 
   // ─── Serialization ──────────────────────────────────────────────────────────
@@ -1218,7 +1260,7 @@ export class KonvaEngine implements LayoutEngine {
       y: this.stage.y() + dy
     })
     this.stage.batchDraw()
-    this.emitter.emit('viewportChanged', this.getViewport())
+    this.emit('viewportChanged', this.getViewport())
   }
 
   applyZoom(delta: number, centerX: number, centerY: number): void {

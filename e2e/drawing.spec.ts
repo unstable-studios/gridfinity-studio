@@ -1,5 +1,8 @@
+import { readFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { StudioApp } from './app'
+import type { SavedProject } from './app'
 
 let app: StudioApp
 
@@ -50,6 +53,25 @@ test('drawing a shape is one undo step and leaves no preview behind', async () =
   await app.menu('Edit', /^Undo/)
   await app.expectShapeCount(0)
   await app.expectBinCount(1)
+
+  // Redo brings the pocket back inside the bin.
+  await app.menu('Edit', /^Redo/)
+  await app.expectShapeCount(1)
+  const redone = await app.save(join(app.dir, 'redone.gfstudio'))
+  const [bin] = redone.layoutSnapshot.groups
+  expect(redone.layoutSnapshot.shapes[0].groupId, 'redo keeps the pocket in its bin').toBe(bin.id)
+  expect(bin.childIds).toEqual([redone.layoutSnapshot.shapes[0].id])
+
+  // So does reloading the window, which restores the session copy.
+  await page.reload()
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+  const reloadedPath = join(app.dir, 'reloaded.gfstudio')
+  await app.stubSaveDialog(reloadedPath)
+  await app.menu('File', /^Save as/)
+  await expect.poll(() => readFile(reloadedPath, 'utf8').catch(() => '')).not.toBe('')
+  const reloaded = JSON.parse(await readFile(reloadedPath, 'utf8')) as SavedProject
+  expect(reloaded.layoutSnapshot).toEqual(redone.layoutSnapshot)
 
   expect(app.errors).toEqual([])
 })
