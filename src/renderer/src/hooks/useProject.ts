@@ -183,11 +183,11 @@ const useProjectStore = create<ProjectState>()((set, get) => {
           })
           return true
         } else {
-          if (result.reason !== 'cancelled') notifySaveFailed(result.error)
+          if (result.reason !== 'cancelled') notifySaveFailed(result.reason, result.error)
           return false
         }
       } catch (err) {
-        notifySaveFailed(err instanceof Error ? err.message : undefined)
+        notifySaveFailed(undefined, err instanceof Error ? err.message : undefined)
         return false
       }
     },
@@ -211,11 +211,11 @@ const useProjectStore = create<ProjectState>()((set, get) => {
           })
           return true
         } else {
-          if (result.reason !== 'cancelled') notifySaveFailed(result.error)
+          if (result.reason !== 'cancelled') notifySaveFailed(result.reason, result.error)
           return false
         }
       } catch (err) {
-        notifySaveFailed(err instanceof Error ? err.message : undefined)
+        notifySaveFailed(undefined, err instanceof Error ? err.message : undefined)
         return false
       }
     },

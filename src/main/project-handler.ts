@@ -105,6 +105,7 @@ export async function saveProject(
     if (!validationResult.valid) {
       return {
         success: false,
+        reason: 'invalid',
         error: formatValidationErrors(validationResult.errors)
       }
     }

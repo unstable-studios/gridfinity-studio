@@ -1,7 +1,8 @@
 /**
  * Why an operation did not succeed, when it is not a plain failure.
  * - `cancelled`: the person dismissed the file dialog. Not an error.
- * - `invalid`: the file was read but is not a valid project.
+ * - `invalid`: the project data failed validation, on open (the file is not a
+ *   valid project) or on save (the project in memory is inconsistent).
  */
 export type FailureReason = 'cancelled' | 'invalid'
 
