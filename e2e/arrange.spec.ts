@@ -22,6 +22,7 @@ test('align pockets to each other and center one in its bin', async () => {
 
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.expectBinCount(1)
 
   // A bin is selected: nothing to align.
   await expect(page.getByRole('group', { name: 'Align' })).toHaveCount(0)
@@ -31,6 +32,7 @@ test('align pockets to each other and center one in its bin', async () => {
   const looseTo = { x: 880, y: 230 }
   await app.selectTool('Rect')
   await app.drag(looseFrom, looseTo)
+  await app.expectShapeCount(1)
   let saved = await app.save(file)
   const loose = saved.layoutSnapshot.shapes[0]
   const toScreen = mappingFromDrawnRect(loose, looseFrom, looseTo)
@@ -46,14 +48,15 @@ test('align pockets to each other and center one in its bin', async () => {
   const aTo = inBin(0.35, 0.3)
   await app.selectTool('Rect')
   await app.drag(aFrom, aTo)
+  await app.expectShapeCount(2)
   saved = await app.save(file)
   const aId = saved.layoutSnapshot.shapes.find((s) => s.id !== loose.id)!.id
   const aDrawn = shape(saved, aId)
   expect(aDrawn.groupId).toBe(bin.id)
 
   // One pocket in a bin: it can be centered, not pushed against an edge.
-  await expect(align('Align left')).toBeDisabled()
-  await expect(align('Align bottom')).toBeDisabled()
+  await expect(page.getByRole('group', { name: 'Align' }).getByRole('button')).toHaveCount(2)
+  await expect(align('Align left')).toHaveCount(0)
   await align('Center horizontally in bin').click()
   saved = await app.save(file)
   // A grouped shape's saved position is relative to the bin's center.
@@ -69,7 +72,6 @@ test('align pockets to each other and center one in its bin', async () => {
   saved = await app.save(file)
   expect(shape(saved, aId).x, 'undo keeps the horizontal centering').toBeCloseTo(0, 3)
   expect(shape(saved, aId).y, 'undo reverts the vertical centering').toBeCloseTo(aDrawn.y, 3)
-  await app.menu('Edit', /^Redo/)
 
   // Pocket B, lower right and a different size. Then select both.
   const bFrom = inBin(0.6, 0.65)
@@ -77,11 +79,15 @@ test('align pockets to each other and center one in its bin', async () => {
   await app.selectTool('Rect')
   await app.drag(bFrom, bTo)
   await app.expectShapeCount(3)
-  const aAt = inBin(0.5, 0.5)
+  // Where a pocket is on screen: its saved position is relative to the
+  // bin's center.
+  const screenOf = (s: SavedShape): Point =>
+    toScreen({ x: bin.x + bin.width / 2 + s.x, y: bin.y - bin.height / 2 + s.y })
+  const aAt = screenOf(shape(saved, aId))
   await page.keyboard.down('Shift')
   await page.mouse.click(aAt.x, aAt.y)
   await page.keyboard.up('Shift')
-  await expect(align('Align left')).toBeEnabled()
+  await expect(page.getByRole('group', { name: 'Align' }).getByRole('button')).toHaveCount(6)
 
   saved = await app.save(file)
   const bId = saved.layoutSnapshot.shapes.find((s) => s.id !== loose.id && s.id !== aId)!.id
@@ -109,6 +115,26 @@ test('align pockets to each other and center one in its bin', async () => {
   saved = await app.save(file)
   expect(shape(saved, bId).x, 'undo reverts align left').toBeCloseTo(before.b.x, 3)
   expect(top(shape(saved, aId)), 'and keeps align top').toBeCloseTo(top(shape(saved, bId)), 3)
+
+  // An align that moves both pockets is still one undo step. Undo cleared
+  // the selection, so select both again.
+  const start = { a: shape(saved, aId), b: shape(saved, bId) }
+  const aNow = screenOf(start.a)
+  const bNow = screenOf(start.b)
+  await page.mouse.click(aNow.x, aNow.y)
+  await page.keyboard.down('Shift')
+  await page.mouse.click(bNow.x, bNow.y)
+  await page.keyboard.up('Shift')
+  await align('Align horizontal centers').click()
+  saved = await app.save(file)
+  expect(shape(saved, aId).x, 'horizontal centers line up').toBeCloseTo(shape(saved, bId).x, 3)
+  expect(shape(saved, aId).x, 'pocket A moved').not.toBeCloseTo(start.a.x, 1)
+  expect(shape(saved, bId).x, 'pocket B moved').not.toBeCloseTo(start.b.x, 1)
+  await app.menu('Edit', /^Undo/)
+  saved = await app.save(file)
+  expect(shape(saved, aId).x, 'one undo puts pocket A back').toBeCloseTo(start.a.x, 3)
+  expect(shape(saved, bId).x, 'and pocket B').toBeCloseTo(start.b.x, 3)
+  expect(top(shape(saved, aId)), 'without undoing align top').toBeCloseTo(top(shape(saved, bId)), 3)
 
   expect(app.errors).toEqual([])
 })

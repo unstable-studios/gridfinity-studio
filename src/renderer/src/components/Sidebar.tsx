@@ -60,6 +60,14 @@ function LayoutSidebar(): React.JSX.Element {
     return shapes.find((s) => s.id === selectedIds[0]) ?? null
   }, [selectedIds, shapes])
 
+  // Which arrange buttons to offer. Follows shapes and groups so it is not
+  // measured again on every pan and zoom.
+  const arrange = useMemo(
+    () => (engine ? arrangeTarget(engine, selectedIds) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [engine, selectedIds, shapes, groups]
+  )
+
   const handleAddBin = (widthUnits: number, depthUnits: number): void => {
     if (!engine) return
     const id = crypto.randomUUID()
@@ -278,9 +286,9 @@ function LayoutSidebar(): React.JSX.Element {
         </SidebarSection>
       )}
 
-      {engine && arrangeTarget(engine, selectedIds) && (
+      {engine && arrange && (
         <SidebarSection title="Arrange">
-          <ArrangeControls engine={engine} selectedIds={selectedIds} />
+          <ArrangeControls engine={engine} selectedIds={selectedIds} target={arrange} />
         </SidebarSection>
       )}
 

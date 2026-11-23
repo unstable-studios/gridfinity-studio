@@ -493,14 +493,14 @@ export class KonvaEngine implements LayoutEngine {
   translateShapes(moves: ShapeMove[]): void {
     if (this.disposed) return
     this.batch(() => {
-      const moved: string[] = []
+      const moved = new Set<string>()
       for (const { id, dx, dy } of moves) {
         const node = this.konvaMap.get(id)
         if (!node || (dx === 0 && dy === 0)) continue
         // Bins are neither rotated nor scaled, so a world-space offset is the
         // same offset in a bin's local coordinates.
         node.position({ x: node.x() + dx, y: node.y() + dy })
-        moved.push(id)
+        moved.add(id)
       }
       // Reassign after every shape is in place, then report final positions.
       for (const id of moved) this.reassignByCentroid(id)
@@ -1014,18 +1014,12 @@ export class KonvaEngine implements LayoutEngine {
   /** Put a shape in the bin that contains its center, or in none. */
   private reassignByCentroid(shapeId: string): void {
     const data = this.shapeMap.get(shapeId)
-    const node = this.konvaMap.get(shapeId)
-    if (!data || !node) return
-
-    // Compute world-space centroid — use absolute position to handle grouped shapes
-    const absPos = node.getAbsolutePosition()
-    const stage = this.stage
-    if (!stage) return
-    // Convert from stage (screen) coordinates to world coordinates
-    const stagePos = stage.position()
-    const scale = stage.scaleX()
-    const worldX = (absPos.x - stagePos.x) / scale
-    const worldY = (absPos.y - stagePos.y) / scale
+    // The center of the shape as drawn. A path's own position is its origin,
+    // which can sit outside the shape.
+    const bounds = this.getShapeBounds(shapeId)
+    if (!data || !bounds) return
+    const worldX = (bounds.minX + bounds.maxX) / 2
+    const worldY = (bounds.minY + bounds.maxY) / 2
 
     // Find which bin contains the shape's centroid
     const targetBin = findContainingBinGroup(this.getAllGroups(), worldX, worldY)

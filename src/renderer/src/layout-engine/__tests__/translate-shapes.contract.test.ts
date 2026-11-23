@@ -173,6 +173,77 @@ describe('shape bounds and translateShapes', () => {
     expect(snapshotAtEvent[0]).toBe(JSON.stringify(engine.toSnapshot()))
   })
 
+  it('moves and reassigns the same way when the view is zoomed and panned', () => {
+    engine.createGroup(bin('a', 0))
+    engine.createGroup(bin('b', 200))
+    engine.addShape(rect('r', 40, 60))
+    engine.addToGroup('r', 'a')
+    engine.zoomTo(2.5)
+    engine.panTo(123, -45)
+
+    engine.translateShapes([{ id: 'r', dx: 200, dy: 10 }])
+    expect(engine.getShape('r')!.groupId).toBe('b')
+    expect(bounds('r')).toEqual([230, 65, 250, 75])
+
+    engine.translateShapes([{ id: 'r', dx: -100, dy: 0 }])
+    expect(engine.getShape('r')!.groupId).toBeNull()
+    expect(bounds('r')).toEqual([130, 65, 150, 75])
+    expect(engine.getShape('r')!.x).toBeCloseTo(140)
+    expect(engine.getShape('r')!.y).toBeCloseTo(70)
+  })
+
+  it('moves rotated shapes and polygons by the same world offset', () => {
+    engine.addShape({ ...rect('r', 40, 60), rotation: 90 })
+    engine.addShape({
+      ...base,
+      id: 'p',
+      type: 'polygon',
+      x: 100,
+      y: 100,
+      points: [
+        { x: -20, y: -10 },
+        { x: 20, y: -5 },
+        { x: -10, y: 10 }
+      ]
+    })
+    engine.translateShapes([
+      { id: 'r', dx: 7, dy: -3 },
+      { id: 'p', dx: -10, dy: 20 }
+    ])
+    expect(bounds('r')).toEqual([42, 47, 52, 67])
+    expect(bounds('p')).toEqual([70, 110, 110, 130])
+  })
+
+  it('assigns by the center of the shape as drawn, not the path origin', () => {
+    engine.createGroup(bin('bin', 0))
+    // The path's origin (150, 50) is outside the bin; what it draws,
+    // x 50..70, is inside.
+    engine.addShape({
+      ...base,
+      id: 'path',
+      type: 'svgPath',
+      x: 150,
+      y: 50,
+      pathData: 'M -100 -10 L -80 -10 L -80 10 L -100 10 Z'
+    })
+    expect(engine.getShape('path')!.groupId).toBeNull()
+
+    engine.translateShapes([{ id: 'path', dx: 0, dy: 5 }])
+    expect(engine.getShape('path')!.groupId).toBe('bin')
+  })
+
+  it('applies every move for an id that is listed more than once, and reports it once', () => {
+    engine.addShape(rect('r', 40, 60))
+    const moved: string[] = []
+    engine.on('shapeMoved', (e) => moved.push(e.id))
+    engine.translateShapes([
+      { id: 'r', dx: 5, dy: 0 },
+      { id: 'r', dx: 5, dy: 2 }
+    ])
+    expect(bounds('r')).toEqual([40, 57, 60, 67])
+    expect(moved).toEqual(['r'])
+  })
+
   it('does nothing for an empty list', () => {
     const seen: string[] = []
     engine.on('shapeMoved', () => seen.push('moved'))
