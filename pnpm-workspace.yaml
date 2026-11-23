@@ -5,3 +5,4 @@ allowBuilds:
   electron-winstaller: true
   esbuild: true
   sharp: true
+autoInstallPeers: false

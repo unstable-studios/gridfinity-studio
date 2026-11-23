@@ -40,8 +40,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
   private deps: KonvaGroupRendererDeps
   private onMoved: (id: string, x: number, y: number) => void
   private onResized:
-    | ((id: string, x: number, y: number, width: number, height: number) => void)
-    | null = null
+    ((id: string, x: number, y: number, width: number, height: number) => void) | null = null
   private onCollisionRejected: ((id: string, reason: 'move' | 'resize') => void) | null = null
 
   /** Last known non-colliding centroid during drag, for live collision prevention. */
