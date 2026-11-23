@@ -1,12 +1,14 @@
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
 import { useTheme } from '@unstable-studios/ui'
 import { resolveColors, type CanvasThemeColors } from '@/lib/theme-config'
 import type { BakeResult } from '@/hooks/useProject'
-import { useLayoutEngine, useEngineState } from '@/layout-engine'
+import { useLayoutEngine, useLayoutEngineContext, useEngineState } from '@/layout-engine'
+import { boundsKey, frameBounds } from '@/lib/camera-framing'
+import type { Bounds3 } from '@/lib/camera-framing'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
@@ -16,6 +18,71 @@ interface BakedMeshData {
   colors: Float32Array
   indices: Uint32Array
   normals: Float32Array
+}
+
+interface BinPlacement {
+  id: string
+  mesh: BakedMeshData
+  /** Bin centroid in the scene (x, 0, z). */
+  position: [number, number, number]
+  width: number
+  depth: number
+}
+
+interface SavedCamera {
+  /** Layout the camera was saved for; see `boundsKey`. */
+  layoutKey: string | null
+  pos: [number, number, number]
+  target: [number, number, number]
+}
+
+const MAX_CAMERA_DISTANCE = 2000
+// Beyond the furthest orbit plus the floor, so zooming out never clips.
+const CAMERA_FAR = 10000
+const FLOOR_SIZE = 4000
+const FOG_NEAR = 500
+
+function readSavedCamera(): SavedCamera | null {
+  try {
+    const raw = sessionStorage.getItem(CAMERA_KEY)
+    return raw ? (JSON.parse(raw) as SavedCamera) : null
+  } catch {
+    return null
+  }
+}
+
+const meshHeights = new WeakMap<Float32Array, number>()
+
+/**
+ * Height of a baked mesh. Meshes are built z-up and rotated onto the floor,
+ * so mesh z is height. Cached per vertex buffer: bounds are recomputed on
+ * every engine change, and a bake result's buffer never changes.
+ */
+function meshHeight(positions: Float32Array): number {
+  let height = meshHeights.get(positions)
+  if (height === undefined) {
+    height = 0
+    for (let i = 2; i < positions.length; i += 3) {
+      if (positions[i] > height) height = positions[i]
+    }
+    meshHeights.set(positions, height)
+  }
+  return height
+}
+
+/** Bounding box of every placed bin, in scene coordinates. */
+function sceneBounds(placements: BinPlacement[]): Bounds3 | null {
+  if (placements.length === 0) return null
+  const min: [number, number, number] = [Infinity, 0, Infinity]
+  const max: [number, number, number] = [-Infinity, 0, -Infinity]
+  for (const { mesh, position, width, depth } of placements) {
+    min[0] = Math.min(min[0], position[0] - width / 2)
+    max[0] = Math.max(max[0], position[0] + width / 2)
+    min[2] = Math.min(min[2], position[2] - depth / 2)
+    max[2] = Math.max(max[2], position[2] + depth / 2)
+    max[1] = Math.max(max[1], meshHeight(mesh.positions))
+  }
+  return { min, max }
 }
 
 interface ReviewCanvasProps {
@@ -38,6 +105,41 @@ function ReviewScene({
   colors
 }: SceneProps): React.JSX.Element {
   const controlsRef = useRef<OrbitControlsImpl>(null)
+  const engine = useLayoutEngine()
+  const { sidebarRef } = useLayoutEngineContext()
+  const { tick } = useEngineState()
+  const camera = useThree((state) => state.camera)
+  const size = useThree((state) => state.size)
+  const gl = useThree((state) => state.gl)
+
+  // Each bin's mesh is centered on its own origin; place it at the bin's
+  // layout position so the 3D scene mirrors the 2D layout. Group positions
+  // are re-read from the engine (gated on `tick`) so a bin moved in Design
+  // shows in its new place on the next switch to Preview.
+  const placements = useMemo(() => {
+    const out: BinPlacement[] = []
+    for (const [binId, result] of bakeResults) {
+      const group = engine?.getGroup(binId)
+      if (!group) continue
+      // Editor lower-left (x, y) → centroid (x + w/2, y - h/2). Editor +y is
+      // screen-down; mapping it to +z keeps the arrangement (down in 2D =
+      // toward the viewer in 3D).
+      out.push({
+        id: binId,
+        mesh: result.mesh,
+        position: [group.x + group.width / 2, 0, group.y - group.height / 2],
+        width: group.width,
+        depth: group.height
+      })
+    }
+    return out
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bakeResults, engine, tick])
+
+  const bounds = useMemo(() => sceneBounds(placements), [placements])
+  const layoutKey = bounds ? boundsKey(bounds) : null
+  // The layout the camera was last framed or restored for.
+  const framedKeyRef = useRef<string | null>(null)
 
   const saveCamera = (): void => {
     if (!controlsRef.current) return
@@ -46,32 +148,76 @@ function ReviewScene({
     sessionStorage.setItem(
       CAMERA_KEY,
       JSON.stringify({
+        layoutKey: framedKeyRef.current,
         pos: [cam.position.x, cam.position.y, cam.position.z],
         target: [target.x, target.y, target.z]
-      })
+      } satisfies SavedCamera)
     )
   }
 
-  // Restore orbit target after controls mount
+  // Shift the projection so the scene centers in the area the sidebar does
+  // not cover, instead of the middle of the whole canvas.
+  // Width of the canvas the sidebar covers. Kept in state for the view
+  // offset, and measured directly where an effect needs it before the state
+  // has caught up (the first framing).
+  const measureSidebarInset = useCallback((): number => {
+    const sidebar = sidebarRef.current
+    if (!sidebar) return 0
+    return Math.max(
+      0,
+      sidebar.getBoundingClientRect().right - gl.domElement.getBoundingClientRect().left
+    )
+  }, [sidebarRef, gl])
+  const [sidebarInset, setSidebarInset] = useState(0)
   useEffect(() => {
-    const raw = sessionStorage.getItem(CAMERA_KEY)
-    if (!raw || !controlsRef.current) return
-    try {
-      const saved = JSON.parse(raw) as {
-        pos: [number, number, number]
-        target: [number, number, number]
-      }
-      controlsRef.current.object.position.set(...saved.pos)
-      controlsRef.current.target.set(...saved.target)
-      controlsRef.current.update()
-      console.log('[ReviewCanvas] camera restored from session')
-    } catch {
-      console.warn('[ReviewCanvas] failed to restore camera state')
+    const sidebar = sidebarRef.current
+    if (!sidebar) return
+    const measure = (): void => setSidebarInset(measureSidebarInset())
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(sidebar)
+    return () => observer.disconnect()
+  }, [sidebarRef, measureSidebarInset, size.width, size.height])
+
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera) || size.width === 0) return
+    camera.setViewOffset(size.width, size.height, -sidebarInset / 2, 0, size.width, size.height)
+    camera.updateProjectionMatrix()
+  }, [camera, size.width, size.height, sidebarInset])
+
+  // Frame the bins whenever the layout changes. A camera the person orbited
+  // to is kept for as long as the layout it was saved for is unchanged.
+  useEffect(() => {
+    const controls = controlsRef.current
+    if (!bounds || !layoutKey || !controls || size.width === 0) return
+    if (framedKeyRef.current === layoutKey) return
+    if (!(camera instanceof THREE.PerspectiveCamera)) return
+    framedKeyRef.current = layoutKey
+
+    const saved = readSavedCamera()
+    if (saved && saved.layoutKey === layoutKey) {
+      camera.position.set(...saved.pos)
+      controls.target.set(...saved.target)
+    } else {
+      const visibleAspect = Math.max(size.width - measureSidebarInset(), 1) / size.height
+      const frame = frameBounds(bounds, camera.fov, visibleAspect)
+      camera.position.set(...frame.position)
+      controls.target.set(...frame.target)
     }
-  }, [])
+    controls.update()
+  }, [bounds, layoutKey, camera, size.width, size.height, measureSidebarInset])
+
+  // Fog fades the floor into the background. Keep it well behind the model
+  // so a large layout, framed from further away, is not fogged itself.
+  const fogNear = bounds ? Math.max(FOG_NEAR, frameBounds(bounds, 50, 1).distance * 2) : FOG_NEAR
+
+  const floorCenter = bounds
+    ? ([(bounds.min[0] + bounds.max[0]) / 2, (bounds.min[2] + bounds.max[2]) / 2] as const)
+    : ([0, 0] as const)
 
   return (
     <>
+      <fog attach="fog" args={[colors.reviewFog, fogNear, fogNear * 1.8]} />
       <ambientLight intensity={0.8} />
       <directionalLight
         position={[6, 10, 6]}
@@ -91,13 +237,13 @@ function ReviewScene({
         makeDefault
         onEnd={saveCamera}
         minDistance={5}
-        maxDistance={500}
+        maxDistance={MAX_CAMERA_DISTANCE}
         maxPolarAngle={Math.PI * 0.85}
       />
 
       {bakeResults.size > 0 ? (
         <BakedBins
-          bakeResults={bakeResults}
+          placements={placements}
           debugColors={debugColors}
           wireframe={wireframe}
           meshColor={colors.meshColor}
@@ -106,55 +252,29 @@ function ReviewScene({
         <EmptyState color={colors.emptyState} />
       )}
 
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} receiveShadow>
-        <planeGeometry args={[200, 200]} />
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[floorCenter[0], -0.1, floorCenter[1]]}
+        receiveShadow
+      >
+        <planeGeometry args={[FLOOR_SIZE, FLOOR_SIZE]} />
         <meshStandardMaterial color={colors.reviewFloor} roughness={1} />
       </mesh>
     </>
   )
 }
 
-/**
- * Lays out each baked bin in 3D at the same position as its 2D layout — so
- * the Preview matches what the user designed in Layout mode. Without this,
- * every bin's mesh renders at (0, 0, 0) and they all stack.
- *
- * We re-read group positions from the engine (gated on `tick`) rather than
- * caching per-bake, so moving a bin in Layout mode is reflected on the next
- * Preview switch.
- */
 function BakedBins({
-  bakeResults,
+  placements,
   debugColors,
   wireframe,
   meshColor
 }: {
-  bakeResults: Map<string, BakeResult>
+  placements: BinPlacement[]
   debugColors: boolean
   wireframe: boolean
   meshColor: string
 }): React.JSX.Element {
-  const engine = useLayoutEngine()
-  const { tick } = useEngineState()
-
-  const placements = useMemo(() => {
-    const out: Array<{ id: string; mesh: BakedMeshData; position: [number, number, number] }> = []
-    for (const [binId, result] of bakeResults) {
-      const group = engine?.getGroup(binId)
-      if (!group) continue
-      // Editor lower-left (x, y) → centroid (x + w/2, y - h/2).
-      // 3D scene: place each bin's CSG-centered mesh at this centroid in
-      // the XZ plane so the 3D layout mirrors the 2D layout. Editor +y is
-      // screen-down; mapping straight to +z in 3D keeps the relative
-      // arrangement intact (downward in 2D = away in 3D).
-      const cx = group.x + group.width / 2
-      const cz = group.y - group.height / 2
-      out.push({ id: binId, mesh: result.mesh, position: [cx, 0, cz] })
-    }
-    return out
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bakeResults, engine, tick])
-
   return (
     <>
       {placements.map(({ id, mesh, position }) => (
@@ -239,14 +359,13 @@ export default function ReviewCanvas({
   return (
     <Canvas
       shadows={{ type: THREE.PCFShadowMap }}
-      camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: 2000 }}
+      camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: CAMERA_FAR }}
       dpr={[1, 1.75]}
       style={{ width: '100%', height: '100%' }}
       gl={{ antialias: true }}
     >
       <Suspense fallback={null}>
         <color attach="background" args={[colors.reviewBg]} />
-        <fog attach="fog" args={[colors.reviewFog, 500, 900]} />
         <ReviewScene
           bakeResults={bakeResults}
           baseUnit={baseUnit}
