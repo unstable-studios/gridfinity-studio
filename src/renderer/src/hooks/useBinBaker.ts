@@ -10,10 +10,12 @@
  * - Per-bin in-flight tracking with explicit `bakeStatus` (idle/baking/ready/
  *   error) so the UI can distinguish "stale-but-rebaking" from "ready".
  * - If a mutation lands during a bake, the in-flight bake completes and a
- *   follow-up bake is chained immediately on resolve (no edits dropped).
+ *   follow-up bake starts as soon as it settles, whether it succeeded or
+ *   failed (no edits dropped). `BakeQueue` owns that bookkeeping.
  * - On bake failure, status becomes 'error' so UI can surface it and disable
  *   export.
- * - Cleans up stale results when bins are deleted.
+ * - Cleans up results when bins are deleted, and ignores a bake that was
+ *   still running for a deleted bin.
  * - `enabled` gates new bakes — caller passes `mode === 'review'` so we don't
  *   burn CPU baking while the user is editing in Layout mode.
  */
@@ -22,6 +24,8 @@ import { useLayoutEngine, useEngineState } from '@/layout-engine'
 import { isBinGroup } from '@/layout-engine/types'
 import type { LayoutGroup, LayoutShape, BinMetadata } from '@/layout-engine/types'
 import { useGeometryWorker } from './useGeometryWorker'
+import type { BakePocketsResult } from './useGeometryWorker'
+import { BakeQueue } from '@/lib/bake-queue'
 import { useProject } from './useProject'
 import type { CSGBinParams, PocketSpec } from '../../../shared/types/worker'
 import type { GridfinityConfig } from '../../../shared/types/project'
@@ -147,128 +151,71 @@ function buildBinParams(
 }
 
 /**
- * Group child shapes by their `groupId` once, instead of running an
- * O(shapes) filter per bin every time the loop fires.
- */
-function indexShapesByGroup(shapes: LayoutShape[]): Map<string, LayoutShape[]> {
-  const idx = new Map<string, LayoutShape[]>()
-  for (const s of shapes) {
-    if (!s.groupId) continue
-    const list = idx.get(s.groupId)
-    if (list) list.push(s)
-    else idx.set(s.groupId, [s])
-  }
-  return idx
-}
-
-/**
  * Mounts the bake loop. Returns nothing — it's a side-effect hook.
  */
 export function useBinBaker(enabled: boolean): void {
   const engine = useLayoutEngine()
   const { tick } = useEngineState()
   const { ready, bakePockets } = useGeometryWorker()
-  const project = useProject((s) => s.project)
-  const setBakeResult = useProject((s) => s.setBakeResult)
-  const setBakeStatus = useProject((s) => s.setBakeStatus)
+  const gridfinity = useProject((s) => s.project?.gridfinity)
 
-  // Bin IDs whose latest dispatched bake hasn't resolved yet.
-  const inFlightRef = useRef<Set<string>>(new Set())
-  // Bin IDs that received a mutation while in-flight; rebaked on completion.
-  const queuedRef = useRef<Set<string>>(new Set())
   // Bin IDs we've previously baked, to detect deletions.
   const lastSeenBinIdsRef = useRef<Set<string>>(new Set())
-  // Stable refs to the bake function and store setters so the closure inside
-  // the in-flight resolution path doesn't capture stale values. Synced via
-  // useEffect (rather than during render) so the new react-hooks/refs rule
-  // is satisfied; the resolver runs asynchronously, so the small delay
-  // before refs update post-commit is fine.
-  const bakePocketsRef = useRef(bakePockets)
-  const setBakeResultRef = useRef(setBakeResult)
-  const setBakeStatusRef = useRef(setBakeStatus)
+  const queueRef = useRef<BakeQueue<BakePocketsResult> | null>(null)
 
   useEffect(() => {
-    bakePocketsRef.current = bakePockets
-    setBakeResultRef.current = setBakeResult
-    setBakeStatusRef.current = setBakeStatus
-  })
+    if (!engine) return
+    queueRef.current = new BakeQueue<BakePocketsResult>({
+      // Reads the engine and settings when the bake starts: a queued bake can
+      // start long after the edit that requested it.
+      bake: (binId) => {
+        const bin = engine.getGroup(binId)
+        if (!bin || !isBinGroup(bin)) return null
+        const childShapes = engine.getAllShapes().filter((s) => s.groupId === binId)
+        const config = useProject.getState().project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
+        return bakePockets(buildBinParams(bin, childShapes, config))
+      },
+      onStart: (binId) => useProject.getState().setBakeStatus(binId, 'baking'),
+      onDone: (binId, result) => {
+        const { setBakeResult, setBakeStatus } = useProject.getState()
+        setBakeResult(binId, { mesh: result, timestamp: Date.now(), warnings: result.warnings })
+        setBakeStatus(binId, 'ready')
+      },
+      onError: (binId, err) => {
+        useProject.getState().setBakeStatus(binId, 'error')
+        console.error(`[useBinBaker] bake failed for ${binId}:`, err)
+      }
+    })
+    return () => {
+      queueRef.current = null
+    }
+  }, [engine, bakePockets])
 
   useEffect(() => {
     if (!engine || !ready || !enabled) return
 
     const handle = setTimeout(() => {
-      const groups = engine.getAllGroups()
-      const allShapes = engine.getAllShapes()
-      const config = project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
-      const shapesByGroup = indexShapesByGroup(allShapes)
-
+      const queue = queueRef.current
+      if (!queue) return
       const liveBinIds = new Set<string>()
-
-      for (const group of groups) {
+      for (const group of engine.getAllGroups()) {
         if (!isBinGroup(group)) continue
         liveBinIds.add(group.id)
-
-        if (inFlightRef.current.has(group.id)) {
-          // Mark for follow-up rebake; the in-flight resolver will pick it up.
-          queuedRef.current.add(group.id)
-          continue
-        }
-
-        scheduleBake(group, shapesByGroup.get(group.id) ?? [], config)
+        queue.request(group.id)
       }
 
       // Drop bake state for bins that no longer exist
+      const { setBakeResult, setBakeStatus } = useProject.getState()
       for (const id of lastSeenBinIdsRef.current) {
         if (!liveBinIds.has(id)) {
-          setBakeResultRef.current(id, null)
-          setBakeStatusRef.current(id, null)
-          inFlightRef.current.delete(id)
-          queuedRef.current.delete(id)
+          queue.forget(id)
+          setBakeResult(id, null)
+          setBakeStatus(id, null)
         }
       }
       lastSeenBinIdsRef.current = liveBinIds
     }, DEBOUNCE_MS)
 
     return () => clearTimeout(handle)
-
-    function scheduleBake(
-      bin: LayoutGroup & { metadata: BinMetadata },
-      childShapes: LayoutShape[],
-      cfg: GridfinityConfig
-    ): void {
-      const binId = bin.id
-      const params = buildBinParams(bin, childShapes, cfg)
-      inFlightRef.current.add(binId)
-      setBakeStatusRef.current(binId, 'baking')
-
-      bakePocketsRef
-        .current(params)
-        .then((result) => {
-          inFlightRef.current.delete(binId)
-          setBakeResultRef.current(binId, {
-            mesh: result,
-            timestamp: Date.now(),
-            warnings: result.warnings
-          })
-          setBakeStatusRef.current(binId, 'ready')
-          // If the bin was edited while we were baking, rebake immediately
-          // with the latest engine state. Otherwise the edit would only get
-          // picked up on the next unrelated tick.
-          if (queuedRef.current.delete(binId) && engine) {
-            const next = engine.getGroup(binId)
-            if (next && isBinGroup(next)) {
-              const nextShapes = engine.getAllShapes().filter((s) => s.groupId === binId)
-              scheduleBake(next, nextShapes, cfg)
-            }
-          }
-        })
-        .catch((err) => {
-          inFlightRef.current.delete(binId)
-          queuedRef.current.delete(binId)
-          setBakeStatusRef.current(binId, 'error')
-
-          console.error(`[useBinBaker] bake failed for ${binId}:`, err)
-        })
-    }
-  }, [tick, engine, ready, enabled, project?.gridfinity])
+  }, [tick, engine, ready, enabled, gridfinity])
 }
