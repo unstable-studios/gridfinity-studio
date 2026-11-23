@@ -49,7 +49,7 @@ jobs:
             pnpm exec commitlint --from "${{ github.event.before }}" --to "${{ github.sha }}"
           fi
 
-  # Lint, typecheck, test run in parallel; build runs after them
+  # Lint, typecheck, test, e2e run in parallel; build runs after them
   lint:
     name: Lint
     if: "!startsWith(github.head_ref || '', 'release-please') && github.actor != 'release-please[bot]'"
@@ -101,10 +101,39 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - run: pnpm test
 
+  e2e:
+    name: End-to-end
+    if: "!startsWith(github.head_ref || '', 'release-please') && github.actor != 'release-please[bot]'"
+    runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: https://npm.pkg.github.com
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Ubuntu 24.04 blocks the unprivileged user namespaces Chromium's
+      # sandbox needs; allow them for this job.
+      - name: Allow Chromium sandbox
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 || true
+      - name: Run smoke suite
+        run: xvfb-run --auto-servernum pnpm test:e2e
+      - name: Upload results
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-results
+          path: e2e/.results
+          retention-days: 7
+
   build:
     name: Build
     if: "!startsWith(github.head_ref || '', 'release-please') && github.actor != 'release-please[bot]'"
-    needs: [commitlint, typecheck, lint, test]
+    needs: [commitlint, typecheck, lint, test, e2e]
     runs-on: ${{ vars.RUNS_ON || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v6

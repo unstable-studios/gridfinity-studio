@@ -114,6 +114,9 @@ pnpm typecheck
 # Run tests
 pnpm test
 
+# Run everything CI runs, including the end-to-end smoke suite
+pnpm verify
+
 # Format code
 pnpm format
 
