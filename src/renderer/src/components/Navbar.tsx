@@ -24,6 +24,7 @@ import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
+import { MOD_KEY } from '@/lib/platform'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import type { UpdateState } from '../../../shared/types/updates'
 import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
@@ -41,7 +42,7 @@ const GITHUB_REPO = 'https://github.com/unstable-studios/gridfinity-studio'
 
 function useProjectName(): string {
   const filePath = useProject((s) => s.filePath)
-  if (!filePath) return 'Untitled Project'
+  if (!filePath) return 'Untitled project'
   const fileName = filePath.split(/[\\/]/).pop() ?? filePath
   return fileName.replace(/\.gfstudio$/i, '')
 }
@@ -92,7 +93,7 @@ export default function Navbar(): React.JSX.Element {
               type="button"
               onClick={() => void saveProject()}
               className="ml-2 px-2 py-0.5 text-[10px] font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition"
-              title="Save changes (Cmd+S)"
+              title={`Save (${MOD_KEY}+S)`}
             >
               Unsaved
             </button>
@@ -199,15 +200,15 @@ function AppMenubar({
         <MenubarTrigger>File</MenubarTrigger>
         <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
           <MenubarItem onSelect={onNewProject}>
-            New Project
-            <MenubarShortcut>Cmd+N</MenubarShortcut>
+            New project
+            <MenubarShortcut>{MOD_KEY}+N</MenubarShortcut>
           </MenubarItem>
           <MenubarItem onSelect={() => void loadProject()}>
-            Open Project
-            <MenubarShortcut>Cmd+O</MenubarShortcut>
+            Open project…
+            <MenubarShortcut>{MOD_KEY}+O</MenubarShortcut>
           </MenubarItem>
           <MenubarSub>
-            <MenubarSubTrigger>Open Recent</MenubarSubTrigger>
+            <MenubarSubTrigger>Open recent</MenubarSubTrigger>
             <MenubarSubContent>
               {recentProjects.length === 0 ? (
                 <MenubarItem disabled>No recent projects</MenubarItem>
@@ -223,19 +224,19 @@ function AppMenubar({
           <MenubarSeparator />
           <MenubarItem disabled={!hasProject} onSelect={() => void saveProject()}>
             Save
-            <MenubarShortcut>Cmd+S</MenubarShortcut>
+            <MenubarShortcut>{MOD_KEY}+S</MenubarShortcut>
           </MenubarItem>
           <MenubarItem disabled={!hasProject} onSelect={() => void saveProjectAs()}>
-            Save As...
-            <MenubarShortcut>Cmd+Shift+S</MenubarShortcut>
+            Save as…
+            <MenubarShortcut>{MOD_KEY}+Shift+S</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem disabled>Import...</MenubarItem>
+          <MenubarItem disabled>Import…</MenubarItem>
           <MenubarSub>
             <MenubarSubTrigger disabled={!allReady}>Export</MenubarSubTrigger>
             <MenubarSubContent>
-              <MenubarItem onSelect={() => void handleExportSTL()}>STL...</MenubarItem>
-              <MenubarItem onSelect={() => void handleExport3MF()}>3MF...</MenubarItem>
+              <MenubarItem onSelect={() => void handleExportSTL()}>STL…</MenubarItem>
+              <MenubarItem onSelect={() => void handleExport3MF()}>3MF…</MenubarItem>
             </MenubarSubContent>
           </MenubarSub>
         </MenubarContent>
@@ -247,21 +248,21 @@ function AppMenubar({
         <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
           <MenubarItem disabled={!canUndo} onSelect={undo}>
             Undo
-            <MenubarShortcut>Cmd+Z</MenubarShortcut>
+            <MenubarShortcut>{MOD_KEY}+Z</MenubarShortcut>
           </MenubarItem>
           <MenubarItem disabled={!canRedo} onSelect={redo}>
             Redo
-            <MenubarShortcut>Cmd+Shift+Z</MenubarShortcut>
+            <MenubarShortcut>{MOD_KEY}+Shift+Z</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem disabled>Cut</MenubarItem>
           <MenubarItem disabled>Copy</MenubarItem>
           <MenubarItem disabled>Paste</MenubarItem>
-          <MenubarItem disabled>Select All</MenubarItem>
+          <MenubarItem disabled>Select all</MenubarItem>
           <MenubarSeparator />
           <MenubarItem onSelect={onOpenPreferences}>
-            Preferences...
-            <MenubarShortcut>Cmd+,</MenubarShortcut>
+            Preferences…
+            <MenubarShortcut>{MOD_KEY}+,</MenubarShortcut>
           </MenubarItem>
         </MenubarContent>
       </MenubarMenu>
@@ -277,7 +278,7 @@ function AppMenubar({
             Documentation
           </MenubarItem>
           <MenubarItem onSelect={() => window.open(`${GITHUB_REPO}/issues/new`, '_blank')}>
-            Report a Bug
+            Report a bug
           </MenubarItem>
           <MenubarSeparator />
           <MenubarItem disabled className="opacity-80 cursor-default">
@@ -369,7 +370,7 @@ function badgeStyle(state: UpdateState): { color: string; srLabel: string } | nu
     case 'downloaded':
       return { color: 'bg-green-500', srLabel: 'Update ready to install' }
     case 'error':
-      return { color: 'bg-red-500', srLabel: 'Update check failed' }
+      return { color: 'bg-red-500', srLabel: 'Update failed' }
     default:
       return null
   }
@@ -427,7 +428,7 @@ function UpdateStatusMenuItem({
         }}
         className="text-xs text-green-600 dark:text-green-400 font-medium"
       >
-        v{state.version} ready — Restart to apply
+        Restart to update to v{state.version}
       </MenubarItem>
     )
   }
@@ -435,7 +436,7 @@ function UpdateStatusMenuItem({
   // error
   return (
     <MenubarItem disabled className="opacity-70 cursor-default text-xs text-red-500">
-      Update check failed
+      Update failed
     </MenubarItem>
   )
 }

@@ -121,7 +121,7 @@ export async function saveProject(
     let targetPath = filePath
     if (!targetPath) {
       const result = await dialog.showSaveDialog({
-        title: 'Save Project',
+        title: 'Save project',
         defaultPath: suggestedPath ?? `${projectData.settings.name}.gfstudio`,
         filters: [
           { name: 'Gridfinity Studio Project', extensions: ['gfstudio'] },
@@ -177,7 +177,7 @@ export async function loadProject(
     let targetPath = filePath
     if (!targetPath) {
       const result = await dialog.showOpenDialog({
-        title: 'Open Project',
+        title: 'Open project',
         filters: [
           { name: 'Gridfinity Studio Project', extensions: ['gfstudio'] },
           { name: 'JSON Files', extensions: ['json'] },

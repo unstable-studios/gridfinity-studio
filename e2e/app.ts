@@ -114,7 +114,7 @@ export class StudioApp {
   /** Save the project to `filePath` and return what was written. */
   async save(filePath: string): Promise<SavedProject> {
     await this.stubSaveDialog(filePath)
-    await this.menu('File', /^Save\b(?! As)/)
+    await this.menu('File', /^Save(?! as)/)
     await expect(this.page.getByText('Unsaved', { exact: true })).toHaveCount(0)
     return JSON.parse(await readFile(filePath, 'utf8')) as SavedProject
   }

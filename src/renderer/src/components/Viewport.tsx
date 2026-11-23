@@ -15,8 +15,7 @@ import type { UndoRedoDebugState } from '@/layout-engine/useEngineUndoRedo'
 import DrawingToolLayer from './DrawingToolLayer'
 import ShapeTooltip from './ShapeTooltip'
 import HintCard from './HintCard'
-
-const MOD_KEY = navigator.platform.includes('Mac') ? '⌘' : 'Ctrl'
+import { MOD_KEY } from '@/lib/platform'
 
 // ─── Layout Mode (engine-powered) ──────────────────────────────────────────
 

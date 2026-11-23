@@ -204,7 +204,7 @@ export function depthToOpacity(
 
 export const DEFAULT_GRIDFINITY_CONFIG: GridfinityConfig = GRIDFINITY_PRESETS.standard
 
-export function createEmptyProject(name: string = 'Untitled Project'): ProjectData {
+export function createEmptyProject(name: string = 'Untitled project'): ProjectData {
   const now = new Date().toISOString()
 
   return {

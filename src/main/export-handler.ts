@@ -85,7 +85,7 @@ export async function exportBatch(
   files: BatchExportFile[]
 ): Promise<BatchExportResult> {
   const result = await dialog.showOpenDialog(win, {
-    title: 'Select Export Directory',
+    title: 'Choose export folder',
     properties: ['openDirectory', 'createDirectory']
   })
 

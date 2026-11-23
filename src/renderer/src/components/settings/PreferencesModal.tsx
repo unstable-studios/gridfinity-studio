@@ -94,7 +94,7 @@ function UnitsTab(): React.JSX.Element {
     <div className="space-y-4">
       <div>
         <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Display Unit
+          Display unit
         </label>
         <ToggleGroup
           type="single"
@@ -131,13 +131,13 @@ function GridfinityTab(): React.JSX.Element {
 }
 
 const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
-  layoutBg: 'Design Background',
-  layoutGrid: 'Design Grid',
-  reviewBg: 'Preview Background',
-  reviewFloor: 'Preview Floor',
-  reviewFog: 'Preview Fog',
-  meshColor: 'Mesh Color',
-  emptyState: 'Empty State'
+  layoutBg: 'Design background',
+  layoutGrid: 'Design grid',
+  reviewBg: 'Preview background',
+  reviewFloor: 'Preview floor',
+  reviewFog: 'Preview fog',
+  meshColor: 'Model color',
+  emptyState: 'Empty state'
 }
 
 function ColorSection({

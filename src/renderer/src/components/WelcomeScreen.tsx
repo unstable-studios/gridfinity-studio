@@ -17,23 +17,23 @@ export default function WelcomeScreen(): React.JSX.Element {
           <StudioLogo className="h-16 w-auto" />
           <h1 className="text-2xl font-bold tracking-tight">Gridfinity Studio</h1>
           <p className="text-sm text-zinc-500 text-center">
-            Design custom Gridfinity storage bins with 2D layout, 3D preview, and STL export.
+            Design Gridfinity bins and export them for printing.
           </p>
         </div>
 
         <div className="flex flex-col gap-2 w-full">
           <Button className="w-full" onClick={() => createNewProject()}>
-            New Project
+            New project
           </Button>
           <Button variant="outline" className="w-full" onClick={() => void loadProject()}>
-            Open Project
+            Open project
           </Button>
         </div>
 
         {recentProjects.length > 0 && (
           <div className="w-full">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-2">
-              Recent Projects
+              Recent projects
             </p>
             <div className="space-y-1">
               {recentProjects.map((filePath) => (

@@ -135,7 +135,7 @@ function LayoutSidebar(): React.JSX.Element {
       <ProjectNameHeader />
 
       {/* Bin creation */}
-      <SidebarSection title="Add Bin">
+      <SidebarSection title="Add bin">
         <GridPicker width={1} depth={1} onChange={handleAddBin} />
       </SidebarSection>
 
@@ -198,7 +198,7 @@ function LayoutSidebar(): React.JSX.Element {
 
       {/* Selected bin properties */}
       {selectedGroup && isBinGroup(selectedGroup) && (
-        <SidebarSection title="Bin Properties">
+        <SidebarSection title="Bin properties">
           <div className="space-y-2 text-xs">
             <GridPicker
               width={selectedGroup.metadata.widthUnits}
@@ -251,7 +251,7 @@ function LayoutSidebar(): React.JSX.Element {
 
       {/* Selected shape properties */}
       {selectedShape && (
-        <SidebarSection title="Shape Properties">
+        <SidebarSection title="Shape properties">
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-zinc-500">Type</span>
@@ -283,7 +283,7 @@ function LayoutSidebar(): React.JSX.Element {
           className="w-full text-red-500 border-red-500/30 hover:bg-red-500/10"
           onClick={handleDeleteSelected}
         >
-          Delete Selected
+          Delete selected
         </Button>
       )}
     </div>
@@ -301,12 +301,12 @@ function PreviewSidebar(): React.JSX.Element {
   const export3MF = useProject((s) => s.export3MF)
   const filePath = useProject((s) => s.filePath)
   const projectName = useMemo(() => {
-    if (!filePath) return 'Untitled Project'
+    if (!filePath) return 'Untitled project'
     return (
       filePath
         .split(/[\\/]/)
         .pop()
-        ?.replace(/\.gfstudio$/i, '') ?? 'Untitled Project'
+        ?.replace(/\.gfstudio$/i, '') ?? 'Untitled project'
     )
   }, [filePath])
 
@@ -341,7 +341,7 @@ function PreviewSidebar(): React.JSX.Element {
 
       <SidebarSection title={`Bins (${totalBins})`}>
         {totalBins === 0 ? (
-          <p className="text-xs text-zinc-500">Switch to Design mode and add a bin to start.</p>
+          <p className="text-xs text-zinc-500">No bins yet. Add one in Design.</p>
         ) : (
           <div className="space-y-1">
             {bins.map((bin) => {
@@ -349,12 +349,12 @@ function PreviewSidebar(): React.JSX.Element {
               const meta = bin.metadata as BinMetadata
               const pip =
                 status === 'ready'
-                  ? { className: 'text-[10px] text-emerald-500', label: '● ready' }
+                  ? { className: 'text-[10px] text-emerald-500', label: '● Ready' }
                   : status === 'error'
-                    ? { className: 'text-[10px] text-red-500', label: '⚠ error' }
+                    ? { className: 'text-[10px] text-red-500', label: '⚠ Failed' }
                     : {
                         className: 'text-[10px] text-amber-500 animate-pulse',
-                        label: '◌ baking…'
+                        label: '◌ Building…'
                       }
               return (
                 <div
@@ -379,7 +379,7 @@ function PreviewSidebar(): React.JSX.Element {
 
       {anyError && (
         <p className="text-[10px] text-red-500">
-          Bake failed for one or more bins — see console for details.
+          Couldn’t build one or more bins. Edit them in Design to try again.
         </p>
       )}
 
@@ -407,8 +407,8 @@ function PreviewSidebar(): React.JSX.Element {
           >
             Export STL…
           </Button>
-          {!allReady && totalBins > 0 && (
-            <p className="text-[10px] text-zinc-500">Wait for bake to complete.</p>
+          {!allReady && !anyError && totalBins > 0 && (
+            <p className="text-[10px] text-zinc-500">Building the model…</p>
           )}
         </div>
       </SidebarSection>
@@ -425,7 +425,7 @@ function ProjectNameHeader(): React.JSX.Element {
         .split(/[\\/]/)
         .pop()!
         .replace(/\.gfstudio$/, '')
-    : 'Untitled Project'
+    : 'Untitled project'
 
   return (
     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate">{name}</p>
@@ -520,8 +520,7 @@ function ShapeDepthField({
         <div className="flex items-start gap-1 text-amber-600 dark:text-amber-400 text-[10px] leading-tight">
           <span aria-hidden="true">⚠</span>
           <span>
-            Within {DEPTH_WARN_MARGIN}mm of bin floor ({maxSafe.toFixed(1)}mm max). Print may be
-            fragile.
+            Close to the bin floor. The print may be fragile. Max {maxSafe.toFixed(1)} mm.
           </span>
         </div>
       )}
