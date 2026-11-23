@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
@@ -60,19 +60,38 @@ function LayoutSidebar(): React.JSX.Element {
     return shapes.find((s) => s.id === selectedIds[0]) ?? null
   }, [selectedIds, shapes])
 
-  // Move the selected shape so its X or Y reads `to`. Goes through
-  // translateShapes so the move is an undo step and the shape changes bin
-  // when its center leaves the one it is in.
-  const moveSelectedShapeTo = (to: { x?: number; y?: number }): void => {
-    const current = selectedShape && engine?.getShape(selectedShape.id)
-    if (!engine || !current) return
-    engine.translateShapes([
-      {
-        id: current.id,
-        dx: to.x === undefined ? 0 : to.x - current.x,
-        dy: to.y === undefined ? 0 : to.y - current.y
-      }
-    ])
+  // Editing a shape's X or Y. Each step moves the shape for live feedback.
+  // When the adjustment is finished the whole move is replayed as one change,
+  // so it is a single undo step and the shape changes bin at most once, at
+  // the end. A shape's position is relative to its bin, so changing bin
+  // part-way through would change what the numbers mean.
+  const positionEditRef = useRef<{ id: string; x: number; y: number } | null>(null)
+
+  const commitPositionEdit = (): void => {
+    const start = positionEditRef.current
+    positionEditRef.current = null
+    const current = start && engine?.getShape(start.id)
+    if (!engine || !start || !current) return
+    const dx = current.x - start.x
+    const dy = current.y - start.y
+    if (dx === 0 && dy === 0) return
+    engine.batch(() => {
+      engine.updateShape(start.id, { x: start.x, y: start.y })
+      engine.translateShapes([{ id: start.id, dx, dy }])
+    })
+  }
+
+  const editSelectedShapePosition = (to: { x?: number; y?: number }): void => {
+    if (!engine || !selectedShape) return
+    if (positionEditRef.current && positionEditRef.current.id !== selectedShape.id) {
+      commitPositionEdit()
+    }
+    if (!positionEditRef.current) {
+      const current = engine.getShape(selectedShape.id)
+      if (!current) return
+      positionEditRef.current = { id: current.id, x: current.x, y: current.y }
+    }
+    engine.updateShape(selectedShape.id, to)
   }
 
   // Which arrange buttons to offer. Follows shapes and groups so it is not
@@ -287,14 +306,16 @@ function LayoutSidebar(): React.JSX.Element {
               value={selectedShape.x}
               step={1}
               precision={1}
-              onChange={(v) => moveSelectedShapeTo({ x: v })}
+              onChange={(v) => editSelectedShapePosition({ x: v })}
+              onCommit={commitPositionEdit}
             />
             <NumericInput
               label="Y"
               value={selectedShape.y}
               step={1}
               precision={1}
-              onChange={(v) => moveSelectedShapeTo({ y: v })}
+              onChange={(v) => editSelectedShapePosition({ y: v })}
+              onCommit={commitPositionEdit}
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
           </div>

@@ -195,7 +195,7 @@ test('edit bins and pockets', async () => {
   expect.soft(app.errors, 'no renderer errors').toEqual([])
 })
 
-test('typing a position in the sidebar is one undo step', async () => {
+test('changing a position in the sidebar is one undo step', async () => {
   app = await StudioApp.launch()
   const { page } = app
   const file = join(app.dir, 'position.gfstudio')
@@ -228,6 +228,26 @@ test('typing a position in the sidebar is one undo step', async () => {
   await app.menu('Edit', /^Redo/)
   saved = await app.save(file)
   expect(saved.layoutSnapshot.shapes[0].x, 'redo applies the typed X').toBeCloseTo(target, 3)
+
+  // Undo and redo clear the selection. Select the shape again, then nudge X
+  // with the scroll wheel: several steps, one undo step.
+  await page.getByRole('button', { name: /^Rectangle 1/ }).click()
+  await expect(xField.getByRole('button')).toHaveText(target.toFixed(1))
+  await xField.getByRole('button').hover()
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.wheel(0, -100)
+    await expect(xField.getByRole('button')).not.toHaveText((target + i).toFixed(1))
+  }
+  // The burst counts as finished once the wheel has been still for a moment.
+  await page.waitForTimeout(800)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'wheel moved the shape').toBeCloseTo(target + 3, 3)
+  await app.menu('Edit', /^Undo/)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'one undo takes back the whole burst').toBeCloseTo(
+    target,
+    3
+  )
 
   expect(app.errors).toEqual([])
 })

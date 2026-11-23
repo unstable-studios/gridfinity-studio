@@ -423,27 +423,9 @@ export class KonvaEngine implements LayoutEngine {
 
     this.mainLayer?.batchDraw()
 
-    // Report the change: a move, a resize, or a generic update for anything
-    // else (metadata such as depth or name). Listeners record undo steps and
-    // refresh the sidebar from these.
-    const keys = Object.keys(patch).filter((k) => k !== 'id')
-    const isPositionOnly = keys.length > 0 && keys.every((k) => k === 'x' || k === 'y')
-    const isResizeOnly =
-      keys.length > 0 &&
-      keys.every((k) => k === 'width' || k === 'height' || k === 'radiusX' || k === 'radiusY')
-    if (isPositionOnly) {
-      this.emit('shapeMoved', { id, x: updated.x, y: updated.y })
-    } else if (isResizeOnly) {
-      this.emit('shapeResized', {
-        id,
-        ...('width' in patch && { width: patch.width }),
-        ...('height' in patch && { height: patch.height }),
-        ...('radiusX' in patch && { radiusX: patch.radiusX }),
-        ...('radiusY' in patch && { radiusY: patch.radiusY })
-      })
-    } else {
-      this.emit('shapeUpdated', { id })
-    }
+    // A generic update: listeners refresh from it, but it is not an undo
+    // step. A move that should be one goes through translateShapes.
+    this.emit('shapeUpdated', { id })
   }
 
   /**

@@ -5,6 +5,12 @@ import { formatDimension, parseDimension, unitLabel } from '../../../../shared/t
 export interface NumericInputProps {
   value: number
   onChange: (value: number) => void
+  /**
+   * Called when an adjustment is finished: a typed value is entered, a scrub
+   * is released, or the wheel and arrow keys have been still for a moment.
+   * `onChange` fires for every step along the way.
+   */
+  onCommit?: () => void
   min?: number
   max?: number
   step?: number
@@ -16,6 +22,9 @@ export interface NumericInputProps {
   /** When set, value is treated as mm internally and displayed in this unit. */
   displayUnit?: DisplayUnit
 }
+
+/** How long the wheel or arrow keys stay quiet before a burst counts as finished. */
+const STEP_COMMIT_DELAY_MS = 400
 
 function clamp(v: number, min: number | undefined, max: number | undefined): number {
   if (min !== undefined && v < min) return min
@@ -42,6 +51,7 @@ function getStep(
 export function NumericInput({
   value,
   onChange,
+  onCommit,
   min,
   max,
   step = 1,
@@ -69,6 +79,32 @@ export function NumericInput({
     ctrlKey: boolean
     metaKey: boolean
   } | null>(null)
+
+  // Wheel and arrow steps come in bursts; the burst is finished once it has
+  // been quiet for a moment.
+  const onCommitRef = useRef(onCommit)
+  useEffect(() => {
+    onCommitRef.current = onCommit
+  })
+  const commitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const commitNow = useCallback(() => {
+    if (commitTimerRef.current) {
+      clearTimeout(commitTimerRef.current)
+      commitTimerRef.current = null
+    }
+    onCommitRef.current?.()
+  }, [])
+  const commitSoon = useCallback(() => {
+    if (commitTimerRef.current) clearTimeout(commitTimerRef.current)
+    commitTimerRef.current = setTimeout(commitNow, STEP_COMMIT_DELAY_MS)
+  }, [commitNow])
+  useEffect(
+    () => () => {
+      // Finish a pending burst if the field goes away first.
+      if (commitTimerRef.current) commitNow()
+    },
+    [commitNow]
+  )
 
   const apply = useCallback(
     (next: number) => {
@@ -114,8 +150,10 @@ export function NumericInput({
   )
 
   const onPointerUp = useCallback(() => {
+    if (!dragRef.current) return
     dragRef.current = null
-  }, [])
+    commitNow()
+  }, [commitNow])
 
   // ── Click to edit ────────────────────────────────────────────
 
@@ -136,7 +174,8 @@ export function NumericInput({
     setEditing(false)
     const parsed = displayUnit ? parseDimension(editText, displayUnit) : parseFloat(editText)
     if (!isNaN(parsed)) apply(parsed)
-  }, [editText, apply, displayUnit])
+    commitNow()
+  }, [editText, apply, displayUnit, commitNow])
 
   // ── Wheel ────────────────────────────────────────────────────
 
@@ -146,8 +185,9 @@ export function NumericInput({
       const s = getStep(e, step, fineStep, coarseStep)
       const direction = e.deltaY < 0 ? 1 : -1
       apply(value + direction * s)
+      commitSoon()
     },
-    [step, fineStep, coarseStep, value, apply]
+    [step, fineStep, coarseStep, value, apply, commitSoon]
   )
 
   // ── Arrow keys ───────────────────────────────────────────────
@@ -172,10 +212,11 @@ export function NumericInput({
           const next = roundTo(parsed + dir * s, precision)
           setEditText(next.toFixed(precision))
           apply(next)
+          commitSoon()
         }
       }
     },
-    [editing, editText, step, fineStep, coarseStep, precision, apply, commitEdit]
+    [editing, editText, step, fineStep, coarseStep, precision, apply, commitEdit, commitSoon]
   )
 
   const displayValue = displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)

@@ -150,21 +150,18 @@ describe('LayoutEngine contract', () => {
       expect(shape!.x).toBe(100)
     })
 
-    it('C3b: updateShape reports a move, a resize or an update', () => {
+    it('C3b: updateShape asks listeners to refresh without reporting a move', () => {
       engine.addShape(makeRect())
       const events: string[] = []
-      engine.on('shapeMoved', (e) => events.push(`moved ${e.x},${e.y}`))
-      engine.on('shapeResized', (e) => events.push(`resized ${e.width}x${e.height}`))
+      engine.on('shapeMoved', () => events.push('moved'))
+      engine.on('shapeResized', () => events.push('resized'))
       engine.on('shapeUpdated', () => events.push('updated'))
 
       engine.updateShape('rect-1', { x: 100 })
-      engine.updateShape('rect-1', { x: 5, y: 7 })
       engine.updateShape('rect-1', { width: 30, height: 12 })
       engine.updateShape('rect-1', { metadata: { name: 'Pocket' } })
-      engine.updateShape('rect-1', { x: 1, metadata: { name: 'Both' } })
 
-      const y = makeRect().y
-      expect(events).toEqual([`moved 100,${y}`, 'moved 5,7', 'resized 30x12', 'updated', 'updated'])
+      expect(events).toEqual(['updated', 'updated', 'updated'])
     })
 
     it('C4: removeShape(id) → getShape(id) returns undefined', () => {
