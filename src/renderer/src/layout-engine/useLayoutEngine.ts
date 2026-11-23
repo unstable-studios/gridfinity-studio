@@ -65,6 +65,11 @@ export function useEngineState(): EngineState {
         )
       }
 
+      // The engine may have changed before this subscription existed (a
+      // project loads in an effect that runs ahead of later components'
+      // subscriptions). Bump the tick so React re-reads engine data once.
+      tickRef.current++
+
       return () => {
         for (const unsub of unsubs) unsub()
       }

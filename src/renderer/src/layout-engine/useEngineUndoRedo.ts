@@ -65,17 +65,21 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     isUndoingRef.current = false
   }, [engine, syncState])
 
-  // Sync state to zustand store so Navbar can read it
-  useEffect(() => {
-    useUndoRedo.setState({ canUndo, canRedo, undo, redo })
-  }, [canUndo, canRedo, undo, redo])
-
-  // Initialize baseline snapshot when engine mounts
-  useEffect(() => {
+  const reset = useCallback(() => {
     if (!engine) return
     stackRef.current.init(JSON.stringify(engine.toSnapshot()))
     syncState()
   }, [engine, syncState])
+
+  // Sync state to zustand store so Navbar and useProjectEngineSync can use it
+  useEffect(() => {
+    useUndoRedo.setState({ canUndo, canRedo, undo, redo, reset })
+  }, [canUndo, canRedo, undo, redo, reset])
+
+  // Initialize baseline snapshot when engine mounts
+  useEffect(() => {
+    reset()
+  }, [reset])
 
   // Subscribe to engine events for undo snapshot capture.
   // All events push synchronously — the isUndoingRef guard prevents

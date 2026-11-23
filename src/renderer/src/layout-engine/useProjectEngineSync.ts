@@ -1,6 +1,7 @@
 import { useEffect, useCallback, useRef } from 'react'
 import { useLayoutEngine } from './useLayoutEngine'
 import { useProject } from '@/hooks/useProject'
+import { useUndoRedo } from '@/hooks/useUndoRedo'
 import type { LayoutSnapshotData } from '../../../shared/types/project'
 import type { LayoutSnapshot } from './types'
 
@@ -65,6 +66,8 @@ export function useProjectEngineSync(): void {
     isRestoringRef.current = true
     engine.loadSnapshot(project.layoutSnapshot as unknown as LayoutSnapshot)
     isRestoringRef.current = false
+    // Loading a project is not an undoable edit: the loaded state is the baseline.
+    useUndoRedo.getState().reset()
   }, [engine, project?.layoutSnapshot, projectId])
 
   const captureSnapshot = useCallback((): void => {
