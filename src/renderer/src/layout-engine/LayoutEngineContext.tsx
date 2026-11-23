@@ -59,11 +59,13 @@ export function LayoutEngineProvider({
     setEngine(newEngine)
 
     return () => {
-      newEngine.dispose()
+      // Dispose the recognizer first: cancelling an in-progress gesture
+      // calls back into the engine.
       if (gestureRef.current) {
         gestureRef.current.dispose()
         gestureRef.current = null
       }
+      newEngine.dispose()
       setEngine((prev) => (prev === newEngine ? null : prev))
     }
     // Mount once; theme and unit height are pushed by the effects below.

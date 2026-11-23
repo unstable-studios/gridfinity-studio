@@ -17,8 +17,6 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { LayoutEngine } from '../interface'
 import type { LayoutShape, LayoutGroup } from '../types'
 import { createLayoutEngine } from '../create-engine'
-// Import adapters to trigger self-registration
-
 /**
  * Reparenting matrix contract tests.
  *

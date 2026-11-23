@@ -50,8 +50,7 @@ export function useProjectEngineSync(): void {
   const isRestoringRef = useRef(false)
 
   // On project load: restore engine state from layoutSnapshot.
-  // Only runs when a NEW project is loaded (different createdAt), not on engine switches.
-  // Engine switches preserve state via LayoutEngineContext's pendingStateRef.
+  // Only runs when a NEW project is loaded (different createdAt).
   const projectId = project?.settings?.createdAt ?? null
   useEffect(() => {
     if (!engine || !project?.layoutSnapshot) return

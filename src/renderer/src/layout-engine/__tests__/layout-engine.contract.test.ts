@@ -18,8 +18,6 @@ import type { LayoutEngine } from '../interface'
 import type { LayoutShape, LayoutGroup } from '../types'
 import { createLayoutEngine } from '../create-engine'
 import { checkGroupCollision } from '../collision'
-// Import adapters to trigger self-registration
-
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 function makeContainer(): HTMLDivElement {
@@ -519,6 +517,24 @@ describe('LayoutEngine contract', () => {
   // ─── C15-C16: Serialization ─────────────────────────────────────────────────
 
   describe('Serialization', () => {
+    it('polygon position survives snapshot round-trips (bbox center convention)', () => {
+      // Asymmetric triangle: bbox center = (50, 40), centroid ≠ bbox center.
+      // Regression test for #252 — a centroid/bbox mix-up shifts the polygon
+      // on every save and load.
+      engine.addShape(makePolygon({ id: 'asym', x: 200, y: 150 }))
+      const original = engine.getShape('asym')!
+
+      for (let i = 0; i < 3; i++) {
+        engine.loadSnapshot(JSON.parse(JSON.stringify(engine.toSnapshot())))
+      }
+
+      const final = engine.getShape('asym')!
+      expect(final.x).toBeCloseTo(original.x, 1)
+      expect(final.y).toBeCloseTo(original.y, 1)
+      expect(original.x).toBeCloseTo(200, 1)
+      expect(original.y).toBeCloseTo(150, 1)
+    })
+
     it('C15: toSnapshot → loadSnapshot roundtrip preserves shapes and groups', () => {
       const rect = makeRect({ id: 'r1' })
       const circle = makeCircle({ id: 'c1' })

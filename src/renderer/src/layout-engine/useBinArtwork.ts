@@ -106,7 +106,7 @@ export function useBinArtwork(
   }, [engine])
 
   useEffect(() => {
-    // Reset cache when engine instance changes (e.g., engine switch)
+    // Reset cache when the engine instance changes (remount)
     if (engine !== prevEngineRef.current) {
       prevKeysRef.current = new Map()
       prevEngineRef.current = engine

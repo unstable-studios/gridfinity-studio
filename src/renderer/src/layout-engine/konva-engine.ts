@@ -1473,5 +1473,3 @@ export class KonvaEngine implements LayoutEngine {
 
   // setupPanZoom removed — pan/zoom now handled by GestureRecognizer (#226)
 }
-
-// Auto-register
