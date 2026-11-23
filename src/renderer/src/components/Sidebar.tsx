@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
@@ -8,6 +8,7 @@ import ArrangeControls from './ArrangeControls'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import { frameOffset } from '@/layout-engine/position-frame'
 import type { PositionFrame } from '@/layout-engine/position-frame'
+import { usePositionFrame } from '@/hooks/usePositionFrame'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
@@ -66,14 +67,21 @@ function LayoutSidebar(): React.JSX.Element {
   // X and Y are shown on the canvas unless the person asks for them relative
   // to the bin. On the canvas the numbers keep their meaning when a shape
   // moves into or out of a bin.
-  const [positionFrame, setPositionFrame] = useState<PositionFrame>('canvas')
+  const positionFrame = usePositionFrame((s) => s.frame)
+  const setPositionFrame = usePositionFrame((s) => s.setFrame)
+  const selectedShapeBin = selectedShape
+    ? groups.find((g) => g.id === selectedShape.groupId)
+    : undefined
   const positionOffset = selectedShape
-    ? frameOffset(
-        selectedShape,
-        groups.find((g) => g.id === selectedShape.groupId),
-        positionFrame
-      )
+    ? frameOffset(selectedShape, selectedShapeBin, positionFrame)
     : { x: 0, y: 0 }
+  // Relative to the bin, a position stays inside it: a value that would put
+  // the shape's center past an edge stops at the edge, so the numbers always
+  // mean the same thing. On the canvas a shape can be moved anywhere.
+  const positionLimit =
+    selectedShapeBin && positionFrame === 'bin'
+      ? { x: selectedShapeBin.width / 2, y: selectedShapeBin.height / 2 }
+      : null
 
   // Editing a shape's X or Y. Each step moves the shape for live feedback.
   // When the adjustment is finished the whole move is replayed as one change,
@@ -318,10 +326,10 @@ function LayoutSidebar(): React.JSX.Element {
             </div>
             {selectedShape.groupId && (
               <div className="flex items-center justify-between">
-                <span className="text-zinc-500">Position on</span>
+                <span className="text-zinc-500">Relative to</span>
                 <ToggleGroup
                   type="single"
-                  aria-label="Position on"
+                  aria-label="Relative to"
                   value={positionFrame}
                   onValueChange={(value) => {
                     if (value) setPositionFrame(value as PositionFrame)
@@ -341,6 +349,8 @@ function LayoutSidebar(): React.JSX.Element {
               value={selectedShape.x + positionOffset.x}
               step={1}
               precision={1}
+              min={positionLimit ? -positionLimit.x : undefined}
+              max={positionLimit?.x}
               onChange={(v) => editSelectedShapePosition({ x: v - positionOffset.x })}
               onCommit={commitPositionEdit}
             />
@@ -349,6 +359,8 @@ function LayoutSidebar(): React.JSX.Element {
               value={selectedShape.y + positionOffset.y}
               step={1}
               precision={1}
+              min={positionLimit ? -positionLimit.y : undefined}
+              max={positionLimit?.y}
               onChange={(v) => editSelectedShapePosition({ y: v - positionOffset.y })}
               onCommit={commitPositionEdit}
             />

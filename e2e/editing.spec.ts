@@ -297,6 +297,9 @@ test('a pocket position reads on the canvas or in its bin', async () => {
   const xValue = page
     .locator('aside')
     .locator('xpath=.//span[normalize-space(.)="X"]/following-sibling::div[1]')
+  const yValue = page
+    .locator('aside')
+    .locator('xpath=.//span[normalize-space(.)="Y"]/following-sibling::div[1]')
   const frame = (name: 'Canvas' | 'Bin'): ReturnType<typeof page.getByRole> =>
     page.getByRole('radio', { name, exact: true })
 
@@ -317,6 +320,7 @@ test('a pocket position reads on the canvas or in its bin', async () => {
   const toScreen = mappingFromDrawnRect(loose, looseFrom, looseTo)
   const bin = saved.layoutSnapshot.groups[0]
   const binCenterX = bin.x + bin.width / 2
+  const binCenterY = bin.y - bin.height / 2
 
   // A pocket in the bin, left of center. Drawing leaves it selected.
   await app.selectTool('Rect')
@@ -331,16 +335,37 @@ test('a pocket position reads on the canvas or in its bin', async () => {
     p.layoutSnapshot.shapes.find((s) => s.id === pocketId)!
   // The file stores a pocket relative to its bin's center.
   const storedX = pocket(saved).x
+  const storedY = pocket(saved).y
   expect(pocket(saved).groupId).toBe(bin.id)
   expect(storedX).toBeLessThan(0)
 
-  // Canvas is the default: X is where the pocket is on the canvas.
+  // Canvas is the default: X and Y are where the pocket is on the canvas.
   await expect(frame('Canvas')).toBeChecked()
   await expect(xValue.getByRole('button')).toHaveText((binCenterX + storedX).toFixed(1))
+  await expect(yValue.getByRole('button')).toHaveText((binCenterY + storedY).toFixed(1))
 
   // Bin shows the same pocket relative to the bin's center.
   await frame('Bin').click()
   await expect(xValue.getByRole('button')).toHaveText(storedX.toFixed(1))
+  await expect(yValue.getByRole('button')).toHaveText(storedY.toFixed(1))
+
+  // Relative to the bin, a value past the edge stops at the edge, so the
+  // pocket stays in the bin and the number shown is where it is.
+  await xValue.getByRole('button').click()
+  await xValue.locator('input').fill('1000')
+  await xValue.locator('input').press('Enter')
+  await expect(xValue.getByRole('button')).toHaveText((bin.width / 2).toFixed(1))
+  saved = await app.save(file)
+  expect(pocket(saved).groupId, 'still in the bin').toBe(bin.id)
+  expect(pocket(saved).x, 'at the bin edge').toBeCloseTo(bin.width / 2, 3)
+  await app.menu('Edit', /^Undo/)
+  saved = await app.save(file)
+  expect(pocket(saved).x, 'undo puts it back').toBeCloseTo(storedX, 3)
+
+  // The choice of frame is kept. Undo cleared the selection, so select the
+  // pocket again, then go back to the canvas.
+  await page.getByRole('button', { name: /^Rectangle 2/ }).click()
+  await expect(frame('Bin')).toBeChecked()
   await frame('Canvas').click()
 
   // A value typed on the canvas reads back as typed, and moves the pocket by
