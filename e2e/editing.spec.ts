@@ -194,3 +194,60 @@ test('edit bins and pockets', async () => {
     .toEqual([])
   expect.soft(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('changing a position in the sidebar is one undo step', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'position.gfstudio')
+  // The value button next to the X label; clicking it turns it into an input.
+  const xField = page
+    .locator('aside')
+    .locator('xpath=.//span[normalize-space(.)="X"]/following-sibling::div[1]')
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  await app.selectTool('Rect')
+  await app.drag({ x: 700, y: 300 }, { x: 780, y: 360 })
+  await app.expectShapeCount(1)
+  const drawn = (await app.save(file)).layoutSnapshot.shapes[0]
+
+  // Drawing leaves the shape selected, so its properties are showing.
+  const target = Math.round(drawn.x) + 10
+  await xField.getByRole('button').click()
+  await xField.locator('input').fill(String(target))
+  await xField.locator('input').press('Enter')
+  await expect(xField.getByRole('button')).toHaveText(target.toFixed(1))
+  let saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'moved to the typed X').toBeCloseTo(target, 3)
+  expect(saved.layoutSnapshot.shapes[0].y, 'Y untouched').toBeCloseTo(drawn.y, 3)
+
+  await app.menu('Edit', /^Undo/)
+  await app.expectShapeCount(1)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'undo restores X').toBeCloseTo(drawn.x, 3)
+
+  await app.menu('Edit', /^Redo/)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'redo applies the typed X').toBeCloseTo(target, 3)
+
+  // Undo and redo clear the selection. Select the shape again, then nudge X
+  // with the scroll wheel: several steps, one undo step.
+  await page.getByRole('button', { name: /^Rectangle 1/ }).click()
+  await expect(xField.getByRole('button')).toHaveText(target.toFixed(1))
+  await xField.getByRole('button').hover()
+  for (let i = 0; i < 3; i++) {
+    await page.mouse.wheel(0, -100)
+    await expect(xField.getByRole('button')).not.toHaveText((target + i).toFixed(1))
+  }
+  // The burst counts as finished once the wheel has been still for a moment.
+  await page.waitForTimeout(800)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'wheel moved the shape').toBeCloseTo(target + 3, 3)
+  await app.menu('Edit', /^Undo/)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'one undo takes back the whole burst').toBeCloseTo(
+    target,
+    3
+  )
+
+  expect(app.errors).toEqual([])
+})

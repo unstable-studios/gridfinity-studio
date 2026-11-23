@@ -20,6 +20,12 @@ export interface LayoutEngine {
 
   // ─── Shape CRUD ─────────────────────────────────────────────────────────────
   addShape(shape: LayoutShape): void
+  /**
+   * Change a shape's properties. Listeners are told to refresh, but this is
+   * not recorded as an undo step and does not reassign the shape's bin: use
+   * it for metadata and for live feedback while a value is being adjusted,
+   * and `translateShapes` for a finished move.
+   */
   updateShape(id: string, patch: Partial<LayoutShape>): void
   removeShape(id: string): void
   getShape(id: string): LayoutShape | undefined

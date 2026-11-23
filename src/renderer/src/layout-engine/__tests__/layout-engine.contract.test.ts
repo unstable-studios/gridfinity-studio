@@ -150,6 +150,20 @@ describe('LayoutEngine contract', () => {
       expect(shape!.x).toBe(100)
     })
 
+    it('C3b: updateShape asks listeners to refresh without reporting a move', () => {
+      engine.addShape(makeRect())
+      const events: string[] = []
+      engine.on('shapeMoved', () => events.push('moved'))
+      engine.on('shapeResized', () => events.push('resized'))
+      engine.on('shapeUpdated', () => events.push('updated'))
+
+      engine.updateShape('rect-1', { x: 100 })
+      engine.updateShape('rect-1', { width: 30, height: 12 })
+      engine.updateShape('rect-1', { metadata: { name: 'Pocket' } })
+
+      expect(events).toEqual(['updated', 'updated', 'updated'])
+    })
+
     it('C4: removeShape(id) → getShape(id) returns undefined', () => {
       engine.addShape(makeRect())
       engine.removeShape('rect-1')
