@@ -8,6 +8,8 @@ export interface ArrangeTarget {
   /** What the shapes align to. Absent means the box that encloses them. */
   frame?: ShapeAABB
   modes: AlignMode[]
+  /** Distributing needs at least three shapes. */
+  canDistribute: boolean
 }
 
 /**
@@ -25,7 +27,7 @@ export function arrangeTarget(engine: LayoutEngine, selectedIds: string[]): Arra
   }
 
   if (boxes.length >= 2) {
-    return { boxes, modes: [...ALIGN_MODES] }
+    return { boxes, modes: [...ALIGN_MODES], canDistribute: boxes.length >= 3 }
   }
   if (boxes.length === 1) {
     const groupId = engine.getShape(boxes[0].id)?.groupId
@@ -34,7 +36,8 @@ export function arrangeTarget(engine: LayoutEngine, selectedIds: string[]): Arra
     return {
       boxes,
       frame: { minX: bin.x, minY: bin.y - bin.height, maxX: bin.x + bin.width, maxY: bin.y },
-      modes: ['centerX', 'centerY']
+      modes: ['centerX', 'centerY'],
+      canDistribute: false
     }
   }
   return null

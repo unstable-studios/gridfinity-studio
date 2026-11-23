@@ -4,13 +4,15 @@ import {
   AlignCenterVertical,
   AlignEndHorizontal,
   AlignEndVertical,
+  AlignHorizontalSpaceAround,
   AlignStartHorizontal,
-  AlignStartVertical
+  AlignStartVertical,
+  AlignVerticalSpaceAround
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { LayoutEngine } from '@/layout-engine'
-import { alignMoves } from '@/layout-engine/arrange'
-import type { AlignMode } from '@/layout-engine/arrange'
+import { alignMoves, distributeMoves } from '@/layout-engine/arrange'
+import type { AlignMode, DistributeAxis } from '@/layout-engine/arrange'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import type { ArrangeTarget } from '@/layout-engine/arrange-target'
 
@@ -23,13 +25,18 @@ const ALIGN_ACTIONS: Array<{ mode: AlignMode; label: string; icon: LucideIcon }>
   { mode: 'bottom', label: 'Align bottom', icon: AlignEndHorizontal }
 ]
 
+const DISTRIBUTE_ACTIONS: Array<{ axis: DistributeAxis; label: string; icon: LucideIcon }> = [
+  { axis: 'horizontal', label: 'Distribute horizontally', icon: AlignHorizontalSpaceAround },
+  { axis: 'vertical', label: 'Distribute vertically', icon: AlignVerticalSpaceAround }
+]
+
 const IN_BIN_LABELS: Partial<Record<AlignMode, string>> = {
   centerX: 'Center horizontally in bin',
   centerY: 'Center vertically in bin'
 }
 
 /**
- * Align buttons for the current selection. `target` decides which buttons
+ * Align and distribute buttons for the current selection. `target` decides which buttons
  * show. Each click measures the shapes again, since a shape can move without
  * this component rendering.
  */
@@ -48,6 +55,12 @@ export default function ArrangeControls({
     const current = arrangeTarget(engine, selectedIds)
     if (!current?.modes.includes(mode)) return
     engine.translateShapes(alignMoves(current.boxes, mode, current.frame))
+  }
+
+  const distribute = (axis: DistributeAxis): void => {
+    const current = arrangeTarget(engine, selectedIds)
+    if (!current?.canDistribute) return
+    engine.translateShapes(distributeMoves(current.boxes, axis))
   }
 
   return (
@@ -72,6 +85,26 @@ export default function ArrangeControls({
           }
         )}
       </div>
+      {target.canDistribute && (
+        <div role="group" aria-label="Distribute" className="grid grid-cols-6 gap-1">
+          {DISTRIBUTE_ACTIONS.map(({ axis, label, icon: Icon }) => (
+            <Button
+              key={axis}
+              variant="outline"
+              size="icon-sm"
+              className="w-full"
+              aria-label={label}
+              title={label}
+              onClick={() => distribute(axis)}
+            >
+              <Icon aria-hidden />
+            </Button>
+          ))}
+        </div>
+      )}
+      {!inBin && !target.canDistribute && (
+        <p className="text-[11px] text-zinc-500">Select 3 or more to distribute.</p>
+      )}
     </div>
   )
 }
