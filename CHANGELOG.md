@@ -1,5 +1,29 @@
 # Changelog
 
+## [1.11.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.10.1...v1.11.0) (2026-11-23)
+
+
+### Features
+
+* **core:** make konva the default layout engine ([#399](https://github.com/unstable-studios/gridfinity-studio/issues/399)) ([db8881c](https://github.com/unstable-studios/gridfinity-studio/commit/db8881c1a2726ae4ba3851779bbaa7d2ddcc84e9))
+
+
+### Bug Fixes
+
+* **core:** draw the shape preview in the overlay, not the engine ([#412](https://github.com/unstable-studios/gridfinity-studio/issues/412)) ([e5820e5](https://github.com/unstable-studios/gridfinity-studio/commit/e5820e5e3c1e34e3b9db602c16b40cdd273e98e3))
+* **core:** opened-project sidebar, undo baseline, unfocused export ([#397](https://github.com/unstable-studios/gridfinity-studio/issues/397)) ([8616ee9](https://github.com/unstable-studios/gridfinity-studio/commit/8616ee97ec854db613027201495dc58f758119bf))
+* repair dev mode, pin node 24, run tests in ci ([#396](https://github.com/unstable-studios/gridfinity-studio/issues/396)) ([be7ac04](https://github.com/unstable-studios/gridfinity-studio/commit/be7ac041080dca095f82a35f875ee0d8bd46e144))
+* **ui:** frame the bins in the 3D preview ([#413](https://github.com/unstable-studios/gridfinity-studio/issues/413)) ([01fb6dd](https://github.com/unstable-studios/gridfinity-studio/commit/01fb6dd3b32872538bdb57a561c873b86722fd17))
+* **ui:** generate styles for classes used inside the ui package ([#410](https://github.com/unstable-studios/gridfinity-studio/issues/410)) ([8910dff](https://github.com/unstable-studios/gridfinity-studio/commit/8910dffcfe497f6998a34343d8b96f881e2d2ae5))
+* **ui:** lock the base unit while the project has bins ([#411](https://github.com/unstable-studios/gridfinity-studio/issues/411)) ([9884da3](https://github.com/unstable-studios/gridfinity-studio/commit/9884da3120f531ebd079103dee17036d2d8c33bd))
+* **ui:** rewrite interface copy to the ui-copy rules ([#401](https://github.com/unstable-studios/gridfinity-studio/issues/401)) ([fb3e2c3](https://github.com/unstable-studios/gridfinity-studio/commit/fb3e2c3b7049ff8705f51892353d10d69f83d28f))
+* **ui:** show the outcome of save, open and export ([#414](https://github.com/unstable-studios/gridfinity-studio/issues/414)) ([f89c201](https://github.com/unstable-studios/gridfinity-studio/commit/f89c2011e89501edfcd25762cfa5f762fe024b2a))
+
+
+### Refactoring
+
+* **core:** remove the fabric layout engine ([#400](https://github.com/unstable-studios/gridfinity-studio/issues/400)) ([95732d8](https://github.com/unstable-studios/gridfinity-studio/commit/95732d845782f36988ecad4046c50ee9f4b25bd3))
+
 ## [1.10.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.10.0...v1.10.1) (2026-05-06)
 
 
