@@ -18,7 +18,7 @@ export const AppModeCtx = createContext<AppModeContext>({
   setMode: () => {},
   activeTool: 'select',
   setActiveTool: () => {},
-  engineType: 'fabric',
+  engineType: 'konva',
   setEngineType: () => {}
 })
 

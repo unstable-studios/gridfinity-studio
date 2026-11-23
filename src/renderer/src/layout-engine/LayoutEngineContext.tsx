@@ -20,7 +20,7 @@ interface LayoutEngineProviderProps {
 
 export function LayoutEngineProvider({
   children,
-  defaultEngine = 'fabric',
+  defaultEngine = 'konva',
   engineType: controlledType
 }: LayoutEngineProviderProps): React.JSX.Element {
   const [engineState, setEngineState] = useState<{

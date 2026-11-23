@@ -12,7 +12,7 @@ export interface LayoutEngineContextValue {
 
 export const LayoutEngineCtx = createContext<LayoutEngineContextValue>({
   engine: null,
-  engineType: 'fabric',
+  engineType: 'konva',
   setEngineType: () => {},
   containerRef: { current: null },
   sidebarRef: { current: null }
