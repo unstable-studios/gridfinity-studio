@@ -7,6 +7,19 @@ import type { SavedProject } from './app'
 
 let app: StudioApp
 
+/**
+ * Wait for an exported file to be completely written, then return what
+ * `parse` makes of it. The app writes after an IPC round trip and the write
+ * is not atomic, so retry until the content parses.
+ */
+async function readWhenComplete<T>(path: string, parse: (bytes: Buffer) => Promise<T>): Promise<T> {
+  let parsed: T | undefined
+  await expect(async () => {
+    parsed = await parse(await readFile(path))
+  }, `export written to ${path}`).toPass({ timeout: 30_000 })
+  return parsed as T
+}
+
 test.beforeEach(async () => {
   app = await StudioApp.launch()
 })
@@ -82,18 +95,12 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   const threeMfPath = join(app.dir, 'smoke.3mf')
   await app.stubSaveDialog(threeMfPath)
   await page.getByRole('button', { name: 'Export 3MF…' }).click()
-  await expect
-    .poll(() =>
-      readFile(threeMfPath).then(
-        (b) => b.length,
-        () => 0
-      )
-    )
-    .toBeGreaterThan(0)
-  const zip = await JSZip.loadAsync(await readFile(threeMfPath))
-  const modelFile = Object.keys(zip.files).find((name) => name.endsWith('.model'))
-  expect(modelFile, '3MF contains a .model part').toBeDefined()
-  const model = await zip.file(modelFile!)!.async('string')
+  const model = await readWhenComplete(threeMfPath, async (bytes) => {
+    const zip = await JSZip.loadAsync(bytes)
+    const modelFile = Object.keys(zip.files).find((name) => name.endsWith('.model'))
+    if (!modelFile) throw new Error('3MF has no .model part')
+    return zip.file(modelFile)!.async('string')
+  })
   expect((model.match(/<vertex /g) ?? []).length).toBeGreaterThan(100)
   expect((model.match(/<triangle /g) ?? []).length).toBeGreaterThan(100)
 
@@ -101,18 +108,14 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   const stlPath = join(app.dir, 'smoke.stl')
   await app.stubSaveDialog(stlPath)
   await page.getByRole('button', { name: 'Export STL…' }).click()
-  await expect
-    .poll(() =>
-      readFile(stlPath).then(
-        (b) => b.length,
-        () => 0
-      )
-    )
-    .toBeGreaterThan(84)
-  const stl = await readFile(stlPath)
-  const triangleCount = stl.readUInt32LE(80)
+  const triangleCount = await readWhenComplete(stlPath, async (bytes) => {
+    const count = bytes.length >= 84 ? bytes.readUInt32LE(80) : -1
+    if (bytes.length !== 84 + count * 50) throw new Error(`STL is ${bytes.length} bytes`)
+    return count
+  })
   expect(triangleCount).toBeGreaterThan(100)
-  expect(stl.length).toBe(84 + triangleCount * 50)
+
+  expect(app.errors, 'no renderer errors while designing and exporting').toEqual([])
 
   // ── Reopen the saved project in a fresh session ─────────────────────────
   await app.close()
@@ -132,5 +135,5 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   const reopened = JSON.parse(await readFile(reopenedPath, 'utf8')) as SavedProject
   expect(reopened.layoutSnapshot).toEqual(saved.layoutSnapshot)
 
-  expect(app.errors, 'no renderer errors').toEqual([])
+  expect(app.errors, 'no renderer errors after reopening').toEqual([])
 })
