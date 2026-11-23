@@ -180,7 +180,7 @@ export function NumericInput({
   // ── Wheel ────────────────────────────────────────────────────
 
   const onWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       e.preventDefault()
       const s = getStep(e, step, fineStep, coarseStep)
       const direction = e.deltaY < 0 ? 1 : -1
@@ -189,6 +189,16 @@ export function NumericInput({
     },
     [step, fineStep, coarseStep, value, apply, commitSoon]
   )
+
+  // React attaches wheel listeners as passive, which cannot preventDefault,
+  // so the panel behind would scroll with every step. Listen natively.
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+    root.addEventListener('wheel', onWheel, { passive: false })
+    return () => root.removeEventListener('wheel', onWheel)
+  }, [onWheel])
 
   // ── Arrow keys ───────────────────────────────────────────────
 
@@ -222,7 +232,7 @@ export function NumericInput({
   const displayValue = displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)
 
   return (
-    <div className="flex min-w-0 items-center gap-1 text-xs" onWheel={onWheel}>
+    <div ref={rootRef} className="flex min-w-0 items-center gap-1 text-xs">
       {/* Label / drag area */}
       {label && (
         <span
