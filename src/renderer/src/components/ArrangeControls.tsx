@@ -36,7 +36,7 @@ const IN_BIN_LABELS: Partial<Record<AlignMode, string>> = {
 }
 
 /**
- * Align buttons for the current selection. `target` decides which buttons
+ * Align and distribute buttons for the current selection. `target` decides which buttons
  * show. Each click measures the shapes again, since a shape can move without
  * this component rendering.
  */
@@ -55,6 +55,12 @@ export default function ArrangeControls({
     const current = arrangeTarget(engine, selectedIds)
     if (!current?.modes.includes(mode)) return
     engine.translateShapes(alignMoves(current.boxes, mode, current.frame))
+  }
+
+  const distribute = (axis: DistributeAxis): void => {
+    const current = arrangeTarget(engine, selectedIds)
+    if (!current?.canDistribute) return
+    engine.translateShapes(distributeMoves(current.boxes, axis))
   }
 
   return (
@@ -79,7 +85,7 @@ export default function ArrangeControls({
           }
         )}
       </div>
-      {!inBin && (
+      {target.canDistribute && (
         <div role="group" aria-label="Distribute" className="grid grid-cols-6 gap-1">
           {DISTRIBUTE_ACTIONS.map(({ axis, label, icon: Icon }) => (
             <Button
@@ -88,14 +94,16 @@ export default function ArrangeControls({
               size="icon-sm"
               className="w-full"
               aria-label={label}
-              title={target.canDistribute ? label : `${label} (select 3 or more)`}
-              disabled={!target.canDistribute}
-              onClick={() => engine.translateShapes(distributeMoves(target.boxes, axis))}
+              title={label}
+              onClick={() => distribute(axis)}
             >
               <Icon aria-hidden />
             </Button>
           ))}
         </div>
+      )}
+      {!inBin && !target.canDistribute && (
+        <p className="text-[11px] text-zinc-500">Select 3 or more to distribute.</p>
       )}
     </div>
   )

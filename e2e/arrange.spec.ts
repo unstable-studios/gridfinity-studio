@@ -169,12 +169,13 @@ test('distribute three shapes with equal gaps', async () => {
   await page.mouse.click(740, 220)
   await page.keyboard.up('Shift')
   await expect(page.getByRole('button', { name: 'Align left', exact: true })).toBeEnabled()
-  await expect(distribute).toBeDisabled()
+  await expect(distribute).toHaveCount(0)
+  await expect(page.getByText('Select 3 or more to distribute.')).toBeVisible()
 
   await page.keyboard.down('Shift')
   await page.mouse.click(670, 220)
   await page.keyboard.up('Shift')
-  await expect(distribute).toBeEnabled()
+  await expect(page.getByText('Select 3 or more to distribute.')).toHaveCount(0)
   await distribute.click()
 
   const after = sorted(await app.save(file))
