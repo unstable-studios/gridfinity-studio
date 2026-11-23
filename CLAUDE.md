@@ -15,6 +15,8 @@ pnpm build            # Typecheck + electron-vite build
 pnpm typecheck        # Run type checking (separate node + web passes)
 pnpm lint             # ESLint with cache
 pnpm test             # Vitest unit and contract tests
+pnpm test:e2e         # Build, then drive the real app with Playwright (e2e/)
+pnpm verify           # typecheck + lint + test + test:e2e — run before calling work done
 pnpm format           # Prettier formatting
 pnpm build:mac        # macOS build
 pnpm build:linux      # Linux build
@@ -121,6 +123,15 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
 - **Release**: release-please for automated versioning and CHANGELOG
 - **Project files**: `.gfstudio` (JSON, schema v0.5.0)
+
+## Verifying Changes
+
+`pnpm verify` is the definition of done. It ends with the end-to-end smoke suite in `e2e/`, which launches the built Electron app with Playwright and drives the core flow: new project → add bin → draw a pocket → save → undo/redo → 3D preview → export 3MF and STL → reopen.
+
+- `e2e/app.ts` holds the helpers: launching with an isolated user-data directory, stubbing native file dialogs, tools, menus, and saving.
+- Tests find things on the canvas without test hooks: draw a shape, save, and derive the world→screen mapping from the saved geometry (`mappingFromDrawnRect`).
+- A failed run leaves a trace and screenshots in `e2e/.results/`; a passing run leaves `preview.png` of the 3D view. Look at it after visual changes.
+- When a change adds or alters a user flow, extend the smoke suite in the same change.
 
 ## Development Principles
 

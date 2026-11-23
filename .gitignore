@@ -53,3 +53,5 @@ vite.svg
 ### act (local GitHub Actions)
 act-*.log
 
+### Playwright end-to-end results
+e2e/.results/
