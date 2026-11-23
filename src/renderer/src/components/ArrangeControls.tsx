@@ -4,13 +4,15 @@ import {
   AlignCenterVertical,
   AlignEndHorizontal,
   AlignEndVertical,
+  AlignHorizontalSpaceAround,
   AlignStartHorizontal,
-  AlignStartVertical
+  AlignStartVertical,
+  AlignVerticalSpaceAround
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { LayoutEngine } from '@/layout-engine'
-import { alignMoves } from '@/layout-engine/arrange'
-import type { AlignMode } from '@/layout-engine/arrange'
+import { alignMoves, distributeMoves } from '@/layout-engine/arrange'
+import type { AlignMode, DistributeAxis } from '@/layout-engine/arrange'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import type { ArrangeTarget } from '@/layout-engine/arrange-target'
 
@@ -21,6 +23,11 @@ const ALIGN_ACTIONS: Array<{ mode: AlignMode; label: string; icon: LucideIcon }>
   { mode: 'top', label: 'Align top', icon: AlignStartHorizontal },
   { mode: 'centerY', label: 'Align vertical centers', icon: AlignCenterHorizontal },
   { mode: 'bottom', label: 'Align bottom', icon: AlignEndHorizontal }
+]
+
+const DISTRIBUTE_ACTIONS: Array<{ axis: DistributeAxis; label: string; icon: LucideIcon }> = [
+  { axis: 'horizontal', label: 'Distribute horizontally', icon: AlignHorizontalSpaceAround },
+  { axis: 'vertical', label: 'Distribute vertically', icon: AlignVerticalSpaceAround }
 ]
 
 const IN_BIN_LABELS: Partial<Record<AlignMode, string>> = {
@@ -72,6 +79,24 @@ export default function ArrangeControls({
           }
         )}
       </div>
+      {!inBin && (
+        <div role="group" aria-label="Distribute" className="grid grid-cols-6 gap-1">
+          {DISTRIBUTE_ACTIONS.map(({ axis, label, icon: Icon }) => (
+            <Button
+              key={axis}
+              variant="outline"
+              size="icon-sm"
+              className="w-full"
+              aria-label={label}
+              title={target.canDistribute ? label : `${label} (select 3 or more)`}
+              disabled={!target.canDistribute}
+              onClick={() => engine.translateShapes(distributeMoves(target.boxes, axis))}
+            >
+              <Icon aria-hidden />
+            </Button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

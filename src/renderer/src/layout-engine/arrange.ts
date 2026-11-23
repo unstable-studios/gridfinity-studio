@@ -1,5 +1,5 @@
 /**
- * Engine-agnostic align math. Works on world-space bounding boxes
+ * Engine-agnostic align and distribute math. Works on world-space bounding boxes
  * (screen-y-down: minY is the top edge) and returns how far each shape has to
  * move. Shapes that are already in place are left out.
  */
@@ -8,6 +8,8 @@ import type { ShapeAABB } from './containment'
 
 export const ALIGN_MODES = ['left', 'centerX', 'right', 'top', 'centerY', 'bottom'] as const
 export type AlignMode = (typeof ALIGN_MODES)[number]
+
+export type DistributeAxis = 'horizontal' | 'vertical'
 
 export interface ArrangeBox extends ShapeAABB {
   id: string
@@ -65,5 +67,36 @@ export function alignMoves(
       case 'bottom':
         return [0, frame.maxY - box.maxY]
     }
+  })
+}
+
+/**
+ * Space `boxes` so the gaps between neighbors are equal along `axis`. The
+ * first and last box, by center, stay where they are. Needs at least three.
+ * When the boxes are too big to fit between the outer two, the equal gap is
+ * negative and they overlap evenly.
+ */
+export function distributeMoves(boxes: ArrangeBox[], axis: DistributeAxis): ShapeMove[] {
+  if (boxes.length < 3) return []
+  const min = (b: ArrangeBox): number => (axis === 'horizontal' ? b.minX : b.minY)
+  const max = (b: ArrangeBox): number => (axis === 'horizontal' ? b.maxX : b.maxY)
+  const center = (b: ArrangeBox): number => (min(b) + max(b)) / 2
+
+  const sorted = [...boxes].sort((a, b) => center(a) - center(b))
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  const middle = sorted.slice(1, -1)
+  const middleSize = middle.reduce((sum, b) => sum + (max(b) - min(b)), 0)
+  const gap = (min(last) - max(first) - middleSize) / (sorted.length - 1)
+
+  const target = new Map<string, number>()
+  let cursor = max(first) + gap
+  for (const box of middle) {
+    target.set(box.id, cursor - min(box))
+    cursor += max(box) - min(box) + gap
+  }
+  return toMoves(boxes, (box) => {
+    const d = target.get(box.id) ?? 0
+    return axis === 'horizontal' ? [d, 0] : [0, d]
   })
 }

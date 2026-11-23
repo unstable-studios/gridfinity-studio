@@ -138,3 +138,59 @@ test('align pockets to each other and center one in its bin', async () => {
 
   expect(app.errors).toEqual([])
 })
+
+test('distribute three shapes with equal gaps', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'distribute.gfstudio')
+  const distribute = page.getByRole('button', { name: 'Distribute horizontally', exact: true })
+  const sorted = (p: SavedProject): SavedShape[] =>
+    [...p.layoutSnapshot.shapes].sort((a, b) => a.x - b.x)
+  const gaps = (shapes: SavedShape[]): number[] =>
+    shapes.slice(1).map((s, i) => s.x - s.width! / 2 - (shapes[i].x + shapes[i].width! / 2))
+
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // Three rectangles of different widths, unevenly spaced, on empty canvas.
+  for (const [from, to] of [
+    [650, 690],
+    [710, 770],
+    [900, 930]
+  ]) {
+    await app.selectTool('Rect')
+    await app.drag({ x: from, y: 200 }, { x: to, y: 240 })
+  }
+  await app.expectShapeCount(3)
+  const before = sorted(await app.save(file))
+  expect(gaps(before)[0]).not.toBeCloseTo(gaps(before)[1], 1)
+
+  // Two selected: align is offered, distribute is not.
+  await page.keyboard.down('Shift')
+  await page.mouse.click(740, 220)
+  await page.keyboard.up('Shift')
+  await expect(page.getByRole('button', { name: 'Align left', exact: true })).toBeEnabled()
+  await expect(distribute).toBeDisabled()
+
+  await page.keyboard.down('Shift')
+  await page.mouse.click(670, 220)
+  await page.keyboard.up('Shift')
+  await expect(distribute).toBeEnabled()
+  await distribute.click()
+
+  const after = sorted(await app.save(file))
+  expect(
+    after.map((s) => s.id),
+    'order is unchanged'
+  ).toEqual(before.map((s) => s.id))
+  expect(gaps(after)[0], 'gaps are equal').toBeCloseTo(gaps(after)[1], 3)
+  expect(after[0].x, 'first shape stays').toBeCloseTo(before[0].x, 3)
+  expect(after[2].x, 'last shape stays').toBeCloseTo(before[2].x, 3)
+  expect(after[1].y, 'only x changes').toBeCloseTo(before[1].y, 3)
+
+  // One undo step.
+  await app.menu('Edit', /^Undo/)
+  const undone = sorted(await app.save(file))
+  expect(undone[1].x, 'undo puts the middle shape back').toBeCloseTo(before[1].x, 3)
+
+  expect(app.errors).toEqual([])
+})
