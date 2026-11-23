@@ -2,15 +2,12 @@ import { dialog } from 'electron'
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import type { BrowserWindow } from 'electron'
+import type { FailureReason, OperationResult } from '../shared/types/results'
 
 /**
  * Result of export operations
  */
-export interface ExportResult {
-  success: boolean
-  error?: string
-  data?: string
-}
+export type ExportResult = OperationResult<string>
 
 /**
  * A single file in a batch export
@@ -23,6 +20,7 @@ export interface BatchExportFile {
 export interface BatchExportResult {
   success: boolean
   error?: string
+  reason?: FailureReason
   exported: number
   directory?: string
 }
@@ -38,7 +36,7 @@ export async function exportSTL(win: BrowserWindow, stlData: ArrayBuffer): Promi
   })
 
   if (result.canceled || !result.filePath) {
-    return { success: false, error: 'Export cancelled' }
+    return { success: false, reason: 'cancelled' }
   }
 
   try {
@@ -47,7 +45,7 @@ export async function exportSTL(win: BrowserWindow, stlData: ArrayBuffer): Promi
   } catch (err) {
     return {
       success: false,
-      error: `Failed to export STL: ${err instanceof Error ? err.message : String(err)}`
+      error: err instanceof Error ? err.message : String(err)
     }
   }
 }
@@ -63,7 +61,7 @@ export async function export3MF(win: BrowserWindow, data: ArrayBuffer): Promise<
   })
 
   if (result.canceled || !result.filePath) {
-    return { success: false, error: 'Export cancelled' }
+    return { success: false, reason: 'cancelled' }
   }
 
   try {
@@ -72,7 +70,7 @@ export async function export3MF(win: BrowserWindow, data: ArrayBuffer): Promise<
   } catch (err) {
     return {
       success: false,
-      error: `Failed to export 3MF: ${err instanceof Error ? err.message : String(err)}`
+      error: err instanceof Error ? err.message : String(err)
     }
   }
 }
@@ -90,7 +88,7 @@ export async function exportBatch(
   })
 
   if (result.canceled || result.filePaths.length === 0) {
-    return { success: false, error: 'Export cancelled', exported: 0 }
+    return { success: false, reason: 'cancelled', exported: 0 }
   }
 
   const dir = result.filePaths[0]
@@ -109,7 +107,7 @@ export async function exportBatch(
   } catch (err) {
     return {
       success: false,
-      error: `Batch export failed: ${err instanceof Error ? err.message : String(err)}`,
+      error: err instanceof Error ? err.message : String(err),
       exported
     }
   }

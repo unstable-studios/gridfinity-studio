@@ -36,7 +36,7 @@ src/renderer/       → React SPA: UI components, Three.js viewport, hooks
 src/shared/         → Shared across all processes: types, schemas, validation
 ```
 
-IPC communication flows through `window.api.project.*` methods (save, load, validate). All IPC handlers return `OperationResult<T>` for consistent error handling.
+IPC communication flows through `window.api.project.*` methods (save, load, validate). All IPC handlers return `OperationResult<T>` (`src/shared/types/results.ts`). A failure carries the underlying `error` detail and, where it applies, a `reason`: `cancelled` (dialog dismissed, not an error) or `invalid` (not a valid project file). The project store turns failures into notices (`lib/project-notices.ts`), so every save, open and export shows its outcome.
 
 ### Key Data Flow
 

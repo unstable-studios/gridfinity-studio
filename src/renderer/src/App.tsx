@@ -3,7 +3,7 @@ import Navbar from '@/components/Navbar'
 import Sidebar from '@/components/Sidebar'
 import Viewport from '@/components/Viewport'
 import WelcomeScreen from '@/components/WelcomeScreen'
-import { ThemeProvider } from '@unstable-studios/ui'
+import { ThemeProvider, Toaster, useTheme } from '@unstable-studios/ui'
 import { AppModeCtx, useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
 import { useBinBaker } from '@/hooks/useBinBaker'
@@ -20,6 +20,12 @@ function BakeLoop(): null {
   const { mode } = useAppMode()
   useBinBaker(mode === 'review')
   return null
+}
+
+/** Where save, open and export outcomes appear; see lib/project-notices. */
+function Notices(): React.JSX.Element {
+  const { resolvedTheme } = useTheme()
+  return <Toaster position="bottom-right" closeButton theme={resolvedTheme} />
 }
 
 function AppContent(): React.JSX.Element {
@@ -81,6 +87,7 @@ export default function App(): React.JSX.Element {
           <div className="flex h-screen flex-col bg-background text-foreground">
             <AppContent />
           </div>
+          <Notices />
         </ReviewPrefsCtx.Provider>
       </AppModeCtx.Provider>
     </ThemeProvider>

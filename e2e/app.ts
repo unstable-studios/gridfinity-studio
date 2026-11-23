@@ -80,6 +80,14 @@ export class StudioApp {
     }, filePath)
   }
 
+  /** Make the next native save and open dialogs behave as if dismissed. */
+  async stubDialogsCancelled(): Promise<void> {
+    await this.electronApp.evaluate(({ dialog }) => {
+      dialog.showSaveDialog = () => Promise.resolve({ canceled: true, filePath: '' })
+      dialog.showOpenDialog = () => Promise.resolve({ canceled: true, filePaths: [] })
+    })
+  }
+
   async menu(menuName: string, item: string | RegExp): Promise<void> {
     await this.page.getByRole('menuitem', { name: menuName, exact: true }).click()
     await this.page.getByRole('menuitem', { name: item }).click()
