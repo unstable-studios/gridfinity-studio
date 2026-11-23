@@ -11,12 +11,10 @@ const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
     shortcuts: ['Shift+click — add to selection', 'Middle-drag — pan', 'Scroll — zoom']
   },
   rectangle: {
-    text: 'Drag to draw a rectangle.',
-    shortcuts: ['Esc — cancel']
+    text: 'Drag to draw a rectangle.'
   },
   circle: {
-    text: 'Drag to draw a circle.',
-    shortcuts: ['Esc — cancel']
+    text: 'Drag to draw a circle.'
   },
   polygon: {
     text: 'Click to add points. Click the first point to finish.',
@@ -26,7 +24,7 @@ const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
 
 const PREVIEW_HINT: HintEntry = {
   text: 'Drag to orbit the model.',
-  shortcuts: ['Scroll — zoom', 'Middle-drag — pan']
+  shortcuts: ['Scroll — zoom', 'Right-drag — pan']
 }
 
 export function getHint(mode: AppMode, activeTool: ActiveTool): HintEntry {

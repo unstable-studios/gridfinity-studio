@@ -244,7 +244,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     },
 
     createNewProject: (config) => {
-      const project = createEmptyProject(config?.name ?? 'Untitled Project')
+      const project = createEmptyProject(config?.name ?? 'Untitled project')
       if (config?.baseUnit) {
         project.gridfinity.baseUnit = config.baseUnit
         project.gridfinity.gridSpacing = config.baseUnit

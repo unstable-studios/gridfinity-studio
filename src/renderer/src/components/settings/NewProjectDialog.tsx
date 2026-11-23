@@ -23,19 +23,19 @@ export default function NewProjectDialog({
   onOpenChange,
   onCreate
 }: NewProjectDialogProps): React.JSX.Element {
-  const [name, setName] = useState('Untitled Project')
+  const [name, setName] = useState('Untitled project')
   const [baseUnit, setBaseUnit] = useState(42)
   const [preset, setPreset] = useState<TolerancePreset>('standard')
 
   const handleCreate = (): void => {
     onCreate({
-      name: name.trim() || 'Untitled Project',
+      name: name.trim() || 'Untitled project',
       baseUnit,
       tolerance: TOLERANCE_PRESETS[preset]
     })
     onOpenChange(false)
     // Reset for next time
-    setName('Untitled Project')
+    setName('Untitled project')
     setBaseUnit(42)
     setPreset('standard')
   }
@@ -45,7 +45,7 @@ export default function NewProjectDialog({
       open={open}
       onOpenChange={(isOpen) => {
         if (!isOpen) {
-          setName('Untitled Project')
+          setName('Untitled project')
           setBaseUnit(42)
           setPreset('standard')
         }

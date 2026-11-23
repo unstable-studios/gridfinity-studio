@@ -94,7 +94,7 @@ function UnitsTab(): React.JSX.Element {
     <div className="space-y-4">
       <div>
         <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Display Unit
+          Display unit
         </label>
         <ToggleGroup
           type="single"

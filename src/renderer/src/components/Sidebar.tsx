@@ -301,12 +301,12 @@ function PreviewSidebar(): React.JSX.Element {
   const export3MF = useProject((s) => s.export3MF)
   const filePath = useProject((s) => s.filePath)
   const projectName = useMemo(() => {
-    if (!filePath) return 'Untitled Project'
+    if (!filePath) return 'Untitled project'
     return (
       filePath
         .split(/[\\/]/)
         .pop()
-        ?.replace(/\.gfstudio$/i, '') ?? 'Untitled Project'
+        ?.replace(/\.gfstudio$/i, '') ?? 'Untitled project'
     )
   }, [filePath])
 
@@ -407,7 +407,7 @@ function PreviewSidebar(): React.JSX.Element {
           >
             Export STL…
           </Button>
-          {!allReady && totalBins > 0 && (
+          {!allReady && !anyError && totalBins > 0 && (
             <p className="text-[10px] text-zinc-500">Building the model…</p>
           )}
         </div>
@@ -425,7 +425,7 @@ function ProjectNameHeader(): React.JSX.Element {
         .split(/[\\/]/)
         .pop()!
         .replace(/\.gfstudio$/, '')
-    : 'Untitled Project'
+    : 'Untitled project'
 
   return (
     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate">{name}</p>

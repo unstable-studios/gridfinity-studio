@@ -104,7 +104,7 @@ export default function GridfinitySettings({
       {/* Mounting options */}
       <div className="space-y-3">
         <Label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          Mounting Options
+          Mounting options
         </Label>
         <ToggleRow
           label="Magnet holes"

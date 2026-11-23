@@ -42,7 +42,7 @@ const GITHUB_REPO = 'https://github.com/unstable-studios/gridfinity-studio'
 
 function useProjectName(): string {
   const filePath = useProject((s) => s.filePath)
-  if (!filePath) return 'Untitled Project'
+  if (!filePath) return 'Untitled project'
   const fileName = filePath.split(/[\\/]/).pop() ?? filePath
   return fileName.replace(/\.gfstudio$/i, '')
 }
@@ -370,7 +370,7 @@ function badgeStyle(state: UpdateState): { color: string; srLabel: string } | nu
     case 'downloaded':
       return { color: 'bg-green-500', srLabel: 'Update ready to install' }
     case 'error':
-      return { color: 'bg-red-500', srLabel: 'Couldn’t check for updates' }
+      return { color: 'bg-red-500', srLabel: 'Update failed' }
     default:
       return null
   }
@@ -436,7 +436,7 @@ function UpdateStatusMenuItem({
   // error
   return (
     <MenubarItem disabled className="opacity-70 cursor-default text-xs text-red-500">
-      Couldn’t check for updates
+      Update failed
     </MenubarItem>
   )
 }

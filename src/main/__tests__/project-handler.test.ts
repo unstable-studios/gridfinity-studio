@@ -22,7 +22,7 @@ describe('project-handler', () => {
       const result = newProject()
       const project = result.data!
 
-      expect(project.settings.name).toBe('Untitled Project')
+      expect(project.settings.name).toBe('Untitled project')
       expect(project.settings.units).toBe('mm')
       expect(project.settings.createdAt).toBeTruthy()
       expect(project.settings.modifiedAt).toBeTruthy()
