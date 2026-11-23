@@ -69,6 +69,21 @@ test('edit bins and pockets', async () => {
     .soft(saved.layoutSnapshot.groups[0].childIds, 'dragged out: bin has no children')
     .toEqual([])
 
+  // The drag is one undo step: undo puts the pocket back in the bin where it
+  // was, and redo takes it out again.
+  await app.menu('Edit', /^Undo/)
+  saved = await app.save(file)
+  pocket = shapeById(saved, pocketId)
+  expect.soft(pocket.groupId, 'undo drag out: back in the bin').toBe(bin.id)
+  expect.soft(pocket.x, 'undo drag out: original x').toBeCloseTo(pocketInBin.x, 0)
+  expect.soft(pocket.y, 'undo drag out: original y').toBeCloseTo(pocketInBin.y, 0)
+  expect
+    .soft(saved.layoutSnapshot.groups[0].childIds, 'undo drag out: bin lists the pocket')
+    .toEqual([pocketId])
+  await app.menu('Edit', /^Redo/)
+  saved = await app.save(file)
+  expect.soft(shapeById(saved, pocketId).groupId, 'redo drag out: unassigned').toBeNull()
+
   await app.drag(outside, pocketAt)
   saved = await app.save(file)
   pocket = shapeById(saved, pocketId)

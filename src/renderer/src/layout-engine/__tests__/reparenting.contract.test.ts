@@ -314,4 +314,70 @@ describe('Reparenting matrix', () => {
     expect(engine.getGroup('a')!.childIds).not.toContain('r')
     expect(engine.getGroup('b')!.childIds).not.toContain('r')
   })
+
+  // ─── Events ──────────────────────────────────────────────────────────────
+
+  it('addToGroup and removeFromGroup emit groupChanged with the new children', () => {
+    engine.createGroup(makeGroup({ id: 'a', x: 0, y: 100, width: 100, height: 100 }))
+    engine.createGroup(makeGroup({ id: 'b', x: 200, y: 100, width: 100, height: 100 }))
+    engine.addShape(makeRect({ id: 'r', x: 40, y: 60 }))
+    const events: Array<{ groupId: string; childIds: string[] }> = []
+    engine.on('groupChanged', (e) => events.push(e))
+
+    engine.addToGroup('r', 'a')
+    expect(events).toEqual([{ groupId: 'a', childIds: ['r'] }])
+
+    // Moving between bins reports both, each already in its final state.
+    events.length = 0
+    engine.addToGroup('r', 'b')
+    expect(events).toEqual([
+      { groupId: 'a', childIds: [] },
+      { groupId: 'b', childIds: ['r'] }
+    ])
+
+    events.length = 0
+    engine.removeFromGroup('r')
+    expect(events).toEqual([{ groupId: 'b', childIds: [] }])
+
+    // No change, no event.
+    events.length = 0
+    engine.removeFromGroup('r')
+    expect(events).toEqual([])
+  })
+
+  it('batch delivers events after the last mutation', () => {
+    engine.createGroup(makeGroup({ id: 'bin', x: 0, y: 100, width: 100, height: 100 }))
+    const seen: Array<{ event: string; groupId: string | null | undefined }> = []
+    const record = (event: string) => () =>
+      seen.push({ event, groupId: engine.getShape('r')?.groupId })
+    engine.on('shapeCreated', record('shapeCreated'))
+    engine.on('groupChanged', record('groupChanged'))
+
+    engine.batch(() => {
+      engine.addShape(makeRect({ id: 'r', x: 40, y: 60 }))
+      engine.addToGroup('r', 'bin')
+      expect(seen).toEqual([])
+    })
+
+    expect(seen).toEqual([
+      { event: 'shapeCreated', groupId: 'bin' },
+      { event: 'groupChanged', groupId: 'bin' }
+    ])
+  })
+
+  it('batch delivers events raised before an error', () => {
+    const created: string[] = []
+    engine.on('shapeCreated', (e) => created.push(e.shape.id))
+
+    expect(() =>
+      engine.batch(() => {
+        engine.addShape(makeRect({ id: 'r' }))
+        throw new Error('boom')
+      })
+    ).toThrow('boom')
+
+    expect(created).toEqual(['r'])
+    engine.addShape(makeRect({ id: 'r2' }))
+    expect(created).toEqual(['r', 'r2'])
+  })
 })

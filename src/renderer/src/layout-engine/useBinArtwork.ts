@@ -98,8 +98,8 @@ export function useBinArtwork(
   // the new canvas objects.
   useEffect(() => {
     if (!engine) return
-    return engine.on('groupChanged', ({ childIds }) => {
-      if (childIds.length === 0) {
+    return engine.on('groupChanged', ({ groupId }) => {
+      if (!engine.getGroup(groupId)) {
         prevKeysRef.current = new Map()
       }
     })
