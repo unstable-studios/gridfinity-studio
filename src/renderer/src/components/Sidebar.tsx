@@ -60,6 +60,21 @@ function LayoutSidebar(): React.JSX.Element {
     return shapes.find((s) => s.id === selectedIds[0]) ?? null
   }, [selectedIds, shapes])
 
+  // Move the selected shape so its X or Y reads `to`. Goes through
+  // translateShapes so the move is an undo step and the shape changes bin
+  // when its center leaves the one it is in.
+  const moveSelectedShapeTo = (to: { x?: number; y?: number }): void => {
+    const current = selectedShape && engine?.getShape(selectedShape.id)
+    if (!engine || !current) return
+    engine.translateShapes([
+      {
+        id: current.id,
+        dx: to.x === undefined ? 0 : to.x - current.x,
+        dy: to.y === undefined ? 0 : to.y - current.y
+      }
+    ])
+  }
+
   // Which arrange buttons to offer. Follows shapes and groups so it is not
   // measured again on every pan and zoom.
   const arrange = useMemo(
@@ -272,14 +287,14 @@ function LayoutSidebar(): React.JSX.Element {
               value={selectedShape.x}
               step={1}
               precision={1}
-              onChange={(v) => engine?.updateShape(selectedShape.id, { x: v })}
+              onChange={(v) => moveSelectedShapeTo({ x: v })}
             />
             <NumericInput
               label="Y"
               value={selectedShape.y}
               step={1}
               precision={1}
-              onChange={(v) => engine?.updateShape(selectedShape.id, { y: v })}
+              onChange={(v) => moveSelectedShapeTo({ y: v })}
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
           </div>

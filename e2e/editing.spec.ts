@@ -194,3 +194,40 @@ test('edit bins and pockets', async () => {
     .toEqual([])
   expect.soft(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('typing a position in the sidebar is one undo step', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'position.gfstudio')
+  // The value button next to the X label; clicking it turns it into an input.
+  const xField = page
+    .locator('aside')
+    .locator('xpath=.//span[normalize-space(.)="X"]/following-sibling::div[1]')
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  await app.selectTool('Rect')
+  await app.drag({ x: 700, y: 300 }, { x: 780, y: 360 })
+  await app.expectShapeCount(1)
+  const drawn = (await app.save(file)).layoutSnapshot.shapes[0]
+
+  // Drawing leaves the shape selected, so its properties are showing.
+  const target = Math.round(drawn.x) + 10
+  await xField.getByRole('button').click()
+  await xField.locator('input').fill(String(target))
+  await xField.locator('input').press('Enter')
+  await expect(xField.getByRole('button')).toHaveText(target.toFixed(1))
+  let saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'moved to the typed X').toBeCloseTo(target, 3)
+  expect(saved.layoutSnapshot.shapes[0].y, 'Y untouched').toBeCloseTo(drawn.y, 3)
+
+  await app.menu('Edit', /^Undo/)
+  await app.expectShapeCount(1)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'undo restores X').toBeCloseTo(drawn.x, 3)
+
+  await app.menu('Edit', /^Redo/)
+  saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].x, 'redo applies the typed X').toBeCloseTo(target, 3)
+
+  expect(app.errors).toEqual([])
+})

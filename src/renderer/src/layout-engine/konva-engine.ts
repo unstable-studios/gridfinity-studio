@@ -423,18 +423,25 @@ export class KonvaEngine implements LayoutEngine {
 
     this.mainLayer?.batchDraw()
 
-    // Emit a generic update event for any patch that doesn't already have
-    // a more specific event (move/resize). React subscribers tick on this
-    // so the sidebar / tooltip pick up metadata changes (depth, name, …).
-    const isPositionOnly =
-      Object.keys(patch).length > 0 &&
-      Object.keys(patch).every((k) => k === 'x' || k === 'y' || k === 'id')
+    // Report the change: a move, a resize, or a generic update for anything
+    // else (metadata such as depth or name). Listeners record undo steps and
+    // refresh the sidebar from these.
+    const keys = Object.keys(patch).filter((k) => k !== 'id')
+    const isPositionOnly = keys.length > 0 && keys.every((k) => k === 'x' || k === 'y')
     const isResizeOnly =
-      Object.keys(patch).length > 0 &&
-      Object.keys(patch).every(
-        (k) => k === 'width' || k === 'height' || k === 'radiusX' || k === 'radiusY' || k === 'id'
-      )
-    if (!isPositionOnly && !isResizeOnly) {
+      keys.length > 0 &&
+      keys.every((k) => k === 'width' || k === 'height' || k === 'radiusX' || k === 'radiusY')
+    if (isPositionOnly) {
+      this.emit('shapeMoved', { id, x: updated.x, y: updated.y })
+    } else if (isResizeOnly) {
+      this.emit('shapeResized', {
+        id,
+        ...('width' in patch && { width: patch.width }),
+        ...('height' in patch && { height: patch.height }),
+        ...('radiusX' in patch && { radiusX: patch.radiusX }),
+        ...('radiusY' in patch && { radiusY: patch.radiusY })
+      })
+    } else {
       this.emit('shapeUpdated', { id })
     }
   }
