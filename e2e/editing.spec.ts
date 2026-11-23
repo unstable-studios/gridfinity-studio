@@ -289,3 +289,82 @@ test('changing a position in the sidebar is one undo step', async () => {
 
   expect(app.errors).toEqual([])
 })
+
+test('a pocket position reads on the canvas or in its bin', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'frame.gfstudio')
+  const xValue = page
+    .locator('aside')
+    .locator('xpath=.//span[normalize-space(.)="X"]/following-sibling::div[1]')
+  const frame = (name: 'Canvas' | 'Bin'): ReturnType<typeof page.getByRole> =>
+    page.getByRole('radio', { name, exact: true })
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.expectBinCount(1)
+
+  // Calibrate world→screen from a rectangle drawn on empty canvas. A shape
+  // outside every bin is on the canvas already, so there is nothing to pick.
+  const looseFrom = { x: 820, y: 180 }
+  const looseTo = { x: 880, y: 230 }
+  await app.selectTool('Rect')
+  await app.drag(looseFrom, looseTo)
+  await app.expectShapeCount(1)
+  await expect(frame('Bin')).toHaveCount(0)
+  let saved = await app.save(file)
+  const loose = saved.layoutSnapshot.shapes[0]
+  const toScreen = mappingFromDrawnRect(loose, looseFrom, looseTo)
+  const bin = saved.layoutSnapshot.groups[0]
+  const binCenterX = bin.x + bin.width / 2
+
+  // A pocket in the bin, left of center. Drawing leaves it selected.
+  await app.selectTool('Rect')
+  await app.drag(
+    toScreen({ x: bin.x + bin.width * 0.2, y: bin.y - bin.height * 0.7 }),
+    toScreen({ x: bin.x + bin.width * 0.4, y: bin.y - bin.height * 0.5 })
+  )
+  await app.expectShapeCount(2)
+  saved = await app.save(file)
+  const pocketId = saved.layoutSnapshot.shapes.find((s) => s.id !== loose.id)!.id
+  const pocket = (p: SavedProject): SavedShape =>
+    p.layoutSnapshot.shapes.find((s) => s.id === pocketId)!
+  // The file stores a pocket relative to its bin's center.
+  const storedX = pocket(saved).x
+  expect(pocket(saved).groupId).toBe(bin.id)
+  expect(storedX).toBeLessThan(0)
+
+  // Canvas is the default: X is where the pocket is on the canvas.
+  await expect(frame('Canvas')).toBeChecked()
+  await expect(xValue.getByRole('button')).toHaveText((binCenterX + storedX).toFixed(1))
+
+  // Bin shows the same pocket relative to the bin's center.
+  await frame('Bin').click()
+  await expect(xValue.getByRole('button')).toHaveText(storedX.toFixed(1))
+  await frame('Canvas').click()
+
+  // A value typed on the canvas reads back as typed, and moves the pocket by
+  // the difference.
+  const typed = Math.round(binCenterX + storedX) + 6
+  await xValue.getByRole('button').click()
+  await xValue.locator('input').fill(String(typed))
+  await xValue.locator('input').press('Enter')
+  await expect(xValue.getByRole('button')).toHaveText(typed.toFixed(1))
+  saved = await app.save(file)
+  expect(pocket(saved).x, 'stored relative to the bin').toBeCloseTo(typed - binCenterX, 3)
+  expect(pocket(saved).groupId).toBe(bin.id)
+
+  // Typed far enough to leave the bin: the pocket is unassigned and the
+  // field still shows what was typed.
+  const outside = Math.round(bin.x + bin.width + 30)
+  await xValue.getByRole('button').click()
+  await xValue.locator('input').fill(String(outside))
+  await xValue.locator('input').press('Enter')
+  await expect(xValue.getByRole('button')).toHaveText(outside.toFixed(1))
+  await expect(frame('Bin')).toHaveCount(0)
+  saved = await app.save(file)
+  expect(pocket(saved).groupId, 'left the bin').toBeNull()
+  expect(pocket(saved).x, 'stored on the canvas').toBeCloseTo(outside, 3)
+
+  expect(app.errors).toEqual([])
+})
