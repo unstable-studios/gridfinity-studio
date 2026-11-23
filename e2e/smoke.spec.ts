@@ -39,7 +39,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   const projectPath = join(app.dir, 'smoke.gfstudio')
 
   // ── New project, one bin ────────────────────────────────────────────────
-  await page.getByRole('button', { name: 'New Project' }).click()
+  await page.getByRole('button', { name: 'New project' }).click()
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
   await app.expectBinCount(1)
 
@@ -86,7 +86,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
 
   // ── 3D preview ──────────────────────────────────────────────────────────
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
-  await expect(page.getByText(/\bready$/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/\bReady$/)).toBeVisible({ timeout: 30_000 })
   // Kept in e2e/.results for a human (or agent) to look at; not asserted.
   await page.screenshot({ path: testInfo.outputPath('preview.png') })
 
@@ -120,7 +120,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   await app.close()
   app = await StudioApp.launch()
   await app.stubOpenDialog(projectPath)
-  await app.page.getByRole('button', { name: 'Open Project' }).click()
+  await app.page.getByRole('button', { name: 'Open project' }).click()
   await app.expectBinCount(1)
   await app.expectShapeCount(2)
   // Loading is not an undoable edit.
@@ -129,7 +129,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   await app.page.keyboard.press('Escape')
   const reopenedPath = join(app.dir, 'reopened.gfstudio')
   await app.stubSaveDialog(reopenedPath)
-  await app.menu('File', /^Save As/)
+  await app.menu('File', /^Save as/)
   await expect.poll(() => readFile(reopenedPath, 'utf8').catch(() => '')).not.toBe('')
   const reopened = JSON.parse(await readFile(reopenedPath, 'utf8')) as SavedProject
   expect(reopened.layoutSnapshot).toEqual(saved.layoutSnapshot)

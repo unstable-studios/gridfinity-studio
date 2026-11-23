@@ -16,7 +16,7 @@ test('edit bins and pockets', async () => {
   const shapeById = (p: SavedProject, id: string): SavedShape =>
     p.layoutSnapshot.shapes.find((s) => s.id === id)!
 
-  await page.getByRole('button', { name: 'New Project' }).click()
+  await page.getByRole('button', { name: 'New project' }).click()
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
 
   // Calibrate world→screen from a rectangle drawn on empty canvas.
@@ -49,7 +49,7 @@ test('edit bins and pockets', async () => {
 
   // Click selects it.
   await page.mouse.click(pocketAt.x, pocketAt.y)
-  await expect.soft(page.getByText('Shape Properties'), 'click selects pocket').toBeVisible()
+  await expect.soft(page.getByText('Shape properties'), 'click selects pocket').toBeVisible()
 
   // Turning Auto off gives the pocket an explicit depth.
   expect.soft(pocket.metadata?.pocket?.depth ?? null, 'depth starts on Auto').toBeNull()

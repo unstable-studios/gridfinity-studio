@@ -54,16 +54,14 @@ export default function NewProjectDialog({
     >
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
-          <DialogTitle>New Project</DialogTitle>
-          <DialogDescription>
-            Configure Gridfinity grid settings. These can be changed later in Preferences.
-          </DialogDescription>
+          <DialogTitle>New project</DialogTitle>
+          <DialogDescription>Set the grid for this project.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 py-2">
           <div>
             <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
-              Project Name
+              Name
             </label>
             <input
               type="text"
@@ -78,7 +76,7 @@ export default function NewProjectDialog({
           </div>
 
           <NumericInput
-            label="Base Unit"
+            label="Base unit"
             value={baseUnit}
             suffix="mm"
             step={1}
@@ -90,7 +88,7 @@ export default function NewProjectDialog({
 
           <div>
             <label className="text-xs font-medium text-zinc-500 dark:text-zinc-400 mb-1 block">
-              Tolerance Preset
+              Tolerance
             </label>
             <div className="flex gap-1.5">
               {(['tight', 'standard', 'loose'] as const).map((p) => (

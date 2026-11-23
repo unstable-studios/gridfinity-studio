@@ -131,13 +131,13 @@ function GridfinityTab(): React.JSX.Element {
 }
 
 const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
-  layoutBg: 'Design Background',
-  layoutGrid: 'Design Grid',
-  reviewBg: 'Preview Background',
-  reviewFloor: 'Preview Floor',
-  reviewFog: 'Preview Fog',
-  meshColor: 'Mesh Color',
-  emptyState: 'Empty State'
+  layoutBg: 'Design background',
+  layoutGrid: 'Design grid',
+  reviewBg: 'Preview background',
+  reviewFloor: 'Preview floor',
+  reviewFog: 'Preview fog',
+  meshColor: 'Model color',
+  emptyState: 'Empty state'
 }
 
 function ColorSection({

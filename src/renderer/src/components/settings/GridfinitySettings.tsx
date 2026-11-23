@@ -54,24 +54,20 @@ export default function GridfinitySettings({
       {/* Grid dimensions */}
       <div className="grid grid-cols-2 gap-3">
         <NumberField
-          label="Base Unit"
+          label="Base unit"
           value={config.baseUnit}
           suffix="mm"
           disabled={hasBins}
           onChange={(v) => updateNumber('baseUnit', v)}
         />
         <NumberField
-          label="Unit Height"
+          label="Unit height"
           value={config.unitHeight}
           suffix="mm"
           onChange={(v) => updateNumber('unitHeight', v)}
         />
       </div>
-      {hasBins && (
-        <p className="text-xs text-zinc-500">
-          Base unit is locked while bins exist. Remove all bins or start a new project to change it.
-        </p>
-      )}
+      {hasBins && <p className="text-xs text-zinc-500">Remove all bins to change the base unit.</p>}
 
       {/* Tolerance with inline preset */}
       <div>
@@ -111,16 +107,16 @@ export default function GridfinitySettings({
           Mounting Options
         </Label>
         <ToggleRow
-          label="Magnet Holes"
-          description={`${config.magnetHoles.diameter}mm dia, ${config.magnetHoles.depth}mm deep`}
+          label="Magnet holes"
+          description={`${config.magnetHoles.diameter} mm diameter, ${config.magnetHoles.depth} mm deep`}
           checked={config.magnetHoles.enabled}
           onCheckedChange={(checked) =>
             onChange({ ...config, magnetHoles: { ...config.magnetHoles, enabled: checked } })
           }
         />
         <ToggleRow
-          label="Screw Holes"
-          description={`${config.screwHoles.diameter}mm dia, ${config.screwHoles.depth}mm deep`}
+          label="Screw holes"
+          description={`${config.screwHoles.diameter} mm diameter, ${config.screwHoles.depth} mm deep`}
           checked={config.screwHoles.enabled}
           onCheckedChange={(checked) =>
             onChange({ ...config, screwHoles: { ...config.screwHoles, enabled: checked } })

@@ -7,26 +7,26 @@ export interface HintEntry {
 
 const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
   select: {
-    text: 'Click to select, drag to move. Shift+click for multi-select.',
-    shortcuts: ['Shift+Click — add to selection', 'Middle-drag — pan', 'Scroll — zoom']
+    text: 'Click to select. Drag to move.',
+    shortcuts: ['Shift+click — add to selection', 'Middle-drag — pan', 'Scroll — zoom']
   },
   rectangle: {
-    text: 'Click to place a rectangle at the cursor position.',
+    text: 'Drag to draw a rectangle.',
     shortcuts: ['Esc — cancel']
   },
   circle: {
-    text: 'Click to place a circle at the cursor position.',
+    text: 'Drag to draw a circle.',
     shortcuts: ['Esc — cancel']
   },
   polygon: {
-    text: 'Click to place vertices. Close the shape to finish.',
-    shortcuts: ['Esc — cancel', 'Enter — close shape']
+    text: 'Click to add points. Click the first point to finish.',
+    shortcuts: ['Esc — cancel', 'Enter — finish']
   }
 }
 
 const PREVIEW_HINT: HintEntry = {
-  text: 'Orbit to inspect the 3D model. Export when ready.',
-  shortcuts: ['Left-drag — orbit', 'Scroll — zoom', 'Middle-drag — pan']
+  text: 'Drag to orbit the model.',
+  shortcuts: ['Scroll — zoom', 'Middle-drag — pan']
 }
 
 export function getHint(mode: AppMode, activeTool: ActiveTool): HintEntry {
