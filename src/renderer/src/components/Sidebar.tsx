@@ -3,6 +3,8 @@ import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
 import { NumericInput } from '@/components/ui/numeric-input'
+import ArrangeControls from './ArrangeControls'
+import { arrangeTarget } from '@/layout-engine/arrange-target'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
@@ -273,6 +275,12 @@ function LayoutSidebar(): React.JSX.Element {
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
           </div>
+        </SidebarSection>
+      )}
+
+      {engine && arrangeTarget(engine, selectedIds) && (
+        <SidebarSection title="Arrange">
+          <ArrangeControls engine={engine} selectedIds={selectedIds} />
         </SidebarSection>
       )}
 

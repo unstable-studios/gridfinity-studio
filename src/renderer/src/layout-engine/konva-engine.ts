@@ -15,6 +15,8 @@ import { KonvaGroupRenderer } from './konva-group-renderer'
 import { checkGroupCollision } from './collision'
 import type { HitResult } from './input-action-handler'
 import { findContainingBinGroup, findChildrenOutsideBin } from './containment'
+import type { ShapeAABB } from './containment'
+import type { ShapeMove } from './arrange'
 import { isBinGroup } from './types'
 import { depthToOpacity } from '../../../shared/types/project'
 
@@ -287,7 +289,7 @@ export class KonvaEngine implements LayoutEngine {
       // One change: listeners see the shape at its new position and in its
       // new bin together, so the move is a single undo step.
       this.batch(() => {
-        this.evaluateShapeReassignment(shape.id, node)
+        this.evaluateShapeReassignment(shape.id)
 
         const data = this.shapeMap.get(shape.id)
         if (data) {
@@ -475,6 +477,44 @@ export class KonvaEngine implements LayoutEngine {
     this.konvaMap.delete(id)
     this.mainLayer?.batchDraw()
     this.emit('shapeDeleted', { id })
+  }
+
+  getShapeBounds(id: string): ShapeAABB | undefined {
+    const node = this.konvaMap.get(id)
+    if (!node || !this.mainLayer) return undefined
+    const rect = node.getClientRect({
+      skipStroke: true,
+      skipShadow: true,
+      relativeTo: this.mainLayer
+    })
+    return { minX: rect.x, minY: rect.y, maxX: rect.x + rect.width, maxY: rect.y + rect.height }
+  }
+
+  translateShapes(moves: ShapeMove[]): void {
+    if (this.disposed) return
+    this.batch(() => {
+      const moved: string[] = []
+      for (const { id, dx, dy } of moves) {
+        const node = this.konvaMap.get(id)
+        if (!node || (dx === 0 && dy === 0)) continue
+        // Bins are neither rotated nor scaled, so a world-space offset is the
+        // same offset in a bin's local coordinates.
+        node.position({ x: node.x() + dx, y: node.y() + dy })
+        moved.push(id)
+      }
+      // Reassign after every shape is in place, then report final positions.
+      for (const id of moved) this.reassignByCentroid(id)
+      for (const id of moved) {
+        const node = this.konvaMap.get(id)
+        const data = this.shapeMap.get(id)
+        if (!node || !data) continue
+        data.x = node.x()
+        data.y = node.y()
+        this.emit('shapeMoved', { id, x: node.x(), y: node.y() })
+      }
+      this.transformer?.forceUpdate()
+      this.mainLayer?.batchDraw()
+    })
   }
 
   getShape(id: string): LayoutShape | undefined {
@@ -958,7 +998,7 @@ export class KonvaEngine implements LayoutEngine {
    * Evaluate whether a shape should be reassigned to a different bin (or unassigned)
    * based on its world-space centroid after a drag ends.
    */
-  private evaluateShapeReassignment(shapeId: string, node: Konva.Shape): void {
+  private evaluateShapeReassignment(shapeId: string): void {
     // Clear any drag highlight
     if (this.highlightedGroupId) {
       this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
@@ -968,8 +1008,14 @@ export class KonvaEngine implements LayoutEngine {
     // Skip during multi-select drag
     if ((this.transformer?.nodes().length ?? 0) > 1) return
 
+    this.reassignByCentroid(shapeId)
+  }
+
+  /** Put a shape in the bin that contains its center, or in none. */
+  private reassignByCentroid(shapeId: string): void {
     const data = this.shapeMap.get(shapeId)
-    if (!data) return
+    const node = this.konvaMap.get(shapeId)
+    if (!data || !node) return
 
     // Compute world-space centroid — use absolute position to handle grouped shapes
     const absPos = node.getAbsolutePosition()
