@@ -6,7 +6,11 @@ import { NumericInput } from '@/components/ui/numeric-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
-import { frameOffset } from '@/layout-engine/position-frame'
+import {
+  shownPositionLimits,
+  toShownPosition,
+  toStoredPosition
+} from '@/layout-engine/position-frame'
 import type { PositionFrame } from '@/layout-engine/position-frame'
 import { usePositionFrame } from '@/hooks/usePositionFrame'
 import { useProject } from '@/hooks/useProject'
@@ -72,16 +76,19 @@ function LayoutSidebar(): React.JSX.Element {
   const selectedShapeBin = selectedShape
     ? groups.find((g) => g.id === selectedShape.groupId)
     : undefined
-  const positionOffset = selectedShape
-    ? frameOffset(selectedShape, selectedShapeBin, positionFrame)
+  // Shown with the origin at the lower left and Y increasing upward.
+  const shownPosition = selectedShape
+    ? toShownPosition(selectedShape, selectedShapeBin, positionFrame)
     : { x: 0, y: 0 }
-  // Relative to the bin, a position stays inside it: a value that would put
-  // the shape's center past an edge stops at the edge, so the numbers always
-  // mean the same thing. On the canvas a shape can be moved anywhere.
-  const positionLimit =
-    selectedShapeBin && positionFrame === 'bin'
-      ? { x: selectedShapeBin.width / 2, y: selectedShapeBin.height / 2 }
-      : null
+  const positionLimits = selectedShape
+    ? shownPositionLimits(selectedShape, selectedShapeBin, positionFrame)
+    : null
+  const editShownPosition = (shown: { x?: number; y?: number }): void => {
+    if (!selectedShape) return
+    editSelectedShapePosition(
+      toStoredPosition(shown, selectedShape, selectedShapeBin, positionFrame)
+    )
+  }
 
   // Editing a shape's X or Y. Each step moves the shape for live feedback.
   // When the adjustment is finished the whole move is replayed as one change,
@@ -346,22 +353,22 @@ function LayoutSidebar(): React.JSX.Element {
             )}
             <NumericInput
               label="X"
-              value={selectedShape.x + positionOffset.x}
+              value={shownPosition.x}
               step={1}
               precision={1}
-              min={positionLimit ? -positionLimit.x : undefined}
-              max={positionLimit?.x}
-              onChange={(v) => editSelectedShapePosition({ x: v - positionOffset.x })}
+              min={positionLimits?.min.x}
+              max={positionLimits?.max.x}
+              onChange={(v) => editShownPosition({ x: v })}
               onCommit={commitPositionEdit}
             />
             <NumericInput
               label="Y"
-              value={selectedShape.y + positionOffset.y}
+              value={shownPosition.y}
               step={1}
               precision={1}
-              min={positionLimit ? -positionLimit.y : undefined}
-              max={positionLimit?.y}
-              onChange={(v) => editSelectedShapePosition({ y: v - positionOffset.y })}
+              min={positionLimits?.min.y}
+              max={positionLimits?.max.y}
+              onChange={(v) => editShownPosition({ y: v })}
               onCommit={commitPositionEdit}
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}

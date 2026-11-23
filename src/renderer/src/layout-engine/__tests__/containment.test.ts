@@ -194,3 +194,19 @@ describe('findBestBinForShape', () => {
     expect(findBestBinForShape([BIN_A], aabb(50, 50, 50, 50))).toBeNull()
   })
 })
+
+describe('findContainingBinGroup at an edge', () => {
+  const bin = makeBin('bin', 0, 84, 84, 84)
+
+  it('counts a point a rounding error past the edge as inside', () => {
+    expect(findContainingBinGroup([bin], 84 + 1e-9, 42)?.id).toBe('bin')
+    expect(findContainingBinGroup([bin], -1e-9, 42)?.id).toBe('bin')
+    expect(findContainingBinGroup([bin], 42, 84 + 1e-9)?.id).toBe('bin')
+    expect(findContainingBinGroup([bin], 42, -1e-9)?.id).toBe('bin')
+  })
+
+  it('counts a point clearly past the edge as outside', () => {
+    expect(findContainingBinGroup([bin], 84.01, 42)).toBeNull()
+    expect(findContainingBinGroup([bin], 42, -0.01)).toBeNull()
+  })
+})

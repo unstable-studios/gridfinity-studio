@@ -83,7 +83,7 @@ The `LayoutEngine` interface abstracts all 2D canvas operations. Konva is the on
 | `collision.ts` | AABB collision detection for drag/resize |
 | `arrange.ts` | Align and distribute math on world-space bounding boxes |
 | `arrange-target.ts` | What the current selection can be aligned to |
-| `position-frame.ts` | Converts a shape's stored position to canvas or bin-relative coordinates |
+| `position-frame.ts` | Converts between stored positions and the ones shown in the UI (lower-left origin, Y up) |
 | `bin-artwork.ts` | Generates bin decorations (grid lines, screw holes, magnet holes) |
 | `useLayoutEngine.ts` | React hook — reactive engine state via useSyncExternalStore |
 | `useProjectEngineSync.ts` | Syncs engine ↔ project store on save/load |
@@ -91,6 +91,8 @@ The `LayoutEngine` interface abstracts all 2D canvas operations. Konva is the on
 | `LayoutEngineContext.tsx` | React context provider |
 
 **Coordinate convention**: `LayoutGroup.x/y` is the **lower-left corner** (smallest x, largest y in screen coords). Engines use center-based coords internally and convert at the boundary.
+
+**Positions shown to the person** always have the origin at the lower left, X increasing right and Y increasing up: the canvas origin, or a bin's lower-left corner. Stored positions have Y increasing down, and a shape in a bin is stored relative to the bin's center. `position-frame.ts` is the only place that converts; use it for any position that appears in the UI.
 
 ### Path Aliases
 

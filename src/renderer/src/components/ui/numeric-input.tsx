@@ -239,7 +239,10 @@ export function NumericInput({
     [editing, editText, step, fineStep, coarseStep, precision, apply, commitEdit, commitSoon]
   )
 
-  const displayValue = displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)
+  // A small negative rounds to "-0.0"; show it as zero.
+  const displayValue = (
+    displayUnit ? formatDimension(value, displayUnit) : value.toFixed(precision)
+  ).replace(/^-(0(?:\.0+)?)$/, '$1')
 
   return (
     <div ref={rootRef} className="flex min-w-0 items-center gap-1 text-xs">
