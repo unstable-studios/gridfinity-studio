@@ -46,7 +46,13 @@ export default function GridfinitySettings({
   }
 
   function handleReset(): void {
-    onChange(structuredClone(DEFAULT_GRIDFINITY_CONFIG))
+    const defaults = structuredClone(DEFAULT_GRIDFINITY_CONFIG)
+    // Existing bins are sized for the current base unit, so it stays locked.
+    onChange(
+      hasBins
+        ? { ...defaults, baseUnit: config.baseUnit, gridSpacing: config.gridSpacing }
+        : defaults
+    )
   }
 
   return (
@@ -126,7 +132,7 @@ export default function GridfinitySettings({
 
       {/* Reset */}
       <Button variant="outline" size="sm" className="w-full" onClick={handleReset}>
-        Reset to Defaults
+        Reset to defaults
       </Button>
     </div>
   )

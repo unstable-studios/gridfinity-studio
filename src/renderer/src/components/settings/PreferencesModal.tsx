@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { useProject } from '@/hooks/useProject'
+import { isBinGroup, useEngineState, useLayoutEngine } from '@/layout-engine'
 import { useTheme } from '@unstable-studios/ui'
 import { Button } from '@unstable-studios/ui'
 import ColorPicker from '@/components/ui/color-picker'
@@ -114,6 +115,10 @@ function UnitsTab(): React.JSX.Element {
 
 function GridfinityTab(): React.JSX.Element {
   const { project, updateGridfinity } = useProject()
+  const engine = useLayoutEngine()
+  // Re-read the engine whenever it changes so the lock follows the canvas.
+  useEngineState()
+  const hasBins = (engine?.getAllGroups() ?? []).some(isBinGroup)
 
   if (!project) {
     return (
@@ -127,7 +132,9 @@ function GridfinityTab(): React.JSX.Element {
     updateGridfinity(config)
   }
 
-  return <GridfinitySettings config={project.gridfinity} onChange={handleChange} hasBins={false} />
+  return (
+    <GridfinitySettings config={project.gridfinity} onChange={handleChange} hasBins={hasBins} />
+  )
 }
 
 const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
