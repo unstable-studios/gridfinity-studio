@@ -8,6 +8,7 @@ import { NumericInput } from '@/components/ui/numeric-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
 import NameField from './NameField'
+import { storedName } from '@/lib/item-name'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -277,7 +278,7 @@ function LayoutSidebar(): React.JSX.Element {
                     autoFocus
                     aria-label="Bin name"
                     className={RENAME_ROW_CLASS}
-                    value={meta.name ?? 'Bin'}
+                    value={storedName(meta) ?? 'Bin'}
                     onRename={(name) => renameGroup(group.id, name)}
                     onDone={() => setRenamingId(null)}
                   />
@@ -292,7 +293,7 @@ function LayoutSidebar(): React.JSX.Element {
                   onClick={(e) => handleRowClick(group.id, e)}
                   onDoubleClick={() => setRenamingId(group.id)}
                 >
-                  <span className="font-medium">{meta.name ?? 'Bin'}</span>
+                  <span className="font-medium">{storedName(meta) ?? 'Bin'}</span>
                   <span className="ml-2 opacity-60">
                     {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                   </span>
@@ -316,7 +317,7 @@ function LayoutSidebar(): React.JSX.Element {
                     autoFocus
                     aria-label="Shape name"
                     className={RENAME_ROW_CLASS}
-                    value={(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
+                    value={storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
                     onRename={(name) => renameShape(shape.id, name)}
                     onDone={() => setRenamingId(null)}
                   />
@@ -332,7 +333,7 @@ function LayoutSidebar(): React.JSX.Element {
                   onDoubleClick={() => setRenamingId(shape.id)}
                 >
                   <span className="font-medium">
-                    {(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
+                    {storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
                   </span>
                   <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
                 </button>
@@ -349,9 +350,11 @@ function LayoutSidebar(): React.JSX.Element {
             <label className="flex items-center gap-2">
               <span className="text-zinc-500">Name</span>
               <NameField
+                // A field per bin: text typed for one bin can never be applied to another.
+                key={selectedGroup.id}
                 aria-label="Bin name"
                 className="px-2 py-1 text-xs"
-                value={selectedGroup.metadata.name ?? 'Bin'}
+                value={storedName(selectedGroup.metadata) ?? 'Bin'}
                 onRename={(name) => renameGroup(selectedGroup.id, name)}
               />
             </label>
@@ -411,11 +414,10 @@ function LayoutSidebar(): React.JSX.Element {
             <label className="flex items-center gap-2">
               <span className="text-zinc-500">Name</span>
               <NameField
+                key={selectedShape.id}
                 aria-label="Shape name"
                 className="px-2 py-1 text-xs"
-                value={
-                  (selectedShape.metadata?.name as string) ?? shapeTypeLabel(selectedShape.type)
-                }
+                value={storedName(selectedShape.metadata) ?? shapeTypeLabel(selectedShape.type)}
                 onRename={(name) => renameShape(selectedShape.id, name)}
               />
             </label>
@@ -551,7 +553,7 @@ function PreviewSidebar(): React.JSX.Element {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate text-zinc-800 dark:text-zinc-200">
-                      {meta.name ?? 'Bin'}
+                      {storedName(meta) ?? 'Bin'}
                     </p>
                     <p className="text-[10px] text-zinc-500">
                       {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)

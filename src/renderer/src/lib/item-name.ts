@@ -6,7 +6,18 @@ export const MAX_NAME_LENGTH = 60
  * and one that did not change is not worth an undo step.
  */
 export function nameToStore(typed: string, current: string | undefined): string | null {
-  const name = typed.replace(/\s+/g, ' ').trim().slice(0, MAX_NAME_LENGTH).trim()
+  // Cut by whole characters, so an emoji at the limit is not left as half of one.
+  const tidy = Array.from(typed.replace(/\s+/g, ' ').trim())
+  const name = tidy.slice(0, MAX_NAME_LENGTH).join('').trim()
   if (name === '' || name === current) return null
   return name
+}
+
+/**
+ * The name stored on a bin or shape, if it has one. A project file edited by hand can hold
+ * anything there, so only text counts.
+ */
+export function storedName(metadata: Record<string, unknown> | undefined): string | undefined {
+  const name = metadata?.name
+  return typeof name === 'string' && name !== '' ? name : undefined
 }

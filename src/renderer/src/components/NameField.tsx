@@ -57,6 +57,24 @@ export default function NameField({
     onDone?.()
   }
 
+  // A field can go away while it still has the keyboard: the selection changes, or the panel
+  // it is in closes. That gives no blur, so what was typed is kept here instead.
+  // `onDone` is not called: React also runs this once when the field first appears in
+  // development, and closing an in-place rename then would end it before it began.
+  const latest = useRef({ text, value, onRename })
+  useEffect(() => {
+    latest.current = { text, value, onRename }
+  })
+  useEffect(() => {
+    const input = inputRef.current
+    return () => {
+      if (document.activeElement !== input || cancelledRef.current) return
+      const { text: typed, value: current, onRename: rename } = latest.current
+      const name = nameToStore(typed, current)
+      if (name !== null) rename(name)
+    }
+  }, [])
+
   return (
     <Input
       ref={inputRef}
@@ -68,6 +86,8 @@ export default function NameField({
       onChange={(e) => setText(e.target.value)}
       onBlur={finish}
       onKeyDown={(e) => {
+        // Enter that confirms a choice in an input method is not the end of the name.
+        if (e.nativeEvent.isComposing) return
         if (e.key === 'Enter') {
           e.currentTarget.blur()
         } else if (e.key === 'Escape') {
