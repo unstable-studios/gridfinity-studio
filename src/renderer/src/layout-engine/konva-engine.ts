@@ -312,9 +312,11 @@ export class KonvaEngine implements LayoutEngine {
     const data = this.shapeMap.get(id)
     const node = this.konvaMap.get(id)
     if (!data || !node) return
-    const sx = node.scaleX()
-    const sy = node.scaleY()
-    if (sx === 1 && sy === 1) return
+    // A handle dragged past the opposite edge gives a negative scale. These shapes are the
+    // same mirrored, so only the amount counts: a size is never negative.
+    const sx = Math.abs(node.scaleX())
+    const sy = Math.abs(node.scaleY())
+    if (node.scaleX() === 1 && node.scaleY() === 1) return
 
     if (data.type === 'rect') {
       node.scaleX(1)

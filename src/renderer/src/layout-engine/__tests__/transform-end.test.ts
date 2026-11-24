@@ -152,6 +152,35 @@ describe('the end of a transform', () => {
     expect(node('rect').scaleX()).toBe(1)
   })
 
+  it('never gives a rectangle or ellipse a negative size', () => {
+    engine.addShape(makeRect('rect', 200))
+    engine.addShape({
+      ...shapeBase,
+      id: 'ellipse',
+      type: 'circle',
+      x: 300,
+      y: 40,
+      radiusX: 8,
+      radiusY: 4
+    } as LayoutShape)
+    // A handle dragged past the opposite edge mirrors the shape.
+    engine.select(['rect'])
+    grab()
+    node('rect').scaleX(-2)
+    node('rect').fire('transform')
+    letGo()
+    engine.select(['ellipse'])
+    grab()
+    node('ellipse').scaleY(-3)
+    node('ellipse').fire('transform')
+    letGo()
+
+    expect(engine.getShape('rect')).toMatchObject({ width: 20, height: 10 })
+    expect(engine.getShape('ellipse')).toMatchObject({ radiusX: 8, radiusY: 12 })
+    expect(node('rect').scaleX()).toBe(1)
+    expect(node('ellipse').scaleY()).toBe(1)
+  })
+
   it('takes a shape out of its bin when the transform carries it out', () => {
     engine.addShape(makeRect('rect', 40))
     engine.addToGroup('rect', 'bin')
