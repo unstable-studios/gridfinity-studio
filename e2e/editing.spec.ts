@@ -448,3 +448,36 @@ test('a bin cannot be resized onto its neighbor from the sidebar', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('rows in the sidebar select with Shift and Cmd or Ctrl', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+  const selectedRows = page.locator('aside button[aria-pressed="true"]')
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  for (const y of [200, 300, 400]) {
+    await app.selectTool('Rectangle')
+    await app.drag({ x: 700, y }, { x: 760, y: y + 40 })
+  }
+  await app.expectShapeCount(3)
+
+  // A plain click selects one row. Shift reaches from it to the row clicked.
+  await row('Rectangle 1').click()
+  await expect(selectedRows).toHaveCount(1)
+  await row('Rectangle 3').click({ modifiers: ['Shift'] })
+  await expect(selectedRows).toHaveCount(3)
+
+  // Cmd or Ctrl takes one row out of the selection.
+  await row('Rectangle 2').click({ modifiers: ['ControlOrMeta'] })
+  await expect(selectedRows).toHaveCount(2)
+  await expect(row('Rectangle 2')).toHaveAttribute('aria-pressed', 'false')
+
+  // The canvas has the same selection: Delete removes the two selected shapes.
+  await page.keyboard.press('Delete')
+  await app.expectShapeCount(1)
+  await expect(row('Rectangle 2')).toBeVisible()
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
