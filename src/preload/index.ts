@@ -51,7 +51,9 @@ const api = {
       return () => ipcRenderer.off(UPDATE_CHANNELS.state, listener)
     },
     /** Quit and install the downloaded update. Only meaningful when state is 'downloaded'. */
-    installNow: (): Promise<void> => ipcRenderer.invoke(UPDATE_CHANNELS.installNow)
+    installNow: (): Promise<void> => ipcRenderer.invoke(UPDATE_CHANNELS.installNow),
+    /** Look for an update now. Does nothing while a check or download is under way. */
+    check: (): Promise<void> => ipcRenderer.invoke(UPDATE_CHANNELS.check)
   }
 }
 

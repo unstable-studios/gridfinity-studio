@@ -4,7 +4,12 @@ import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import log from 'electron-log/main'
-import { IDLE_STATE, UPDATE_CHANNELS, type UpdateState } from '../shared/types/updates'
+import {
+  IDLE_STATE,
+  UPDATE_CHANNELS,
+  canCheckForUpdates,
+  type UpdateState
+} from '../shared/types/updates'
 import icon from '../../resources/icon.png?asset'
 import {
   saveProject,
@@ -182,7 +187,8 @@ app.whenReady().then(() => {
   // Update IPC: renderer can read current state and trigger install. Register
   // BEFORE createWindow() so the renderer's mount-time getState() call can't
   // race ahead of `ipcMain.handle` and reject.
-  let updateState: UpdateState = IDLE_STATE
+  // A build that was not installed has no update feed to read: say so from the start.
+  let updateState: UpdateState = is.dev ? { kind: 'unavailable' } : IDLE_STATE
   const broadcast = (next: UpdateState): void => {
     updateState = next
     for (const win of BrowserWindow.getAllWindows()) {
@@ -201,6 +207,22 @@ app.whenReady().then(() => {
       if (mayClose) autoUpdater.quitAndInstall(false, true)
     })
   })
+
+  /** Look for an update, unless a check or a download is already under way. */
+  const checkForUpdates = (): void => {
+    if (is.dev || !canCheckForUpdates(updateState)) return
+    // Say so at once: the first event from the updater can take a moment.
+    broadcast({ kind: 'checking' })
+    autoUpdater.checkForUpdatesAndNotify().catch((err: unknown) => {
+      // The updater also emits `error` for most failures. This covers the ones it only
+      // rejects with, so a failed check never leaves "Checking" on screen.
+      log.error('[autoUpdater] check failed', err)
+      if (updateState.kind === 'checking') {
+        broadcast({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+      }
+    })
+  }
+  ipcMain.handle(UPDATE_CHANNELS.check, checkForUpdates)
 
   createWindow()
 
@@ -230,7 +252,7 @@ app.whenReady().then(() => {
     autoUpdater.autoInstallOnAppQuit = true
 
     autoUpdater.on('checking-for-update', () => broadcast({ kind: 'checking' }))
-    autoUpdater.on('update-not-available', () => broadcast(IDLE_STATE))
+    autoUpdater.on('update-not-available', () => broadcast({ kind: 'up-to-date' }))
     autoUpdater.on('update-available', (info) => {
       broadcast({ kind: 'downloading', version: info.version, progress: 0 })
     })
@@ -246,13 +268,8 @@ app.whenReady().then(() => {
       broadcast({ kind: 'error', message: err.message ?? String(err) })
     })
 
-    void autoUpdater.checkForUpdatesAndNotify()
-    setInterval(
-      () => {
-        void autoUpdater.checkForUpdatesAndNotify()
-      },
-      60 * 60 * 1000
-    )
+    checkForUpdates()
+    setInterval(checkForUpdates, 60 * 60 * 1000)
   }
 })
 

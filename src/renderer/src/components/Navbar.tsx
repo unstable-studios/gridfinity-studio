@@ -30,6 +30,7 @@ import { useAppMode } from '@/hooks/useAppMode'
 import { MOD_KEY } from '@/lib/platform'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import type { UpdateState } from '../../../shared/types/updates'
+import { updateMenuItems, type UpdateAction } from '@/lib/update-menu'
 import { useExport, useExportScopeReset } from '@/hooks/useExport'
 import {
   SquareDashedIcon,
@@ -123,7 +124,7 @@ function AppMenubar({
   const { undo, redo, canUndo, canRedo } = useUndoRedo()
   const edit = useEditShortcuts()
   useCloseGuard()
-  const { state: updateState, installNow } = useAppUpdate()
+  const { state: updateState, installNow, check: checkForUpdates } = useAppUpdate()
 
   useEffect(() => {
     loadRecentProjects()
@@ -269,7 +270,14 @@ function AppMenubar({
           <MenubarItem disabled className="opacity-80 cursor-default">
             Version {__APP_VERSION__}
           </MenubarItem>
-          <UpdateStatusMenuItem state={updateState} onInstallNow={installNow} />
+          <UpdateMenuItems
+            state={updateState}
+            actions={{
+              check: checkForUpdates,
+              install: installNow,
+              download: () => window.open(`${GITHUB_REPO}/releases/latest`, '_blank')
+            }}
+          />
         </MenubarContent>
       </MenubarMenu>
     </Menubar>
@@ -348,7 +356,7 @@ function ToolBar() {
 /**
  * Decorative dot on the Help menu trigger when an update is downloading,
  * ready, or errored. Hidden from screen readers — the actual textual status
- * lives inside the menu (UpdateStatusMenuItem) and in an sr-only label here.
+ * lives inside the menu (UpdateMenuItems) and in an sr-only label here.
  */
 function badgeStyle(state: UpdateState): { color: string; srLabel: string } | null {
   switch (state.kind) {
@@ -377,53 +385,38 @@ function UpdateBadge({ state }: { state: UpdateState }): React.JSX.Element | nul
   )
 }
 
-function UpdateStatusMenuItem({
+/** The update lines of the Help menu: where things stand, and what can be done about it. */
+function UpdateMenuItems({
   state,
-  onInstallNow
+  actions
 }: {
   state: UpdateState
-  onInstallNow: () => void
-}): React.JSX.Element | null {
-  if (state.kind === 'idle') return null
-
-  if (state.kind === 'checking') {
-    return (
-      <MenubarItem disabled className="opacity-70 cursor-default text-xs">
-        Checking for updates…
-      </MenubarItem>
-    )
+  actions: Record<UpdateAction, () => void>
+}): React.JSX.Element {
+  const tones = {
+    good: 'text-green-600 dark:text-green-400 font-medium',
+    bad: 'text-red-500'
   }
-
-  if (state.kind === 'downloading') {
-    const pct = Math.max(0, Math.min(100, Math.round(state.progress)))
-    const label = state.version
-      ? `Downloading v${state.version}… ${pct}%`
-      : `Downloading update… ${pct}%`
-    return (
-      <MenubarItem disabled className="opacity-70 cursor-default text-xs">
-        {label}
-      </MenubarItem>
-    )
-  }
-
-  if (state.kind === 'downloaded') {
-    return (
-      <MenubarItem
-        onSelect={(e) => {
-          e.preventDefault()
-          onInstallNow()
-        }}
-        className="text-xs text-green-600 dark:text-green-400 font-medium"
-      >
-        Restart to update to v{state.version}
-      </MenubarItem>
-    )
-  }
-
-  // error
   return (
-    <MenubarItem disabled className="opacity-70 cursor-default text-xs text-red-500">
-      Update failed
-    </MenubarItem>
+    <>
+      {updateMenuItems(state).map(({ label, action, tone }) => (
+        <MenubarItem
+          key={label}
+          disabled={!action}
+          className={`text-xs ${action ? '' : 'cursor-default opacity-70'} ${tone ? tones[tone] : ''}`}
+          onSelect={
+            action
+              ? (e) => {
+                  // A check keeps the menu open, so its answer is seen where it was asked for.
+                  if (action === 'check') e.preventDefault()
+                  actions[action]()
+                }
+              : undefined
+          }
+        >
+          {label}
+        </MenubarItem>
+      ))}
+    </>
   )
 }

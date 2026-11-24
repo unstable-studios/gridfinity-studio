@@ -43,3 +43,19 @@ test('base unit is locked while the project has bins', async () => {
 
   expect(app.errors).toEqual([])
 })
+
+test('the Help menu says where updates stand', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('menuitem', { name: 'Help', exact: true }).click()
+
+  // The app under test was not installed, so it has no update feed to read. It says so,
+  // and offers no check that could not work.
+  const status = page.getByRole('menuitem', { name: 'This build doesn’t update itself' })
+  await expect(status).toBeVisible()
+  await expect(status).toBeDisabled()
+  await expect(page.getByRole('menuitem', { name: /Check/ })).toHaveCount(0)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
