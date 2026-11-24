@@ -77,8 +77,9 @@ export default function Navbar(): React.JSX.Element {
     <>
       <NavbarRoot
         brand={<Logo />}
-        // The UI package's bar is 56px tall plus padding, sized for a website. 40px fits the tools.
-        className="relative z-50 max-w-none [&>div]:max-w-none [&>div>div]:h-10 py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950"
+        // The UI package's bar is 56px tall by default, sized for a website. 40px fits the tools.
+        height="h-10"
+        className="relative z-50 max-w-none [&>div]:max-w-none py-1.5 border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950"
       >
         <NavbarContent className="gap-1">
           <AppMenubar
