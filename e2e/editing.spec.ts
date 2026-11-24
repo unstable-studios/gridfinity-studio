@@ -499,10 +499,9 @@ test('bins and shapes can be renamed', async () => {
   await binName.press('Enter')
   await expect(row('Screws')).toBeVisible()
 
-  // A rename is one undo step.
+  // A rename is one undo step. Undo also clears the selection, so the panel closes.
   await app.menu('Edit', /^Undo/)
   await expect(row('Bin 1')).toBeVisible()
-  await expect(binName).toHaveValue('Bin 1')
   await app.expectBinCount(1)
 
   // Double-click a row to rename it in place. The field takes the keyboard.
