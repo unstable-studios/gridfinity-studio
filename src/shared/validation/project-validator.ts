@@ -49,23 +49,14 @@ export class ProjectValidator {
     project: Partial<ProjectData>,
     errors: ValidationError[]
   ): void {
-    if (!project.schemaVersion) return
-
-    if (typeof project.schemaVersion !== 'string') {
+    // The version decides how a file is read, so one with none cannot be trusted: it would
+    // skip every conversion.
+    const version = project.schemaVersion
+    if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
       errors.push({
         field: 'schemaVersion',
-        message: 'Schema version must be a string',
-        value: project.schemaVersion
-      })
-      return
-    }
-
-    const versionRegex = /^\d+\.\d+\.\d+$/
-    if (!versionRegex.test(project.schemaVersion)) {
-      errors.push({
-        field: 'schemaVersion',
-        message: 'Schema version must follow semver format (e.g., "0.1.0")',
-        value: project.schemaVersion
+        message: 'Schema version must be three numbers, such as "0.5.0"',
+        ...(typeof version === 'string' || typeof version === 'number' ? { value: version } : {})
       })
     }
   }

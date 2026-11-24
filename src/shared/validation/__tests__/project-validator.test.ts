@@ -63,6 +63,25 @@ describe('ProjectValidator', () => {
       expect(result.errors.some((e) => e.field === 'schemaVersion')).toBe(true)
     })
 
+    it('rejects a version that is missing, empty or not text', () => {
+      // Such a file used to open, and would then skip every conversion.
+      for (const schemaVersion of [
+        '',
+        null,
+        undefined,
+        0,
+        5,
+        false,
+        '0.5',
+        'v0.5.0',
+        '0.6.0-beta.1'
+      ]) {
+        const result = validateProject({ ...createEmptyProject(), schemaVersion })
+        expect(result.valid, String(schemaVersion)).toBe(false)
+        expect(result.errors.map((e) => e.field)).toContain('schemaVersion')
+      }
+    })
+
     it('accepts valid semver schema version', () => {
       const result = ProjectValidator.validate(createEmptyProject())
       expect(result.valid).toBe(true)

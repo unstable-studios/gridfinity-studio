@@ -4,7 +4,8 @@
  */
 
 /**
- * Schema version for project file format. Raising it needs a step in
+ * Schema version for project file format. It is not the app's version: raise it only when
+ * the format changes in a way an older app would misread. Raising it needs a step in
  * `validation/migrations.ts`, so files written before the change still open.
  */
 export const CURRENT_SCHEMA_VERSION = '0.5.0'

@@ -66,14 +66,13 @@ test('failed and cancelled file operations tell the person what happened', async
       'It was made with a newer version of Gridfinity Studio. Update the app, then open it again.'
     )
   ).toBeVisible()
+  await app.expectBinCount(1) // the project that was open is untouched
   await dismissAll()
 
   await writeFile(fromAnotherVersion, JSON.stringify({ schemaVersion: '0.4.0', entities: [] }))
   await app.menu('File', /^Open project/)
   await expect(
-    page.getByText(
-      'It was made with an early version of Gridfinity Studio that this version can’t read.'
-    )
+    page.getByText('It was made with an early version of Gridfinity Studio and can’t be opened.')
   ).toBeVisible()
   await app.expectBinCount(1) // the project that was open is untouched
   await dismissAll()

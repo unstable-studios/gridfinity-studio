@@ -6,8 +6,12 @@
  *   2. Add an entry to `MIGRATIONS` below, keyed by the version it converts FROM, that
  *      turns a project of that version into the next one.
  *   3. Add a test for it with a project of the old version.
- * A test checks there is a step from every version back to `OLDEST_SUPPORTED_VERSION`, so a
- * raised version with no step fails.
+ * A test checks the steps lead from `OLDEST_SUPPORTED_VERSION` to the current version with
+ * none left over, so a raised version with no step fails.
+ *
+ * Raise the version only when the format changes in a way an older app would misread. It
+ * is not the app's version: an app that meets a newer file refuses to open it. A step gets
+ * the file as it was read, before any checking, so it must cope with missing parts.
  *
  * Files from before `OLDEST_SUPPORTED_VERSION` are not opened. They kept bins and entities
  * in their own lists, and the app that wrote them was never released for general use.
@@ -35,8 +39,10 @@ export type UpToDate =
   /**
    * - `too-new`: written by a later version of the app.
    * - `too-old`: from before the oldest format this app reads.
+   * - `invalid`: a step could not convert it, so it is not a sound project of the version it
+   *   claims. `detail` says what went wrong.
    */
-  | { ok: false; reason: 'too-new' | 'too-old'; version: string }
+  | { ok: false; reason: 'too-new' | 'too-old' | 'invalid'; detail?: string }
 
 const SEMVER = /^(\d+)\.(\d+)\.(\d+)$/
 
@@ -68,22 +74,59 @@ export function bringUpToDate(
   const version = (raw as RawProject).schemaVersion
   if (typeof version !== 'string' || !SEMVER.test(version)) return { ok: true, project: raw }
 
-  if (compareVersions(version, current) > 0) return { ok: false, reason: 'too-new', version }
-  if (compareVersions(version, OLDEST_SUPPORTED_VERSION) < 0) {
-    return { ok: false, reason: 'too-old', version }
-  }
+  if (compareVersions(version, current) > 0) return { ok: false, reason: 'too-new' }
+  if (compareVersions(version, OLDEST_SUPPORTED_VERSION) < 0)
+    return { ok: false, reason: 'too-old' }
 
   let project = raw as RawProject
-  // Each step moves to a later version, so this ends. The limit is for a table that does not.
-  for (let steps = 0; project.schemaVersion !== current; steps++) {
-    const from = project.schemaVersion as string
-    const step = migrations[from]
-    if (!step || steps > 1000 || compareVersions(step.to, from) <= 0) {
-      // A format in the supported range with no way forward is a mistake in the table
-      // above, not in the file. It reads as too old rather than opening half converted.
-      return { ok: false, reason: 'too-old', version }
+  let at = version
+  // Versions are compared as numbers throughout: "0.05.0" is 0.5.0.
+  while (compareVersions(at, current) !== 0) {
+    const step = Object.entries(migrations).find(([from]) => compareVersions(from, at) === 0)?.[1]
+    // A version this app reads, with no step forward that moves it on and stops at the
+    // current one, is a mistake in the table, not in the file. It fails loudly: telling the
+    // person their file is too old would be untrue.
+    if (
+      !step ||
+      !SEMVER.test(step.to) ||
+      compareVersions(step.to, at) <= 0 ||
+      compareVersions(step.to, current) > 0
+    ) {
+      throw new Error(`No sound migration from project format ${at} toward ${current}`)
     }
-    project = { ...step.migrate(project), schemaVersion: step.to }
+    try {
+      // The file has not been checked yet: a step sees whatever was in it.
+      project = { ...step.migrate(project), schemaVersion: step.to }
+    } catch (err) {
+      return {
+        ok: false,
+        reason: 'invalid',
+        detail: `Could not convert from format ${at}: ${err instanceof Error ? err.message : String(err)}`
+      }
+    }
+    at = step.to
   }
-  return { ok: true, project }
+  // A file whose version was written another way now carries it the usual way.
+  return { ok: true, project: version === current ? raw : { ...project, schemaVersion: current } }
+}
+
+/**
+ * Whether the steps lead from the oldest format the app reads to the current one, with
+ * nothing left over. For the test that guards a format change; it runs no step.
+ */
+export function migrationPath(
+  migrations: Record<string, Migration> = MIGRATIONS,
+  current: string = CURRENT_SCHEMA_VERSION
+): { complete: boolean; unused: string[] } {
+  const used = new Set<string>()
+  let at = OLDEST_SUPPORTED_VERSION
+  while (at !== current) {
+    const step = migrations[at]
+    if (!step || used.has(at) || !SEMVER.test(step.to) || compareVersions(step.to, at) <= 0) {
+      return { complete: false, unused: Object.keys(migrations).filter((from) => !used.has(from)) }
+    }
+    used.add(at)
+    at = step.to
+  }
+  return { complete: true, unused: Object.keys(migrations).filter((from) => !used.has(from)) }
 }

@@ -195,7 +195,7 @@ The bin's lower-left corner is at (0, 0), so it covers x from 0 to 84 and y from
 [`project-validator.ts`](../src/shared/validation/project-validator.ts) runs when a file is opened and again before it is saved. It checks:
 
 - The four top-level fields exist.
-- `schemaVersion`, when it has a value, is text in the form `1.2.3`.
+- `schemaVersion` is three numbers, such as `0.5.0`.
 - `settings`: a name, two dates as text, and a known unit.
 - `gridfinity`: the four numbers, with `baseUnit`, `gridSpacing` and `unitHeight` greater than 0, and both hole settings.
 - `layoutSnapshot`: `version` is text, `gridConfig` has a size greater than 0 and its two switches, and `shapes` and `groups` are lists.
@@ -227,3 +227,5 @@ A file's `schemaVersion` decides what happens when it is opened.
 4. Update this document.
 
 A test checks that the steps lead from `0.5.0` to the current version, so raising the version without adding a step fails.
+
+Raise the version only when the format changes in a way an older app would misread. It is not the app's version, and an app that meets a newer file refuses to open it. Adding a field that older apps can ignore does not need a new version.

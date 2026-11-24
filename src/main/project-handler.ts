@@ -5,6 +5,7 @@ import { createEmptyProject } from '../shared/types/project'
 import type { ProjectData } from '../shared/types/project'
 import { validateProject, formatValidationErrors } from '../shared/validation/project-validator'
 import { bringUpToDate } from '../shared/validation/migrations'
+import { CURRENT_SCHEMA_VERSION } from '../shared/types/project'
 import type { OperationResult } from '../shared/types/results'
 
 /**
@@ -131,9 +132,11 @@ export async function saveProject(
       targetPath = result.filePath
     }
 
-    // Update modified timestamp
+    // What is written is in the current format, so it carries the current version whatever
+    // the project in memory says. Then the modified time.
     const dataToSave: ProjectData = {
       ...projectData,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
       settings: {
         ...projectData.settings,
         modifiedAt: new Date().toISOString()
@@ -202,7 +205,7 @@ export async function loadProject(
     // Convert a file from an earlier format, before checking it against the current one.
     const upToDate = bringUpToDate(projectData)
     if (!upToDate.ok) {
-      return { success: false, reason: upToDate.reason, error: upToDate.version }
+      return { success: false, reason: upToDate.reason, error: upToDate.detail }
     }
     projectData = upToDate.project
 

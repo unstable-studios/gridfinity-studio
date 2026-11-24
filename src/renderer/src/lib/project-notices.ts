@@ -48,7 +48,7 @@ export function notifyOpenFailed(
     reason === 'too-new'
       ? 'It was made with a newer version of Gridfinity Studio. Update the app, then open it again.'
       : reason === 'too-old'
-        ? 'It was made with an early version of Gridfinity Studio that this version can’t read.'
+        ? 'It was made with an early version of Gridfinity Studio and can’t be opened.'
         : reason === 'invalid'
           ? `It isn’t a Gridfinity Studio project, or it is damaged.${firstProblem(detail)}`
           : describeFileError(detail)
