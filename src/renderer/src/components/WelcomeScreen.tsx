@@ -11,8 +11,10 @@ export default function WelcomeScreen(): React.JSX.Element {
   }, [loadRecentProjects])
 
   return (
-    <div className="flex flex-1 items-center justify-center">
-      <div className="flex flex-col items-center gap-8 max-w-sm">
+    // In a short window the list of recent projects can be taller than the space: it scrolls.
+    <div className="flex min-h-0 flex-1 overflow-y-auto">
+      {/* Auto margins center it, and still let the top be reached when it does not fit. */}
+      <div className="m-auto flex max-w-sm flex-col items-center gap-8 py-6">
         <div className="flex flex-col items-center gap-2">
           <StudioLogo className="h-16 w-auto" />
           <h1 className="text-2xl font-bold tracking-tight">Gridfinity Studio</h1>
