@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
@@ -7,6 +7,7 @@ import { selectionAfterClick } from '@/lib/list-selection'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
+import NameField from './NameField'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -48,6 +49,9 @@ export default function Sidebar(): React.JSX.Element {
 
 // ─── Layout Sidebar ─────────────────────────────────────────
 
+/** A row while its name is being typed: the same size as the row it replaces. */
+const RENAME_ROW_CLASS = 'px-2 py-1 text-xs'
+
 /** A row in the bin or shape list. `select-none` keeps a Shift-click from selecting text. */
 function listRowClass(isSelected: boolean): string {
   return `w-full select-none rounded px-2 py-1 text-left text-xs transition-colors ${
@@ -85,6 +89,17 @@ function LayoutSidebar(): React.JSX.Element {
     })
     listAnchorRef.current = next.anchor
     engine.select(next.selected)
+  }
+
+  // The row being renamed in place, after a double-click.
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const renameGroup = (id: string, name: string): void => {
+    const group = engine?.getGroup(id)
+    if (group) engine?.updateGroup(id, { metadata: { ...group.metadata, name } })
+  }
+  const renameShape = (id: string, name: string): void => {
+    const shape = engine?.getShape(id)
+    if (shape) engine?.updateShape(id, { metadata: { ...shape.metadata, name } })
   }
 
   // Determine what's selected
@@ -250,6 +265,19 @@ function LayoutSidebar(): React.JSX.Element {
             {binGroups.map((group) => {
               const meta = group.metadata as BinMetadata
               const isSelected = selectedIds.includes(group.id)
+              if (renamingId === group.id) {
+                return (
+                  <NameField
+                    key={group.id}
+                    autoFocus
+                    aria-label="Bin name"
+                    className={RENAME_ROW_CLASS}
+                    value={meta.name ?? 'Bin'}
+                    onRename={(name) => renameGroup(group.id, name)}
+                    onDone={() => setRenamingId(null)}
+                  />
+                )
+              }
               return (
                 <button
                   key={group.id}
@@ -257,6 +285,7 @@ function LayoutSidebar(): React.JSX.Element {
                   aria-pressed={isSelected}
                   className={listRowClass(isSelected)}
                   onClick={(e) => handleRowClick(group.id, e)}
+                  onDoubleClick={() => setRenamingId(group.id)}
                 >
                   <span className="font-medium">{meta.name ?? 'Bin'}</span>
                   <span className="ml-2 opacity-60">
@@ -275,6 +304,19 @@ function LayoutSidebar(): React.JSX.Element {
           <div className="space-y-0.5">
             {shapes.map((shape) => {
               const isSelected = selectedIds.includes(shape.id)
+              if (renamingId === shape.id) {
+                return (
+                  <NameField
+                    key={shape.id}
+                    autoFocus
+                    aria-label="Shape name"
+                    className={RENAME_ROW_CLASS}
+                    value={(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
+                    onRename={(name) => renameShape(shape.id, name)}
+                    onDone={() => setRenamingId(null)}
+                  />
+                )
+              }
               return (
                 <button
                   key={shape.id}
@@ -282,6 +324,7 @@ function LayoutSidebar(): React.JSX.Element {
                   aria-pressed={isSelected}
                   className={listRowClass(isSelected)}
                   onClick={(e) => handleRowClick(shape.id, e)}
+                  onDoubleClick={() => setRenamingId(shape.id)}
                 >
                   <span className="font-medium">
                     {(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
@@ -298,6 +341,15 @@ function LayoutSidebar(): React.JSX.Element {
       {selectedGroup && isBinGroup(selectedGroup) && (
         <SidebarSection title="Bin properties">
           <div className="space-y-2 text-xs">
+            <label className="flex items-center gap-2">
+              <span className="text-zinc-500">Name</span>
+              <NameField
+                aria-label="Bin name"
+                className="px-2 py-1 text-xs"
+                value={selectedGroup.metadata.name ?? 'Bin'}
+                onRename={(name) => renameGroup(selectedGroup.id, name)}
+              />
+            </label>
             <GridPicker
               width={selectedGroup.metadata.widthUnits}
               depth={selectedGroup.metadata.depthUnits}
@@ -351,6 +403,17 @@ function LayoutSidebar(): React.JSX.Element {
       {selectedShape && (
         <SidebarSection title="Shape properties">
           <div className="space-y-2 text-xs">
+            <label className="flex items-center gap-2">
+              <span className="text-zinc-500">Name</span>
+              <NameField
+                aria-label="Shape name"
+                className="px-2 py-1 text-xs"
+                value={
+                  (selectedShape.metadata?.name as string) ?? shapeTypeLabel(selectedShape.type)
+                }
+                onRename={(name) => renameShape(selectedShape.id, name)}
+              />
+            </label>
             <div className="flex items-center justify-between">
               <span className="text-zinc-500">Type</span>
               <span className="text-zinc-300">{shapeTypeLabel(selectedShape.type)}</span>

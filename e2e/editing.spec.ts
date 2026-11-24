@@ -481,3 +481,55 @@ test('rows in the sidebar select with Shift and Cmd or Ctrl', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('bins and shapes can be renamed', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.expectBinCount(1)
+
+  // In Bin properties: type a name and press Enter.
+  const binName = page.getByRole('textbox', { name: 'Bin name' })
+  await expect(binName).toHaveValue('Bin 1')
+  await binName.fill('Screws')
+  await binName.press('Enter')
+  await expect(row('Screws')).toBeVisible()
+
+  // A rename is one undo step.
+  await app.menu('Edit', /^Undo/)
+  await expect(row('Bin 1')).toBeVisible()
+  await expect(binName).toHaveValue('Bin 1')
+  await app.expectBinCount(1)
+
+  // Double-click a row to rename it in place. The field takes the keyboard.
+  await row('Bin 1').dblclick()
+  await page.keyboard.type('Nails')
+  await page.keyboard.press('Enter')
+  await expect(row('Nails')).toBeVisible()
+
+  // Esc keeps the old name, and so does an empty one.
+  await row('Nails').dblclick()
+  await page.keyboard.type('Oops')
+  await page.keyboard.press('Escape')
+  await expect(row('Nails')).toBeVisible()
+  await binName.fill('')
+  await binName.press('Enter')
+  await expect(binName).toHaveValue('Nails')
+
+  // Shapes rename the same way, and typing in the field does not delete the shape.
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 700, y: 300 }, { x: 780, y: 360 })
+  await app.expectShapeCount(1)
+  const shapeName = page.getByRole('textbox', { name: 'Shape name' })
+  await shapeName.fill('Calipers')
+  await shapeName.press('Backspace')
+  await shapeName.press('Enter')
+  await expect(row('Caliper')).toBeVisible()
+  await app.expectShapeCount(1)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
