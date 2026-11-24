@@ -1,8 +1,7 @@
 /**
  * Worker message types for the geometry Web Worker.
  *
- * The geometry worker handles CPU-intensive mesh operations off the main thread:
- * extrusion, boolean ops, and final bin baking.
+ * The geometry worker builds each bin's solid off the main thread.
  */
 
 // ─── Mesh transfer format ─────────────────────────────────────────
@@ -54,27 +53,6 @@ export interface CSGBinParams {
 export type WorkerRequest =
   | { type: 'init' }
   | {
-      type: 'extrude'
-      id: string
-      vertices: Float32Array
-      depth: number
-      zTop?: number
-    }
-  | {
-      type: 'boolean'
-      id: string
-      op: 'union' | 'subtract' | 'intersect'
-      meshA: MeshData
-      meshB: MeshData
-    }
-  | {
-      type: 'bake'
-      id: string
-      bin: MeshData
-      solids: MeshData[]
-      cutters: MeshData[]
-    }
-  | {
       type: 'bake-pockets'
       id: string
       binParams: CSGBinParams
@@ -84,17 +62,9 @@ export type WorkerRequest =
 
 export type WorkerResponse =
   | { type: 'init'; success: boolean; error?: string }
-  | ({ type: 'extrude'; id: string } & MeshDataWithNormals)
-  | ({ type: 'boolean'; id: string } & MeshDataWithNormals)
-  | ({
-      type: 'bake'
-      id: string
-      warnings: string[]
-    } & MeshDataWithNormals)
   | ({
       type: 'bake-pockets'
       id: string
       warnings: string[]
     } & BakedMesh)
   | { type: 'error'; id?: string; error: string }
-  | { type: 'progress'; id: string; stage: string; percent: number }
