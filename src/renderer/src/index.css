@@ -94,6 +94,16 @@
   height: 16px;
 }
 
+/*
+ * The UI package keeps room for a page scrollbar, so a website does not shift when one
+ * appears. This app fills its window and the page never scrolls: the room showed as an
+ * empty track down the right edge.
+ */
+html {
+  scrollbar-gutter: auto;
+  overflow: hidden;
+}
+
 @layer base {
   body {
     @apply bg-zinc-200 text-zinc-800;

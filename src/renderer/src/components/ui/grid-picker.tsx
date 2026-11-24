@@ -33,8 +33,9 @@ export function GridPicker({
       <p className="text-[10px] text-zinc-500 text-center">
         {hasSize ? `${displayW}×${displayD}` : 'Pick a size'}
       </p>
+      {/* Centered under its label, like the fields around it. */}
       <div
-        className="inline-grid gap-[2px]"
+        className="mx-auto grid w-fit gap-[2px]"
         style={{ gridTemplateColumns: `repeat(${maxWidth}, 1fr)` }}
         onMouseLeave={handleMouseLeave}
       >
