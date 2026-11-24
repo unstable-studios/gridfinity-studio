@@ -3,6 +3,7 @@ import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
 import { shapeTypeLabel } from '@/lib/shape-labels'
+import { selectionAfterClick } from '@/lib/list-selection'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
@@ -47,6 +48,15 @@ export default function Sidebar(): React.JSX.Element {
 
 // ─── Layout Sidebar ─────────────────────────────────────────
 
+/** A row in the bin or shape list. `select-none` keeps a Shift-click from selecting text. */
+function listRowClass(isSelected: boolean): string {
+  return `w-full select-none rounded px-2 py-1 text-left text-xs transition-colors ${
+    isSelected
+      ? 'bg-blue-600 text-white'
+      : 'text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
+  }`
+}
+
 function LayoutSidebar(): React.JSX.Element {
   const engine = useLayoutEngine()
   const { selectedIds, tick } = useEngineState()
@@ -59,6 +69,23 @@ function LayoutSidebar(): React.JSX.Element {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const shapes = useMemo(() => engine?.getAllShapes() ?? [], [engine, selectedIds, tick])
   const binGroups = useMemo(() => groups.filter(isBinGroup), [groups])
+
+  // Clicking rows in the two lists selects as in a file manager. The lists count as one,
+  // bins first, so a Shift-click can reach from a bin down into the shapes.
+  const listAnchorRef = useRef<string | null>(null)
+  const handleRowClick = (id: string, e: React.MouseEvent): void => {
+    if (!engine) return
+    const next = selectionAfterClick({
+      order: [...binGroups.map((g) => g.id), ...shapes.map((sh) => sh.id)],
+      selected: selectedIds,
+      clicked: id,
+      anchor: listAnchorRef.current,
+      shift: e.shiftKey,
+      toggle: e.metaKey || e.ctrlKey
+    })
+    listAnchorRef.current = next.anchor
+    engine.select(next.selected)
+  }
 
   // Determine what's selected
   const selectedGroup = useMemo(() => {
@@ -227,12 +254,9 @@ function LayoutSidebar(): React.JSX.Element {
                 <button
                   key={group.id}
                   type="button"
-                  className={`w-full rounded px-2 py-1 text-left text-xs transition-colors ${
-                    isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                  }`}
-                  onClick={() => engine?.select([group.id])}
+                  aria-pressed={isSelected}
+                  className={listRowClass(isSelected)}
+                  onClick={(e) => handleRowClick(group.id, e)}
                 >
                   <span className="font-medium">{meta.name ?? 'Bin'}</span>
                   <span className="ml-2 opacity-60">
@@ -255,12 +279,9 @@ function LayoutSidebar(): React.JSX.Element {
                 <button
                   key={shape.id}
                   type="button"
-                  className={`w-full rounded px-2 py-1 text-left text-xs transition-colors ${
-                    isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                  }`}
-                  onClick={() => engine?.select([shape.id])}
+                  aria-pressed={isSelected}
+                  className={listRowClass(isSelected)}
+                  onClick={(e) => handleRowClick(shape.id, e)}
                 >
                   <span className="font-medium">
                     {(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
