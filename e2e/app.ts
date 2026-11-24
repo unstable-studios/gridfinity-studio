@@ -69,8 +69,19 @@ export class StudioApp {
   /** Make the next native save dialog return `filePath`. */
   async stubSaveDialog(filePath: string): Promise<void> {
     await this.electronApp.evaluate(({ dialog }, target) => {
-      dialog.showSaveDialog = () => Promise.resolve({ canceled: false, filePath: target })
+      dialog.showSaveDialog = (...args: unknown[]) => {
+        const options = args[args.length - 1] as { defaultPath?: string } | undefined
+        ;(globalThis as { lastSaveDefaultPath?: string }).lastSaveDefaultPath = options?.defaultPath
+        return Promise.resolve({ canceled: false, filePath: target })
+      }
     }, filePath)
+  }
+
+  /** The file name the app offered in the last stubbed save dialog. */
+  async lastSaveDialogDefault(): Promise<string | undefined> {
+    return this.electronApp.evaluate(
+      () => (globalThis as { lastSaveDefaultPath?: string }).lastSaveDefaultPath
+    )
   }
 
   /** Make the next native open dialog return `filePath`. */

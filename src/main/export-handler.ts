@@ -26,12 +26,30 @@ export interface BatchExportResult {
 }
 
 /**
+ * File name to offer in the save dialog. `suggestedName` comes from the renderer, so anything
+ * that could point at another folder or is not allowed in a file name is taken out.
+ */
+export function exportFileName(suggestedName: string | undefined, extension: string): string {
+  const withoutExtension = (suggestedName ?? '').replace(new RegExp(`\\.${extension}$`, 'i'), '')
+  const safe = withoutExtension
+    // eslint-disable-next-line no-control-regex
+    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[.\s]+|[.\s]+$/g, '')
+  return `${safe || 'gridfinity-bin'}.${extension}`
+}
+
+/**
  * Export STL binary data to a file via native save dialog
  */
-export async function exportSTL(win: BrowserWindow, stlData: ArrayBuffer): Promise<ExportResult> {
+export async function exportSTL(
+  win: BrowserWindow,
+  stlData: ArrayBuffer,
+  suggestedName?: string
+): Promise<ExportResult> {
   const result = await dialog.showSaveDialog(win, {
     title: 'Export STL',
-    defaultPath: 'gridfinity-bin.stl',
+    defaultPath: exportFileName(suggestedName, 'stl'),
     filters: [{ name: 'STL Files', extensions: ['stl'] }]
   })
 
@@ -53,10 +71,14 @@ export async function exportSTL(win: BrowserWindow, stlData: ArrayBuffer): Promi
 /**
  * Export a single 3MF file via native save dialog
  */
-export async function export3MF(win: BrowserWindow, data: ArrayBuffer): Promise<ExportResult> {
+export async function export3MF(
+  win: BrowserWindow,
+  data: ArrayBuffer,
+  suggestedName?: string
+): Promise<ExportResult> {
   const result = await dialog.showSaveDialog(win, {
     title: 'Export 3MF',
-    defaultPath: 'gridfinity-bin.3mf',
+    defaultPath: exportFileName(suggestedName, '3mf'),
     filters: [{ name: '3MF Files', extensions: ['3mf'] }]
   })
 

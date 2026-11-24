@@ -158,16 +158,16 @@ app.whenReady().then(() => {
 
   // Export IPC handlers. The save dialog attaches to the window that sent the
   // request; the focused window can be null when another app has focus.
-  ipcMain.handle('export:stl', async (event, stlData: ArrayBuffer) => {
+  ipcMain.handle('export:stl', async (event, stlData: ArrayBuffer, suggestedName?: string) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return { success: false, error: 'No active window' }
-    return exportSTL(win, stlData)
+    return exportSTL(win, stlData, suggestedName)
   })
 
-  ipcMain.handle('export:3mf', async (event, data: ArrayBuffer) => {
+  ipcMain.handle('export:3mf', async (event, data: ArrayBuffer, suggestedName?: string) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (!win) return { success: false, error: 'No active window' }
-    return export3MF(win, data)
+    return export3MF(win, data, suggestedName)
   })
 
   ipcMain.handle('export:batch', async (event, files: BatchExportFile[]) => {
