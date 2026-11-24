@@ -112,29 +112,49 @@ describe('export3MF — vertex and triangle counts', () => {
     expect(countOccurrences(xml, '<triangle ')).toBe(1)
   })
 
-  it('BoxGeometry (non-indexed): 12 triangles x 3 vertices = 36 vertices', async () => {
-    // BoxGeometry has 6 faces x 2 triangles each = 12 triangles
-    // toNonIndexed() expands to 36 unique vertices
+  it('BoxGeometry (non-indexed): 8 shared vertices and 12 triangles', async () => {
+    // 36 corners at 8 positions. Each position is written once.
     const geo = new THREE.BoxGeometry(42, 42, 7).toNonIndexed()
     const zip = await unzip(await export3MF(geo))
     const xml = await readEntry(zip, '3D/3dmodel.model')
 
-    expect(countOccurrences(xml, '<vertex ')).toBe(36)
+    expect(countOccurrences(xml, '<vertex ')).toBe(8)
     expect(countOccurrences(xml, '<triangle ')).toBe(12)
   })
 
-  it('BoxGeometry (indexed): export3MF flattens it to the same counts as non-indexed', async () => {
-    // If the writer fails to call toNonIndexed() the triangle indices would be wrong.
-    // The vertex count is the real signal: indexed BoxGeometry has 24 unique verts,
-    // non-indexed has 36. We expect 36 because the writer must flatten.
-    const indexedGeo = new THREE.BoxGeometry(42, 42, 7) // indexed by default
-    expect(indexedGeo.index).not.toBeNull() // confirm fixture is actually indexed
+  it('BoxGeometry (indexed): the same counts as non-indexed', async () => {
+    // Indexed BoxGeometry has 24 vertices: each corner is split three ways for normals.
+    const indexedGeo = new THREE.BoxGeometry(42, 42, 7)
+    expect(indexedGeo.index).not.toBeNull()
 
     const zip = await unzip(await export3MF(indexedGeo))
     const xml = await readEntry(zip, '3D/3dmodel.model')
 
-    expect(countOccurrences(xml, '<vertex ')).toBe(36)
+    expect(countOccurrences(xml, '<vertex ')).toBe(8)
     expect(countOccurrences(xml, '<triangle ')).toBe(12)
+  })
+
+  it('triangles that touch share vertex indices', async () => {
+    const geo = makeGeometry([
+      // triangle 0
+      0, 0, 0, 1, 0, 0, 0, 1, 0,
+      // triangle 1 shares the edge from (1,0,0) to (0,1,0)
+      1, 0, 0, 1, 1, 0, 0, 1, 0
+    ])
+    const zip = await unzip(await export3MF(geo))
+    const xml = await readEntry(zip, '3D/3dmodel.model')
+
+    expect(countOccurrences(xml, '<vertex ')).toBe(4)
+    expect(xml).toContain('v1="0" v2="1" v3="2"')
+    expect(xml).toContain('v1="1" v2="3" v3="2"')
+  })
+
+  it('leaves out a triangle that collapses to a line', async () => {
+    const geo = makeGeometry([0, 0, 0, 1, 0, 0, 0, 1, 0, 2, 0, 0, 2, 0, 0, 3, 1, 0])
+    const zip = await unzip(await export3MF(geo))
+    const xml = await readEntry(zip, '3D/3dmodel.model')
+
+    expect(countOccurrences(xml, '<triangle ')).toBe(1)
   })
 
   it('triangle indices reference only valid vertex positions (v1/v2/v3 < vertex count)', async () => {
@@ -153,9 +173,7 @@ describe('export3MF — vertex and triangle counts', () => {
     }
   })
 
-  it('triangle indices are sequential (v1=3t, v2=3t+1, v3=3t+2) for non-indexed geometry', async () => {
-    // For non-indexed input the writer must emit sequential indices because
-    // vertices are stored one-per-triangle-corner.
+  it('triangles that do not touch keep separate vertices', async () => {
     const geo = makeGeometry([
       // triangle 0
       0, 0, 0, 1, 0, 0, 0, 1, 0,
