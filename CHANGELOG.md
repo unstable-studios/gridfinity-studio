@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.17.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.0...v1.17.1) (2026-11-24)
+
+
+### Refactoring
+
+* **core:** convert project files forward, and drop the old formats ([#525](https://github.com/unstable-studios/gridfinity-studio/issues/525)) ([a66a5b5](https://github.com/unstable-studios/gridfinity-studio/commit/a66a5b54166d1da39b8f2835691b9555c5ac795d))
+* **core:** remove the geometry worker's unused messages ([#524](https://github.com/unstable-studios/gridfinity-studio/issues/524)) ([5cb0185](https://github.com/unstable-studios/gridfinity-studio/commit/5cb0185c6743613b3c1a78cdea535675c85d33c3))
+
 ## [1.17.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.3...v1.17.0) (2026-11-24)
 
 
