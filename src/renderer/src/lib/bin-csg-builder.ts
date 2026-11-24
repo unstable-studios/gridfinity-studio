@@ -88,8 +88,37 @@ let madeThisBake: Disposable[] | null = null
 
 /** Note a solid or outline so it is freed when the bake ends. Returns it. */
 function keep<T extends Disposable>(made: T): T {
-  madeThisBake?.push(made)
+  if (!madeThisBake) throw new Error('keep() was called outside a bake: nothing would free this')
+  madeThisBake.push(made)
   return made
+}
+
+/** manifold-3d's number for the "Positive" fill rule, the one `new CrossSection` defaults to. */
+const FILL_POSITIVE = 2
+
+/**
+ * An outline from one polygon's points.
+ *
+ * manifold-3d 3.5.5's own `new CrossSection(polygons)` puts each polygon's points in a list
+ * on its heap and frees only a copy of that list. The lists are made here instead and
+ * handed to the constructor underneath, so both can be freed. If a later version changes
+ * what is underneath, this falls back to `new CrossSection`, and the test that counts what
+ * a bake leaves behind says so.
+ */
+function outlineOf(polygon: Array<[number, number]>, M: ManifoldModule): CrossSection {
+  const Underneath = Object.getPrototypeOf(M.CrossSection.prototype ?? null)?.constructor
+  const usable =
+    typeof M.Vector_vec2 === 'function' &&
+    typeof M.Vector2_vec2 === 'function' &&
+    typeof Underneath === 'function' &&
+    Underneath !== Object
+  if (!usable) return keep(new M.CrossSection([polygon]))
+
+  const points = keep(new M.Vector_vec2())
+  for (const [x, y] of polygon) points.push_back({ x, y })
+  const polygons = keep(new M.Vector2_vec2())
+  polygons.push_back(points)
+  return keep(new Underneath(polygons, FILL_POSITIVE))
 }
 
 /**
@@ -221,7 +250,6 @@ function buildBaseFeet(params: CSGBinParams, M: ManifoldModule): Manifold {
  * one piece so that no seam runs around the bin where a base and a body would meet.
  */
 function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
-  const { CrossSection } = M
   const { widthUnits, depthUnits, baseUnit, tolerance, heightUnits, unitHeight, hasLip } = params
 
   const hw = (widthUnits * baseUnit - tolerance * 2) / 2
@@ -231,7 +259,7 @@ function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
   // groove and the pockets are placed from `totalH`, so the height itself is not changed
   // here: only a bin that would end below the top of its base is brought up to it.
   const topZ = Math.max(hasLip ? totalH + LIP_HEIGHT : totalH, BASE_HEIGHT)
-  const outline = keep(new CrossSection([roundedRectPolygon(hw, hd, OUTER_CORNER_RADIUS)]))
+  const outline = outlineOf(roundedRectPolygon(hw, hd, OUTER_CORNER_RADIUS), M)
   const prism = extrudeOutline(outline, topZ - BASE_PROFILE_HEIGHT, M)
   return keep(prism.translate([0, 0, BASE_PROFILE_HEIGHT]))
 }
@@ -330,7 +358,7 @@ function subtractHoles(bin: Manifold, params: CSGBinParams, M: ManifoldModule): 
 }
 
 function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule): Manifold {
-  const { Manifold, CrossSection } = M
+  const { Manifold } = M
   if (params.pockets.length === 0) return bin
 
   const cutters: Manifold[] = []
@@ -344,7 +372,7 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
       poly.push([pocket.posX + pocket.vertices[i * 2], pocket.posY + pocket.vertices[i * 2 + 1]])
     }
 
-    let cs = keep(new CrossSection([poly]))
+    let cs = outlineOf(poly, M)
 
     if (pocket.clearance > 0) {
       // The offset leaves pairs of points a few nanometers apart where a rounded corner
@@ -630,7 +658,14 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
   } finally {
     // Also when the bake threw: what was made up to then is still on Manifold's heap.
     madeThisBake = null
-    for (const item of made) item.delete()
+    for (const item of made) {
+      try {
+        item.delete()
+      } catch {
+        // Already freed. Carry on: one bad entry must not leave the rest behind, or hide
+        // the error the bake itself threw.
+      }
+    }
   }
 }
 

@@ -90,7 +90,28 @@ async function recordingModule(): Promise<{ module: unknown; made: Handle[] }> {
       return outline
     }
   })
-  return { module: { ...module, CrossSection }, made }
+  // The module's own functions and lists, which the builder also calls.
+  const inner = module as unknown as Functions
+  const recorded: Functions = {}
+  for (const name of Object.getOwnPropertyNames(inner)) {
+    if (typeof inner[name] !== 'function') continue
+    if (name.startsWith('_')) {
+      recorded[name] = (...args: unknown[]) => {
+        const result = inner[name](...args)
+        if (isHandle(result)) made.push(result)
+        return result
+      }
+    } else if (name.startsWith('Vector')) {
+      recorded[name] = new Proxy(inner[name] as unknown as new () => Handle, {
+        construct(target, args) {
+          const list = Reflect.construct(target, args) as Handle
+          made.push(list)
+          return list
+        }
+      }) as unknown as Functions[string]
+    }
+  }
+  return { module: { ...module, ...recorded, CrossSection }, made }
 }
 
 describe('a bake', () => {
@@ -100,6 +121,10 @@ describe('a bake', () => {
 
     // Feet, trunk, lip groove, holes and a pocket: a real bake makes dozens.
     expect(made.length).toBeGreaterThan(40)
+    // The point lists are made by the builder, where they can be freed, and not inside the
+    // library, where this test could not see them.
+    const lists = made.filter((item) => item.constructor.name.startsWith('Vector'))
+    expect(lists.length).toBeGreaterThanOrEqual(4)
     expect(made.filter((item) => !item.isDeleted())).toHaveLength(0)
     // The mesh was copied out first.
     expect(mesh.indices.length).toBeGreaterThan(0)
