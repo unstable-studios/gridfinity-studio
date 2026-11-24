@@ -17,7 +17,6 @@ import { boxFromDrag, type DrawOptions, type Point } from '@/lib/draw-box'
 import { binFromDrag, type DrawnBin } from '@/lib/draw-bin'
 import { addBin } from '@/lib/new-bin'
 import { checkGroupCollision } from '@/layout-engine/collision'
-import { useProject } from '@/hooks/useProject'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
 
@@ -165,7 +164,6 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   const { activeTool, setActiveTool } = useAppMode()
   const { engine } = useLayoutEngineContext()
   const { viewport } = useEngineState()
-  const baseUnit = useProject((s) => s.project?.gridfinity.baseUnit ?? 42)
 
   // Reset polygon state when switching away from polygon tool.
 
@@ -202,11 +200,15 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   }, [])
 
   // Pressing or letting go of a modifier key during a drag changes the shape straight away,
-  // without waiting for the pointer to move.
-  const isDragging = dragPreview !== null && activeTool !== 'bin'
+  // without waiting for the pointer to move. Esc calls the drag off.
+  const isDragging = dragPreview !== null
   useEffect(() => {
     if (!isDragging) return
     const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        if (e.type === 'keydown') cleanupPreview()
+        return
+      }
       if (!MODIFIER_KEYS.has(e.key)) return
       const start = dragStartRef.current
       const pointer = dragCurrentRef.current
@@ -215,6 +217,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       if (e.key === 'Alt') e.preventDefault()
       // A held key repeats its keydown. Nothing has changed since the first one.
       if (e.repeat) return
+      // A bin fills whole grid cells whatever keys are held.
+      if (activeTool === 'bin') return
       setDragPreview({ start, current: snapShapePoint(pointer, e), options: drawOptions(e) })
     }
     window.addEventListener('keydown', onKey)
@@ -223,7 +227,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKey)
     }
-  }, [isDragging])
+  }, [isDragging, activeTool, cleanupPreview])
 
   useEffect(() => {
     return () => {
@@ -409,13 +413,14 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
       if (activeTool === 'bin') {
-        const bin = binFromDrag(dragStartRef.current, world, baseUnit)
+        const cell = engine.getGridConfig().size
+        const bin = binFromDrag(dragStartRef.current, world, cell)
         setDragPreview(null)
         dragStartRef.current = null
         dragCurrentRef.current = null
         // A bin can't sit on another. The preview has already shown there is no room.
         if (binOverlaps(engine, bin)) return
-        addBin(engine, bin, baseUnit)
+        addBin(engine, bin, cell, { adoptShapes: true })
         setActiveTool('select')
         return
       }
@@ -454,7 +459,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       dragStartRef.current = null
       dragCurrentRef.current = null
     },
-    [engine, activeTool, setActiveTool, baseUnit]
+    [engine, activeTool, setActiveTool]
   )
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -474,11 +479,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
     >
       {dragPreview && activeTool === 'bin' && (
         <BinPreviewSvg
-          bin={binFromDrag(dragPreview.start, dragPreview.current, baseUnit)}
-          blocked={binOverlaps(
-            engine,
-            binFromDrag(dragPreview.start, dragPreview.current, baseUnit)
-          )}
+          bin={binFromDrag(dragPreview.start, dragPreview.current, engine.getGridConfig().size)}
+          engine={engine}
           viewport={viewport}
         />
       )}
@@ -555,17 +557,18 @@ function binOverlaps(engine: LayoutEngine, bin: DrawnBin): boolean {
 /** The bin being drawn, with its size in grid units. Red when there is no room for it. */
 function BinPreviewSvg({
   bin,
-  blocked,
+  engine,
   viewport
 }: {
   bin: DrawnBin
-  blocked: boolean
+  engine: LayoutEngine
   viewport: { panX: number; panY: number; zoom: number }
 }): React.JSX.Element {
   const x = bin.x * viewport.zoom - viewport.panX
   const y = (bin.y - bin.height) * viewport.zoom - viewport.panY
   const width = bin.width * viewport.zoom
   const height = bin.height * viewport.zoom
+  const blocked = binOverlaps(engine, bin)
   const colors = blocked ? BIN_PREVIEW_BLOCKED : BIN_PREVIEW
 
   return (

@@ -43,6 +43,18 @@ describe('binFromDrag', () => {
     expect(bin.y).toBe(126)
   })
 
+  it('counts a point on a grid line as the cell after the line', () => {
+    expect(binFromDrag({ x: 10, y: 10 }, { x: 84, y: 10 }, UNIT)).toMatchObject({ widthUnits: 3 })
+  })
+
+  it('works with a base unit that is not a whole number', () => {
+    expect(binFromDrag({ x: 1, y: 1 }, { x: 50, y: 1 }, 41.5)).toMatchObject({
+      x: 0,
+      width: 83,
+      widthUnits: 2
+    })
+  })
+
   it('follows the base unit', () => {
     expect(binFromDrag({ x: 10, y: 10 }, { x: 60, y: 10 }, 50)).toMatchObject({
       width: 100,

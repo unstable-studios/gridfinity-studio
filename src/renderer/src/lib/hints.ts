@@ -31,7 +31,8 @@ const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
     ]
   },
   bin: {
-    text: 'Drag to draw a bin.'
+    text: 'Drag to draw a bin. Click for one grid square.',
+    shortcuts: [{ keys: 'Esc', does: 'cancel' }]
   },
   rectangle: {
     text: 'Drag to draw a rectangle.',

@@ -2,7 +2,7 @@ import { mkdtemp, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { _electron as electron, expect } from '@playwright/test'
-import type { ElectronApplication, Page } from '@playwright/test'
+import type { ElectronApplication, Locator, Page } from '@playwright/test'
 
 export interface SavedShape {
   id: string
@@ -184,8 +184,15 @@ export class StudioApp {
     await this.page.getByRole('menuitem', { name: item }).click()
   }
 
+  /** A tool in the toolbar. "Bin" is also an option elsewhere, so the toolbar is named. */
+  tool(name: 'Select' | 'Bin' | 'Rectangle' | 'Ellipse' | 'Polygon'): Locator {
+    return this.page
+      .getByRole('radiogroup', { name: 'Tools' })
+      .getByRole('radio', { name, exact: true })
+  }
+
   async selectTool(name: 'Select' | 'Bin' | 'Rectangle' | 'Ellipse' | 'Polygon'): Promise<void> {
-    await this.page.getByRole('radio', { name, exact: true }).click()
+    await this.tool(name).click()
   }
 
   /** Press-drag-release with intermediate moves, as a person would. */

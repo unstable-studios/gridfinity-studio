@@ -353,6 +353,7 @@ function ToolBar() {
   return (
     <ToggleGroup
       type="single"
+      aria-label="Tools"
       value={activeTool ?? ''}
       onValueChange={(value) => {
         if (value) setActiveTool(value as typeof activeTool)

@@ -302,7 +302,7 @@ test('a pocket position reads on the canvas or in its bin', async () => {
     .locator('aside')
     .locator('xpath=.//span[normalize-space(.)="Y"]/following-sibling::div[1]')
   const frame = (name: 'Canvas' | 'Bin'): ReturnType<typeof page.getByRole> =>
-    page.getByRole('radio', { name, exact: true })
+    page.getByRole('radiogroup', { name: 'Relative to' }).getByRole('radio', { name, exact: true })
 
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
