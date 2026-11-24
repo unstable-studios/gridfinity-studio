@@ -1,12 +1,12 @@
 /**
  * 3MF export utility.
  *
- * Produces a minimal but spec-compliant 3MF ZIP blob from a Three.js
- * BufferGeometry. The geometry must be non-indexed with a 'position'
- * attribute (i.e. toNonIndexed() has been called, or it was never
- * indexed to begin with).
+ * Writes a 3MF package from a Three.js BufferGeometry. Corners at the same
+ * position are written as one vertex, so triangles that touch share vertex
+ * indices. A slicer joins triangles by index: without shared vertices it reads
+ * every triangle as a separate open surface.
  *
- * Spec: http://schemas.microsoft.com/3dmanufacturing/core/2015/02
+ * Spec: https://github.com/3MFConsortium/spec_core/blob/master/3MF%20Core%20Specification.md
  */
 
 import JSZip from 'jszip'
@@ -44,26 +44,7 @@ function buildModelXml(geometry: THREE.BufferGeometry, name: string): string {
 </model>`
   }
 
-  const vertexCount = posAttr.count
-  const triangleCount = vertexCount / 3
-
-  // Build vertex lines
-  const vertexLines: string[] = []
-  for (let i = 0; i < vertexCount; i++) {
-    const x = posAttr.getX(i)
-    const y = posAttr.getY(i)
-    const z = posAttr.getZ(i)
-    vertexLines.push(`          <vertex x="${fmt(x)}" y="${fmt(y)}" z="${fmt(z)}" />`)
-  }
-
-  // Build triangle lines — non-indexed, so every 3 vertices is one triangle
-  const triangleLines: string[] = []
-  for (let t = 0; t < triangleCount; t++) {
-    const v1 = t * 3
-    const v2 = t * 3 + 1
-    const v3 = t * 3 + 2
-    triangleLines.push(`          <triangle v1="${v1}" v2="${v2}" v3="${v3}" />`)
-  }
+  const { vertexLines, triangleLines } = weld(posAttr, geometry.index)
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
@@ -85,9 +66,46 @@ ${triangleLines.join('\n')}
 </model>`
 }
 
-/** Format a float with up to 6 significant decimal places, no trailing zeros. */
+/**
+ * Merge corners that share a position and list each triangle by merged vertex.
+ * Geometry arrives with corners split for shading, or with no index at all.
+ * A triangle that collapses to a line or point is left out.
+ */
+function weld(
+  posAttr: THREE.BufferAttribute,
+  index: THREE.BufferAttribute | null
+): { vertexLines: string[]; triangleLines: string[] } {
+  const vertexLines: string[] = []
+  const triangleLines: string[] = []
+  const written = new Map<string, number>()
+  const cornerCount = index ? index.count : posAttr.count
+
+  const vertexAt = (corner: number): number => {
+    const i = index ? index.getX(corner) : corner
+    const line = `          <vertex x="${fmt(posAttr.getX(i))}" y="${fmt(posAttr.getY(i))}" z="${fmt(posAttr.getZ(i))}" />`
+    let vertex = written.get(line)
+    if (vertex === undefined) {
+      vertex = vertexLines.length
+      written.set(line, vertex)
+      vertexLines.push(line)
+    }
+    return vertex
+  }
+
+  for (let corner = 0; corner + 2 < cornerCount; corner += 3) {
+    const v1 = vertexAt(corner)
+    const v2 = vertexAt(corner + 1)
+    const v3 = vertexAt(corner + 2)
+    if (v1 === v2 || v2 === v3 || v3 === v1) continue
+    triangleLines.push(`          <triangle v1="${v1}" v2="${v2}" v3="${v3}" />`)
+  }
+
+  return { vertexLines, triangleLines }
+}
+
+/** Format a float with up to 6 decimal places, no trailing zeros and no negative zero. */
 function fmt(n: number): string {
-  return parseFloat(n.toFixed(6)).toString()
+  return (parseFloat(n.toFixed(6)) + 0).toString()
 }
 
 /** Escape the five XML special characters. */
@@ -105,18 +123,14 @@ function escapeXml(s: string): string {
 /**
  * Export a BufferGeometry as a 3MF ZIP Blob.
  *
- * @param geometry - A THREE.BufferGeometry. If indexed, it will be converted
- *   to non-indexed form internally before export.
+ * @param geometry - A THREE.BufferGeometry, indexed or not.
  * @param name     - Object name embedded in the model XML (default "model").
  */
 export async function export3MF(geometry: THREE.BufferGeometry, name = 'model'): Promise<Blob> {
-  // Always work with a non-indexed copy so vertices align 1:1 with triangles.
-  const geo = geometry.index ? geometry.toNonIndexed() : geometry
-
   const zip = new JSZip()
   zip.file('[Content_Types].xml', CONTENT_TYPES_XML)
   zip.folder('_rels')!.file('.rels', RELS_XML)
-  zip.folder('3D')!.file('3dmodel.model', buildModelXml(geo, name))
+  zip.folder('3D')!.file('3dmodel.model', buildModelXml(geometry, name))
 
-  return zip.generateAsync({ type: 'blob' })
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
 }
