@@ -118,6 +118,8 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 
 `dependencies` holds only the packages the main and preload processes import (`electron-updater`, `electron-log`, `@electron-toolkit/*`). electron-builder packs everything listed there into the installers. Everything the renderer uses goes under `devDependencies`: electron-vite bundles it into `out/renderer`. `runtime-dependencies.test.ts` fails when the two lists drift.
 
+Renovate keeps dependencies current (`renovate.json`): update PRs wait until a release is 3 days old, so they pass pnpm's release-age check; security fixes open at once; and the lockfile is refreshed weekly, which is what updates indirect dependencies. Dependabot alerts stay on as the list Renovate's security PRs come from. Dependabot opens no PRs.
+
 ## Code Style
 
 - Prettier: single quotes, no semicolons, 100 char width, no trailing commas
