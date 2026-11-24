@@ -450,6 +450,35 @@ test('a bin cannot be resized onto its neighbor from the sidebar', async () => {
   expect(app.errors, 'no renderer errors').toEqual([])
 })
 
+test('bins added from the size grid fill rows and never overlap', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'rows.gfstudio')
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  for (let i = 0; i < 7; i++) {
+    await page.getByRole('button', { name: '1×1', exact: true }).first().click()
+    await app.expectBinCount(i + 1)
+  }
+  const { groups } = (await app.save(file)).layoutSnapshot
+  const unit = groups[0].width
+
+  // Six fit in a row with a unit between them. The seventh starts the next row.
+  const places = groups.map((g) => `${g.x / unit},${g.y / unit}`)
+  expect(places).toEqual(['0,0', '2,0', '4,0', '6,0', '8,0', '10,0', '0,2'])
+
+  // Deleting one leaves a gap, and the next bin goes there.
+  await page.getByRole('button', { name: /^Bin 3/ }).click()
+  await page.getByRole('button', { name: 'Delete selected' }).click()
+  await app.expectBinCount(6)
+  await page.getByRole('button', { name: '1×1', exact: true }).first().click()
+  await app.expectBinCount(7)
+  const refilled = (await app.save(file)).layoutSnapshot.groups
+  expect(refilled.filter((g) => g.x === 4 * unit && g.y === 0)).toHaveLength(1)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
 test('rows in the sidebar select with Shift and Cmd or Ctrl', async () => {
   app = await StudioApp.launch()
   const { page } = app
