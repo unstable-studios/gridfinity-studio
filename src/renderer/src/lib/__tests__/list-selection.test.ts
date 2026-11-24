@@ -83,4 +83,47 @@ describe('selectionAfterClick', () => {
       ).toEqual({ selected: ['c'], anchor: 'c' })
     }
   })
+
+  it('reaches back to what was selected on the canvas since the last row click', () => {
+    // Row a was clicked, then c was selected on the canvas.
+    const result = selectionAfterClick({
+      ...plain,
+      shift: true,
+      selected: ['c'],
+      clicked: 'e',
+      anchor: 'a'
+    })
+
+    expect(result).toEqual({ selected: ['c', 'd', 'e'], anchor: 'c' })
+  })
+
+  it('reaches back to a canvas selection when no row was clicked before', () => {
+    const result = selectionAfterClick({
+      ...plain,
+      shift: true,
+      selected: ['b'],
+      clicked: 'd',
+      anchor: null
+    })
+
+    expect(result).toEqual({ selected: ['b', 'c', 'd'], anchor: 'b' })
+  })
+
+  it('never repeats a row', () => {
+    for (const shift of [false, true]) {
+      for (const toggle of [false, true]) {
+        for (const clicked of order) {
+          const { selected } = selectionAfterClick({
+            order,
+            shift,
+            toggle,
+            selected: ['b', 'd'],
+            clicked,
+            anchor: 'd'
+          })
+          expect(new Set(selected).size).toBe(selected.length)
+        }
+      }
+    }
+  })
 })
