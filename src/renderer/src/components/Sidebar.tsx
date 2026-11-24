@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
+import { shapeTypeLabel } from '@/lib/shape-labels'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
@@ -36,7 +37,7 @@ export default function Sidebar(): React.JSX.Element {
   return (
     <aside
       ref={sidebarRef}
-      className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto"
+      className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto [scrollbar-gutter:stable]"
     >
       {mode === 'layout' ? <LayoutSidebar /> : <PreviewSidebar />}
     </aside>
@@ -211,7 +212,7 @@ function LayoutSidebar(): React.JSX.Element {
 
       {/* Bin creation */}
       <SidebarSection title="Add bin">
-        <GridPicker width={1} depth={1} onChange={handleAddBin} />
+        <GridPicker onChange={handleAddBin} />
       </SidebarSection>
 
       {/* Bin list */}
@@ -263,7 +264,7 @@ function LayoutSidebar(): React.JSX.Element {
                   <span className="font-medium">
                     {(shape.metadata?.name as string) ?? shape.id}
                   </span>
-                  <span className="ml-2 opacity-60">{shape.type}</span>
+                  <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
                 </button>
               )
             })}
@@ -330,7 +331,7 @@ function LayoutSidebar(): React.JSX.Element {
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-zinc-500">Type</span>
-              <span className="text-zinc-300 font-mono">{selectedShape.type}</span>
+              <span className="text-zinc-300">{shapeTypeLabel(selectedShape.type)}</span>
             </div>
             {selectedShape.groupId && (
               <div className="flex items-center justify-between">

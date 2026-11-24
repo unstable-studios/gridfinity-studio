@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react'
 
 interface GridPickerProps {
-  width: number
-  depth: number
+  /** The current size. Leave both out for a picker that only adds something. */
+  width?: number
+  depth?: number
   maxWidth?: number
   maxDepth?: number
   onChange: (width: number, depth: number) => void
@@ -23,13 +24,14 @@ export function GridPicker({
     setHoverD(null)
   }, [])
 
-  const displayW = hoverW ?? width
-  const displayD = hoverD ?? depth
+  const displayW = hoverW ?? width ?? 0
+  const displayD = hoverD ?? depth ?? 0
+  const hasSize = displayW > 0 && displayD > 0
 
   return (
     <div className="space-y-1">
       <p className="text-[10px] text-zinc-500 text-center">
-        {displayW}×{displayD}
+        {hasSize ? `${displayW}×${displayD}` : 'Pick a size'}
       </p>
       <div
         className="inline-grid gap-[2px]"
@@ -43,7 +45,7 @@ export function GridPicker({
             // Flip: visual top row corresponds to maxDepth, bottom row to 1
             const row = maxDepth - d
             const isHighlighted = col <= displayW && row <= displayD
-            const isActive = col <= width && row <= depth
+            const isActive = col <= (width ?? 0) && row <= (depth ?? 0)
             return (
               <button
                 key={`${col}-${row}`}
