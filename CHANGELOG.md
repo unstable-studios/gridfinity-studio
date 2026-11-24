@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.16.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.2...v1.16.3) (2026-11-24)
+
+
+### Bug Fixes
+
+* **core:** keep the bin when a pocket has nothing to cut ([#499](https://github.com/unstable-studios/gridfinity-studio/issues/499)) ([fd55e61](https://github.com/unstable-studios/gridfinity-studio/commit/fd55e61899cabe8beff0f187e0f6345fb1f2d4e5))
+
 ## [1.16.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.1...v1.16.2) (2026-11-24)
 
 
