@@ -132,7 +132,7 @@ Renovate keeps dependencies current (`renovate.json`): update PRs wait until a r
 - **Frontend**: React 19, Tailwind CSS 4, Shadcn/ui, Headless UI
 - **2D Canvas**: Konva 10 (imperative), behind the LayoutEngine interface
 - **3D Preview**: Three.js via @react-three/fiber and @react-three/drei
-- **CSG**: Manifold (WASM) for solid geometry, earcut for triangulation
+- **CSG**: Manifold (WASM) for solid geometry
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
 - **Release**: release-please for automated versioning and CHANGELOG. `feat`, `fix`, `perf`, `docs`, `refactor` and `build` commits appear in the changelog and trigger a release; `chore`, `ci`, `test` and `style` do not
 - **Project files**: `.gfstudio` (JSON, schema v0.5.0)

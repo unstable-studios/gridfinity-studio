@@ -10,21 +10,16 @@
  */
 
 import { circleSegments } from './curve-segments'
-import { BASE_PROFILE_HEIGHT, LIP_PROFILE, LIP_OFFSET, LIP_HEIGHT } from './bin-generator'
-
-// ─── Gridfinity Spec Constants ───────────────────────────────────
-
-/** Per-unit base profile: [inset_from_outer_edge, height_from_bottom] */
-const BASE_PROFILE: ReadonlyArray<readonly [number, number]> = [
-  [0, 0],
-  [0.8, 0.8],
-  [0.8, 2.6],
-  [2.95, 4.95]
-]
-
-const OUTER_CORNER_RADIUS = 3.75
-const BASE_HEIGHT = 7
-const MAGNET_HOLE_OFFSET = 8
+import {
+  BASE_HEIGHT,
+  BASE_PROFILE,
+  BASE_PROFILE_HEIGHT,
+  LIP_HEIGHT,
+  LIP_OFFSET,
+  LIP_PROFILE,
+  MAGNET_HOLE_OFFSET,
+  OUTER_CORNER_RADIUS
+} from '../../../shared/gridfinity-dimensions'
 
 /** Points closer to the outline than this are dropped after an offset, in mm. */
 const OFFSET_CLEANUP = 1e-5

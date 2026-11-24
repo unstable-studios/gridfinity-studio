@@ -58,7 +58,7 @@ export default defineConfig({
       }
     },
     optimizeDeps: {
-      include: ['manifold-3d', 'earcut']
+      include: ['manifold-3d']
     },
     build: {
       rollupOptions: {
