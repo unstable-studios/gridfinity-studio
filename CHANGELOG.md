@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.16.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.0...v1.16.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **core:** make a shape transform one step that updates bins ([#487](https://github.com/unstable-studios/gridfinity-studio/issues/487)) ([e215f54](https://github.com/unstable-studios/gridfinity-studio/commit/e215f54aa13d8916ae0baa375cdab320e3c37c22))
+
+
+### Documentation
+
+* describe the current project file format ([#489](https://github.com/unstable-studios/gridfinity-studio/issues/489)) ([0646e12](https://github.com/unstable-studios/gridfinity-studio/commit/0646e1275302b090074fcbdf08e1c102a5565a00))
+
 ## [1.16.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.15.0...v1.16.0) (2026-11-24)
 
 
