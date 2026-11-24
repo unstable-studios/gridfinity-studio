@@ -1,7 +1,8 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { ProjectData } from '../shared/types/project'
 import type { UpdateState } from '../shared/types/updates'
-import type { FailureReason, OperationResult } from '../shared/types/results'
+import type { OperationResult } from '../shared/types/results'
+import type { BatchExport, BatchExportFile, ExportFormat } from '../shared/types/export'
 
 interface UpdatesAPI {
   getState: () => Promise<UpdateState>
@@ -29,13 +30,7 @@ interface ProjectAPI {
 interface ExportAPI {
   stl: (stlData: ArrayBuffer, suggestedName?: string) => Promise<OperationResult<string>>
   threemf: (data: ArrayBuffer, suggestedName?: string) => Promise<OperationResult<string>>
-  batch: (files: Array<{ filename: string; data: ArrayBuffer }>) => Promise<{
-    success: boolean
-    error?: string
-    reason?: FailureReason
-    exported: number
-    directory?: string
-  }>
+  batch: (files: BatchExportFile[], format: ExportFormat) => Promise<OperationResult<BatchExport>>
 }
 
 declare global {

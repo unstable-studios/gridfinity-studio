@@ -2,23 +2,10 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import JSZip from 'jszip'
-import { StudioApp, mappingFromDrawnRect } from './app'
+import { StudioApp, mappingFromDrawnRect, readWhenComplete } from './app'
 import type { SavedProject } from './app'
 
 let app: StudioApp
-
-/**
- * Wait for an exported file to be completely written, then return what
- * `parse` makes of it. The app writes after an IPC round trip and the write
- * is not atomic, so retry until the content parses.
- */
-async function readWhenComplete<T>(path: string, parse: (bytes: Buffer) => Promise<T>): Promise<T> {
-  let parsed: T | undefined
-  await expect(async () => {
-    parsed = await parse(await readFile(path))
-  }, `export written to ${path}`).toPass({ timeout: 30_000 })
-  return parsed as T
-}
 
 test.beforeEach(async () => {
   app = await StudioApp.launch()
