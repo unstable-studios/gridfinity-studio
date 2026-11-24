@@ -69,6 +69,8 @@ export interface CSGMeshResult {
 type ManifoldModule = any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Manifold = any
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type CrossSection = any
 
 // ─── Memory ──────────────────────────────────────────────────────
 
@@ -88,6 +90,22 @@ let madeThisBake: Disposable[] | null = null
 function keep<T extends Disposable>(made: T): T {
   madeThisBake?.push(made)
   return made
+}
+
+/**
+ * Extrude an outline straight up from z = 0.
+ *
+ * manifold-3d 3.5.5's own `extrude` copies the outline's points onto its heap and never
+ * frees the copy. Its two inner calls are used here instead, so the copy can be freed. If a
+ * later version drops them, this falls back to `extrude`, and the test that counts what a
+ * bake leaves behind says so.
+ */
+function extrudeOutline(outline: CrossSection, height: number, M: ManifoldModule): Manifold {
+  if (typeof M._Extrude !== 'function' || typeof outline._ToPolygons !== 'function') {
+    return keep(M.Manifold.extrude(outline, height))
+  }
+  const points = keep(outline._ToPolygons())
+  return keep(M._Extrude(points, height, 0, 0, { x: 1, y: 1 }))
 }
 
 // ─── Rounded Rectangle CrossSection ─────────────────────────────
@@ -203,7 +221,7 @@ function buildBaseFeet(params: CSGBinParams, M: ManifoldModule): Manifold {
  * one piece so that no seam runs around the bin where a base and a body would meet.
  */
 function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
-  const { Manifold, CrossSection } = M
+  const { CrossSection } = M
   const { widthUnits, depthUnits, baseUnit, tolerance, heightUnits, unitHeight, hasLip } = params
 
   const hw = (widthUnits * baseUnit - tolerance * 2) / 2
@@ -214,7 +232,7 @@ function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
   // here: only a bin that would end below the top of its base is brought up to it.
   const topZ = Math.max(hasLip ? totalH + LIP_HEIGHT : totalH, BASE_HEIGHT)
   const outline = keep(new CrossSection([roundedRectPolygon(hw, hd, OUTER_CORNER_RADIUS)]))
-  const prism = keep(Manifold.extrude(outline, topZ - BASE_PROFILE_HEIGHT))
+  const prism = extrudeOutline(outline, topZ - BASE_PROFILE_HEIGHT, M)
   return keep(prism.translate([0, 0, BASE_PROFILE_HEIGHT]))
 }
 
@@ -340,7 +358,7 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
     const lipExtension = params.hasLip ? LIP_HEIGHT + 1 : 0
     const cutHeight = pocket.depth + lipExtension
     const cutBase = pocket.zTop - pocket.depth
-    const prism = keep(Manifold.extrude(cs, cutHeight))
+    const prism = extrudeOutline(cs, cutHeight, M)
     cutters.push(keep(prism.translate([0, 0, cutBase])))
   }
 

@@ -6,7 +6,8 @@ import type { CSGBinParams } from '../bin-csg-builder'
 
 /**
  * The geometry worker keeps one Manifold module for as long as the app is open, and every
- * visit to Preview bakes every bin again. A bake must give back what it took.
+ * visit to Preview bakes every bin again. A bake must give back what it took: before it
+ * did, a module failed with "memory access out of bounds" after about 700 bakes of this bin.
  */
 
 const params: CSGBinParams = {
@@ -31,38 +32,99 @@ const params: CSGBinParams = {
   ]
 }
 
-/** Without giving memory back, a module fails after about 300 bakes of a bin like this. */
-const BAKES = 1200
+interface Handle {
+  isDeleted(): boolean
+}
 
-describe('baking again and again on one module', () => {
-  it('still bakes after many more bakes than leaked memory would allow', async () => {
-    const module = await Module()
-    module.setup()
-    const first = buildBinCSG(params, module)
+function isHandle(value: unknown): value is Handle {
+  return (
+    typeof value === 'object' && value !== null && typeof (value as Handle).isDeleted === 'function'
+  )
+}
 
-    let done = 1
-    let last = first
-    try {
-      for (; done < BAKES; done++) last = buildBinCSG(params, module)
-    } catch (err) {
-      throw new Error(`bake ${done + 1} of ${BAKES} failed: ${String(err)}`, { cause: err })
+type Functions = Record<string, (...args: unknown[]) => unknown>
+
+/**
+ * A fresh Manifold module that notes every solid and outline made through it: by a static
+ * such as `Manifold.hull`, by a method such as `translate`, or by `new CrossSection`.
+ */
+async function recordingModule(): Promise<{ module: unknown; made: Handle[] }> {
+  const module = (await Module()) as unknown as {
+    setup(): void
+    Manifold: Functions & { prototype: Functions }
+    CrossSection: Functions & { prototype: Functions }
+  }
+  module.setup()
+  const made: Handle[] = []
+  const noting = (owner: Functions, name: string): void => {
+    const original = owner[name]
+    owner[name] = function (this: unknown, ...args: unknown[]) {
+      const result = original.apply(this, args)
+      if (isHandle(result)) made.push(result)
+      return result
     }
+  }
+  // Methods can sit anywhere up the chain, so each object in it is gone through once.
+  const done = new Set<object>()
+  const stops = new Set<object>([Object.prototype, Function.prototype])
+  for (const kind of [module.Manifold, module.CrossSection]) {
+    for (const start of [kind, kind.prototype]) {
+      for (
+        let owner: Functions | null = start;
+        owner && !stops.has(owner) && !done.has(owner);
+        owner = Object.getPrototypeOf(owner)
+      ) {
+        done.add(owner)
+        for (const name of Object.getOwnPropertyNames(owner)) {
+          const skip = ['constructor', 'prototype', 'delete', 'isDeleted', 'deleteLater', 'clone']
+          const { value, writable } = Object.getOwnPropertyDescriptor(owner, name) ?? {}
+          if (!skip.includes(name) && typeof value === 'function' && writable) noting(owner, name)
+        }
+      }
+    }
+  }
+  const CrossSection = new Proxy(module.CrossSection as unknown as new () => Handle, {
+    construct(target, args) {
+      const outline = Reflect.construct(target, args) as Handle
+      made.push(outline)
+      return outline
+    }
+  })
+  return { module: { ...module, CrossSection }, made }
+}
 
-    expect(last.positions).toEqual(first.positions)
-  }, 300_000)
+describe('a bake', () => {
+  it('frees every solid and outline it made', async () => {
+    const { module, made } = await recordingModule()
+    const mesh = buildBinCSG(params, module)
 
-  it('gives back what it took when a bake fails part-way', async () => {
-    const module = await Module()
-    module.setup()
+    // Feet, trunk, lip groove, holes and a pocket: a real bake makes dozens.
+    expect(made.length).toBeGreaterThan(40)
+    expect(made.filter((item) => !item.isDeleted())).toHaveLength(0)
+    // The mesh was copied out first.
+    expect(mesh.indices.length).toBeGreaterThan(0)
+    expect(Number.isFinite(mesh.positions[0])).toBe(true)
+  })
+
+  it('frees what it made when it fails part-way', async () => {
+    const { module, made } = await recordingModule()
     // A pocket that cannot be built: the feet, trunk and holes are made before it throws.
     const broken = {
       ...params,
       pockets: [{ ...params.pockets[0], vertices: null as unknown as Float32Array }]
     }
 
-    for (let i = 0; i < BAKES; i++) expect(() => buildBinCSG(broken, module)).toThrow()
+    expect(() => buildBinCSG(broken, module)).toThrow()
+    expect(made.length).toBeGreaterThan(20)
+    expect(made.filter((item) => !item.isDeleted())).toHaveLength(0)
+  })
 
-    // The module is still good for a real bake.
-    expect(buildBinCSG(params, module).indices.length).toBeGreaterThan(0)
-  }, 300_000)
+  it('can be followed by another on the same module', async () => {
+    const { module, made } = await recordingModule()
+    const first = buildBinCSG(params, module)
+    const second = buildBinCSG(params, module)
+
+    expect(second.positions).toEqual(first.positions)
+    expect(made.filter((item) => !item.isDeleted())).toHaveLength(0)
+  })
 })
