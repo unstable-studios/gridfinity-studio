@@ -75,6 +75,32 @@ test('choosing Don’t save closes without saving', async () => {
   await expect.poll(() => app.hasWindow(), 'the window closes').toBe(false)
 })
 
+test('quitting with unsaved work asks, and Cancel calls the quit off', async () => {
+  app = await launchWithUnsavedBin()
+
+  await app.answerUnsavedPrompt('cancel')
+  await app.requestQuit()
+
+  await expect.poll(() => app.unsavedPromptCount(), 'the question was asked').toBe(1)
+  expect(await app.hasWindow(), 'the window stays open').toBe(true)
+
+  // The quit is forgotten: closing the window later asks again and nothing quits.
+  await app.requestWindowClose()
+  await expect.poll(() => app.unsavedPromptCount()).toBe(2)
+  expect(await app.isRunning(), 'the app is still running').toBe(true)
+  expect(await app.hasWindow()).toBe(true)
+})
+
+test('quitting and choosing Don’t save quits the app, not just the window', async () => {
+  app = await launchWithUnsavedBin()
+
+  await app.answerUnsavedPrompt('discard')
+  await app.requestQuit()
+
+  // On a Mac a closed window alone would leave the app running.
+  await expect.poll(() => app.isRunning(), 'the app quits').toBe(false)
+})
+
 // In these two, the question would be answered Cancel and the window would stay open. The
 // window closing is what shows the question was never asked.
 

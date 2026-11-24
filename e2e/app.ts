@@ -112,6 +112,23 @@ export class StudioApp {
     })
   }
 
+  /** Ask the app to quit, as Cmd+Q or the app menu does. */
+  async requestQuit(): Promise<void> {
+    await this.electronApp.evaluate(({ app }) => {
+      setImmediate(() => app.quit())
+    })
+  }
+
+  /** Whether the app is still running, with or without a window. */
+  async isRunning(): Promise<boolean> {
+    try {
+      await this.electronApp.evaluate(() => true)
+      return true
+    } catch {
+      return false
+    }
+  }
+
   /** Whether the app still has a window. */
   async hasWindow(): Promise<boolean> {
     try {
