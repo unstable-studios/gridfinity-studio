@@ -260,9 +260,10 @@ test('a pocket with no area leaves its bin whole and says so in Preview', async 
   await mouse.click(at.x, at.y)
   await app.expectBinCount(1)
 
-  // A polygon whose three points are in one line, inside that bin.
+  // A polygon whose three points are in one line, inside that bin. The line slants, so the
+  // box around it has a size and the bin takes the shape in.
   await app.selectTool('Polygon')
-  for (const dx of [-4, 0, 4]) await mouse.click(at.x + dx, at.y)
+  for (const d of [-4, 0, 4]) await mouse.click(at.x + d, at.y + d)
   await page.keyboard.press('Enter')
   await app.expectShapeCount(1)
   const saved = await app.save(file)
