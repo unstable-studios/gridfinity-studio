@@ -530,10 +530,13 @@ function PreviewSidebar(): React.JSX.Element {
               const isSelected = selectedBinIds.includes(bin.id)
               const pip =
                 status === 'ready'
-                  ? { color: 'text-emerald-500', label: '● Ready' }
+                  ? { color: 'text-emerald-700 dark:text-emerald-500', label: '● Ready' }
                   : status === 'error'
-                    ? { color: 'text-red-500', label: '⚠ Failed' }
-                    : { color: 'text-amber-500 animate-pulse', label: '◌ Building…' }
+                    ? { color: 'text-red-700 dark:text-red-500', label: '⚠ Failed' }
+                    : {
+                        color: 'text-amber-700 dark:text-amber-500 animate-pulse',
+                        label: '◌ Building…'
+                      }
               return (
                 <button
                   key={bin.id}
@@ -563,13 +566,13 @@ function PreviewSidebar(): React.JSX.Element {
       </SidebarSection>
 
       {anyError && (
-        <p className="text-[10px] text-red-500">
+        <p className="text-[10px] text-red-700 dark:text-red-500">
           Couldn’t build one or more bins. Edit them in Design to try again.
         </p>
       )}
 
       {warnings.length > 0 && (
-        <ul className="space-y-0.5 text-[10px] text-amber-500">
+        <ul className="space-y-0.5 text-[10px] text-amber-700 dark:text-amber-500">
           {warnings.map((warning, i) => (
             <li key={i}>{warning}</li>
           ))}
