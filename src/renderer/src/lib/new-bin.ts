@@ -51,10 +51,12 @@ export function placeForNewBin(
 
   const width = widthUnits * unit
   const height = depthUnits * unit
-  const left = Math.min(...existing.map((bin) => bin.x))
+  // Rows and columns stay on the canvas grid even if the bin they start from is off it.
+  const onGrid = (value: number): number => Math.round(value / unit) * unit
+  const left = onGrid(Math.min(...existing.map((bin) => bin.x)))
   const right = Math.max(...existing.map((bin) => bin.x + bin.width))
   // Rows are counted down from the bottom edge of the highest bin.
-  const firstBaseline = Math.min(...existing.map((bin) => bin.y))
+  const firstBaseline = onGrid(Math.min(...existing.map((bin) => bin.y)))
   const lowest = Math.max(...existing.map((bin) => bin.y))
   const columns = Math.max(ROW_UNITS, Math.ceil((right - left) / unit), widthUnits)
   // Slightly less than a unit, so a bin exactly one unit away is far enough.
