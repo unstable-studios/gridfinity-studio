@@ -97,10 +97,18 @@ export class StudioApp {
     )
   }
 
+  /** How many save dialogs the cancelled stub has dismissed. */
+  async cancelledSaveDialogCount(): Promise<number> {
+    return this.electronApp.evaluate(
+      () => (globalThis as { cancelledSaveDialogs?: number }).cancelledSaveDialogs ?? 0
+    )
+  }
+
   /** Ask the window to close, as the close button does. */
   async requestWindowClose(): Promise<void> {
+    // The close can end the app. It is put off a moment so this call gets its reply first.
     await this.electronApp.evaluate(({ BrowserWindow }) => {
-      BrowserWindow.getAllWindows()[0]?.close()
+      setImmediate(() => BrowserWindow.getAllWindows()[0]?.close())
     })
   }
 
@@ -145,7 +153,11 @@ export class StudioApp {
   /** Make the next native save and open dialogs behave as if dismissed. */
   async stubDialogsCancelled(): Promise<void> {
     await this.electronApp.evaluate(({ dialog }) => {
-      dialog.showSaveDialog = () => Promise.resolve({ canceled: true, filePath: '' })
+      dialog.showSaveDialog = () => {
+        const counter = globalThis as { cancelledSaveDialogs?: number }
+        counter.cancelledSaveDialogs = (counter.cancelledSaveDialogs ?? 0) + 1
+        return Promise.resolve({ canceled: true, filePath: '' })
+      }
       dialog.showOpenDialog = () => Promise.resolve({ canceled: true, filePaths: [] })
     })
   }

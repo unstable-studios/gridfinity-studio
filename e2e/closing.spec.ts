@@ -55,9 +55,15 @@ test('choosing Save keeps the app open when the save is dismissed', async () => 
   await app.answerUnsavedPrompt('save')
   await app.requestWindowClose()
 
-  await expect.poll(() => app.unsavedPromptCount()).toBe(1)
+  await expect.poll(() => app.cancelledSaveDialogCount(), 'the save dialog came up').toBe(1)
   expect(await app.hasWindow(), 'the window stays open').toBe(true)
   await app.expectBinCount(1)
+
+  // The window is not left waiting on that save: closing asks again.
+  await app.answerUnsavedPrompt('cancel')
+  await app.requestWindowClose()
+  await expect.poll(() => app.unsavedPromptCount(), 'the question is asked again').toBe(2)
+  expect(await app.hasWindow()).toBe(true)
 })
 
 test('choosing Don’t save closes without saving', async () => {
