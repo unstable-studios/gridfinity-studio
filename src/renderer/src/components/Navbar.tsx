@@ -23,6 +23,7 @@ import PreferencesModal from '@/components/settings/PreferencesModal'
 import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
 import { useProjectName } from '@/hooks/useProjectName'
+import { useEditCommands } from '@/hooks/useEditCommands'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
 import { MOD_KEY } from '@/lib/platform'
@@ -129,6 +130,7 @@ function AppMenubar({
     export3MF
   } = useProject()
   const { undo, redo, canUndo, canRedo } = useUndoRedo()
+  const edit = useEditCommands()
   const projectName = useProjectName()
   const { state: updateState, installNow } = useAppUpdate()
 
@@ -249,10 +251,22 @@ function AppMenubar({
             <MenubarShortcut>{MOD_KEY}+Shift+Z</MenubarShortcut>
           </MenubarItem>
           <MenubarSeparator />
-          <MenubarItem disabled>Cut</MenubarItem>
-          <MenubarItem disabled>Copy</MenubarItem>
-          <MenubarItem disabled>Paste</MenubarItem>
-          <MenubarItem disabled>Select all</MenubarItem>
+          <MenubarItem disabled={!edit.canCopy} onSelect={edit.cut}>
+            Cut
+            <MenubarShortcut>{MOD_KEY}+X</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem disabled={!edit.canCopy} onSelect={edit.copy}>
+            Copy
+            <MenubarShortcut>{MOD_KEY}+C</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem disabled={!edit.canPaste} onSelect={edit.paste}>
+            Paste
+            <MenubarShortcut>{MOD_KEY}+V</MenubarShortcut>
+          </MenubarItem>
+          <MenubarItem disabled={!edit.canSelectAll} onSelect={edit.selectAll}>
+            Select all
+            <MenubarShortcut>{MOD_KEY}+A</MenubarShortcut>
+          </MenubarItem>
           <MenubarSeparator />
           <MenubarItem onSelect={onOpenPreferences}>
             Preferences…
