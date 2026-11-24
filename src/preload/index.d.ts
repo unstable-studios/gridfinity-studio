@@ -9,6 +9,11 @@ interface UpdatesAPI {
   installNow: () => Promise<void>
 }
 
+interface CloseGuardAPI {
+  setUnsaved: (unsaved: boolean) => void
+  onSaveRequested: (save: () => Promise<boolean>) => () => void
+}
+
 interface ProjectAPI {
   save: (
     projectData: ProjectData,
@@ -40,6 +45,7 @@ declare global {
       project: ProjectAPI
       export: ExportAPI
       updates: UpdatesAPI
+      closeGuard: CloseGuardAPI
     }
   }
 }

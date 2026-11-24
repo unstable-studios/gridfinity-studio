@@ -38,6 +38,8 @@ src/shared/         → Shared across all processes: types, schemas, validation
 
 IPC communication flows through `window.api.project.*` methods (save, load, validate). All IPC handlers return `OperationResult<T>` (`src/shared/types/results.ts`). A failure carries the underlying `error` detail and, where it applies, a `reason`: `cancelled` (dialog dismissed, not an error) or `invalid` (not a valid project file). The project store turns failures into notices (`lib/project-notices.ts`), so every save, open and export shows its outcome.
 
+Closing a window or quitting with unsaved work asks first (`src/main/close-guard.ts`). The renderer tells the main process whether there is unsaved work (`useCloseGuard`) and saves on request, since only it holds the project. Anything that closes the windows without giving them a say, such as installing an update, calls `settleUnsavedWork()` first and goes ahead only if it resolves to true.
+
 ### Key Data Flow
 
 ```
