@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.16.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.15.0...v1.16.0) (2026-11-24)
+
+
+### Features
+
+* **ui:** place new bins in rows without overlap ([#480](https://github.com/unstable-studios/gridfinity-studio/issues/480)) ([6d5c3dd](https://github.com/unstable-studios/gridfinity-studio/commit/6d5c3dd79bf86df8a056b125587ca83476021f82))
+
+
+### Bug Fixes
+
+* **core:** cut a pocket the way its shape is turned ([#479](https://github.com/unstable-studios/gridfinity-studio/issues/479)) ([2a48071](https://github.com/unstable-studios/gridfinity-studio/commit/2a48071ae7b9a95962dcdca2f684c79ee2b9edc5))
+
+
+### Documentation
+
+* write the readme ([#481](https://github.com/unstable-studios/gridfinity-studio/issues/481)) ([9162c2d](https://github.com/unstable-studios/gridfinity-studio/commit/9162c2db11a7246bdfda3bece53eaaed43f3ce4b))
+
 ## [1.15.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.14.0...v1.15.0) (2026-11-24)
 
 
