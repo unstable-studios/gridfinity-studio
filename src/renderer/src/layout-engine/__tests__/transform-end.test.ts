@@ -268,15 +268,49 @@ describe('the end of a transform', () => {
       expect(internals().transformer.keepRatio()).toBe(false)
     })
 
-    it('limits the handles once a selection has been turned', () => {
+    it('keeps every handle while a selection turned as one is still selected', () => {
+      // The handle turns every shape and the frame by the same amount, so none is turned
+      // against the frame.
       engine.addShape(makeRect('a', 200))
       engine.addShape(makeRect('b', 230))
       engine.select(['a', 'b'])
       grab()
-      // One of the two is turned against the frame.
       node('a').rotation(25)
+      node('b').rotation(25)
+      internals().transformer.rotation(25)
       letGo()
+      expect(handles()).toHaveLength(8)
+
+      // Selected afresh, the frame is square to the canvas again and both are turned
+      // against it.
+      engine.select(['a', 'b'])
       expect(handles()).toEqual(corners)
+      expect(internals().transformer.keepRatio()).toBe(true)
+    })
+
+    it('works the handles out again when a selected shape is turned or unlocked by a change', () => {
+      engine.addShape(makeRect('a', 200))
+      engine.addShape(makeRect('b', 230))
+      engine.select(['a', 'b'])
+      engine.updateShape('a', { rotation: 30 })
+      expect(handles()).toEqual(corners)
+      // Unlocking the ratio of one shape must not unlock a selection that needs it kept.
+      engine.updateShape('a', { lockAspectRatio: false })
+      expect(internals().transformer.keepRatio()).toBe(true)
+      engine.updateShape('a', { rotation: 0 })
+      expect(handles()).toHaveLength(8)
+      expect(internals().transformer.keepRatio()).toBe(false)
+    })
+
+    it('leaves no skew on a shape when a transform ends', () => {
+      engine.addShape(makeRect('a', 200))
+      engine.select(['a'])
+      grab()
+      node('a').skewX(0.3)
+      node('a').rotation(10)
+      letGo()
+      expect(node('a').skewX()).toBe(0)
+      expect(node('a').skewY()).toBe(0)
     })
 
     it('gives a bin every handle, also after a turned selection', () => {

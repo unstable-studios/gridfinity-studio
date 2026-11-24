@@ -382,6 +382,10 @@ export class KonvaEngine implements LayoutEngine {
         const node = this.konvaMap.get(id)
         if (!data || !node) continue
         // Read after reassigning: a shape's position is measured from its bin.
+        // A skew cannot be stored. None is expected now, and none is left to show a shape
+        // that is not the one saved.
+        node.skewX(0)
+        node.skewY(0)
         data.x = node.x()
         data.y = node.y()
         data.rotation = node.rotation()
@@ -448,15 +452,12 @@ export class KonvaEngine implements LayoutEngine {
       this.applyDepthOpacity(updated, node)
     }
 
-    // If lockAspectRatio changed and this node is selected, update transformer
-    if (patch.lockAspectRatio !== undefined && this.transformer) {
-      const selectedIds = this.getSelectedIds()
-      if (selectedIds.includes(id)) {
-        const shouldLock =
-          selectedIds.length > 0 &&
-          selectedIds.every((sid) => this.shapeMap.get(sid)?.lockAspectRatio === true)
-        this.transformer.keepRatio(shouldLock)
-      }
+    // A new ratio lock or angle can change which resize handles the selection may have.
+    if (
+      (patch.lockAspectRatio !== undefined || patch.rotation !== undefined) &&
+      this.getSelectedIds().includes(id)
+    ) {
+      this.limitResizeHandles()
     }
 
     this.mainLayer?.batchDraw()
