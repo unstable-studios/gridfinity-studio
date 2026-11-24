@@ -22,6 +22,17 @@ export interface KonvaGroupRendererDeps {
 }
 
 /**
+ * How a bin looks while a dragged shape is over it. The fill carries the highlight: a bin's own
+ * fill is nearly clear, so a tint reads on a dark canvas and a light one, where a change of
+ * outline alone does not.
+ */
+export const DROP_TARGET_STYLE = {
+  fill: 'rgba(59, 130, 246, 0.3)',
+  stroke: '#3b82f6',
+  strokeWidth: 3
+} as const
+
+/**
  * Konva implementation of GroupRenderer.
  *
  * Handles internally:
@@ -51,6 +62,8 @@ export class KonvaGroupRenderer implements GroupRenderer {
   private origStroke: string
   /** Original stroke width from the group style, for reliable flash restore. */
   private origStrokeWidth: number
+  /** Fill from the group style, restored when a drop-target highlight ends. */
+  private origFill: string
   /** Whether this group is currently highlighted as a drop target. */
   private highlighted = false
   /** Snapshot of bounds before a resize starts, for edge-anchoring. */
@@ -74,6 +87,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.height = group.height
     this.origStroke = group.style.stroke
     this.origStrokeWidth = group.style.strokeWidth
+    this.origFill = group.style.fill
 
     // Lower-left → centroid
     const centroidX = group.x + group.width / 2
@@ -145,6 +159,9 @@ export class KonvaGroupRenderer implements GroupRenderer {
           // Keep flash-restore values in sync with the configured style
           this.origStroke = current.style.stroke
           this.origStrokeWidth = current.style.strokeWidth
+          this.origFill = current.style.fill
+          // A style change must not wipe out a highlight that is still showing.
+          if (this.highlighted) bgRect.setAttrs(DROP_TARGET_STYLE)
         }
       }
     }
@@ -485,17 +502,17 @@ export class KonvaGroupRenderer implements GroupRenderer {
     const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
     if (!bgRect) return
     this.highlighted = true
-    bgRect.stroke('#3b82f6')
-    bgRect.strokeWidth(2)
+    bgRect.setAttrs(DROP_TARGET_STYLE)
     this.deps.layer.batchDraw()
   }
 
-  /** Remove drop-target highlight, restoring original stroke. */
+  /** Remove drop-target highlight, restoring the bin's own fill and stroke. */
   unhighlight(): void {
     if (!this.highlighted) return
     const bgRect = this.konvaGroup.findOne('.__groupBg') as Konva.Rect | undefined
     if (!bgRect) return
     this.highlighted = false
+    bgRect.fill(this.origFill)
     bgRect.stroke(this.origStroke)
     bgRect.strokeWidth(this.origStrokeWidth)
     this.deps.layer.batchDraw()
