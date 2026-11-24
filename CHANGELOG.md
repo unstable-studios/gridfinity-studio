@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.17.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.3...v1.17.0) (2026-11-24)
+
+
+### Features
+
+* **ui:** check for updates again, and recover when one fails ([#521](https://github.com/unstable-studios/gridfinity-studio/issues/521)) ([c9a6c32](https://github.com/unstable-studios/gridfinity-studio/commit/c9a6c3218c47eacd5d6668eb1cf68f5711677512))
+* **ui:** collapse the add bin section once it is not needed ([#520](https://github.com/unstable-studios/gridfinity-studio/issues/520)) ([3889b9a](https://github.com/unstable-studios/gridfinity-studio/commit/3889b9ab052b74c75703227eae33ebe088a9bfeb))
+
+
+### Bug Fixes
+
+* **ui:** tidy the window edge, top bar, switch and size grid ([#519](https://github.com/unstable-studios/gridfinity-studio/issues/519)) ([ba123a4](https://github.com/unstable-studios/gridfinity-studio/commit/ba123a4718194611cd837ba350f733f5bcea3579))
+
 ## [1.16.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.2...v1.16.3) (2026-11-24)
 
 
