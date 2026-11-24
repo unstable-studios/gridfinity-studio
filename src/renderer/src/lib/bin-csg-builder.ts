@@ -2,11 +2,9 @@
  * CSG-first Gridfinity bin builder using Manifold primitives.
  *
  * Builds a proper manifold-valid solid via boolean operations:
- *   union(feet, bridge, body) - difference(cavity) - difference(lip groove) - difference(holes) - difference(pockets)
+ *   union(feet, trunk) - difference(lip groove) - difference(holes) - difference(pockets)
  *
- * The approach mirrors gridfinity-rebuilt-openscad:
- *   sweepRoundedRect() = sweep a 2D profile around a rounded rectangular path
- *   by extruding straight edges and revolving corners.
+ * Tapers (the feet and the lip groove) are hulls of the outlines at their two ends.
  *
  * All dimensions in millimetres. Returns positions/indices/normals ready for Three.js.
  */
@@ -25,7 +23,6 @@ const BASE_PROFILE: ReadonlyArray<readonly [number, number]> = [
 ]
 
 const OUTER_CORNER_RADIUS = 3.75
-const BASE_BRIDGE_HEIGHT = 7 - BASE_PROFILE_HEIGHT // 2.05
 const BASE_HEIGHT = 7
 const MAGNET_HOLE_OFFSET = 8
 
@@ -72,8 +69,6 @@ export interface CSGMeshResult {
 type ManifoldModule = any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Manifold = any
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type CrossSection = any
 
 // ─── Rounded Rectangle CrossSection ─────────────────────────────
 
@@ -129,141 +124,80 @@ export function roundedRectPolygon(
   return points
 }
 
-/** Create a Manifold CrossSection from a rounded rectangle */
-function roundedRectCS(
-  hw: number,
-  hd: number,
-  cornerRadius: number,
-  CSConstructor: CrossSection
-): CrossSection {
-  return new CSConstructor([roundedRectPolygon(hw, hd, cornerRadius)])
-}
-
 // ─── Build Steps ─────────────────────────────────────────────────
 
+/** A rounded rectangle's outline as points in space, centered on (cx, cy) at height z. */
+function ringAt(
+  hw: number,
+  hd: number,
+  radius: number,
+  cx: number,
+  cy: number,
+  z: number
+): Array<[number, number, number]> {
+  return roundedRectPolygon(hw, hd, radius).map(([x, y]) => [x + cx, y + cy, z])
+}
+
+/**
+ * The feet: one under each grid square, each a stack of tapers following BASE_PROFILE.
+ * A taper is the hull of the outlines at its bottom and top, so it is exact.
+ */
 function buildBaseFeet(params: CSGBinParams, M: ManifoldModule): Manifold {
-  const { Manifold, CrossSection } = M
+  const { Manifold } = M
   const { widthUnits, depthUnits, baseUnit, tolerance } = params
 
-  // Per-unit cell half-size
   const cellHW = baseUnit / 2 - tolerance
   const cellHD = baseUnit / 2 - tolerance
-
-  // Base profile polygon (closed, for sweep):
-  // The profile is [radialOffset, height] from the corner center outward.
-  // BASE_PROFILE gives [inset_from_outer_edge, height].
-  // For sweep, radial offset = cornerRadius + (maxInset - inset) where we measure from center.
-  // Actually, the profile polygon for sweepRoundedRect maps:
-  //   X = distance from the path centerline (the rounded rect path)
-  //   Y = height
-  // The path is at cornerRadius from the center, so:
-  //   profile X = 0 means ON the path = cornerRadius from center
-  //   profile X = positive means outward from path
-  //
-  // For the base foot, the rounded rect path runs at BASE_BOTTOM_RADIUS from center.
-  // The base profile starts at the path (X=0) and grows outward.
-  // BASE_PROFILE[i] = [inset, height]: at height, the outer surface is at (maxInset - inset) from the path.
-  // Wait — the profile needs to be a closed polygon for the cross section.
-
-  // Let me reconsider. The base foot is a solid shape. We can build it as:
-  // For each profile step, create a rounded-rect extrusion, then union them.
-  // This is simpler and more reliable than sweep.
-
+  const maxInset = BASE_PROFILE[BASE_PROFILE.length - 1][0]
   const feet: Manifold[] = []
-  const maxInset = BASE_PROFILE[BASE_PROFILE.length - 1][0] // 2.95
 
   for (let gx = 0; gx < widthUnits; gx++) {
     for (let gy = 0; gy < depthUnits; gy++) {
       const ccx = baseUnit * (gx + 0.5 - widthUnits / 2)
       const ccy = baseUnit * (gy + 0.5 - depthUnits / 2)
+      /** The foot's outline at a step of the profile. It is full size at the top step. */
+      const ring = (step: number): Array<[number, number, number]> => {
+        const [inset, z] = BASE_PROFILE[step]
+        const grow = inset - maxInset
+        return ringAt(
+          cellHW + grow,
+          cellHD + grow,
+          Math.max(0.01, OUTER_CORNER_RADIUS + grow),
+          ccx,
+          ccy,
+          z
+        )
+      }
 
-      // Build the foot as stacked extrusions between each profile step
-      // At each step, the foot extends from the centerline to (maxInset - inset) from the outer edge.
-      // cellHW is the half-width of the cell. The outer edge is at cellHW.
-      // At a given inset, the ring is at cellHW - (maxInset - inset) = cellHW - maxInset + inset
-      // Corner radius at a given inset: OUTER_CORNER_RADIUS - (maxInset - inset)
-
-      // Build each segment between profile steps
-      for (let i = 0; i < BASE_PROFILE.length - 1; i++) {
-        const [inset0, z0] = BASE_PROFILE[i]
-        const [inset1, z1] = BASE_PROFILE[i + 1]
-
-        // The larger ring (at the higher profile step) defines the outer boundary
-        // The smaller ring (at the lower step) defines the inner boundary
-        // We extrude the larger cross-section for this height band, then
-        // subtract the complement if needed.
-        // Actually, since each step has a different inset, we need a frustum.
-        // Manifold doesn't have frustum directly, but we can hull between two cross sections.
-
-        // Simpler approach: build each profile segment as a solid slab at the LARGER size,
-        // then intersect with a solid slab at the SMALLER size to create the step.
-        // Actually simplest: just extrude each step's cross section for its height band,
-        // then union. This creates a stepped profile (no angled chamfer), but it's a start.
-        // For true chamfers we'd need hull or sweep.
-
-        // Use Manifold.hull to create the frustum between two cross sections
-        // Hull of two planar solids at different Z creates the chamfer
-
-        const hw0 = cellHW - maxInset + inset0
-        const hd0 = cellHD - maxInset + inset0
-        const r0 = Math.max(0.01, OUTER_CORNER_RADIUS - maxInset + inset0)
-
-        const hw1 = cellHW - maxInset + inset1
-        const hd1 = cellHD - maxInset + inset1
-        const r1 = Math.max(0.01, OUTER_CORNER_RADIUS - maxInset + inset1)
-
-        // Create thin discs at z0 and z1 with respective cross sections, then hull
-        const epsilon = 0.001
-        const cs0 = roundedRectCS(hw0, hd0, r0, CrossSection)
-        const cs1 = roundedRectCS(hw1, hd1, r1, CrossSection)
-
-        const disc0 = Manifold.extrude(cs0, epsilon).translate([ccx, ccy, z0])
-        const disc1 = Manifold.extrude(cs1, epsilon).translate([ccx, ccy, z1])
-
-        const segment = Manifold.hull(disc0, disc1)
-        feet.push(segment)
+      for (let step = 0; step < BASE_PROFILE.length - 1; step++) {
+        feet.push(Manifold.hull([...ring(step), ...ring(step + 1)]))
       }
     }
   }
 
-  // Union all feet
   return Manifold.union(feet)
 }
 
-function buildBridge(params: CSGBinParams, M: ManifoldModule): Manifold {
-  const { Manifold, CrossSection } = M
-  const { widthUnits, depthUnits, baseUnit, tolerance } = params
-
-  const outerW = widthUnits * baseUnit - tolerance * 2
-  const outerD = depthUnits * baseUnit - tolerance * 2
-  const hw = outerW / 2
-  const hd = outerD / 2
-
-  const cs = roundedRectCS(hw, hd, OUTER_CORNER_RADIUS, CrossSection)
-  return Manifold.extrude(cs, BASE_BRIDGE_HEIGHT).translate([0, 0, BASE_PROFILE_HEIGHT])
-}
-
-function buildBody(params: CSGBinParams, M: ManifoldModule): Manifold {
+/**
+ * Everything above the feet: one prism from the top of the feet to the top of the bin. It is
+ * one piece so that no seam runs around the bin where a base and a body would meet.
+ */
+function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
   const { Manifold, CrossSection } = M
   const { widthUnits, depthUnits, baseUnit, tolerance, heightUnits, unitHeight, hasLip } = params
 
-  const outerW = widthUnits * baseUnit - tolerance * 2
-  const outerD = depthUnits * baseUnit - tolerance * 2
-  const hw = outerW / 2
-  const hd = outerD / 2
-  const totalH = heightUnits * unitHeight
-
-  // Extend the body through the lip height so the outer wall is one
-  // continuous surface with no tessellation seam at the lip junction.
+  const hw = (widthUnits * baseUnit - tolerance * 2) / 2
+  const hd = (depthUnits * baseUnit - tolerance * 2) / 2
+  // A bin is never lower than its base.
+  const totalH = Math.max(heightUnits * unitHeight, BASE_HEIGHT)
+  // The trunk runs through the lip height: the groove is cut out of it afterwards.
   const topZ = hasLip ? totalH + LIP_HEIGHT : totalH
-  const bodyHeight = topZ - BASE_HEIGHT
-  if (bodyHeight <= 0) {
-    const cs = roundedRectCS(hw, hd, OUTER_CORNER_RADIUS, CrossSection)
-    return Manifold.extrude(cs, 0.01).translate([0, 0, BASE_HEIGHT])
-  }
-
-  const cs = roundedRectCS(hw, hd, OUTER_CORNER_RADIUS, CrossSection)
-  return Manifold.extrude(cs, bodyHeight).translate([0, 0, BASE_HEIGHT])
+  const outline = new CrossSection([roundedRectPolygon(hw, hd, OUTER_CORNER_RADIUS)])
+  return Manifold.extrude(outline, topZ - BASE_PROFILE_HEIGHT).translate([
+    0,
+    0,
+    BASE_PROFILE_HEIGHT
+  ])
 }
 
 /**
@@ -280,7 +214,7 @@ function buildBody(params: CSGBinParams, M: ManifoldModule): Manifold {
 function buildLipGroove(params: CSGBinParams, M: ManifoldModule): Manifold | null {
   if (!params.hasLip) return null
 
-  const { Manifold, CrossSection } = M
+  const { Manifold } = M
   const { widthUnits, depthUnits, baseUnit, tolerance, heightUnits, unitHeight } = params
 
   const outerW = widthUnits * baseUnit - tolerance * 2
@@ -290,7 +224,6 @@ function buildLipGroove(params: CSGBinParams, M: ManifoldModule): Manifold | nul
   const totalH = heightUnits * unitHeight
   const maxLipInset = LIP_PROFILE[LIP_PROFILE.length - 1][0] // 2.6
 
-  const epsilon = 0.001
   const grooveParts: Manifold[] = []
 
   for (let i = 0; i < LIP_PROFILE.length - 1; i++) {
@@ -302,19 +235,15 @@ function buildLipGroove(params: CSGBinParams, M: ManifoldModule): Manifold | nul
     // At top (inset=2.6): LIP_OFFSET + 0 = 0.25mm (thin tip)
     const innerInset0 = LIP_OFFSET + maxLipInset - inset0
     const innerInset1 = LIP_OFFSET + maxLipInset - inset1
+    const r0 = Math.max(0.01, OUTER_CORNER_RADIUS - innerInset0)
+    const r1 = Math.max(0.01, OUTER_CORNER_RADIUS - innerInset1)
 
-    const iHW0 = hw - innerInset0
-    const iHD0 = hd - innerInset0
-    const iR0 = Math.max(0.01, OUTER_CORNER_RADIUS - innerInset0)
-    const iHW1 = hw - innerInset1
-    const iHD1 = hd - innerInset1
-    const iR1 = Math.max(0.01, OUTER_CORNER_RADIUS - innerInset1)
-
-    const cs0 = roundedRectCS(iHW0, iHD0, iR0, CrossSection)
-    const cs1 = roundedRectCS(iHW1, iHD1, iR1, CrossSection)
-    const disc0 = Manifold.extrude(cs0, epsilon).translate([0, 0, totalH + z0])
-    const disc1 = Manifold.extrude(cs1, epsilon).translate([0, 0, totalH + z1])
-    grooveParts.push(Manifold.hull(disc0, disc1))
+    grooveParts.push(
+      Manifold.hull([
+        ...ringAt(hw - innerInset0, hd - innerInset0, r0, 0, 0, totalH + z0),
+        ...ringAt(hw - innerInset1, hd - innerInset1, r1, 0, 0, totalH + z1)
+      ])
+    )
   }
 
   return Manifold.union(grooveParts)
@@ -526,6 +455,48 @@ function computeCreaseNormals(positions: Float32Array, indices: Uint32Array): CS
   return { positions: outPos, indices: outIdx, normals: outNorm, solidVertices }
 }
 
+/** Corners closer together than this are one corner, in mm. */
+const SAME_POINT = 1e-6
+
+/**
+ * Where two parts of a solid met along a shared edge, the union can leave the corners of
+ * both, in the same place, joined by triangles with no area. Join each such pair into one
+ * corner and drop those triangles. Only corners already joined by an edge are merged, so
+ * surfaces that merely touch stay separate.
+ */
+function collapseZeroLengthEdges(positions: Float32Array, indices: Uint32Array): Uint32Array {
+  const standsFor = new Uint32Array(positions.length / 3).map((_, i) => i)
+  const find = (v: number): number => {
+    while (standsFor[v] !== v) {
+      standsFor[v] = standsFor[standsFor[v]]
+      v = standsFor[v]
+    }
+    return v
+  }
+  const samePlace = (a: number, b: number): boolean =>
+    Math.abs(positions[a * 3] - positions[b * 3]) < SAME_POINT &&
+    Math.abs(positions[a * 3 + 1] - positions[b * 3 + 1]) < SAME_POINT &&
+    Math.abs(positions[a * 3 + 2] - positions[b * 3 + 2]) < SAME_POINT
+
+  for (let t = 0; t < indices.length; t += 3) {
+    for (let e = 0; e < 3; e++) {
+      const a = indices[t + e]
+      const b = indices[t + ((e + 1) % 3)]
+      if (a !== b && samePlace(a, b))
+        standsFor[Math.max(find(a), find(b))] = Math.min(find(a), find(b))
+    }
+  }
+
+  const kept: number[] = []
+  for (let t = 0; t < indices.length; t += 3) {
+    const a = find(indices[t])
+    const b = find(indices[t + 1])
+    const c = find(indices[t + 2])
+    if (a !== b && b !== c && c !== a) kept.push(a, b, c)
+  }
+  return new Uint32Array(kept)
+}
+
 // ─── Main Entry Point ────────────────────────────────────────────
 
 /**
@@ -543,14 +514,8 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
   // Step 1: Build base feet
   const feet = buildBaseFeet(params, M)
 
-  // Step 2: Build bridge
-  const bridge = buildBridge(params, M)
-
-  // Step 3: Build body
-  const body = buildBody(params, M)
-
-  // Step 4: Union all solid parts
-  let bin = Manifold.union([feet, bridge, body])
+  // Step 2: Build everything above the feet, and join the two
+  let bin = Manifold.union([feet, buildTrunk(params, M)])
 
   // Step 5: Subtract lip groove (body extends through lip; groove carves the profile)
   const lipGroove = buildLipGroove(params, M)
@@ -573,7 +538,7 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
     rawPositions[i * 3 + 1] = mesh.vertProperties[off + 1]
     rawPositions[i * 3 + 2] = mesh.vertProperties[off + 2]
   }
-  const rawIndices = new Uint32Array(mesh.triVerts)
+  const rawIndices = collapseZeroLengthEdges(rawPositions, new Uint32Array(mesh.triVerts))
 
   // Compute normals with crease-angle vertex splitting
   return computeCreaseNormals(rawPositions, rawIndices)

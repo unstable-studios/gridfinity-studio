@@ -154,4 +154,57 @@ describe('baking a bin', () => {
     )
     expect(turned.volume).toBeCloseTo(straight.volume, 1)
   })
+
+  /** How many triangles have no area, and how many edges are not shared by exactly two. */
+  function flaws(mesh: {
+    positions: Float32Array
+    indices: Uint32Array
+    solidVertices: Uint32Array
+  }): { flat: number; openEdges: number } {
+    const { positions: p, indices, solidVertices } = mesh
+    let flat = 0
+    const uses = new Map<string, number>()
+    for (let t = 0; t < indices.length; t += 3) {
+      const [a, b, c] = [indices[t] * 3, indices[t + 1] * 3, indices[t + 2] * 3]
+      const u = [p[b] - p[a], p[b + 1] - p[a + 1], p[b + 2] - p[a + 2]]
+      const v = [p[c] - p[a], p[c + 1] - p[a + 1], p[c + 2] - p[a + 2]]
+      const cross = [
+        u[1] * v[2] - u[2] * v[1],
+        u[2] * v[0] - u[0] * v[2],
+        u[0] * v[1] - u[1] * v[0]
+      ]
+      if (Math.hypot(...cross) / 2 < 1e-7) flat++
+      // Vertices are split for shading. The solid's own vertices say which edges are shared.
+      const solid = [0, 1, 2].map((corner) => solidVertices[indices[t + corner]])
+      for (let e = 0; e < 3; e++) {
+        const [from, to] = [solid[e], solid[(e + 1) % 3]]
+        const key = from < to ? `${from}-${to}` : `${to}-${from}`
+        uses.set(key, (uses.get(key) ?? 0) + 1)
+      }
+    }
+    return { flat, openEdges: [...uses.values()].filter((count) => count !== 2).length }
+  }
+
+  it.each<[string, Partial<CSGBinParams>]>([
+    ['1×1 with a lip', {}],
+    [
+      '1×1 without a lip or holes',
+      { hasLip: false, magnetHoles: { enabled: false, diameter: 6.5, depth: 2.4 } }
+    ],
+    ['2×2 with a lip and holes', { widthUnits: 2, depthUnits: 2 }],
+    ['3×2 without a lip', { widthUnits: 3, depthUnits: 2, hasLip: false }],
+    [
+      '2×1 with screw holes',
+      { widthUnits: 2, screwHoles: { enabled: true, diameter: 3, depth: 6 } }
+    ],
+    ['1×1 with a pocket', { pockets: [rectPocket()] }],
+    ['1×1 with a turned pocket', { pockets: [rectPocket(30)] }]
+  ])('leaves no flat triangles and no open edges: %s', (_name, overrides) => {
+    expect(flaws(buildBinCSG(binParams(overrides), manifold))).toEqual({ flat: 0, openEdges: 0 })
+  })
+
+  it('makes a bin one unit high exactly one unit high', () => {
+    const { max } = measure(buildBinCSG(binParams({ heightUnits: 1, hasLip: false }), manifold))
+    expect(max[2]).toBeCloseTo(7, 6)
+  })
 })
