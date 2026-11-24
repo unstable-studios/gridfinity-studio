@@ -3,6 +3,7 @@ import type {
   WorkerRequest,
   WorkerResponse,
   MeshDataWithNormals,
+  BakedMesh,
   CSGBinParams
 } from '../../../shared/types/worker'
 
@@ -12,7 +13,7 @@ interface PendingRequest {
   reject: (reason: Error) => void
 }
 
-export interface BakePocketsResult extends MeshDataWithNormals {
+export interface BakePocketsResult extends BakedMesh {
   warnings: string[]
 }
 
@@ -67,7 +68,9 @@ export function useGeometryWorker(): UseGeometryWorkerResult {
           normals: msg.normals,
           colors: msg.colors
         }
-        if (msg.type === 'bake-pockets' || msg.type === 'bake') {
+        if (msg.type === 'bake-pockets') {
+          pending.resolve({ ...base, solidVertices: msg.solidVertices, warnings: msg.warnings })
+        } else if (msg.type === 'bake') {
           pending.resolve({ ...base, warnings: msg.warnings })
         } else {
           pending.resolve(base)
