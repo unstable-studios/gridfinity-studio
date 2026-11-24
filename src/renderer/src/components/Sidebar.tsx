@@ -84,7 +84,12 @@ function LayoutSidebar(): React.JSX.Element {
       toggle: e.metaKey || e.ctrlKey
     })
     listAnchorRef.current = next.anchor
-    engine.select(next.selected)
+    // A shape in a selected bin comes along with the bin. Selecting both would move it twice.
+    const picked = new Set(next.selected)
+    const inPickedBin = new Set(
+      shapes.filter((sh) => sh.groupId !== null && picked.has(sh.groupId)).map((sh) => sh.id)
+    )
+    engine.select(next.selected.filter((selectedId) => !inPickedBin.has(selectedId)))
   }
 
   // Determine what's selected

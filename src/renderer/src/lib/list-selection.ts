@@ -24,7 +24,14 @@ export interface ListSelection {
 }
 
 export function selectionAfterClick(click: ListClick): ListSelection {
-  const { order, selected, clicked, anchor, shift, toggle } = click
+  const { order, selected, clicked, shift, toggle } = click
+
+  // The selection can change on the canvas between clicks. A row that is no longer selected
+  // is not where the person last was, so reach back to the last selected row instead.
+  const stillSelected = click.anchor !== null && selected.includes(click.anchor)
+  const anchor = stillSelected
+    ? click.anchor
+    : (selected.filter((id) => order.includes(id)).at(-1) ?? null)
 
   if (shift) {
     const from = anchor === null ? -1 : order.indexOf(anchor)
