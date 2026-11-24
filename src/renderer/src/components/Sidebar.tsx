@@ -105,7 +105,10 @@ function LayoutSidebar(): React.JSX.Element {
   const setRenamingId = (id: string | null): void => useRenaming.setState({ id })
   /** A right-click acts on the row under it: select that row unless it already is. */
   const selectForMenu = (id: string): void => {
-    if (!selectedIds.includes(id)) engine?.select([id])
+    // A shape in a selected bin is part of that selection, though only the bin is listed.
+    const binId = engine?.getShape(id)?.groupId
+    const isSelected = selectedIds.includes(id) || (binId != null && selectedIds.includes(binId))
+    if (!isSelected) engine?.select([id])
   }
   const renameGroup = (id: string, name: string): void => {
     const group = engine?.getGroup(id)
@@ -428,7 +431,9 @@ function LayoutSidebar(): React.JSX.Element {
             </label>
             <div className="flex items-center justify-between">
               <span className="text-zinc-500">Type</span>
-              <span className="text-zinc-300">{shapeTypeLabel(selectedShape.type)}</span>
+              <span className="text-zinc-700 dark:text-zinc-300">
+                {shapeTypeLabel(selectedShape.type)}
+              </span>
             </div>
             {selectedShape.groupId && (
               <div className="flex items-center justify-between">

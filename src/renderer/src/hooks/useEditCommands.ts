@@ -53,12 +53,6 @@ export function useEditCommands(): EditCommands {
   const { mode } = useAppMode()
   const baseUnit = useProject((s) => s.project?.gridfinity.baseUnit ?? 42)
   const hasContent = useClipboard((s) => s.content !== null)
-  // What was copied belongs to the project it came from. Another project can have a
-  // different grid, where a pasted bin would not fit.
-  const projectKey = useProject((s) => s.project?.settings.createdAt)
-  useEffect(() => {
-    useClipboard.setState({ content: null, nextOffset: 0 })
-  }, [projectKey])
   const designing = mode === 'layout' && engine !== null
 
   const copyToClipboard = useCallback(
@@ -183,6 +177,16 @@ export function useEditShortcuts(): EditCommands {
   const { mode } = useAppMode()
   const designing = mode === 'layout' && engine !== null
   const { copy, cut, paste, selectAll } = commands
+
+  // What was copied belongs to the project it came from. Another project can have a
+  // different grid, where a pasted bin would not fit. This lives here, in the one hook that
+  // is mounted once: in `useEditCommands` it would run again, and empty the clipboard, each
+  // time a menu appeared.
+  const projectKey = useProject((s) => s.project?.settings.createdAt)
+  useEffect(() => {
+    useClipboard.setState({ content: null, nextOffset: 0 })
+    useRenaming.setState({ id: null })
+  }, [projectKey])
 
   useEffect(() => {
     if (!designing) return

@@ -34,13 +34,16 @@ export default function EditContextMenu({
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent
-        className="min-w-40"
+        // No closing animation: while it played, the menu still took keys and clicks, so a
+        // quick second click ran an item twice.
+        className="min-w-40 data-[state=closed]:animate-none"
         onCloseAutoFocus={(e) => {
-          // Leave the keyboard where it is instead of sending it to the canvas or list.
-          e.preventDefault()
           const run = afterClose.current
           afterClose.current = null
-          run?.()
+          if (!run) return
+          // Otherwise the keyboard goes back to where the menu was opened from.
+          e.preventDefault()
+          run()
         }}
       >
         <ContextMenuItem

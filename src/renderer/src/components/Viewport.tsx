@@ -146,8 +146,15 @@ export default function Viewport(): React.JSX.Element {
     const canvas = e.currentTarget.getBoundingClientRect()
     const world = engine.screenToWorld(e.clientX - canvas.left, e.clientY - canvas.top)
     const hit = engine.objectAt(world.x, world.y)
-    if (!hit) engine.clearSelection()
-    else if (!engine.getSelectedIds().includes(hit.id)) engine.select([hit.id])
+    if (!hit) {
+      engine.clearSelection()
+      return
+    }
+    // A shape in a selected bin is part of that selection, though only the bin is listed.
+    const selected = engine.getSelectedIds()
+    const binId = hit.type === 'shape' ? engine.getShape(hit.id)?.groupId : null
+    const isSelected = selected.includes(hit.id) || (binId != null && selected.includes(binId))
+    if (!isSelected) engine.select([hit.id])
   }
 
   return (

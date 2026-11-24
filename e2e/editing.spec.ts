@@ -707,5 +707,30 @@ test('right-click a bin or shape for its menu', async () => {
   await expect(page.getByRole('menu')).toHaveCount(0)
   await app.selectTool('Select')
 
+  // With the bin selected, a right-click on its pocket keeps the bin selected: Delete takes
+  // the bin and the pocket, not the pocket alone.
+  await row('Bin 1').click()
+  await page.mouse.click(420, 620, { button: 'right' })
+  await expect(selectedRows).toHaveText(/^Bin 1/)
+  await menuItem('Copy').click()
+
+  // What was copied is still there after the lists have gone away and come back.
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await page.getByRole('radio', { name: 'Design', exact: true }).click()
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await menuItem('Paste').click()
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  // After a right-click, an ordinary drag still moves a shape: the menu did not leave the
+  // canvas thinking a button was held.
+  const file = join(app.dir, 'menu.gfstudio')
+  const before = (await app.save(file)).layoutSnapshot.shapes.find((s) => s.groupId !== null)!
+  await page.mouse.click(420, 620, { button: 'right' })
+  await page.keyboard.press('Escape')
+  await app.drag({ x: 420, y: 620 }, { x: 440, y: 640 })
+  const after = (await app.save(file)).layoutSnapshot.shapes.find((s) => s.id === before.id)!
+  expect(after.x, 'the pocket moved').not.toBe(before.x)
+
   expect(app.errors, 'no renderer errors').toEqual([])
 })
