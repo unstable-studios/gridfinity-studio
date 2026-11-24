@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import type { ProjectData } from '../shared/types/project'
 import { UPDATE_CHANNELS, type UpdateState } from '../shared/types/updates'
+import { CLOSE_GUARD_CHANNELS } from '../shared/types/close-guard'
 
 // Custom APIs for renderer
 const api = {
@@ -20,6 +21,24 @@ const api = {
       ipcRenderer.invoke('export:3mf', data, suggestedName),
     batch: (files: Array<{ filename: string; data: ArrayBuffer }>) =>
       ipcRenderer.invoke('export:batch', files)
+  },
+  closeGuard: {
+    /** Tell the main process whether closing the window would lose work. */
+    setUnsaved: (unsaved: boolean): void =>
+      ipcRenderer.send(CLOSE_GUARD_CHANNELS.setUnsaved, unsaved),
+    /**
+     * Register what saves the project when the person chooses Save on the way out. It
+     * resolves to whether the save succeeded. Returns an unsubscribe function.
+     */
+    onSaveRequested: (save: () => Promise<boolean>): (() => void) => {
+      const listener = (): void => {
+        void save()
+          .catch(() => false)
+          .then((saved) => ipcRenderer.send(CLOSE_GUARD_CHANNELS.saveResult, saved))
+      }
+      ipcRenderer.on(CLOSE_GUARD_CHANNELS.saveRequested, listener)
+      return () => ipcRenderer.off(CLOSE_GUARD_CHANNELS.saveRequested, listener)
+    }
   },
   updates: {
     /** Read the current update state (renderer may mount after main has emitted). */

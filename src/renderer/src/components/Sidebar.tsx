@@ -3,9 +3,15 @@ import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
 import { shapeTypeLabel } from '@/lib/shape-labels'
+import { selectionAfterClick } from '@/lib/list-selection'
 import { NumericInput } from '@/components/ui/numeric-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
+import NameField from './NameField'
+import EditContextMenu from './EditContextMenu'
+import { useRenaming } from '@/hooks/useEditCommands'
+import { storedName } from '@/lib/item-name'
+import { removeItems } from '@/lib/remove-items'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -48,6 +54,18 @@ export default function Sidebar(): React.JSX.Element {
 
 // ─── Layout Sidebar ─────────────────────────────────────────
 
+/** A row while its name is being typed: the same size as the row it replaces. */
+const RENAME_ROW_CLASS = 'px-2 py-1 text-xs'
+
+/** A row in the bin or shape list. `select-none` keeps a Shift-click from selecting text. */
+function listRowClass(isSelected: boolean): string {
+  return `w-full select-none rounded px-2 py-1 text-left text-xs transition-colors ${
+    isSelected
+      ? 'bg-blue-600 text-white'
+      : 'text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
+  }`
+}
+
 function LayoutSidebar(): React.JSX.Element {
   const engine = useLayoutEngine()
   const { selectedIds, tick } = useEngineState()
@@ -60,6 +78,47 @@ function LayoutSidebar(): React.JSX.Element {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const shapes = useMemo(() => engine?.getAllShapes() ?? [], [engine, selectedIds, tick])
   const binGroups = useMemo(() => groups.filter(isBinGroup), [groups])
+
+  // Clicking rows in the two lists selects as in a file manager. The lists count as one,
+  // bins first, so a Shift-click can reach from a bin down into the shapes.
+  const listAnchorRef = useRef<string | null>(null)
+  const handleRowClick = (id: string, e: React.MouseEvent): void => {
+    if (!engine) return
+    const next = selectionAfterClick({
+      order: [...binGroups.map((g) => g.id), ...shapes.map((sh) => sh.id)],
+      selected: selectedIds,
+      clicked: id,
+      anchor: listAnchorRef.current,
+      shift: e.shiftKey,
+      toggle: e.metaKey || e.ctrlKey
+    })
+    listAnchorRef.current = next.anchor
+    // A shape in a selected bin comes along with the bin. Selecting both would move it twice.
+    const picked = new Set(next.selected)
+    const inPickedBin = new Set(
+      shapes.filter((sh) => sh.groupId !== null && picked.has(sh.groupId)).map((sh) => sh.id)
+    )
+    engine.select(next.selected.filter((selectedId) => !inPickedBin.has(selectedId)))
+  }
+
+  // The row being renamed in place, after a double-click.
+  const renamingId = useRenaming((state) => state.id)
+  const setRenamingId = (id: string | null): void => useRenaming.setState({ id })
+  /** A right-click acts on the row under it: select that row unless it already is. */
+  const selectForMenu = (id: string): void => {
+    // A shape in a selected bin is part of that selection, though only the bin is listed.
+    const binId = engine?.getShape(id)?.groupId
+    const isSelected = selectedIds.includes(id) || (binId != null && selectedIds.includes(binId))
+    if (!isSelected) engine?.select([id])
+  }
+  const renameGroup = (id: string, name: string): void => {
+    const group = engine?.getGroup(id)
+    if (group) engine?.updateGroup(id, { metadata: { ...group.metadata, name } })
+  }
+  const renameShape = (id: string, name: string): void => {
+    const shape = engine?.getShape(id)
+    if (shape) engine?.updateShape(id, { metadata: { ...shape.metadata, name } })
+  }
 
   // Determine what's selected
   const selectedGroup = useMemo(() => {
@@ -196,16 +255,7 @@ function LayoutSidebar(): React.JSX.Element {
   }
 
   const handleDeleteSelected = (): void => {
-    if (!engine || selectedIds.length === 0) return
-    engine.clearSelection()
-    for (const id of selectedIds) {
-      const group = engine.getGroup(id)
-      if (group) {
-        engine.removeGroup(id)
-      } else {
-        engine.removeShape(id)
-      }
-    }
+    if (engine) removeItems(engine, selectedIds)
   }
 
   return (
@@ -220,57 +270,85 @@ function LayoutSidebar(): React.JSX.Element {
       {/* Bin list */}
       {binGroups.length > 0 && (
         <SidebarSection title={`Bins (${binGroups.length})`}>
-          <div className="space-y-0.5">
-            {binGroups.map((group) => {
-              const meta = group.metadata as BinMetadata
-              const isSelected = selectedIds.includes(group.id)
-              return (
-                <button
-                  key={group.id}
-                  type="button"
-                  className={`w-full rounded px-2 py-1 text-left text-xs transition-colors ${
-                    isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                  }`}
-                  onClick={() => engine?.select([group.id])}
-                >
-                  <span className="font-medium">{meta.name ?? 'Bin'}</span>
-                  <span className="ml-2 opacity-60">
-                    {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+          <EditContextMenu>
+            <div className="space-y-0.5">
+              {binGroups.map((group) => {
+                const meta = group.metadata as BinMetadata
+                const isSelected = selectedIds.includes(group.id)
+                if (renamingId === group.id) {
+                  return (
+                    <NameField
+                      key={group.id}
+                      autoFocus
+                      aria-label="Bin name"
+                      className={RENAME_ROW_CLASS}
+                      value={storedName(meta) ?? 'Bin'}
+                      onRename={(name) => renameGroup(group.id, name)}
+                      onDone={() => setRenamingId(null)}
+                    />
+                  )
+                }
+                return (
+                  <button
+                    key={group.id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    className={listRowClass(isSelected)}
+                    onClick={(e) => handleRowClick(group.id, e)}
+                    onDoubleClick={() => setRenamingId(group.id)}
+                    onContextMenu={() => selectForMenu(group.id)}
+                  >
+                    <span className="font-medium">{storedName(meta) ?? 'Bin'}</span>
+                    <span className="ml-2 opacity-60">
+                      {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </EditContextMenu>
         </SidebarSection>
       )}
 
       {/* Shape list */}
       {shapes.length > 0 && (
         <SidebarSection title={`Shapes (${shapes.length})`}>
-          <div className="space-y-0.5">
-            {shapes.map((shape) => {
-              const isSelected = selectedIds.includes(shape.id)
-              return (
-                <button
-                  key={shape.id}
-                  type="button"
-                  className={`w-full rounded px-2 py-1 text-left text-xs transition-colors ${
-                    isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-                  }`}
-                  onClick={() => engine?.select([shape.id])}
-                >
-                  <span className="font-medium">
-                    {(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
-                  </span>
-                  <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
-                </button>
-              )
-            })}
-          </div>
+          <EditContextMenu>
+            <div className="space-y-0.5">
+              {shapes.map((shape) => {
+                const isSelected = selectedIds.includes(shape.id)
+                if (renamingId === shape.id) {
+                  return (
+                    <NameField
+                      key={shape.id}
+                      autoFocus
+                      aria-label="Shape name"
+                      className={RENAME_ROW_CLASS}
+                      value={storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
+                      onRename={(name) => renameShape(shape.id, name)}
+                      onDone={() => setRenamingId(null)}
+                    />
+                  )
+                }
+                return (
+                  <button
+                    key={shape.id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    className={listRowClass(isSelected)}
+                    onClick={(e) => handleRowClick(shape.id, e)}
+                    onDoubleClick={() => setRenamingId(shape.id)}
+                    onContextMenu={() => selectForMenu(shape.id)}
+                  >
+                    <span className="font-medium">
+                      {storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
+                    </span>
+                    <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </EditContextMenu>
         </SidebarSection>
       )}
 
@@ -278,6 +356,17 @@ function LayoutSidebar(): React.JSX.Element {
       {selectedGroup && isBinGroup(selectedGroup) && (
         <SidebarSection title="Bin properties">
           <div className="space-y-2 text-xs">
+            <label className="flex items-center gap-2">
+              <span className="text-zinc-500">Name</span>
+              <NameField
+                // A field per bin: text typed for one bin can never be applied to another.
+                key={selectedGroup.id}
+                aria-label="Bin name"
+                className="px-2 py-1 text-xs"
+                value={storedName(selectedGroup.metadata) ?? 'Bin'}
+                onRename={(name) => renameGroup(selectedGroup.id, name)}
+              />
+            </label>
             <GridPicker
               width={selectedGroup.metadata.widthUnits}
               depth={selectedGroup.metadata.depthUnits}
@@ -331,9 +420,21 @@ function LayoutSidebar(): React.JSX.Element {
       {selectedShape && (
         <SidebarSection title="Shape properties">
           <div className="space-y-2 text-xs">
+            <label className="flex items-center gap-2">
+              <span className="text-zinc-500">Name</span>
+              <NameField
+                key={selectedShape.id}
+                aria-label="Shape name"
+                className="px-2 py-1 text-xs"
+                value={storedName(selectedShape.metadata) ?? shapeTypeLabel(selectedShape.type)}
+                onRename={(name) => renameShape(selectedShape.id, name)}
+              />
+            </label>
             <div className="flex items-center justify-between">
               <span className="text-zinc-500">Type</span>
-              <span className="text-zinc-300">{shapeTypeLabel(selectedShape.type)}</span>
+              <span className="text-zinc-700 dark:text-zinc-300">
+                {shapeTypeLabel(selectedShape.type)}
+              </span>
             </div>
             {selectedShape.groupId && (
               <div className="flex items-center justify-between">
@@ -463,7 +564,7 @@ function PreviewSidebar(): React.JSX.Element {
                 >
                   <div className="min-w-0 flex-1">
                     <p className="text-xs font-medium truncate text-zinc-800 dark:text-zinc-200">
-                      {meta.name ?? 'Bin'}
+                      {storedName(meta) ?? 'Bin'}
                     </p>
                     <p className="text-[10px] text-zinc-500">
                       {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)

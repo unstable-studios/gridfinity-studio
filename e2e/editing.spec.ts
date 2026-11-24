@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { StudioApp, mappingFromDrawnRect } from './app'
@@ -445,6 +446,291 @@ test('a bin cannot be resized onto its neighbor from the sidebar', async () => {
   // Two wide only touches it: allowed.
   await sizeGrid('2×1').click()
   expect(await firstBinWidth(), 'bin grows to meet its neighbor').toBe(unit * 2)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
+test('rows in the sidebar select with Shift and Cmd or Ctrl', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+  const selectedRows = page.locator('aside button[aria-pressed="true"]')
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  for (const y of [200, 300, 400]) {
+    await app.selectTool('Rectangle')
+    await app.drag({ x: 700, y }, { x: 760, y: y + 40 })
+  }
+  await app.expectShapeCount(3)
+
+  // A plain click selects one row. Shift reaches from it to the row clicked.
+  await row('Rectangle 1').click()
+  await expect(selectedRows).toHaveCount(1)
+  await row('Rectangle 3').click({ modifiers: ['Shift'] })
+  await expect(selectedRows).toHaveCount(3)
+
+  // Cmd or Ctrl takes one row out of the selection.
+  await row('Rectangle 2').click({ modifiers: ['ControlOrMeta'] })
+  await expect(selectedRows).toHaveCount(2)
+  await expect(row('Rectangle 2')).toHaveAttribute('aria-pressed', 'false')
+
+  // The canvas has the same selection: Delete removes the two selected shapes.
+  await page.keyboard.press('Delete')
+  await app.expectShapeCount(1)
+  await expect(row('Rectangle 2')).toBeVisible()
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
+test('bins and shapes can be renamed', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.expectBinCount(1)
+
+  // In Bin properties: type a name and press Enter.
+  const binName = page.getByRole('textbox', { name: 'Bin name' })
+  await expect(binName).toHaveValue('Bin 1')
+  await binName.fill('Screws')
+  await binName.press('Enter')
+  await expect(row('Screws')).toBeVisible()
+
+  // A rename is one undo step. Undo also clears the selection, so the panel closes.
+  await app.menu('Edit', /^Undo/)
+  await expect(row('Bin 1')).toBeVisible()
+  await app.expectBinCount(1)
+
+  // Double-click a row to rename it in place. The field takes the keyboard.
+  await row('Bin 1').dblclick()
+  await page.keyboard.type('Nails')
+  await page.keyboard.press('Enter')
+  await expect(row('Nails')).toBeVisible()
+
+  // Esc keeps the old name, and so does an empty one.
+  await row('Nails').dblclick()
+  await page.keyboard.type('Oops')
+  await page.keyboard.press('Escape')
+  await expect(row('Nails')).toBeVisible()
+  await binName.fill('')
+  await binName.press('Enter')
+  await expect(binName).toHaveValue('Nails')
+
+  // Shapes rename the same way, and typing in the field does not delete the shape.
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 700, y: 300 }, { x: 780, y: 360 })
+  await app.expectShapeCount(1)
+  const shapeName = page.getByRole('textbox', { name: 'Shape name' })
+  await shapeName.fill('Calipers')
+  await shapeName.press('Backspace')
+  await shapeName.press('Enter')
+  await expect(row('Caliper')).toBeVisible()
+  await app.expectShapeCount(1)
+
+  // Saving while a name is still being typed keeps the name: no Enter, straight to save.
+  const file = join(app.dir, 'renamed.gfstudio')
+  await app.stubSaveDialog(file)
+  await shapeName.fill('Wrench')
+  await page.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+s`)
+  await expect(page.getByText('Unsaved', { exact: true })).toHaveCount(0)
+  const saved = JSON.parse(await readFile(file, 'utf8')) as SavedProject
+  expect(saved.layoutSnapshot.shapes[0].metadata?.name, 'the typed name is in the file').toBe(
+    'Wrench'
+  )
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
+test('cut, copy and paste bins and shapes', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'clipboard.gfstudio')
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  const editItem = async (name: string): Promise<ReturnType<typeof page.getByRole>> => {
+    await page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
+    return page.getByRole('menuitem', { name: new RegExp(`^${name}`) })
+  }
+
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // Nothing to paste or copy yet.
+  await expect(await editItem('Paste')).toBeDisabled()
+  await expect(page.getByRole('menuitem', { name: /^Copy/ })).toBeDisabled()
+  await page.keyboard.press('Escape')
+
+  // A bin with a pocket in it. Find the pocket's bin from the saved file.
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(1)
+  let saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].groupId, 'pocket is in the bin').not.toBeNull()
+
+  // Copy the bin and paste it: a second bin with its own pocket, clear of the first.
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await page.keyboard.press(`${mod}+c`)
+  await page.keyboard.press(`${mod}+v`)
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+  saved = await app.save(file)
+  const [first, second] = [...saved.layoutSnapshot.groups].sort((a, b) => a.x - b.x)
+  expect(second.x, 'pasted bin is clear of the first').toBeGreaterThanOrEqual(first.x + first.width)
+  expect(second.childIds, 'pasted bin has its own pocket').toHaveLength(1)
+  expect(first.childIds).toHaveLength(1)
+  expect(second.childIds[0]).not.toBe(first.childIds[0])
+  await expect(page.getByRole('button', { name: /^Bin 1 copy/ })).toBeVisible()
+
+  // The paste is one undo step, and redo brings it back.
+  await app.menu('Edit', /^Undo/)
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+  await app.menu('Edit', /^Redo/)
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  // Cut the copy from the menu: it goes, pocket and all.
+  await page.getByRole('button', { name: /^Bin 1 copy/ }).click()
+  await (await editItem('Cut')).click()
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+
+  // Copy the pocket on its own and paste it: the copy lands beside it, in the same bin.
+  await page.getByRole('button', { name: /^Rectangle 1/ }).click()
+  await (await editItem('Copy')).click()
+  await (await editItem('Paste')).click()
+  await app.expectShapeCount(2)
+  saved = await app.save(file)
+  const [bin] = saved.layoutSnapshot.groups
+  expect(bin.childIds, 'the pasted pocket joins the bin it lands in').toHaveLength(2)
+  const [original, copy] = saved.layoutSnapshot.shapes
+  expect(copy.x, 'the paste lands beside the original').not.toBe(original.x)
+
+  // Typing in a field keeps the keys for the text.
+  const binName = page.getByRole('textbox', { name: 'Bin name' })
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await binName.focus()
+  await page.keyboard.press(`${mod}+a`)
+  await page.keyboard.press(`${mod}+v`)
+  await app.expectShapeCount(2)
+  await app.expectBinCount(1)
+  await page.keyboard.press('Escape')
+
+  // Select all picks the bin. Its pockets come along with it, so they are not picked again.
+  await page.keyboard.press(`${mod}+a`)
+  await expect(page.locator('aside button[aria-pressed="true"]')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: /^Bin 1/ })).toHaveAttribute('aria-pressed', 'true')
+
+  // Delete takes the bin with everything in it, as one undo step.
+  await page.keyboard.press('Delete')
+  await app.expectShapeCount(0)
+  await expect(page.getByText(/^Bins \(\d+\)$/)).toHaveCount(0)
+  await app.menu('Edit', /^Undo/)
+  await app.expectBinCount(1)
+  await app.expectShapeCount(2)
+
+  // A cut bin pastes back where it was.
+  const before = (await app.save(file)).layoutSnapshot.groups[0]
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await page.keyboard.press(`${mod}+x`)
+  await app.expectShapeCount(0)
+  await page.keyboard.press(`${mod}+v`)
+  await app.expectBinCount(1)
+  await app.expectShapeCount(2)
+  const after = (await app.save(file)).layoutSnapshot.groups[0]
+  expect({ x: after.x, y: after.y }, 'cut and paste puts the bin back').toEqual({
+    x: before.x,
+    y: before.y
+  })
+  expect(after.childIds).toHaveLength(2)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
+test('right-click a bin or shape for its menu', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+  const menuItem = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('menuitem', { name, exact: true })
+  const selectedRows = page.locator('aside button[aria-pressed="true"]')
+  const emptyCanvas = { x: 900, y: 250 }
+
+  // A bin with a pocket in it.
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(1)
+
+  // In the sidebar: a right-click selects the row and opens the menu.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y)
+  await expect(selectedRows).toHaveCount(0)
+  // While the menu is open the page behind it is hidden from lookups by role, so the
+  // selected row is counted by its attribute instead.
+  await row('Bin 1').click({ button: 'right' })
+  await expect(selectedRows).toHaveCount(1)
+  await menuItem('Duplicate').click()
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  await row('Bin 1 copy').click({ button: 'right' })
+  await menuItem('Delete').click()
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+
+  // On the canvas: a right-click on the pocket selects it. Rename types in the sidebar row.
+  await page.mouse.click(420, 620, { button: 'right' })
+  await expect(selectedRows).toHaveText(/^Rectangle 1/)
+  await menuItem('Rename').click()
+  // The rename starts once the menu has closed. The row's field is the first of the two.
+  await expect(page.getByRole('textbox', { name: 'Shape name' }).first()).toBeFocused()
+  await page.keyboard.type('Slot')
+  await page.keyboard.press('Enter')
+  await expect(row('Slot')).toBeVisible()
+
+  // On empty canvas nothing is selected, so only what needs no selection is offered.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(selectedRows).toHaveCount(0)
+  await expect(menuItem('Rename')).toBeDisabled()
+  await expect(menuItem('Delete')).toBeDisabled()
+  await menuItem('Select all').click()
+  await expect(row('Bin 1')).toHaveAttribute('aria-pressed', 'true')
+
+  // A drawing tool keeps its clicks: no menu.
+  await app.selectTool('Rectangle')
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await app.selectTool('Select')
+
+  // With the bin selected, a right-click on its pocket keeps the bin selected: Delete takes
+  // the bin and the pocket, not the pocket alone.
+  await row('Bin 1').click()
+  await page.mouse.click(420, 620, { button: 'right' })
+  await expect(selectedRows).toHaveText(/^Bin 1/)
+  await menuItem('Copy').click()
+
+  // What was copied is still there after the lists have gone away and come back.
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await page.getByRole('radio', { name: 'Design', exact: true }).click()
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await menuItem('Paste').click()
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  // After a right-click, an ordinary drag still moves a shape: the menu did not leave the
+  // canvas thinking a button was held.
+  const file = join(app.dir, 'menu.gfstudio')
+  const before = (await app.save(file)).layoutSnapshot.shapes.find((s) => s.groupId !== null)!
+  await page.mouse.click(420, 620, { button: 'right' })
+  await page.keyboard.press('Escape')
+  await app.drag({ x: 420, y: 620 }, { x: 440, y: 640 })
+  const after = (await app.save(file)).layoutSnapshot.shapes.find((s) => s.id === before.id)!
+  expect(after.x, 'the pocket moved').not.toBe(before.x)
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })

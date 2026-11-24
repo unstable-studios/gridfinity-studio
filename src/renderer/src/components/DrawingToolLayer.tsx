@@ -292,6 +292,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   useEffect(() => {
     if (activeTool !== 'polygon') return
     const handler = (e: KeyboardEvent): void => {
+      // Enter and Esc in a text field belong to the field.
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return
       if (e.key === 'Escape') {
         setState(INITIAL_STATE)
       } else if (e.key === 'Enter') {

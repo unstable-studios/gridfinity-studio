@@ -287,7 +287,11 @@ export class GestureRecognizer {
     // Suppress context menu on middle-click release
     if (this.mode === 'panning') {
       e.preventDefault()
+      return
     }
+    // A press that opens a menu is not the start of a drag. On a Mac, Ctrl+click arrives as
+    // a primary press followed by this event, and the menu then swallows the release.
+    this.cancel()
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────

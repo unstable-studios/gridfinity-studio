@@ -14,6 +14,7 @@ import {
   getRecentProjects
 } from './project-handler'
 import { exportSTL, export3MF, exportBatch } from './export-handler'
+import { guardUnsavedWork, settleUnsavedWork } from './close-guard'
 import type { BatchExportFile } from './export-handler'
 import type { ProjectData } from '../shared/types/project'
 
@@ -83,6 +84,8 @@ function createWindow(): void {
   if (saved?.isMaximized) {
     mainWindow.maximize()
   }
+
+  guardUnsavedWork(mainWindow)
 
   // Save bounds on close
   mainWindow.on('close', () => {
@@ -192,7 +195,11 @@ app.whenReady().then(() => {
     // build. Calling quitAndInstall outside those conditions would be a
     // surprising restart triggered by an exposed IPC channel.
     if (is.dev || updateState.kind !== 'downloaded') return
-    autoUpdater.quitAndInstall(false, true)
+    // quitAndInstall starts the installer before any window is asked to close, so unsaved
+    // work has to be dealt with first.
+    void settleUnsavedWork().then((mayClose) => {
+      if (mayClose) autoUpdater.quitAndInstall(false, true)
+    })
   })
 
   createWindow()

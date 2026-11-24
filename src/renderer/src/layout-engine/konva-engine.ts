@@ -796,6 +796,8 @@ export class KonvaEngine implements LayoutEngine {
 
     newGroup.childIds = [...newGroup.childIds, shapeId]
     shape.groupId = groupId
+    // How deep a pocket looks depends on the bin it is in.
+    this.applyDepthOpacity(shape, node)
 
     this.mainLayer?.batchDraw()
     return true
@@ -828,6 +830,7 @@ export class KonvaEngine implements LayoutEngine {
 
     group.childIds = group.childIds.filter((id) => id !== shapeId)
     shape.groupId = null
+    this.applyDepthOpacity(shape, node)
 
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()
@@ -1559,7 +1562,13 @@ export class KonvaEngine implements LayoutEngine {
     // an actual object is under the pointer (not empty canvas / background).
     this.stage.on('mousedown', (e) => {
       const t = e.target
+      // Only the primary button moves or resizes anything. A right-click opens a menu,
+      // which takes the release, so it must not count as an interaction that never ends.
+      if (e.evt.button !== 0) return
       if (t && t !== this.stage && t !== this.bgRect) this.interacting = true
+    })
+    this.stage.on('contextmenu', () => {
+      this.interacting = false
     })
     this.stage.on('mouseup', () => {
       this.interacting = false
