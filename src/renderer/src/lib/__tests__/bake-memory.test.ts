@@ -133,14 +133,14 @@ describe('a bake', () => {
 
   it('frees what it made when it fails part-way', async () => {
     const { module, made } = await recordingModule()
-    // A pocket that cannot be built: the feet, trunk and holes are made before it throws.
-    const broken = {
-      ...params,
-      pockets: [{ ...params.pockets[0], vertices: null as unknown as Float32Array }]
+    // Cutting the lip groove fails: the feet, the trunk and the groove are made by then.
+    const { Manifold } = module as { Manifold: { difference: () => never } }
+    Manifold.difference = () => {
+      throw new Error('could not cut')
     }
 
-    expect(() => buildBinCSG(broken, module)).toThrow()
-    expect(made.length).toBeGreaterThan(20)
+    expect(() => buildBinCSG(params, module)).toThrow('could not cut')
+    expect(made.length).toBeGreaterThan(10)
     expect(made.filter((item) => !item.isDeleted())).toHaveLength(0)
   })
 

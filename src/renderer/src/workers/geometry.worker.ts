@@ -252,6 +252,15 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
           `[worker] CSG bake complete: ${verts} verts, ${tris} tris, ${msg.binParams.pockets.length} pockets (${totalMs}ms)`
         )
 
+        const skipped = csgResult.skippedPockets
+        if (skipped > 0) {
+          warnings.push(
+            skipped === 1
+              ? 'A shape with no area was not cut.'
+              : `${skipped} shapes with no area were not cut.`
+          )
+        }
+
         const colors = new Float32Array(0)
         const response: WorkerResponse = {
           type: 'bake-pockets',

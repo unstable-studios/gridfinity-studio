@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
-import { StudioApp } from './app'
+import { StudioApp, readWhenComplete } from './app'
 import type { SavedProject } from './app'
 
 let app: StudioApp
@@ -243,6 +243,48 @@ test('drag on the canvas to draw a bin on the grid', async () => {
   const third = withPocket.layoutSnapshot.groups.find((g) => g.childIds.length > 0)
   expect(third, 'the new bin holds the shape').toBeDefined()
   expect(withPocket.layoutSnapshot.shapes[0].groupId).toBe(third!.id)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
+test('a pocket with no area leaves its bin whole and says so in Preview', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const { mouse } = page
+  const file = join(app.dir, 'flat.gfstudio')
+  const at = { x: 700, y: 300 }
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  // A click with the Bin tool draws a bin over the grid square under it.
+  await app.selectTool('Bin')
+  await mouse.click(at.x, at.y)
+  await app.expectBinCount(1)
+
+  // A polygon whose three points are in one line, inside that bin.
+  await app.selectTool('Polygon')
+  for (const dx of [-4, 0, 4]) await mouse.click(at.x + dx, at.y)
+  await page.keyboard.press('Enter')
+  await app.expectShapeCount(1)
+  const saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].groupId, 'the polygon is in the bin').toBe(
+    saved.layoutSnapshot.groups[0].id
+  )
+
+  // The bin is built, and the shape that could not be cut is named as the reason.
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await expect(page.getByText(/\bReady$/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText('A shape with no area was not cut.')).toBeVisible()
+
+  // An export of it has a bin in it.
+  const stlPath = join(app.dir, 'flat.stl')
+  await app.stubSaveDialog(stlPath)
+  await page.getByRole('button', { name: 'Export STL…' }).click()
+  const triangles = await readWhenComplete(stlPath, async (bytes) => {
+    const count = bytes.length >= 84 ? bytes.readUInt32LE(80) : -1
+    if (bytes.length !== 84 + count * 50) throw new Error(`STL is ${bytes.length} bytes`)
+    return count
+  })
+  expect(triangles).toBeGreaterThan(100)
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })

@@ -40,7 +40,11 @@ function binParams(overrides: Partial<CSGBinParams> = {}): CSGBinParams {
 }
 
 function bake(params: CSGBinParams): BakeResult {
-  return { mesh: { ...buildBinCSG(params, manifold), colors: new Float32Array(0) } } as BakeResult
+  return {
+    mesh: { ...buildBinCSG(params, manifold), colors: new Float32Array(0) },
+    timestamp: 0,
+    warnings: []
+  }
 }
 
 interface ReadMesh {

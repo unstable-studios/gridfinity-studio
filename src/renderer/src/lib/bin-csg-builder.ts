@@ -53,7 +53,8 @@ export interface PocketSpec {
   zTop: number
 }
 
-export interface CSGMeshResult {
+/** A solid's triangles, ready for Three.js. */
+export interface CSGMesh {
   positions: Float32Array
   indices: Uint32Array
   normals: Float32Array
@@ -62,6 +63,11 @@ export interface CSGMeshResult {
    * for shading, so this is the only record of which triangles the solid joins.
    */
   solidVertices: Uint32Array
+}
+
+export interface CSGMeshResult extends CSGMesh {
+  /** How many pockets were left out because their outline encloses nothing. */
+  skippedPockets: number
 }
 
 // ─── Manifold type aliases (avoid importing manifold-3d types) ───
@@ -357,6 +363,39 @@ function subtractHoles(bin: Manifold, params: CSGBinParams, M: ManifoldModule): 
   return keep(Manifold.difference(bin, keep(Manifold.union(holes))))
 }
 
+/** An outline enclosing less than this is not a pocket, in mm². */
+const MIN_POCKET_AREA = 1e-6
+
+/**
+ * Where a pocket is cut, as points in the bin, counter-clockwise. Null when there is nothing
+ * to cut: fewer than three points, a point that is not a number, or no area, such as three
+ * points in a line.
+ *
+ * Manifold reads a clockwise outline as "everything but this", and an outline with no area
+ * much the same. Cutting either from a bin leaves no bin at all, so they are caught here.
+ */
+export function pocketOutline(pocket: PocketSpec): Array<[number, number]> | null {
+  const count = Math.floor(pocket.vertices.length / 2)
+  if (count < 3) return null
+
+  const outline: Array<[number, number]> = []
+  for (let i = 0; i < count; i++) {
+    const x = pocket.posX + pocket.vertices[i * 2]
+    const y = pocket.posY + pocket.vertices[i * 2 + 1]
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+    outline.push([x, y])
+  }
+
+  let twiceArea = 0
+  for (let i = 0; i < count; i++) {
+    const [x0, y0] = outline[i]
+    const [x1, y1] = outline[(i + 1) % count]
+    twiceArea += x0 * y1 - x1 * y0
+  }
+  if (Math.abs(twiceArea) / 2 < MIN_POCKET_AREA) return null
+  return twiceArea < 0 ? outline.reverse() : outline
+}
+
 function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule): Manifold {
   const { Manifold } = M
   if (params.pockets.length === 0) return bin
@@ -364,13 +403,8 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
   const cutters: Manifold[] = []
 
   for (const pocket of params.pockets) {
-    const vertCount = pocket.vertices.length / 2
-    if (vertCount < 3) continue
-
-    const poly: Array<[number, number]> = []
-    for (let i = 0; i < vertCount; i++) {
-      poly.push([pocket.posX + pocket.vertices[i * 2], pocket.posY + pocket.vertices[i * 2 + 1]])
-    }
+    const poly = pocketOutline(pocket)
+    if (!poly) continue
 
     let cs = outlineOf(poly, M)
 
@@ -417,7 +451,7 @@ const CREASE_ANGLE_DEG = 30
  * a single vertex position may need different normals for different faces.
  * `solidVertices` keeps the input index of each output vertex.
  */
-function computeCreaseNormals(positions: Float32Array, indices: Uint32Array): CSGMeshResult {
+function computeCreaseNormals(positions: Float32Array, indices: Uint32Array): CSGMesh {
   const triCount = indices.length / 3
   const cosThreshold = Math.cos((CREASE_ANGLE_DEG * Math.PI) / 180)
 
@@ -654,7 +688,8 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
   const made: Disposable[] = []
   madeThisBake = made
   try {
-    return meshOf(buildSolid(params, manifoldModule))
+    const skippedPockets = params.pockets.filter((pocket) => pocketOutline(pocket) === null).length
+    return { ...meshOf(buildSolid(params, manifoldModule)), skippedPockets }
   } finally {
     // Also when the bake threw: what was made up to then is still on Manifold's heap.
     madeThisBake = null
@@ -691,7 +726,7 @@ function buildSolid(params: CSGBinParams, M: ManifoldModule): Manifold {
 }
 
 /** A solid's triangles, copied off Manifold's heap and ready for Three.js. */
-function meshOf(bin: Manifold): CSGMeshResult {
+function meshOf(bin: Manifold): CSGMesh {
   // Extract raw mesh from Manifold
   const mesh = bin.getMesh()
   const numProp = mesh.numProp
