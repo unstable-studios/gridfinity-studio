@@ -184,7 +184,7 @@ export class StudioApp {
     await this.page.getByRole('menuitem', { name: item }).click()
   }
 
-  async selectTool(name: 'Select' | 'Rectangle' | 'Ellipse' | 'Polygon'): Promise<void> {
+  async selectTool(name: 'Select' | 'Bin' | 'Rectangle' | 'Ellipse' | 'Polygon'): Promise<void> {
     await this.page.getByRole('radio', { name, exact: true }).click()
   }
 

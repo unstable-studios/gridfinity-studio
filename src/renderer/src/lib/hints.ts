@@ -30,6 +30,9 @@ const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
       { keys: 'Scroll', does: 'zoom' }
     ]
   },
+  bin: {
+    text: 'Drag to draw a bin.'
+  },
   rectangle: {
     text: 'Drag to draw a rectangle.',
     shortcuts: DRAG_SHORTCUTS

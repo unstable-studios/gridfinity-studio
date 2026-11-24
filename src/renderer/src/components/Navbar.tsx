@@ -36,6 +36,7 @@ import {
   SquareDashedIcon,
   BoxIcon,
   MousePointerIcon,
+  Grid2x2PlusIcon,
   SquareIcon,
   CircleIcon,
   PentagonIcon
@@ -343,6 +344,7 @@ function ToolBar() {
 
   const tools = [
     { id: 'select' as const, label: 'Select', icon: MousePointerIcon },
+    { id: 'bin' as const, label: 'Bin', icon: Grid2x2PlusIcon },
     { id: 'rectangle' as const, label: 'Rectangle', icon: SquareIcon },
     { id: 'circle' as const, label: 'Ellipse', icon: CircleIcon },
     { id: 'polygon' as const, label: 'Polygon', icon: PentagonIcon }
