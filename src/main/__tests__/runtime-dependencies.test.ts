@@ -7,8 +7,13 @@ import { describe, expect, it } from 'vitest'
  * electron-builder packs every package under `dependencies` into the installers, and
  * electron-vite leaves exactly those packages out of the main and preload bundles. So
  * `dependencies` has to be the packages the main and preload processes import, and nothing
- * else: a missing one breaks the installed app at startup, and an extra one is dead weight
- * (the renderer's libraries are already bundled into `out/renderer`).
+ * else. An extra one is dead weight: the renderer's libraries are already bundled into
+ * `out/renderer`. A missing one is bundled into the main script instead, which breaks a
+ * package that has to load from `node_modules` (a native addon, or one that reads its own
+ * files).
+ *
+ * Imports are found by pattern. Type-only imports (`import type`) are erased by the build
+ * and do not count.
  */
 
 const root = resolve(__dirname, '../../..')
@@ -31,7 +36,11 @@ function importedPackages(dirs: string[]): string[] {
   const found = new Set<string>()
   const importPattern = /(?:from\s+|import\s*\(\s*|require\s*\(\s*|^\s*import\s+)['"]([^'"]+)['"]/gm
   for (const file of dirs.flatMap((dir) => sourceFiles(join(root, dir)))) {
-    for (const match of readFileSync(file, 'utf8').matchAll(importPattern)) {
+    const source = readFileSync(file, 'utf8').replace(
+      /^\s*import\s+type\s[^;]*?from\s+['"][^'"]+['"]/gm,
+      ''
+    )
+    for (const match of source.matchAll(importPattern)) {
       const specifier = match[1]
       if (specifier.startsWith('.') || specifier.startsWith('node:')) continue
       const name = packageName(specifier)
