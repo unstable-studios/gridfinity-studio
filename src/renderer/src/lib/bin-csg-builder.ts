@@ -11,6 +11,7 @@
  * All dimensions in millimetres. Returns positions/indices/normals ready for Three.js.
  */
 
+import { circleSegments } from './curve-segments'
 import { BASE_PROFILE_HEIGHT, LIP_PROFILE, LIP_OFFSET, LIP_HEIGHT } from './bin-generator'
 
 // ─── Gridfinity Spec Constants ───────────────────────────────────
@@ -27,7 +28,6 @@ const OUTER_CORNER_RADIUS = 3.75
 const BASE_BRIDGE_HEIGHT = 7 - BASE_PROFILE_HEIGHT // 2.05
 const BASE_HEIGHT = 7
 const MAGNET_HOLE_OFFSET = 8
-const HOLE_SEGMENTS = 24
 
 /** Arc resolution for rounded rect corners (higher = smoother) */
 const CORNER_SEGMENTS = 16
@@ -333,7 +333,7 @@ function subtractHoles(bin: Manifold, params: CSGBinParams, M: ManifoldModule): 
             depth,
             diameter / 2,
             diameter / 2,
-            HOLE_SEGMENTS
+            circleSegments(diameter / 2)
           ).translate([hx, hy, 0])
           holes.push(hole)
         }
@@ -362,7 +362,7 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
     let cs = new CrossSection([poly])
 
     if (pocket.clearance > 0) {
-      cs = cs.offset(pocket.clearance)
+      cs = cs.offset(pocket.clearance, 'Round', 2, circleSegments(pocket.clearance))
     }
 
     // Extend upward through the lip (+ 1mm overshoot) so edge pockets

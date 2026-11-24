@@ -4,7 +4,10 @@ import JSZip from 'jszip'
 import Module from 'manifold-3d'
 import { buildBinCSG } from '../bin-csg-builder'
 import type { CSGBinParams } from '../bin-csg-builder'
+import { circleSegments, CURVE_TOLERANCE } from '../curve-segments'
 import { build3MFArrayBuffer } from '../export-baked'
+import { shapeToPocketVertices } from '../pocket-vertices'
+import type { LayoutShape } from '@/layout-engine/types'
 import type { BakeResult } from '@/hooks/useProject'
 
 /**
@@ -168,5 +171,45 @@ describe('3MF export of a baked bin', () => {
 
     expect(openEdges(mesh)).toBe(0)
     expect(shells(mesh)).toBe(2)
+  })
+
+  it('cuts a round pocket to within the curve tolerance', async () => {
+    const radius = 15
+    const clearance = 0.25
+    const segments = circleSegments(radius)
+    const circle = { type: 'circle', radiusX: radius, radiusY: radius } as LayoutShape
+    const vertices = shapeToPocketVertices(circle)!
+    const floor = 21 - 8
+    const params = binParams({
+      magnetHoles: { enabled: false, diameter: 6.5, depth: 2.4 },
+      pockets: [{ vertices, depth: 8, clearance, posX: 0, posY: 0, zTop: 21 }]
+    })
+    const buffer = await build3MFArrayBuffer(new Map([['a', bake(params)]]), 'bin')
+    const mesh = await readMesh(buffer!)
+
+    const rim = mesh.vertices.filter(([, , z]) => Math.abs(z - floor) < 1e-4)
+    expect(rim.length).toBeGreaterThanOrEqual(segments)
+    const wall = radius + clearance
+    for (const [x, y] of rim) {
+      expect(Math.hypot(x, y)).toBeGreaterThan(wall - 2 * CURVE_TOLERANCE)
+      expect(Math.hypot(x, y)).toBeLessThan(wall + 1e-4)
+    }
+    // Middle of the longest segment: the farthest the wall gets from a true circle.
+    const angles = rim.map(([x, y]) => Math.atan2(y, x)).sort((a, b) => a - b)
+    let widest = angles[0] + 2 * Math.PI - angles[angles.length - 1]
+    for (let i = 1; i < angles.length; i++) widest = Math.max(widest, angles[i] - angles[i - 1])
+    expect(wall * (1 - Math.cos(widest / 2))).toBeLessThan(2 * CURVE_TOLERANCE)
+    expect(openEdges(mesh)).toBe(0)
+  })
+
+  it('cuts magnet holes with at least 64 sides', async () => {
+    const params = binParams({ widthUnits: 1, depthUnits: 1 })
+    const buffer = await build3MFArrayBuffer(new Map([['a', bake(params)]]), 'bin')
+    const mesh = await readMesh(buffer!)
+
+    const onHole = mesh.vertices.filter(
+      ([x, y, z]) => Math.abs(z - 2.4) < 1e-4 && Math.abs(Math.hypot(x - 13, y - 13) - 3.25) < 1e-3
+    )
+    expect(onHole.length).toBeGreaterThanOrEqual(64)
   })
 })
