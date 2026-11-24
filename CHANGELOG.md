@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.16.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.1...v1.16.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **core:** bake bins without flat triangles or thin steps ([#493](https://github.com/unstable-studios/gridfinity-studio/issues/493)) ([25658c8](https://github.com/unstable-studios/gridfinity-studio/commit/25658c8c6636e35e70ec31b661110aada3c26100))
+* **core:** free a bake's memory when it ends ([#496](https://github.com/unstable-studios/gridfinity-studio/issues/496)) ([e63fab4](https://github.com/unstable-studios/gridfinity-studio/commit/e63fab4c59063f6fb0ca0089baf640a12cbb728a))
+* **core:** validate a project's layout when it opens ([#492](https://github.com/unstable-studios/gridfinity-studio/issues/492)) ([d25b5e9](https://github.com/unstable-studios/gridfinity-studio/commit/d25b5e93a93263b92d0463536b9e8bd0ffb0db9d))
+
 ## [1.16.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.16.0...v1.16.1) (2026-11-24)
 
 
