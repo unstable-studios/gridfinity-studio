@@ -1,4 +1,5 @@
 import type { LayoutShape } from '@/layout-engine/types'
+import { polygonBboxCenter } from '@/layout-engine/polygon-center'
 import { circleSegments } from './curve-segments'
 
 /**
@@ -8,9 +9,31 @@ import { circleSegments } from './curve-segments'
  *
  * Output is in math y-up convention (Manifold/CrossSection convention).
  * Editor y is screen-y-down; for shapes built from editor input (polygon),
- * flip y on the way out.
+ * flip y on the way out. The outline is turned by the shape's rotation.
  */
 export function shapeToPocketVertices(shape: LayoutShape): Float32Array | null {
+  const vertices = unrotatedVertices(shape)
+  return vertices && rotated(vertices, shape.rotation)
+}
+
+/**
+ * Turn the outline the way the shape is turned on the canvas. `degrees` is clockwise as seen
+ * on screen, which in y-up coordinates is a turn the other way.
+ */
+function rotated(vertices: Float32Array, degrees: number): Float32Array {
+  if (!degrees) return vertices
+  const angle = (-degrees * Math.PI) / 180
+  const cos = Math.cos(angle)
+  const sin = Math.sin(angle)
+  const out = new Float32Array(vertices.length)
+  for (let i = 0; i < vertices.length; i += 2) {
+    out[i] = vertices[i] * cos - vertices[i + 1] * sin
+    out[i + 1] = vertices[i] * sin + vertices[i + 1] * cos
+  }
+  return out
+}
+
+function unrotatedVertices(shape: LayoutShape): Float32Array | null {
   switch (shape.type) {
     case 'rect': {
       const hw = shape.width / 2
@@ -39,7 +62,10 @@ export function shapeToPocketVertices(shape: LayoutShape): Float32Array | null {
       // the way out so the polygon ends up in math y-up convention,
       // matching the rect/circle output. Mirroring across X reverses
       // winding, so reuse the post-flip vertices for the area test.
-      const flipped = pts.map((p) => ({ x: p.x, y: -p.y }))
+      // The shape's position is the center of the box around its points, as the canvas
+      // draws it, wherever the points themselves are centered.
+      const center = polygonBboxCenter(pts)
+      const flipped = pts.map((p) => ({ x: p.x - center.x, y: -(p.y - center.y) }))
       let area2 = 0
       for (let i = 0; i < flipped.length; i++) {
         const a = flipped[i]

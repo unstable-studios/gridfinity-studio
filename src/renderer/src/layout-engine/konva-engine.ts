@@ -19,6 +19,7 @@ import type { ShapeAABB } from './containment'
 import type { ShapeMove } from './arrange'
 import { isBinGroup } from './types'
 import { depthToOpacity } from '../../../shared/types/project'
+import { polygonBboxCenter } from './polygon-center'
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 
@@ -28,26 +29,6 @@ const DEFAULT_GRID_ORIGIN = 'rgba(113, 113, 122, 0.35)'
 const GRID_EXTENT = 10000
 
 // ─── Helpers ────────────────────────────────────────────────────────────────────
-
-/**
- * Compute the bounding-box center of a polygon's points.
- * Used to set Konva.Line offset so that x,y = bbox center, the same
- * center convention rect and circle shapes use.
- */
-function polygonBboxCenter(points: { x: number; y: number }[]): { x: number; y: number } {
-  if (points.length === 0) return { x: 0, y: 0 }
-  let minX = Infinity
-  let maxX = -Infinity
-  let minY = Infinity
-  let maxY = -Infinity
-  for (const p of points) {
-    if (p.x < minX) minX = p.x
-    if (p.x > maxX) maxX = p.x
-    if (p.y < minY) minY = p.y
-    if (p.y > maxY) maxY = p.y
-  }
-  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 }
-}
 
 function layoutShapeToKonva(shape: LayoutShape): Konva.Shape {
   let node: Konva.Shape

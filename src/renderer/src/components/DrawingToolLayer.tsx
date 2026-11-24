@@ -249,10 +249,6 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       if (finishingRef.current) return
       finishingRef.current = true
 
-      const cx = pts.reduce((sum, p) => sum + p.x, 0) / pts.length
-      const cy = pts.reduce((sum, p) => sum + p.y, 0) / pts.length
-      const relativePoints = pts.map((p) => ({ x: p.x - cx, y: p.y - cy }))
-
       let minX = Infinity
       let minY = Infinity
       let maxX = -Infinity
@@ -263,6 +259,11 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         if (p.y < minY) minY = p.y
         if (p.y > maxY) maxY = p.y
       }
+      // A polygon's position is the center of the box around it, and its points are measured
+      // from there. Anything else and it would jump as it is added.
+      const cx = (minX + maxX) / 2
+      const cy = (minY + maxY) / 2
+      const relativePoints = pts.map((p) => ({ x: p.x - cx, y: p.y - cy }))
       const bin = findBinForDrawnShape(engine, { minX, minY, maxX, maxY })
       const id = crypto.randomUUID()
       const name = nextShapeName(engine, 'polygon')
