@@ -234,7 +234,7 @@ function LayoutSidebar(): React.JSX.Element {
                   }`}
                   onClick={() => engine?.select([group.id])}
                 >
-                  <span className="font-medium">{meta.name ?? group.id}</span>
+                  <span className="font-medium">{meta.name ?? 'Bin'}</span>
                   <span className="ml-2 opacity-60">
                     {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                   </span>
@@ -263,7 +263,7 @@ function LayoutSidebar(): React.JSX.Element {
                   onClick={() => engine?.select([shape.id])}
                 >
                   <span className="font-medium">
-                    {(shape.metadata?.name as string) ?? shape.id}
+                    {(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
                   </span>
                   <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
                 </button>
@@ -631,9 +631,7 @@ function ShapeDepthField({
       {nearMax && (
         <div className="flex items-start gap-1 text-amber-600 dark:text-amber-400 text-[10px] leading-tight">
           <span aria-hidden="true">⚠</span>
-          <span>
-            Close to the bin floor. The print may be fragile. Max {maxSafe.toFixed(1)} mm.
-          </span>
+          <span>Leaves a thin floor. Max {maxSafe.toFixed(1)} mm.</span>
         </div>
       )}
     </div>

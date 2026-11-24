@@ -25,7 +25,7 @@ const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
     text: 'Drag to draw a rectangle.'
   },
   circle: {
-    text: 'Drag to draw an ellipse.'
+    text: 'Drag out from the center to draw a circle. Resize it to make an ellipse.'
   },
   polygon: {
     text: 'Click to add points. Click the first point to finish.',

@@ -144,7 +144,7 @@ const COLOR_LABELS: Record<keyof CanvasThemeColors, string> = {
   reviewFloor: 'Preview floor',
   reviewFog: 'Preview fog',
   meshColor: 'Model color',
-  emptyState: 'Empty state'
+  emptyState: 'Empty preview'
 }
 
 function ColorSection({

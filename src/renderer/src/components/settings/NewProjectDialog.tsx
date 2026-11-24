@@ -103,7 +103,7 @@ export default function NewProjectDialog({
                   onClick={() => setPreset(p)}
                 >
                   {p.charAt(0).toUpperCase() + p.slice(1)}
-                  <span className="block text-[10px] opacity-70">{TOLERANCE_PRESETS[p]}mm</span>
+                  <span className="block text-[10px] opacity-70">{TOLERANCE_PRESETS[p]} mm</span>
                 </button>
               ))}
             </div>
