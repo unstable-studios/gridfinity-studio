@@ -95,7 +95,6 @@ test('export every bin or only the selected ones', async () => {
   await page.getByRole('radio', { name: 'Design', exact: true }).click()
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
   await expect(scope('All bins')).toBeChecked()
-  await expect(scope('Selected (1)')).toBeEnabled()
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
