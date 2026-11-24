@@ -58,3 +58,19 @@ export function checkGroupCollision(
   }
   return null
 }
+
+/**
+ * Whether changing a group's bounds from `current` to `proposed` would put it on top of a
+ * group it does not already overlap. Overlaps that exist already don't count, so a group that
+ * is somehow on top of another can still be made smaller.
+ */
+export function wouldOverlapAnotherGroup(
+  current: AABB,
+  proposed: AABB,
+  groupId: string,
+  allGroups: LayoutGroup[]
+): boolean {
+  return allGroups.some(
+    (other) => other.id !== groupId && aabbOverlap(proposed, other) && !aabbOverlap(current, other)
+  )
+}

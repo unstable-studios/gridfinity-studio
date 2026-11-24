@@ -12,7 +12,7 @@ import type {
   GroupDecoration
 } from './types'
 import { KonvaGroupRenderer } from './konva-group-renderer'
-import { checkGroupCollision } from './collision'
+import { checkGroupCollision, wouldOverlapAnotherGroup } from './collision'
 import type { HitResult } from './input-action-handler'
 import { findContainingBinGroup, findChildrenOutsideBin } from './containment'
 import type { ShapeAABB } from './containment'
@@ -619,12 +619,32 @@ export class KonvaEngine implements LayoutEngine {
     this.emit('groupChanged', { groupId: group.id, childIds: [...group.childIds] })
   }
 
-  updateGroup(id: string, patch: Partial<LayoutGroup>): void {
-    if (this.disposed) return
+  updateGroup(id: string, patch: Partial<LayoutGroup>): boolean {
+    if (this.disposed) return false
     const group = this.groupMap.get(id)
-    if (!group) return
+    if (!group) return false
     const renderer = this.rendererMap.get(id)
-    if (!renderer) return
+    if (!renderer) return false
+
+    const movesOrResizes =
+      patch.x !== undefined ||
+      patch.y !== undefined ||
+      patch.width !== undefined ||
+      patch.height !== undefined
+    if (movesOrResizes) {
+      const proposed = {
+        x: patch.x ?? group.x,
+        y: patch.y ?? group.y,
+        width: patch.width ?? group.width,
+        height: patch.height ?? group.height
+      }
+      if (wouldOverlapAnotherGroup(group, proposed, id, this.getAllGroups())) {
+        renderer.flashCollision()
+        const resizes = patch.width !== undefined || patch.height !== undefined
+        this.emit('collisionRejected', { id, reason: resizes ? 'resize' : 'move' })
+        return false
+      }
+    }
 
     // Lower-left is anchored across width/height changes, so the bin's
     // centroid moves by (deltaW/2, -deltaH/2). Children are rendered relative
@@ -652,6 +672,7 @@ export class KonvaEngine implements LayoutEngine {
     }
 
     this.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
+    return true
   }
 
   /**

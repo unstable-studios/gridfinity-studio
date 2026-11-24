@@ -621,6 +621,45 @@ describe('LayoutEngine contract', () => {
       expect(updated.x).toBeCloseTo(84, 0)
     })
 
+    it('updateGroup refuses a resize onto another group', () => {
+      engine.createGroup(makeGroup({ id: 'left', x: 0, y: 84, width: 84, height: 84 }))
+      engine.createGroup(makeGroup({ id: 'right', x: 84, y: 84, width: 84, height: 84 }))
+      const rejected = vi.fn()
+      const changed = vi.fn()
+      engine.on('collisionRejected', rejected)
+      engine.on('groupChanged', changed)
+
+      expect(engine.updateGroup('left', { width: 168 })).toBe(false)
+
+      expect(engine.getGroup('left')!.width).toBe(84)
+      expect(rejected).toHaveBeenCalledWith({ id: 'left', reason: 'resize' })
+      expect(changed).not.toHaveBeenCalled()
+    })
+
+    it('updateGroup allows a resize that only touches another group', () => {
+      engine.createGroup(makeGroup({ id: 'left', x: 0, y: 84, width: 42, height: 84 }))
+      engine.createGroup(makeGroup({ id: 'right', x: 84, y: 84, width: 84, height: 84 }))
+
+      expect(engine.updateGroup('left', { width: 84 })).toBe(true)
+      expect(engine.getGroup('left')!.width).toBe(84)
+    })
+
+    it('updateGroup allows a change that is not a move or resize next to another group', () => {
+      engine.createGroup(makeGroup({ id: 'left', x: 0, y: 84, width: 84, height: 84 }))
+      engine.createGroup(makeGroup({ id: 'right', x: 84, y: 84, width: 84, height: 84 }))
+
+      expect(engine.updateGroup('left', { metadata: { name: 'Screws' } })).toBe(true)
+      expect(engine.getGroup('left')!.metadata).toEqual({ name: 'Screws' })
+    })
+
+    it('updateGroup lets a group that already overlaps another be made smaller', () => {
+      engine.createGroup(makeGroup({ id: 'left', x: 0, y: 84, width: 168, height: 84 }))
+      engine.createGroup(makeGroup({ id: 'right', x: 84, y: 84, width: 84, height: 84 }))
+
+      expect(engine.updateGroup('left', { width: 126 })).toBe(true)
+      expect(engine.getGroup('left')!.width).toBe(126)
+    })
+
     it('C28: checkGroupCollision detects overlap', () => {
       const groups: LayoutGroup[] = [
         makeGroup({ id: 'a', x: 0, y: 168, width: 168, height: 168 }),
