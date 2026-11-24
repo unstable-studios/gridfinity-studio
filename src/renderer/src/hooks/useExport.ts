@@ -2,7 +2,7 @@
  * Exporting the baked bins: which ones, whether they are ready, and writing the file.
  * The sidebar and the File menu both export through this, so they always agree.
  */
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useLayoutEngine, useEngineState, isBinGroup } from '@/layout-engine'
 import type { BinMetadata, LayoutGroup } from '@/layout-engine'
@@ -18,7 +18,7 @@ export type ExportFormat = 'stl' | '3mf'
 
 type Bin = LayoutGroup & { metadata: BinMetadata }
 
-/** What the person last asked for. Kept while the app is open, across projects. */
+/** What the person asked for, until `useExportScopeReset` puts it back. */
 const useExportOptions = create<{ scope: ExportScope }>(() => ({ scope: 'all' }))
 
 export interface ExportCommands {
@@ -31,7 +31,7 @@ export interface ExportCommands {
   /** `selected` only while there are selected bins to export. */
   scope: ExportScope
   setScope: (scope: ExportScope) => void
-  /** Whether every chosen bin is built and up to date. */
+  /** Whether every chosen bin has been built, in Preview. */
   canExport: boolean
   exportAs: (format: ExportFormat) => Promise<void>
 }
@@ -96,4 +96,17 @@ export function useExport(): ExportCommands {
     canExport,
     exportAs
   }
+}
+
+/**
+ * Go back to exporting every bin when the person leaves Preview or the project changes.
+ * "Selected" is then always a choice made with the bins in view, never one left over from
+ * earlier that would quietly export part of a project. Mount once.
+ */
+export function useExportScopeReset(): void {
+  const { mode } = useAppMode()
+  const projectKey = useProject((s) => s.project?.settings.createdAt)
+  useEffect(() => {
+    useExportOptions.setState({ scope: 'all' })
+  }, [mode, projectKey])
 }

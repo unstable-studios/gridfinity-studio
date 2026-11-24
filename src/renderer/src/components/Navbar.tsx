@@ -30,7 +30,7 @@ import { useAppMode } from '@/hooks/useAppMode'
 import { MOD_KEY } from '@/lib/platform'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import type { UpdateState } from '../../../shared/types/updates'
-import { useExport } from '@/hooks/useExport'
+import { useExport, useExportScopeReset } from '@/hooks/useExport'
 import {
   SquareDashedIcon,
   BoxIcon,
@@ -129,6 +129,7 @@ function AppMenubar({
   }, [loadRecentProjects])
 
   const { canExport, exportAs } = useExport()
+  useExportScopeReset()
 
   // File keyboard shortcuts (undo/redo handled by useEngineUndoRedo)
   const handleFileKeys = useCallback(
