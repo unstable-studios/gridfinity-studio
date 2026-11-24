@@ -1,4 +1,4 @@
-import type { ProjectData } from '../types/project'
+import type { LayoutSnapshotData, ProjectData } from '../types/project'
 import { SUPPORTED_SCHEMA_VERSIONS, CURRENT_SCHEMA_VERSION } from '../types/project'
 
 export interface ValidationError {
@@ -28,13 +28,10 @@ export class ProjectValidator {
     this.validateRequired(project, errors)
     this.validateSchemaVersion(project, errors)
 
-    if (project.settings) {
-      this.validateSettings(project.settings, errors)
-    }
-
-    if (project.gridfinity) {
-      this.validateGridfinity(project.gridfinity, errors)
-    }
+    // A field that is present is checked even when it holds nothing: `null` is not settings.
+    if ('settings' in project) this.validateSettings(project.settings, errors)
+    if ('gridfinity' in project) this.validateGridfinity(project.gridfinity, errors)
+    if ('layoutSnapshot' in project) validateLayout(project.layoutSnapshot, errors)
 
     return { valid: errors.length === 0, errors }
   }
@@ -196,6 +193,172 @@ export class ProjectValidator {
   }
 }
 
+// ─── Layout ─────────────────────────────────────────────────────────
+
+/** At most this many problems are reported for a layout. A broken file can have thousands. */
+const MAX_LAYOUT_ERRORS = 20
+
+/** The fields each kind of shape must have, beyond the ones every shape has. */
+const SHAPE_FIELDS: Record<string, { numbers?: string[]; text?: string[] }> = {
+  rect: { numbers: ['width', 'height'] },
+  circle: { numbers: ['radiusX', 'radiusY'] },
+  polygon: {},
+  svgPath: { text: ['pathData'] },
+  meshImport: { text: ['meshRef'] }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/** A number that can be drawn and cut: not NaN, and not infinite. */
+function isLength(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+/**
+ * Check the layout: the bins, the shapes, and that they point at each other.
+ *
+ * This is what the canvas and the 3D model rely on. It does not check that a bin's
+ * `childIds` list matches its shapes' `groupId`: the shapes decide, and `repairLayout`
+ * rebuilds the lists when a file is opened.
+ */
+function validateLayout(layout: unknown, all: ValidationError[]): void {
+  const errors: ValidationError[] = []
+  const add = (field: string, message: string, value?: unknown): void => {
+    errors.push({ field: `layoutSnapshot.${field}`, message, value })
+  }
+
+  if (!isRecord(layout)) {
+    all.push({ field: 'layoutSnapshot', message: 'Layout must be an object', value: layout })
+    return
+  }
+  if (typeof layout.version !== 'string') add('version', 'version must be text', layout.version)
+
+  const grid = layout.gridConfig
+  if (!isRecord(grid)) {
+    add('gridConfig', 'gridConfig must be an object', grid)
+  } else {
+    if (!isLength(grid.size) || grid.size <= 0) {
+      add('gridConfig.size', 'size must be a number greater than 0', grid.size)
+    }
+    for (const flag of ['enabled', 'visible']) {
+      if (typeof grid[flag] !== 'boolean') {
+        add(`gridConfig.${flag}`, `${flag} must be true or false`, grid[flag])
+      }
+    }
+  }
+
+  const shapes = Array.isArray(layout.shapes) ? layout.shapes : null
+  const groups = Array.isArray(layout.groups) ? layout.groups : null
+  if (!shapes) add('shapes', 'shapes must be a list', layout.shapes)
+  if (!groups) add('groups', 'groups must be a list', layout.groups)
+
+  // Bins and shapes share one set of ids: the canvas looks both up by id.
+  const seen = new Set<string>()
+  const checkId = (field: string, id: unknown): id is string => {
+    if (typeof id !== 'string' || id === '') {
+      add(`${field}.id`, 'id must be text and not empty', id)
+      return false
+    }
+    if (seen.has(id)) add(`${field}.id`, `Duplicate id: ${id}`, id)
+    seen.add(id)
+    return true
+  }
+  const checkNumbers = (field: string, item: Record<string, unknown>, names: string[]): void => {
+    for (const name of names) {
+      if (!isLength(item[name])) add(`${field}.${name}`, `${name} must be a number`, item[name])
+    }
+  }
+
+  const groupIds = new Set<string>()
+  groups?.forEach((group, i) => {
+    const field = `groups[${i}]`
+    if (!isRecord(group)) return add(field, 'A group must be an object', group)
+    if (checkId(field, group.id)) groupIds.add(group.id)
+    checkNumbers(field, group, ['x', 'y', 'width', 'height', 'rotation'])
+    if (!Array.isArray(group.childIds) || group.childIds.some((id) => typeof id !== 'string')) {
+      add(`${field}.childIds`, 'childIds must be a list of ids', group.childIds)
+    }
+    if (!isRecord(group.style)) add(`${field}.style`, 'style must be an object', group.style)
+    if (group.metadata !== undefined && !isRecord(group.metadata)) {
+      add(`${field}.metadata`, 'metadata must be an object', group.metadata)
+    }
+  })
+
+  shapes?.forEach((shape, i) => {
+    const field = `shapes[${i}]`
+    if (!isRecord(shape)) return add(field, 'A shape must be an object', shape)
+    checkId(field, shape.id)
+    checkNumbers(field, shape, ['x', 'y', 'rotation', 'strokeWidth'])
+    for (const name of ['fill', 'stroke']) {
+      if (typeof shape[name] !== 'string')
+        add(`${field}.${name}`, `${name} must be text`, shape[name])
+    }
+    if (shape.metadata !== undefined && !isRecord(shape.metadata)) {
+      add(`${field}.metadata`, 'metadata must be an object', shape.metadata)
+    }
+
+    const fields = typeof shape.type === 'string' ? SHAPE_FIELDS[shape.type] : undefined
+    if (!fields || !Object.hasOwn(SHAPE_FIELDS, shape.type as string)) {
+      add(
+        `${field}.type`,
+        `type must be one of: ${Object.keys(SHAPE_FIELDS).join(', ')}`,
+        shape.type
+      )
+    } else {
+      checkNumbers(field, shape, fields.numbers ?? [])
+      for (const name of fields.text ?? []) {
+        if (typeof shape[name] !== 'string')
+          add(`${field}.${name}`, `${name} must be text`, shape[name])
+      }
+      if (shape.type === 'polygon') {
+        const points = shape.points
+        const valid =
+          Array.isArray(points) &&
+          points.every((point) => isRecord(point) && isLength(point.x) && isLength(point.y))
+        if (!valid) add(`${field}.points`, 'points must be a list of { x, y } numbers', points)
+      }
+    }
+
+    if (shape.groupId !== null && typeof shape.groupId !== 'string') {
+      add(`${field}.groupId`, 'groupId must be an id or null', shape.groupId)
+    } else if (shape.groupId !== null && groups && !groupIds.has(shape.groupId)) {
+      add(`${field}.groupId`, `groupId points at a bin that does not exist: ${shape.groupId}`)
+    }
+  })
+
+  const extra = errors.length - MAX_LAYOUT_ERRORS
+  all.push(...errors.slice(0, MAX_LAYOUT_ERRORS))
+  if (extra > 0) all.push({ field: 'layoutSnapshot', message: `and ${extra} more problems` })
+}
+
+/**
+ * Make each bin's `childIds` list the shapes that say they are in it. A shape's `groupId`
+ * is what the canvas goes by, so a list that has drifted from it is put right, not refused.
+ * A bin keeps the order it had, with shapes it did not list added at the end.
+ */
+export function repairLayout(layout: LayoutSnapshotData): LayoutSnapshotData {
+  const members = new Map<string, string[]>()
+  for (const shape of layout.shapes) {
+    if (shape.groupId === null) continue
+    members.set(shape.groupId, [...(members.get(shape.groupId) ?? []), shape.id])
+  }
+  let changed = false
+  const groups = layout.groups.map((group) => {
+    const mine = members.get(group.id) ?? []
+    const kept = group.childIds.filter((id, i, ids) => mine.includes(id) && ids.indexOf(id) === i)
+    const childIds = [...kept, ...mine.filter((id) => !kept.includes(id))]
+    const same =
+      childIds.length === group.childIds.length &&
+      childIds.every((id, i) => id === group.childIds[i])
+    if (same) return group
+    changed = true
+    return { ...group, childIds }
+  })
+  return changed ? { ...layout, groups } : layout
+}
+
 export function validateProject(data: unknown): ValidationResult {
   return ProjectValidator.validate(data)
 }
@@ -203,11 +366,18 @@ export function validateProject(data: unknown): ValidationResult {
 /**
  * Migrate a loaded project to the current schema version.
  * Old entity/bin data is handled by migrations.ts (which converts to layoutSnapshot).
- * This function handles any remaining fixups on the canonical ProjectData shape.
+ * This function handles any remaining fixups on the canonical ProjectData shape: the
+ * version number, and bins' lists of their shapes.
  */
 export function migrateProject(project: ProjectData): ProjectData {
-  if (project.schemaVersion === CURRENT_SCHEMA_VERSION) return project
-  return { ...project, schemaVersion: CURRENT_SCHEMA_VERSION }
+  const layoutSnapshot = repairLayout(project.layoutSnapshot)
+  if (
+    project.schemaVersion === CURRENT_SCHEMA_VERSION &&
+    layoutSnapshot === project.layoutSnapshot
+  ) {
+    return project
+  }
+  return { ...project, schemaVersion: CURRENT_SCHEMA_VERSION, layoutSnapshot }
 }
 
 export function formatValidationErrors(errors: ValidationError[]): string {

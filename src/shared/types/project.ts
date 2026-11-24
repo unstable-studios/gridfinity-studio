@@ -217,7 +217,9 @@ export function createEmptyProject(name: string = 'Untitled project'): ProjectDa
       modifiedAt: now,
       units: 'mm'
     },
-    gridfinity: { ...DEFAULT_GRIDFINITY_CONFIG },
+    // A full copy: the hole settings are objects, and a project must not share them with
+    // the preset every other new project starts from.
+    gridfinity: structuredClone(DEFAULT_GRIDFINITY_CONFIG),
     layoutSnapshot: {
       version: '1.0.0',
       shapes: [],

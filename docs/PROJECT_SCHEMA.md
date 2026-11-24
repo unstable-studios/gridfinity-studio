@@ -95,7 +95,7 @@ Fields every shape has:
 | `type`                          | string                 | `"rect"`, `"circle"`, `"polygon"`, `"svgPath"` or `"meshImport"`.                                                                                              |
 | `x`, `y`                        | number                 | The shape's center, or for an `svgPath` the path's origin. For a shape in a bin, measured **from the center of the bin**. Otherwise, a position on the canvas. |
 | `rotation`                      | number                 | Degrees, clockwise as seen on screen, about the shape's center.                                                                                                |
-| `groupId`                       | string or null         | The bin the shape is in. The app keeps it in step with that bin's `childIds`. When a file is opened the shape goes where its `groupId` says.                   |
+| `groupId`                       | string or null         | The bin the shape is in, or null. It must be a bin in the file. A bin's `childIds` follows from it.                                                            |
 | `fill`, `stroke`, `strokeWidth` | string, string, number | How the shape is drawn on the canvas.                                                                                                                          |
 | `metadata`                      | object                 | Optional. See below.                                                                                                                                           |
 | `lockAspectRatio`               | boolean                | Optional. Keeps the shape's proportions when it is resized.                                                                                                    |
@@ -198,10 +198,14 @@ The bin's lower-left corner is at (0, 0), so it covers x from 0 to 84 and y from
 - `schemaVersion`, when it has a value, is text in the form `1.2.3`.
 - `settings`: a name, two dates as text, and a known unit.
 - `gridfinity`: the four numbers, with `baseUnit`, `gridSpacing` and `unitHeight` greater than 0, and both hole settings.
+- `layoutSnapshot`: `version` is text, `gridConfig` has a size greater than 0 and its two switches, and `shapes` and `groups` are lists.
+- Every bin and shape has an id, and no id is used twice.
+- Positions, sizes and rotations are numbers. A shape has a known `type` and the fields that type needs.
+- A shape's `groupId` is null or the id of a bin in the file.
 
-A file that fails is not opened.
+A file that fails is not opened, and the notice names the first problems found.
 
-The validator does not look inside `layoutSnapshot`. Before the layout is put on the canvas, the app checks only its outline: `version` is text, `shapes` and `groups` are lists, and `gridConfig` has its three fields. If that fails, the project opens with an empty canvas.
+A bin's `childIds` is not checked against its shapes. The shapes' `groupId` decides, and each bin's list is rebuilt from them when the file is opened.
 
 ## Other versions
 
