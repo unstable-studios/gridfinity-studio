@@ -532,7 +532,7 @@ function PreviewSidebar(): React.JSX.Element {
                 status === 'ready'
                   ? { color: 'text-emerald-700 dark:text-emerald-500', label: '● Ready' }
                   : status === 'error'
-                    ? { color: 'text-red-700 dark:text-red-500', label: '⚠ Failed' }
+                    ? { color: 'text-red-700 dark:text-red-400', label: '⚠ Failed' }
                     : {
                         color: 'text-amber-700 dark:text-amber-500 animate-pulse',
                         label: '◌ Building…'
@@ -566,7 +566,7 @@ function PreviewSidebar(): React.JSX.Element {
       </SidebarSection>
 
       {anyError && (
-        <p className="text-[10px] text-red-700 dark:text-red-500">
+        <p className="text-[10px] text-red-700 dark:text-red-400">
           Couldn’t build one or more bins. Edit them in Design to try again.
         </p>
       )}
@@ -789,7 +789,7 @@ function ShapeDepthField({
         />
       )}
       {nearMax && (
-        <div className="flex items-start gap-1 text-amber-600 dark:text-amber-400 text-[10px] leading-tight">
+        <div className="flex items-start gap-1 text-amber-700 dark:text-amber-400 text-[10px] leading-tight">
           <span aria-hidden="true">⚠</span>
           <span>Leaves a thin floor. Max {maxSafe.toFixed(1)} mm.</span>
         </div>

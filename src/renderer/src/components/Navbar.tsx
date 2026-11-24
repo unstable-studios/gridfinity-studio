@@ -397,8 +397,10 @@ function UpdateMenuItems({
   actions: Record<UpdateAction, () => void>
 }): React.JSX.Element {
   const tones = {
-    good: 'text-green-600 dark:text-green-400 font-medium',
-    bad: 'text-red-500'
+    good: 'text-green-700 dark:text-green-400 font-medium',
+    // A line that only says something is disabled, and a disabled line is dimmed. This one
+    // has to be read, so it is not.
+    bad: 'text-red-700 dark:text-red-400 data-[disabled]:opacity-100'
   }
   return (
     <>
