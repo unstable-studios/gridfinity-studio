@@ -38,7 +38,8 @@ export default function Sidebar(): React.JSX.Element {
   return (
     <aside
       ref={sidebarRef}
-      className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 px-4 py-4 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 overflow-y-auto [scrollbar-gutter:stable]"
+      // The right padding is 8px less than the left: `panel-scroll` keeps 8px for the scrollbar.
+      className="absolute top-3 left-3 bottom-3 z-30 w-64 rounded-xl border border-zinc-300/60 bg-white/90 py-4 pl-4 pr-2 shadow-lg backdrop-blur-xl dark:border-zinc-700/60 dark:bg-zinc-900/90 panel-scroll"
     >
       {mode === 'layout' ? <LayoutSidebar /> : <PreviewSidebar />}
     </aside>
