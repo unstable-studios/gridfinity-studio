@@ -292,7 +292,7 @@ test('a pocket with no area leaves its bin whole, and Preview says which shape',
   expect(app.errors, 'no renderer errors').toEqual([])
 })
 
-test('the Add bin section closes once bins are drawn, and stays open once it is used', async () => {
+test('the Add bin section gets out of the way, and remembers being opened or closed', async () => {
   app = await StudioApp.launch()
   const { page } = app
   const section = page.getByRole('button', { name: 'Add bin', exact: true })
@@ -301,28 +301,36 @@ test('the Add bin section closes once bins are drawn, and stays open once it is 
   // An empty project: the size grid is there to start from.
   await page.getByRole('button', { name: 'New project' }).click()
   await expect(section).toHaveAttribute('aria-expanded', 'true')
-  await expect(size).toHaveCount(1)
 
-  // A bin drawn on the canvas: the grid was not needed, so it gets out of the way. The only
-  // size grid left is the new bin's own.
-  await app.selectTool('Bin')
-  await page.mouse.click(700, 300)
+  // Adding a bin from it keeps it there for the next one.
+  await size.first().click()
+  await app.expectBinCount(1)
+  await expect(section).toHaveAttribute('aria-expanded', 'true')
+
+  // That was not a choice. The next time the app starts on a project with bins, the grid
+  // is closed, and the only size grid is the selected bin's own.
+  await page.reload()
   await app.expectBinCount(1)
   await expect(section).toHaveAttribute('aria-expanded', 'false')
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
   await expect(size).toHaveCount(1)
 
-  // Opened and used, it stays open for the next bin.
+  // A bin drawn on the canvas leaves it closed.
+  await app.selectTool('Bin')
+  await page.mouse.click(900, 250)
+  await app.expectBinCount(2)
+  await expect(section).toHaveAttribute('aria-expanded', 'false')
+
+  // Opened by its title, it is open the next time too.
   await section.click()
   await expect(section).toHaveAttribute('aria-expanded', 'true')
-  await size.first().click()
-  await app.expectBinCount(2)
+  await page.reload()
   await expect(section).toHaveAttribute('aria-expanded', 'true')
 
-  // Closed by hand, it stays closed.
+  // And closed by its title, it stays closed.
   await section.click()
   await expect(section).toHaveAttribute('aria-expanded', 'false')
-  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
-  await page.getByRole('radio', { name: 'Design', exact: true }).click()
+  await page.reload()
   await expect(section).toHaveAttribute('aria-expanded', 'false')
 
   expect(app.errors, 'no renderer errors').toEqual([])

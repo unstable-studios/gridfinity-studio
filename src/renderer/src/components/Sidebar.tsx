@@ -14,7 +14,12 @@ import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
 import { removeItems } from '@/lib/remove-items'
 import { addBin, placeForNewBin } from '@/lib/new-bin'
-import { addBinSectionOpen, storeAddBinOpen, storedAddBinOpen } from '@/lib/add-bin-section'
+import {
+  addBinSection,
+  addBinSectionOpen,
+  chooseAddBinOpen,
+  noteAddBinUsed
+} from '@/lib/add-bin-section'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -198,18 +203,14 @@ function LayoutSidebar(): React.JSX.Element {
     [engine, selectedIds, shapes, groups]
   )
 
-  const [addBinOpen, setAddBinOpen] = useState(storedAddBinOpen)
-  const chooseAddBinOpen = (open: boolean): void => {
-    setAddBinOpen(open)
-    storeAddBinOpen(open)
-  }
+  const [addBinState, setAddBinSection] = useState(addBinSection)
 
   const handleAddBin = (widthUnits: number, depthUnits: number): void => {
     if (!engine) return
     const place = placeForNewBin(binGroups, widthUnits, depthUnits, baseUnit)
     addBin(engine, { ...place, widthUnits, depthUnits }, baseUnit)
     // Someone adding bins from the grid wants it to stay there for the next one.
-    chooseAddBinOpen(true)
+    setAddBinSection(noteAddBinUsed())
   }
 
   const handleUpdateBinMetadata = (groupId: string, patch: Partial<BinMetadata>): void => {
@@ -241,8 +242,8 @@ function LayoutSidebar(): React.JSX.Element {
       {/* Bin creation */}
       <SidebarSection
         title="Add bin"
-        open={addBinSectionOpen(addBinOpen, binGroups.length)}
-        onOpenChange={chooseAddBinOpen}
+        open={addBinSectionOpen(addBinState, binGroups.length)}
+        onOpenChange={(open) => setAddBinSection(chooseAddBinOpen(open))}
       >
         <GridPicker onChange={handleAddBin} />
       </SidebarSection>
@@ -690,7 +691,7 @@ function SidebarSection({
         type="button"
         aria-expanded={open}
         onClick={() => onOpenChange(!open)}
-        className={`${titleClass} flex w-full items-center justify-between rounded text-left outline-none hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-zinc-200 ${open ? 'mb-2' : ''}`}
+        className={`${titleClass} -my-1 flex w-full items-center justify-between rounded py-1 text-left outline-none hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-zinc-200 ${open ? 'mb-2' : ''}`}
       >
         {title}
         <Chevron className="size-3.5" aria-hidden />
