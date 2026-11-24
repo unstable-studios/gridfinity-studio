@@ -71,3 +71,7 @@ To package an installer for your platform, run `pnpm build:mac`, `pnpm build:win
 ## Contributing
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org), checked in CI: `type(scope): subject`. [CONTRIBUTING.md](CONTRIBUTING.md) has the details. Open pull requests against `main`.
+
+## License
+
+[MIT](LICENSE)
