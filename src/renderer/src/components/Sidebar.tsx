@@ -236,7 +236,7 @@ function LayoutSidebar(): React.JSX.Element {
                 >
                   <span className="font-medium">{meta.name ?? group.id}</span>
                   <span className="ml-2 opacity-60">
-                    {meta.widthUnits}x{meta.depthUnits} ({meta.heightUnits}u)
+                    {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                   </span>
                 </button>
               )
@@ -418,11 +418,10 @@ function PreviewSidebar(): React.JSX.Element {
   // partial / stale / errored exports.
   const allReady = totalBins > 0 && bins.every((b) => bakeStatus.get(b.id) === 'ready')
   const anyError = bins.some((b) => bakeStatus.get(b.id) === 'error')
-  const totalWarnings = useMemo(() => {
-    let n = 0
-    for (const r of bakeResults.values()) n += r.warnings.length
-    return n
-  }, [bakeResults])
+  const warnings = useMemo(
+    () => [...bakeResults.values()].flatMap((r) => r.warnings),
+    [bakeResults]
+  )
 
   const handleExportSTL = async (): Promise<void> => {
     const placements = placementsFromGroups(bins)
@@ -483,10 +482,12 @@ function PreviewSidebar(): React.JSX.Element {
         </p>
       )}
 
-      {totalWarnings > 0 && (
-        <p className="text-[10px] text-amber-500">
-          {totalWarnings} warning{totalWarnings === 1 ? '' : 's'} — see console
-        </p>
+      {warnings.length > 0 && (
+        <ul className="space-y-0.5 text-[10px] text-amber-500">
+          {warnings.map((warning, i) => (
+            <li key={i}>{warning}</li>
+          ))}
+        </ul>
       )}
 
       <SidebarSection title="Export">

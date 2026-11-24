@@ -30,7 +30,7 @@ test('align pockets to each other and center one in its bin', async () => {
   // Calibrate world→screen from a rectangle drawn on empty canvas.
   const looseFrom = { x: 820, y: 180 }
   const looseTo = { x: 880, y: 230 }
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(looseFrom, looseTo)
   await app.expectShapeCount(1)
   let saved = await app.save(file)
@@ -46,7 +46,7 @@ test('align pockets to each other and center one in its bin', async () => {
   // Pocket A, in the upper left of the bin. Drawing leaves it selected.
   const aFrom = inBin(0.15, 0.2)
   const aTo = inBin(0.35, 0.3)
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(aFrom, aTo)
   await app.expectShapeCount(2)
   saved = await app.save(file)
@@ -76,7 +76,7 @@ test('align pockets to each other and center one in its bin', async () => {
   // Pocket B, lower right and a different size. Then select both.
   const bFrom = inBin(0.6, 0.65)
   const bTo = inBin(0.9, 0.85)
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(bFrom, bTo)
   await app.expectShapeCount(3)
   // Where a pocket is on screen: its saved position is relative to the
@@ -157,7 +157,7 @@ test('distribute three shapes with equal gaps', async () => {
     [710, 770],
     [900, 930]
   ]) {
-    await app.selectTool('Rect')
+    await app.selectTool('Rectangle')
     await app.drag({ x: from, y: 200 }, { x: to, y: 240 })
   }
   await app.expectShapeCount(3)

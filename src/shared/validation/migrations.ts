@@ -67,7 +67,7 @@ function migrateV040toV050(project: RawProject): MigrationResult {
     if (shapes.length > 0) {
       return {
         project: { ...project, schemaVersion: '0.5.0' },
-        warnings: ['Project already has layoutSnapshot — preserved existing data']
+        warnings: ['Project already has layoutSnapshot. Existing data was kept.']
       }
     }
   }

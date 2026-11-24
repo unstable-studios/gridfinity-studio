@@ -123,7 +123,7 @@ function GridfinityTab(): React.JSX.Element {
   if (!project) {
     return (
       <p className="text-sm text-muted-foreground">
-        Open a project to configure Gridfinity settings.
+        Open a project to change its Gridfinity settings.
       </p>
     )
   }
@@ -197,14 +197,14 @@ function ColorsTab(): React.JSX.Element {
   return (
     <div className="space-y-5">
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        Canvas colors for each theme mode. Refresh to apply.
+        Canvas colors for each theme. Restart the app to apply.
       </p>
       <div className="grid grid-cols-2 gap-6">
         <ColorSection mode="dark" colors={config.dark} onUpdate={updateColor} />
         <ColorSection mode="light" colors={config.light} onUpdate={updateColor} />
       </div>
       <Button variant="outline" size="sm" onClick={resetToDefaults}>
-        Reset to Defaults
+        Reset to defaults
       </Button>
     </div>
   )

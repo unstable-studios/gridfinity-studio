@@ -10,8 +10,10 @@ export default function HintCard(): React.JSX.Element {
       <p className="text-zinc-700 dark:text-zinc-300">{hint.text}</p>
       {hint.shortcuts && hint.shortcuts.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-zinc-500 dark:text-zinc-500">
-          {hint.shortcuts.map((s) => (
-            <span key={s}>{s}</span>
+          {hint.shortcuts.map(({ keys, does }) => (
+            <span key={keys}>
+              <span className="font-medium text-zinc-600 dark:text-zinc-400">{keys}</span> {does}
+            </span>
           ))}
         </div>
       )}

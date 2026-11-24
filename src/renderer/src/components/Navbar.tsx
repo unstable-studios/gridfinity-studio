@@ -47,7 +47,7 @@ function useWindowTitle(): void {
 
   useEffect(() => {
     const suffix = isModified ? ' *' : ''
-    document.title = `Gridfinity Studio — ${projectName}${suffix}`
+    document.title = `${projectName}${suffix} - Gridfinity Studio`
   }, [projectName, isModified])
 }
 
@@ -322,8 +322,8 @@ function ToolBar() {
 
   const tools = [
     { id: 'select' as const, label: 'Select', icon: MousePointerIcon },
-    { id: 'rectangle' as const, label: 'Rect', icon: SquareIcon },
-    { id: 'circle' as const, label: 'Circle', icon: CircleIcon },
+    { id: 'rectangle' as const, label: 'Rectangle', icon: SquareIcon },
+    { id: 'circle' as const, label: 'Ellipse', icon: CircleIcon },
     { id: 'polygon' as const, label: 'Polygon', icon: PentagonIcon }
   ]
 

@@ -50,7 +50,7 @@ export async function exportSTL(
   const result = await dialog.showSaveDialog(win, {
     title: 'Export STL',
     defaultPath: exportFileName(suggestedName, 'stl'),
-    filters: [{ name: 'STL Files', extensions: ['stl'] }]
+    filters: [{ name: 'STL files', extensions: ['stl'] }]
   })
 
   if (result.canceled || !result.filePath) {
@@ -79,7 +79,7 @@ export async function export3MF(
   const result = await dialog.showSaveDialog(win, {
     title: 'Export 3MF',
     defaultPath: exportFileName(suggestedName, '3mf'),
-    filters: [{ name: '3MF Files', extensions: ['3mf'] }]
+    filters: [{ name: '3MF files', extensions: ['3mf'] }]
   })
 
   if (result.canceled || !result.filePath) {

@@ -117,9 +117,9 @@ export async function saveProject(
         title: 'Save project',
         defaultPath: suggestedPath ?? `${projectData.settings.name}.gfstudio`,
         filters: [
-          { name: 'Gridfinity Studio Project', extensions: ['gfstudio'] },
-          { name: 'JSON Files', extensions: ['json'] },
-          { name: 'All Files', extensions: ['*'] }
+          { name: 'Gridfinity Studio project', extensions: ['gfstudio'] },
+          { name: 'JSON files', extensions: ['json'] },
+          { name: 'All files', extensions: ['*'] }
         ]
       })
 
@@ -169,9 +169,9 @@ export async function loadProject(
       const result = await dialog.showOpenDialog({
         title: 'Open project',
         filters: [
-          { name: 'Gridfinity Studio Project', extensions: ['gfstudio'] },
-          { name: 'JSON Files', extensions: ['json'] },
-          { name: 'All Files', extensions: ['*'] }
+          { name: 'Gridfinity Studio project', extensions: ['gfstudio'] },
+          { name: 'JSON files', extensions: ['json'] },
+          { name: 'All files', extensions: ['*'] }
         ],
         properties: ['openFile']
       })
