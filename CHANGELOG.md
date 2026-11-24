@@ -1,5 +1,21 @@
 # Changelog
 
+## [1.14.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.13.0...v1.14.0) (2026-11-24)
+
+
+### Features
+
+* **ui:** add a right-click menu for bins and shapes ([#472](https://github.com/unstable-studios/gridfinity-studio/issues/472)) ([4d056ee](https://github.com/unstable-studios/gridfinity-studio/commit/4d056eef69c85a51736d1b35809ab3f25f7a7e3e))
+* **ui:** cut, copy and paste bins and shapes ([#470](https://github.com/unstable-studios/gridfinity-studio/issues/470)) ([0db748d](https://github.com/unstable-studios/gridfinity-studio/commit/0db748d8de35b3603e627fc2f71b99ac8c71b6b5))
+* **ui:** rename bins and shapes ([#468](https://github.com/unstable-studios/gridfinity-studio/issues/468)) ([4920a8b](https://github.com/unstable-studios/gridfinity-studio/commit/4920a8b57ca4a9c2fbb9fa6c804bc5a8a2771bf1))
+* **ui:** select several rows in the sidebar with shift and cmd ([#467](https://github.com/unstable-studios/gridfinity-studio/issues/467)) ([9f1ee92](https://github.com/unstable-studios/gridfinity-studio/commit/9f1ee92145aa67dcbfe83a4b10ed78e015c120a2))
+
+
+### Bug Fixes
+
+* **core:** ask before closing with unsaved work ([#471](https://github.com/unstable-studios/gridfinity-studio/issues/471)) ([d237d4f](https://github.com/unstable-studios/gridfinity-studio/commit/d237d4f2ec9453383889bd59c33447ff3baea538))
+* **ui:** give the sidebar a slim scrollbar with even margins ([#473](https://github.com/unstable-studios/gridfinity-studio/issues/473)) ([f11ce20](https://github.com/unstable-studios/gridfinity-studio/commit/f11ce20831788afbde83320df225fac28d63aa79))
+
 ## [1.13.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.12.1...v1.13.0) (2026-11-24)
 
 
