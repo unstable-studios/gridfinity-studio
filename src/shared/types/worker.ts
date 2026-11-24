@@ -17,6 +17,11 @@ export interface MeshDataWithNormals extends MeshData {
   colors: Float32Array
 }
 
+/** A baked bin. `solidVertices` names the vertex of the closed solid each vertex came from. */
+export interface BakedMesh extends MeshDataWithNormals {
+  solidVertices: Uint32Array
+}
+
 // ─── Request types ────────────────────────────────────────────────
 
 export interface PocketSpec {
@@ -86,6 +91,6 @@ export type WorkerResponse =
       type: 'bake-pockets'
       id: string
       warnings: string[]
-    } & MeshDataWithNormals)
+    } & BakedMesh)
   | { type: 'error'; id?: string; error: string }
   | { type: 'progress'; id: string; stage: string; percent: number }

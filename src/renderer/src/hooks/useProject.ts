@@ -18,7 +18,7 @@ import type {
   GridfinityConfig,
   LayoutSnapshotData
 } from '../../../shared/types/project'
-import type { MeshDataWithNormals } from '../../../shared/types/worker'
+import type { BakedMesh } from '../../../shared/types/worker'
 import { downloadBlob } from '../lib/download-blob'
 import { fileName } from '../lib/file-errors'
 import {
@@ -29,7 +29,7 @@ import {
 } from '../lib/project-notices'
 
 export interface BakeResult {
-  mesh: MeshDataWithNormals
+  mesh: BakedMesh
   timestamp: number
   warnings: string[]
 }

@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three'
 import { exportSTL as exportSTLBlob } from './stl-io'
-import { export3MF as export3MFBlob } from './threemf-writer'
+import { export3MF as export3MFBlob, SOLID_VERTEX } from './threemf-writer'
 import type { BakeResult } from '@/hooks/useProject'
 
 /**
@@ -42,10 +42,12 @@ export function combineBakedMeshes(
   const positionsList: Float32Array[] = []
   const normalsList: Float32Array[] = []
   const indicesList: Uint32Array[] = []
+  const solidVerticesList: Uint32Array[] = []
   let vertexOffset = 0
+  let solidVertexOffset = 0
 
   for (const [binId, result] of entries) {
-    const { positions, normals, indices } = result.mesh
+    const { positions, normals, indices, solidVertices } = result.mesh
     const place = placements?.get(binId)
     const dx = place?.cx ?? 0
     // Editor +y is screen-down; in the 3D scene we map that to +Z (away).
@@ -72,6 +74,16 @@ export function combineBakedMeshes(
     }
     indicesList.push(reindexed)
 
+    // Each bin is its own solid, so its vertices are numbered after the previous bin's.
+    const renumbered = new Uint32Array(solidVertices.length)
+    let highest = -1
+    for (let i = 0; i < solidVertices.length; i++) {
+      renumbered[i] = solidVertices[i] + solidVertexOffset
+      if (solidVertices[i] > highest) highest = solidVertices[i]
+    }
+    solidVerticesList.push(renumbered)
+    solidVertexOffset += highest + 1
+
     vertexOffset += positions.length / 3
   }
 
@@ -81,12 +93,14 @@ export function combineBakedMeshes(
   const positions = new Float32Array(totalPositions)
   const normals = new Float32Array(totalPositions)
   const indices = new Uint32Array(totalIndices)
+  const solidVertices = new Uint32Array(totalPositions / 3)
 
   let pOff = 0
   let iOff = 0
   for (let i = 0; i < positionsList.length; i++) {
     positions.set(positionsList[i], pOff)
     normals.set(normalsList[i], pOff)
+    solidVertices.set(solidVerticesList[i], pOff / 3)
     pOff += positionsList[i].length
     indices.set(indicesList[i], iOff)
     iOff += indicesList[i].length
@@ -95,6 +109,7 @@ export function combineBakedMeshes(
   const geo = new THREE.BufferGeometry()
   geo.setAttribute('position', new THREE.BufferAttribute(positions, 3))
   geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+  geo.setAttribute(SOLID_VERTEX, new THREE.BufferAttribute(solidVertices, 1))
   geo.setIndex(new THREE.BufferAttribute(indices, 1))
   return geo
 }

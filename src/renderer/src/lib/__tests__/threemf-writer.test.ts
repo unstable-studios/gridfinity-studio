@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import JSZip from 'jszip'
 import * as THREE from 'three'
-import { export3MF } from '../threemf-writer'
+import { export3MF, SOLID_VERTEX } from '../threemf-writer'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -33,6 +33,13 @@ function makeGeometry(positions: number[]): THREE.BufferGeometry {
 
 // A single triangle in the XY plane
 const singleTrianglePositions = [0, 0, 0, 1, 0, 0, 0, 1, 0]
+
+/** The same, with each vertex numbered by the vertex of the solid it belongs to. */
+function makeSolidGeometry(positions: number[], solidVertices: number[]): THREE.BufferGeometry {
+  const geo = makeGeometry(positions)
+  geo.setAttribute(SOLID_VERTEX, new THREE.BufferAttribute(new Uint32Array(solidVertices), 1))
+  return geo
+}
 
 // ─── ZIP structure ────────────────────────────────────────────────────────────
 
@@ -185,6 +192,39 @@ describe('export3MF — vertex and triangle counts', () => {
 
     expect(xml).toContain('v1="0" v2="1" v3="2"')
     expect(xml).toContain('v1="3" v2="4" v3="5"')
+  })
+})
+
+// ─── Solid vertex numbers ─────────────────────────────────────────────────────
+
+describe('export3MF — solid vertex numbers', () => {
+  // Two triangles that meet along the edge from (1,0,0) to (0,1,0)
+  const twoTriangles = [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0]
+
+  it('joins vertices with the same number', async () => {
+    const zip = await unzip(await export3MF(makeSolidGeometry(twoTriangles, [0, 1, 2, 1, 3, 2])))
+    const model = await readEntry(zip, '3D/3dmodel.model')
+
+    expect(countOccurrences(model, '<vertex ')).toBe(4)
+    expect(countOccurrences(model, '<triangle ')).toBe(2)
+  })
+
+  it('keeps vertices at one position apart when their numbers differ', async () => {
+    const zip = await unzip(await export3MF(makeSolidGeometry(twoTriangles, [0, 1, 2, 3, 4, 5])))
+    const model = await readEntry(zip, '3D/3dmodel.model')
+
+    expect(countOccurrences(model, '<vertex ')).toBe(6)
+    expect(countOccurrences(model, '<triangle ')).toBe(2)
+  })
+
+  it('closes an edge with no length and drops its triangle', async () => {
+    // The second triangle has vertices 1 and 3 at the same position.
+    const positions = [0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0, 0, 1, 0]
+    const zip = await unzip(await export3MF(makeSolidGeometry(positions, [0, 1, 2, 1, 3, 2])))
+    const model = await readEntry(zip, '3D/3dmodel.model')
+
+    expect(countOccurrences(model, '<vertex ')).toBe(3)
+    expect(countOccurrences(model, '<triangle ')).toBe(1)
   })
 })
 

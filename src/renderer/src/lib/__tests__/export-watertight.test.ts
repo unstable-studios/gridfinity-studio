@@ -173,6 +173,41 @@ describe('3MF export of a baked bin', () => {
     expect(shells(mesh)).toBe(2)
   })
 
+  it('stays closed when two square pockets share a corner', async () => {
+    const square = new Float32Array([-5, -5, 5, -5, 5, 5, -5, 5])
+    const pocket = { vertices: square, depth: 8, clearance: 0, zTop: 21 }
+    const params = binParams({
+      magnetHoles: { enabled: false, diameter: 6.5, depth: 2.4 },
+      pockets: [
+        { ...pocket, posX: -5, posY: -5 },
+        { ...pocket, posX: 5, posY: 5 }
+      ]
+    })
+    const buffer = await build3MFArrayBuffer(new Map([['a', bake(params)]]), 'bin')
+    const mesh = await readMesh(buffer!)
+
+    expect(openEdges(mesh)).toBe(0)
+    expect(shells(mesh)).toBe(1)
+  })
+
+  it('stays closed when two round pockets touch at one point', async () => {
+    const circle = { type: 'circle', radiusX: 8, radiusY: 8 } as LayoutShape
+    const vertices = shapeToPocketVertices(circle)!
+    const pocket = { vertices, depth: 8, clearance: 0, posY: 0, zTop: 21 }
+    const params = binParams({
+      magnetHoles: { enabled: false, diameter: 6.5, depth: 2.4 },
+      pockets: [
+        { ...pocket, posX: -8 },
+        { ...pocket, posX: 8 }
+      ]
+    })
+    const buffer = await build3MFArrayBuffer(new Map([['a', bake(params)]]), 'bin')
+    const mesh = await readMesh(buffer!)
+
+    expect(openEdges(mesh)).toBe(0)
+    expect(shells(mesh)).toBe(1)
+  })
+
   it('cuts a round pocket to within the curve tolerance', async () => {
     const radius = 15
     const clearance = 0.25

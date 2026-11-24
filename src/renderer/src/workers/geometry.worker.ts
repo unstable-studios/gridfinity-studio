@@ -260,10 +260,16 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
           positions: csgResult.positions,
           indices: csgResult.indices,
           normals: csgResult.normals,
+          solidVertices: csgResult.solidVertices,
           colors
         }
         ctx.postMessage(response, {
-          transfer: [csgResult.positions.buffer, csgResult.indices.buffer, csgResult.normals.buffer]
+          transfer: [
+            csgResult.positions.buffer,
+            csgResult.indices.buffer,
+            csgResult.normals.buffer,
+            csgResult.solidVertices.buffer
+          ]
         })
       } catch (err) {
         console.error('[worker] Bake-pockets failed:', err)

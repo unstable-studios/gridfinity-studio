@@ -63,6 +63,11 @@ export interface CSGMeshResult {
   positions: Float32Array
   indices: Uint32Array
   normals: Float32Array
+  /**
+   * For each vertex, the vertex of the Manifold solid it was split from. Vertices are split
+   * for shading, so this is the only record of which triangles the solid joins.
+   */
+  solidVertices: Uint32Array
 }
 
 // ─── Manifold type aliases (avoid importing manifold-3d types) ───
@@ -406,11 +411,9 @@ const CREASE_ANGLE_DEG = 30
  *
  * Output is a non-indexed mesh (3 unique vertices per triangle) since
  * a single vertex position may need different normals for different faces.
+ * `solidVertices` keeps the input index of each output vertex.
  */
-function computeCreaseNormals(
-  positions: Float32Array,
-  indices: Uint32Array
-): { positions: Float32Array; indices: Uint32Array; normals: Float32Array } {
+function computeCreaseNormals(positions: Float32Array, indices: Uint32Array): CSGMeshResult {
   const triCount = indices.length / 3
   const cosThreshold = Math.cos((CREASE_ANGLE_DEG * Math.PI) / 180)
 
@@ -460,6 +463,7 @@ function computeCreaseNormals(
   const outPos = new Float32Array(outVerts * 3)
   const outNorm = new Float32Array(outVerts * 3)
   const outIdx = new Uint32Array(outVerts)
+  const solidVertices = new Uint32Array(outVerts)
 
   for (let f = 0; f < triCount; f++) {
     const fnx = faceNormals[f * 3]
@@ -502,10 +506,11 @@ function computeCreaseNormals(
       outNorm[outI * 3 + 2] = nz
 
       outIdx[outI] = outI
+      solidVertices[outI] = srcIdx
     }
   }
 
-  return { positions: outPos, indices: outIdx, normals: outNorm }
+  return { positions: outPos, indices: outIdx, normals: outNorm, solidVertices }
 }
 
 // ─── Main Entry Point ────────────────────────────────────────────
@@ -513,7 +518,8 @@ function computeCreaseNormals(
 /**
  * Build a complete Gridfinity bin as a manifold-valid CSG solid.
  *
- * Returns positions/indices/normals ready for Three.js BufferGeometry.
+ * Returns positions/indices/normals ready for Three.js BufferGeometry, and the solid's own
+ * vertex for each of them so an export can stay closed.
  * Normals use crease-angle splitting: flat surfaces get hard edges,
  * rounded corners get smooth shading.
  */

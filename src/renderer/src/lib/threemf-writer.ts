@@ -1,16 +1,25 @@
 /**
  * 3MF export utility.
  *
- * Writes a 3MF package from a Three.js BufferGeometry. Corners at the same
- * position are written as one vertex, so triangles that touch share vertex
- * indices. A slicer joins triangles by index: without shared vertices it reads
- * every triangle as a separate open surface.
+ * Writes a 3MF package from a Three.js BufferGeometry. A slicer joins triangles
+ * by vertex index: without shared vertices it reads every triangle as a separate
+ * open surface.
+ *
+ * Geometry that carries a `SOLID_VERTEX` attribute says which corners are the
+ * same vertex of the solid, and is written that way. Two walls that only touch
+ * stay separate. Other geometry has its corners joined by position.
  *
  * Spec: https://github.com/3MFConsortium/spec_core/blob/master/3MF%20Core%20Specification.md
  */
 
 import JSZip from 'jszip'
 import * as THREE from 'three'
+
+/**
+ * Name of the attribute that numbers each vertex by the vertex of the closed solid it belongs
+ * to. Vertices with the same number are written as one.
+ */
+export const SOLID_VERTEX = 'solidVertex'
 
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
@@ -44,7 +53,8 @@ function buildModelXml(geometry: THREE.BufferGeometry, name: string): string {
 </model>`
   }
 
-  const { vertexLines, triangleLines } = weld(posAttr, geometry.index)
+  const solidAttr = geometry.getAttribute(SOLID_VERTEX) as THREE.BufferAttribute | undefined
+  const { vertexLines, triangleLines } = weld(posAttr, geometry.index, solidAttr)
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <model unit="millimeter" xmlns="http://schemas.microsoft.com/3dmanufacturing/core/2015/02">
@@ -67,26 +77,67 @@ ${triangleLines.join('\n')}
 }
 
 /**
- * Merge corners that share a position and list each triangle by merged vertex.
+ * Merge corners that are the same vertex and list each triangle by merged vertex.
  * Geometry arrives with corners split for shading, or with no index at all.
- * A triangle that collapses to a line or point is left out.
+ *
+ * Without `solidAttr`, corners are the same vertex when they share a position.
+ * With it, they are the same vertex when it gives them the same number. Two numbers are also
+ * joined where one triangle has both at the same position: that edge has no length, and
+ * closing it removes the triangle. Manifold leaves a few of these, at the lip of a bin.
+ *
+ * A triangle that names a vertex twice is left out.
  */
 function weld(
   posAttr: THREE.BufferAttribute,
-  index: THREE.BufferAttribute | null
+  index: THREE.BufferAttribute | null,
+  solidAttr: THREE.BufferAttribute | undefined
 ): { vertexLines: string[]; triangleLines: string[] } {
   const vertexLines: string[] = []
   const triangleLines: string[] = []
-  const written = new Map<string, number>()
+  const written = new Map<string | number, number>()
   const cornerCount = index ? index.count : posAttr.count
+  const source = (corner: number): number => (index ? index.getX(corner) : corner)
+  const lineAt = (i: number): string =>
+    `          <vertex x="${fmt(posAttr.getX(i))}" y="${fmt(posAttr.getY(i))}" z="${fmt(posAttr.getZ(i))}" />`
+
+  // Solid vertex numbers that were joined, each pointing at the one that stands for it.
+  const joined = new Map<number, number>()
+  const standsFor = (solid: number): number => {
+    let root = solid
+    for (let next = joined.get(root); next !== undefined; next = joined.get(root)) root = next
+    // Point everything on the way at the root, so a long run of joins stays fast.
+    for (let at = solid; at !== root;) {
+      const next = joined.get(at)!
+      joined.set(at, root)
+      at = next
+    }
+    return root
+  }
+  if (solidAttr) {
+    for (let corner = 0; corner + 2 < cornerCount; corner += 3) {
+      const corners = [source(corner), source(corner + 1), source(corner + 2)]
+      const lines = corners.map(lineAt)
+      for (const [a, b] of [
+        [0, 1],
+        [1, 2],
+        [2, 0]
+      ]) {
+        if (lines[a] !== lines[b]) continue
+        const rootA = standsFor(solidAttr.getX(corners[a]))
+        const rootB = standsFor(solidAttr.getX(corners[b]))
+        if (rootA !== rootB) joined.set(rootB, rootA)
+      }
+    }
+  }
 
   const vertexAt = (corner: number): number => {
-    const i = index ? index.getX(corner) : corner
-    const line = `          <vertex x="${fmt(posAttr.getX(i))}" y="${fmt(posAttr.getY(i))}" z="${fmt(posAttr.getZ(i))}" />`
-    let vertex = written.get(line)
+    const i = source(corner)
+    const line = lineAt(i)
+    const key = solidAttr ? standsFor(solidAttr.getX(i)) : line
+    let vertex = written.get(key)
     if (vertex === undefined) {
       vertex = vertexLines.length
-      written.set(line, vertex)
+      written.set(key, vertex)
       vertexLines.push(line)
     }
     return vertex
