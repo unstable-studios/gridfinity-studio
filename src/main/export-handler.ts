@@ -25,13 +25,42 @@ export interface BatchExportResult {
   directory?: string
 }
 
+/** Names Windows keeps for devices. A file can't have one, with or without an extension. */
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+
+/** Longest name offered, without the extension. File systems stop at 255 bytes. */
+const MAX_NAME_LENGTH = 120
+
+/**
+ * File name to offer in the save dialog. `suggestedName` comes from the renderer, so anything
+ * that could point at another folder or is not allowed in a file name is taken out.
+ */
+export function exportFileName(suggestedName: unknown, extension: string): string {
+  const given = typeof suggestedName === 'string' ? suggestedName : ''
+  const clean = (text: string): string =>
+    text
+      // Path separators, characters Windows refuses, control and invisible characters.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[<>:"/\\|?*\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[.\s]+|[.\s]+$/g, '')
+  const withoutExtension = clean(given).replace(new RegExp(`\\.${extension}$`, 'i'), '')
+  let name = clean(withoutExtension).slice(0, MAX_NAME_LENGTH).trim()
+  if (WINDOWS_RESERVED_NAME.test(name)) name = `${name} export`
+  return `${name || 'gridfinity-bin'}.${extension}`
+}
+
 /**
  * Export STL binary data to a file via native save dialog
  */
-export async function exportSTL(win: BrowserWindow, stlData: ArrayBuffer): Promise<ExportResult> {
+export async function exportSTL(
+  win: BrowserWindow,
+  stlData: ArrayBuffer,
+  suggestedName?: string
+): Promise<ExportResult> {
   const result = await dialog.showSaveDialog(win, {
     title: 'Export STL',
-    defaultPath: 'gridfinity-bin.stl',
+    defaultPath: exportFileName(suggestedName, 'stl'),
     filters: [{ name: 'STL Files', extensions: ['stl'] }]
   })
 
@@ -53,10 +82,14 @@ export async function exportSTL(win: BrowserWindow, stlData: ArrayBuffer): Promi
 /**
  * Export a single 3MF file via native save dialog
  */
-export async function export3MF(win: BrowserWindow, data: ArrayBuffer): Promise<ExportResult> {
+export async function export3MF(
+  win: BrowserWindow,
+  data: ArrayBuffer,
+  suggestedName?: string
+): Promise<ExportResult> {
   const result = await dialog.showSaveDialog(win, {
     title: 'Export 3MF',
-    defaultPath: 'gridfinity-bin.3mf',
+    defaultPath: exportFileName(suggestedName, '3mf'),
     filters: [{ name: '3MF Files', extensions: ['3mf'] }]
   })
 

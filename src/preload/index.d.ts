@@ -22,8 +22,8 @@ interface ProjectAPI {
 }
 
 interface ExportAPI {
-  stl: (stlData: ArrayBuffer) => Promise<OperationResult<string>>
-  threemf: (data: ArrayBuffer) => Promise<OperationResult<string>>
+  stl: (stlData: ArrayBuffer, suggestedName?: string) => Promise<OperationResult<string>>
+  threemf: (data: ArrayBuffer, suggestedName?: string) => Promise<OperationResult<string>>
   batch: (files: Array<{ filename: string; data: ArrayBuffer }>) => Promise<{
     success: boolean
     error?: string

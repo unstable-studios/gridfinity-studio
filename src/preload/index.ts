@@ -14,8 +14,10 @@ const api = {
     getRecent: () => ipcRenderer.invoke('project:get-recent')
   },
   export: {
-    stl: (stlData: ArrayBuffer) => ipcRenderer.invoke('export:stl', stlData),
-    threemf: (data: ArrayBuffer) => ipcRenderer.invoke('export:3mf', data),
+    stl: (stlData: ArrayBuffer, suggestedName?: string) =>
+      ipcRenderer.invoke('export:stl', stlData, suggestedName),
+    threemf: (data: ArrayBuffer, suggestedName?: string) =>
+      ipcRenderer.invoke('export:3mf', data, suggestedName),
     batch: (files: Array<{ filename: string; data: ArrayBuffer }>) =>
       ipcRenderer.invoke('export:batch', files)
   },

@@ -22,6 +22,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import PreferencesModal from '@/components/settings/PreferencesModal'
 import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
+import { useProjectName } from '@/hooks/useProjectName'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
 import { MOD_KEY } from '@/lib/platform'
@@ -39,13 +40,6 @@ import {
 } from 'lucide-react'
 
 const GITHUB_REPO = 'https://github.com/unstable-studios/gridfinity-studio'
-
-function useProjectName(): string {
-  const filePath = useProject((s) => s.filePath)
-  if (!filePath) return 'Untitled project'
-  const fileName = filePath.split(/[\\/]/).pop() ?? filePath
-  return fileName.replace(/\.gfstudio$/i, '')
-}
 
 function useWindowTitle(): void {
   const projectName = useProjectName()

@@ -283,7 +283,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         return true
       }
       try {
-        const result = await window.api.export.stl(stlData)
+        const result = await window.api.export.stl(stlData, suggestedFilename)
         if (result.success) {
           if (result.data) notifyExported(fileName(result.data))
           return true
@@ -302,7 +302,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         return true
       }
       try {
-        const result = await window.api.export.threemf(data)
+        const result = await window.api.export.threemf(data, suggestedFilename)
         if (result.success) {
           if (result.data) notifyExported(fileName(result.data))
           return true

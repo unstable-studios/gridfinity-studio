@@ -102,6 +102,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   })
   expect((model.match(/<vertex /g) ?? []).length).toBeGreaterThan(100)
   expect((model.match(/<triangle /g) ?? []).length).toBeGreaterThan(100)
+  expect(await app.lastSaveDialogDefault(), 'export is named after the project').toBe('smoke.3mf')
 
   // ── Export STL: binary layout is 80-byte header, count, 50 bytes each ───
   const stlPath = join(app.dir, 'smoke.stl')
@@ -113,6 +114,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
     return count
   })
   expect(triangleCount).toBeGreaterThan(100)
+  expect(await app.lastSaveDialogDefault(), 'export is named after the project').toBe('smoke.stl')
 
   expect(app.errors, 'no renderer errors while designing and exporting').toEqual([])
 

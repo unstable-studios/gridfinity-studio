@@ -14,6 +14,7 @@ import {
 import type { PositionFrame } from '@/layout-engine/position-frame'
 import { usePositionFrame } from '@/hooks/usePositionFrame'
 import { useProject } from '@/hooks/useProject'
+import { useProjectName } from '@/hooks/useProjectName'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
   useLayoutEngine,
@@ -405,16 +406,7 @@ function PreviewSidebar(): React.JSX.Element {
   const bakeStatus = useProject((s) => s.bakeStatus)
   const exportSTL = useProject((s) => s.exportSTL)
   const export3MF = useProject((s) => s.export3MF)
-  const filePath = useProject((s) => s.filePath)
-  const projectName = useMemo(() => {
-    if (!filePath) return 'Untitled project'
-    return (
-      filePath
-        .split(/[\\/]/)
-        .pop()
-        ?.replace(/\.gfstudio$/i, '') ?? 'Untitled project'
-    )
-  }, [filePath])
+  const projectName = useProjectName()
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
@@ -525,13 +517,7 @@ function PreviewSidebar(): React.JSX.Element {
 // ─── Shared components ──────────────────────────────────────
 
 function ProjectNameHeader(): React.JSX.Element {
-  const filePath = useProject((s) => s.filePath)
-  const name = filePath
-    ? filePath
-        .split(/[\\/]/)
-        .pop()!
-        .replace(/\.gfstudio$/, '')
-    : 'Untitled project'
+  const name = useProjectName()
 
   return (
     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 mb-3 truncate">{name}</p>
