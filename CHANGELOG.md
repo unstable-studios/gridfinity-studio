@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.2...v1.17.3) (2026-11-24)
+
+
+### Build
+
+* pack only the libraries the main process loads ([#533](https://github.com/unstable-studios/gridfinity-studio/issues/533)) ([a562957](https://github.com/unstable-studios/gridfinity-studio/commit/a562957134fd60023f7f563dae437f2fbb5362ca))
+
 ## [1.17.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.1...v1.17.2) (2026-11-24)
 
 
