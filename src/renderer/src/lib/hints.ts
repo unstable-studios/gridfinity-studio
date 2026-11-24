@@ -1,5 +1,5 @@
 import type { AppMode, ActiveTool } from '@/hooks/useAppMode'
-import { ALT_KEY } from './platform'
+import { ALT_KEY, MOD_KEY } from './platform'
 
 export interface Shortcut {
   /** The keys or gesture, such as "Shift+click". */
@@ -13,9 +13,12 @@ export interface HintEntry {
   shortcuts?: Shortcut[]
 }
 
+const SNAP_SHORTCUT: Shortcut = { keys: MOD_KEY, does: 'snap to 1 mm' }
+
 const DRAG_SHORTCUTS: Shortcut[] = [
   { keys: 'Shift', does: 'square or circle' },
-  { keys: ALT_KEY, does: 'from center' }
+  { keys: ALT_KEY, does: 'from center' },
+  SNAP_SHORTCUT
 ]
 
 const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
@@ -37,10 +40,7 @@ const DESIGN_HINTS: Record<NonNullable<ActiveTool>, HintEntry> = {
   },
   polygon: {
     text: 'Click to add points. Click the first point to finish.',
-    shortcuts: [
-      { keys: 'Esc', does: 'cancel' },
-      { keys: 'Enter', does: 'finish' }
-    ]
+    shortcuts: [{ keys: 'Esc', does: 'cancel' }, { keys: 'Enter', does: 'finish' }, SNAP_SHORTCUT]
   }
 }
 

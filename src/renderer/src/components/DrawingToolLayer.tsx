@@ -59,6 +59,9 @@ function snapShapePoint(world: Point, keys: ModifierKeys): Point {
   }
 }
 
+/** Keys that change the shape being dragged: 1:1, from center, and snap. */
+const MODIFIER_KEYS = new Set(['Shift', 'Alt', 'Control', 'Meta'])
+
 /** Alt draws out from the center. Shift keeps the shape square. */
 function drawOptions(keys: ModifierKeys): DrawOptions {
   return { fromCenter: keys.altKey, square: keys.shiftKey }
@@ -175,7 +178,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
   // Refs for drag state (rect/circle) — not rendered, so ref is fine
   const dragStartRef = useRef<Point | null>(null)
-  // Where the pointer last was, so a modifier key pressed mid-drag can redraw the preview.
+  // Where the pointer last was, before any snap, so a modifier key pressed mid-drag can
+  // redraw the preview.
   const dragCurrentRef = useRef<Point | null>(null)
   // Rect/circle preview while dragging. Drawn in the overlay, never added to
   // the engine, so it cannot reach undo history, the sidebar or a saved file.
@@ -192,19 +196,21 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
     setDragPreview(null)
   }, [])
 
-  // Pressing or letting go of Alt or Shift during a drag changes the shape straight away,
+  // Pressing or letting go of a modifier key during a drag changes the shape straight away,
   // without waiting for the pointer to move.
   const isDragging = dragPreview !== null
   useEffect(() => {
     if (!isDragging) return
     const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Alt' && e.key !== 'Shift') return
+      if (!MODIFIER_KEYS.has(e.key)) return
       const start = dragStartRef.current
-      const current = dragCurrentRef.current
-      if (!start || !current) return
+      const pointer = dragCurrentRef.current
+      if (!start || !pointer) return
       // Alt on its own would otherwise move focus to the window menu on Windows and Linux.
       if (e.key === 'Alt') e.preventDefault()
-      setDragPreview({ start, current, options: drawOptions(e) })
+      // A held key repeats its keydown. Nothing has changed since the first one.
+      if (e.repeat) return
+      setDragPreview({ start, current: snapShapePoint(pointer, e), options: drawOptions(e) })
     }
     window.addEventListener('keydown', onKey)
     window.addEventListener('keyup', onKey)
@@ -312,7 +318,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
       if (activeTool === 'rectangle' || activeTool === 'circle') {
         dragStartRef.current = snapped
-        dragCurrentRef.current = snapped
+        dragCurrentRef.current = world
         setDragPreview({ start: snapped, current: snapped, options: drawOptions(e) })
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
       } else if (activeTool === 'polygon') {
@@ -350,9 +356,12 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
 
       if ((activeTool === 'rectangle' || activeTool === 'circle') && dragStartRef.current) {
-        const current = snapShapePoint(world, e)
-        dragCurrentRef.current = current
-        setDragPreview({ start: dragStartRef.current, current, options: drawOptions(e) })
+        dragCurrentRef.current = world
+        setDragPreview({
+          start: dragStartRef.current,
+          current: snapShapePoint(world, e),
+          options: drawOptions(e)
+        })
       } else if (activeTool === 'polygon') {
         const snapped = snapShapePoint(world, e)
         setState((prev) => {
