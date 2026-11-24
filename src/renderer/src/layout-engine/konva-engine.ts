@@ -127,6 +127,8 @@ export class KonvaEngine implements LayoutEngine {
   private unitHeight = 7
   /** Currently highlighted group ID during shape drag (for drop-target feedback). */
   private highlightedGroupId: string | null = null
+  /** The selected shapes as they were when the handles were grabbed. */
+  private shapesAtTransformStart: string | null = null
 
   // Pan/zoom, click-select, and rubber-band now handled by GestureRecognizer (#226)
 
@@ -162,6 +164,9 @@ export class KonvaEngine implements LayoutEngine {
       padding: 2
     })
     this.mainLayer.add(this.transformer)
+    this.transformer.on('transformstart', () => {
+      this.shapesAtTransformStart = this.transformedShapesState()
+    })
     this.transformer.on('transformend', () => this.finishShapeTransform())
 
     // Visible background on grid layer (beneath grid lines)
@@ -331,6 +336,18 @@ export class KonvaEngine implements LayoutEngine {
     }
   }
 
+  /** The shapes the handles are on. A bin handles its own resize. */
+  private transformedShapeIds(): string[] {
+    return (this.transformer?.nodes() ?? [])
+      .filter((node) => node.name() === 'shape')
+      .map((node) => node.id())
+  }
+
+  /** The shapes the handles are on, as text to compare before and after a transform. */
+  private transformedShapesState(): string {
+    return JSON.stringify(this.transformedShapeIds().map((id) => this.getShape(id)))
+  }
+
   /**
    * The handles were let go after turning or resizing the selected shapes. Each shape goes
    * to the bin its center is now in, then all of them are stored and reported together, so
@@ -338,11 +355,13 @@ export class KonvaEngine implements LayoutEngine {
    */
   private finishShapeTransform(): void {
     if (this.disposed || !this.transformer) return
-    const ids = this.transformer
-      .nodes()
-      .filter((node) => node.name() === 'shape')
-      .map((node) => node.id())
+    const ids = this.transformedShapeIds()
     if (ids.length === 0) return
+
+    // A click on a handle that moved nothing is not a change.
+    const before = this.shapesAtTransformStart
+    this.shapesAtTransformStart = null
+    if (before !== null && before === this.transformedShapesState()) return
 
     this.batch(() => {
       for (const id of ids) this.foldScaleIntoSize(id)

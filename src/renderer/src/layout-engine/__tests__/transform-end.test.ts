@@ -19,6 +19,7 @@ globalThis.ResizeObserver = class ResizeObserver {
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type Konva from 'konva'
 import { KonvaEngine } from '../konva-engine'
+import { UndoRedoStack } from '../undo-redo-stack'
 import type { EngineEventMap, LayoutGroup, LayoutShape } from '../types'
 
 /** A 2×2 bin whose lower-left corner is at (0, 84): it covers x 0..84 and y 0..84. */
@@ -84,9 +85,20 @@ describe('the end of a transform', () => {
 
   const internals = (): EngineInternals => engine as unknown as EngineInternals
   const node = (id: string): Konva.Shape => internals().konvaMap.get(id)!
-  const letGo = (): void => {
-    internals().transformer.fire('transformend')
+  /** Take hold of a handle, as a press on one does. */
+  const grab = (): void => {
+    internals().transformer.fire('transformstart')
   }
+  /**
+   * Let go of the handle the way Konva does: its own end event first, then one for each
+   * node, so a bin's handler runs too.
+   */
+  const letGo = (): void => {
+    const transformer = internals().transformer as Konva.Transformer & { _transforming: boolean }
+    transformer._transforming = true
+    transformer.stopTransform()
+  }
+  const snapshot = (): string => JSON.stringify(engine.toSnapshot())
 
   beforeEach(() => {
     container = document.createElement('div')
@@ -108,6 +120,7 @@ describe('the end of a transform', () => {
   it('reports a turned polygon, so the turn can be undone and saved', () => {
     engine.addShape(makePolygon())
     engine.select(['polygon'])
+    grab()
     node('polygon').rotation(45)
     letGo()
 
@@ -118,6 +131,7 @@ describe('the end of a transform', () => {
   it('stores a resized polygon as bigger points', () => {
     engine.addShape(makePolygon())
     engine.select(['polygon'])
+    grab()
     node('polygon').scaleX(2)
     letGo()
 
@@ -129,6 +143,7 @@ describe('the end of a transform', () => {
   it('stores a resized rectangle as a new size, not a scale', () => {
     engine.addShape(makeRect('rect', 200))
     engine.select(['rect'])
+    grab()
     node('rect').scaleX(3)
     letGo()
 
@@ -142,6 +157,7 @@ describe('the end of a transform', () => {
     engine.addToGroup('rect', 'bin')
     engine.select(['rect'])
     events.length = 0
+    grab()
     // Its position is measured from the middle of the bin: this is well to the right of it.
     node('rect').x(300)
     letGo()
@@ -158,6 +174,7 @@ describe('the end of a transform', () => {
     engine.addShape(makeRect('b', 230))
     engine.select(['a', 'b'])
     events.length = 0
+    grab()
     const binsWhenReported: Array<Array<string | null>> = []
     engine.on('shapeResized', () =>
       binsWhenReported.push([engine.getShape('a')!.groupId, engine.getShape('b')!.groupId])
@@ -177,13 +194,92 @@ describe('the end of a transform', () => {
     expect(engine.getShapeBounds('a')!.maxX).toBeCloseTo(25, 6)
   })
 
-  it('leaves the shapes alone when a bin is what was resized', () => {
+  it('leaves the shapes in a bin alone when the bin is resized', () => {
     engine.addShape(makeRect('rect', 40))
     engine.addToGroup('rect', 'bin')
+    const before = engine.getShapeBounds('rect')!
     engine.select(['bin'])
     events.length = 0
+    const groupEvents: string[] = []
+    engine.on('groupResized', () => groupEvents.push('groupResized'))
+    const binNode = internals().transformer.nodes()[0]
+    binNode.fire('transformstart')
+    grab()
+    // Twice as wide: the bin's own handler turns this into a new size on the grid.
+    binNode.scaleX(2)
+    binNode.fire('transform')
     letGo()
 
-    expect(events).toEqual([])
+    expect(groupEvents).toEqual(['groupResized'])
+    expect(engine.getGroup('bin')!.width).toBe(168)
+    expect(events.filter((name) => name.startsWith('shape'))).toEqual([])
+    expect(engine.getShape('rect')!.groupId).toBe('bin')
+    expect(engine.getShapeBounds('rect')!.minX).toBeCloseTo(before.minX, 6)
+  })
+
+  it('does nothing when a handle is clicked without moving it', () => {
+    engine.addShape(makePolygon())
+    engine.addShape(makeRect('rect', 300))
+    for (const id of ['polygon', 'rect']) {
+      engine.select([id])
+      events.length = 0
+      grab()
+      letGo()
+      expect(events, id).toEqual([])
+    }
+  })
+
+  it('keeps a shape in its bin when it is only turned', () => {
+    engine.addShape(makeRect('rect', 40))
+    engine.addToGroup('rect', 'bin')
+    engine.select(['rect'])
+    events.length = 0
+    grab()
+    node('rect').rotation(30)
+    letGo()
+
+    expect(events).toEqual(['shapeResized'])
+    expect(engine.getShape('rect')).toMatchObject({ groupId: 'bin', rotation: 30 })
+  })
+
+  it('is one undo step, however many shapes change bins', () => {
+    engine.addShape(makeRect('a', 200))
+    engine.addShape(makeRect('b', 230))
+    engine.select(['a', 'b'])
+    // Record a step on the events the undo history listens to.
+    const history = new UndoRedoStack()
+    history.init(snapshot())
+    const steps: string[] = []
+    for (const name of ['shapeMoved', 'shapeResized', 'shapeUpdated', 'groupChanged'] as const) {
+      engine.on(name, () => {
+        if (history.push(snapshot(), name)) steps.push(name)
+      })
+    }
+    grab()
+    node('a').x(20)
+    node('b').x(50)
+    letGo()
+
+    expect(steps).toHaveLength(1)
+    // Undoing it puts both shapes back outside the bin.
+    engine.loadSnapshot(JSON.parse(history.undo()!))
+    expect(engine.getGroup('bin')!.childIds).toEqual([])
+    expect(engine.getShape('a')!.groupId).toBeNull()
+  })
+
+  it('keeps a turned and resized polygon through a save and reopen', () => {
+    engine.addShape(makePolygon())
+    engine.select(['polygon'])
+    grab()
+    node('polygon').rotation(45)
+    node('polygon').scaleX(2)
+    letGo()
+    const saved = snapshot()
+    engine.loadSnapshot(JSON.parse(saved))
+
+    const polygon = engine.getShape('polygon') as LayoutShape & { points: Array<{ x: number }> }
+    expect(polygon.rotation).toBe(45)
+    expect(polygon.points.map((p) => p.x)).toEqual([-10, 10, 0])
+    expect(snapshot()).toBe(saved)
   })
 })
