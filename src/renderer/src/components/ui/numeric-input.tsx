@@ -187,7 +187,7 @@ export function NumericInput({
   const commitEdit = useCallback(() => {
     setEditing(false)
     const parsed = displayUnit ? parseDimension(editText, displayUnit) : parseFloat(editText)
-    if (!isNaN(parsed)) apply(parsed)
+    if (Number.isFinite(parsed)) apply(parsed)
     commitNow()
   }, [editText, apply, displayUnit, commitNow])
 
@@ -232,7 +232,7 @@ export function NumericInput({
         const s = getStep(e, step, fineStep, coarseStep)
         const dir = e.key === 'ArrowUp' ? 1 : -1
         const parsed = parseFloat(editText)
-        if (!isNaN(parsed)) {
+        if (Number.isFinite(parsed)) {
           const next = roundTo(parsed + dir * s, precision)
           setEditText(next.toFixed(precision))
           apply(next)

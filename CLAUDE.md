@@ -61,7 +61,7 @@ CSG Pipeline (3D preview)
   └─ ReviewCanvas renders meshes via R3F
 ```
 
-The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnapshot` field containing all shapes, groups, and grid config. The validator (`src/shared/validation/project-validator.ts`) checks the top-level fields, `settings` and `gridfinity`; it does not look inside `layoutSnapshot`. `docs/PROJECT_SCHEMA.md` describes the file format.
+The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnapshot` field containing all shapes, groups, and grid config. The validator (`src/shared/validation/project-validator.ts`) checks `settings`, `gridfinity` and the layout: ids are unique, positions and sizes are numbers, and each shape has its type's fields. Bins and shapes are put back in step on open (`repairLayout`), not refused. `docs/PROJECT_SCHEMA.md` describes the file format.
 
 ### Renderer Architecture
 
