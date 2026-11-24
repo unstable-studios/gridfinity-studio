@@ -291,3 +291,39 @@ test('a pocket with no area leaves its bin whole, and Preview says which shape',
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('the Add bin section closes once bins are drawn, and stays open once it is used', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const section = page.getByRole('button', { name: 'Add bin', exact: true })
+  const size = page.getByRole('button', { name: '1×1', exact: true })
+
+  // An empty project: the size grid is there to start from.
+  await page.getByRole('button', { name: 'New project' }).click()
+  await expect(section).toHaveAttribute('aria-expanded', 'true')
+  await expect(size).toHaveCount(1)
+
+  // A bin drawn on the canvas: the grid was not needed, so it gets out of the way. The only
+  // size grid left is the new bin's own.
+  await app.selectTool('Bin')
+  await page.mouse.click(700, 300)
+  await app.expectBinCount(1)
+  await expect(section).toHaveAttribute('aria-expanded', 'false')
+  await expect(size).toHaveCount(1)
+
+  // Opened and used, it stays open for the next bin.
+  await section.click()
+  await expect(section).toHaveAttribute('aria-expanded', 'true')
+  await size.first().click()
+  await app.expectBinCount(2)
+  await expect(section).toHaveAttribute('aria-expanded', 'true')
+
+  // Closed by hand, it stays closed.
+  await section.click()
+  await expect(section).toHaveAttribute('aria-expanded', 'false')
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await page.getByRole('radio', { name: 'Design', exact: true }).click()
+  await expect(section).toHaveAttribute('aria-expanded', 'false')
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
