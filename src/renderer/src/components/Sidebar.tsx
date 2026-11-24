@@ -234,9 +234,9 @@ function LayoutSidebar(): React.JSX.Element {
                   }`}
                   onClick={() => engine?.select([group.id])}
                 >
-                  <span className="font-medium">{meta.name ?? group.id}</span>
+                  <span className="font-medium">{meta.name ?? 'Bin'}</span>
                   <span className="ml-2 opacity-60">
-                    {meta.widthUnits}x{meta.depthUnits} ({meta.heightUnits}u)
+                    {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                   </span>
                 </button>
               )
@@ -263,7 +263,7 @@ function LayoutSidebar(): React.JSX.Element {
                   onClick={() => engine?.select([shape.id])}
                 >
                   <span className="font-medium">
-                    {(shape.metadata?.name as string) ?? shape.id}
+                    {(shape.metadata?.name as string) ?? shapeTypeLabel(shape.type)}
                   </span>
                   <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
                 </button>
@@ -418,11 +418,10 @@ function PreviewSidebar(): React.JSX.Element {
   // partial / stale / errored exports.
   const allReady = totalBins > 0 && bins.every((b) => bakeStatus.get(b.id) === 'ready')
   const anyError = bins.some((b) => bakeStatus.get(b.id) === 'error')
-  const totalWarnings = useMemo(() => {
-    let n = 0
-    for (const r of bakeResults.values()) n += r.warnings.length
-    return n
-  }, [bakeResults])
+  const warnings = useMemo(
+    () => [...bakeResults.values()].flatMap((r) => r.warnings),
+    [bakeResults]
+  )
 
   const handleExportSTL = async (): Promise<void> => {
     const placements = placementsFromGroups(bins)
@@ -483,10 +482,12 @@ function PreviewSidebar(): React.JSX.Element {
         </p>
       )}
 
-      {totalWarnings > 0 && (
-        <p className="text-[10px] text-amber-500">
-          {totalWarnings} warning{totalWarnings === 1 ? '' : 's'} — see console
-        </p>
+      {warnings.length > 0 && (
+        <ul className="space-y-0.5 text-[10px] text-amber-500">
+          {warnings.map((warning, i) => (
+            <li key={i}>{warning}</li>
+          ))}
+        </ul>
       )}
 
       <SidebarSection title="Export">
@@ -630,9 +631,7 @@ function ShapeDepthField({
       {nearMax && (
         <div className="flex items-start gap-1 text-amber-600 dark:text-amber-400 text-[10px] leading-tight">
           <span aria-hidden="true">⚠</span>
-          <span>
-            Close to the bin floor. The print may be fragile. Max {maxSafe.toFixed(1)} mm.
-          </span>
+          <span>Leaves a thin floor. Max {maxSafe.toFixed(1)} mm.</span>
         </div>
       )}
     </div>

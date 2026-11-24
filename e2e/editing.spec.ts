@@ -45,7 +45,7 @@ test('edit bins and pockets', async () => {
   // Calibrate world→screen from a rectangle drawn on empty canvas.
   const looseFrom = { x: 820, y: 180 }
   const looseTo = { x: 880, y: 230 }
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(looseFrom, looseTo)
   let saved = await app.save(file)
   const loose = saved.layoutSnapshot.shapes[0]
@@ -57,7 +57,7 @@ test('edit bins and pockets', async () => {
   const pocketFrom = toScreen({ x: bin.x + bin.width * 0.3, y: bin.y - bin.height * 0.7 })
   const pocketTo = toScreen({ x: bin.x + bin.width * 0.6, y: bin.y - bin.height * 0.4 })
   const pocketAt = { x: (pocketFrom.x + pocketTo.x) / 2, y: (pocketFrom.y + pocketTo.y) / 2 }
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(pocketFrom, pocketTo)
   saved = await app.save(file)
   const pocketId = saved.layoutSnapshot.shapes.find((s) => s.id !== loose.id)!.id
@@ -182,7 +182,7 @@ test('edit bins and pockets', async () => {
   expect.soft(shapeById(saved, pocketId).groupId, 'pocket survives resize').toBe(bin.id)
 
   // Circle and polygon tools.
-  await app.selectTool('Circle')
+  await app.selectTool('Ellipse')
   await app.drag({ x: 950, y: 180 }, { x: 990, y: 220 })
   await app.selectTool('Polygon')
   for (const p of [
@@ -243,7 +243,7 @@ test('changing a position in the sidebar is one undo step', async () => {
     .locator('xpath=.//span[normalize-space(.)="X"]/following-sibling::div[1]')
 
   await page.getByRole('button', { name: 'New project' }).click()
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag({ x: 700, y: 300 }, { x: 780, y: 360 })
   await app.expectShapeCount(1)
   const drawn = (await app.save(file)).layoutSnapshot.shapes[0]
@@ -311,7 +311,7 @@ test('a pocket position reads on the canvas or in its bin', async () => {
   // outside every bin is on the canvas already, so there is nothing to pick.
   const looseFrom = { x: 820, y: 180 }
   const looseTo = { x: 880, y: 230 }
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(looseFrom, looseTo)
   await app.expectShapeCount(1)
   await expect(frame('Bin')).toHaveCount(0)
@@ -327,7 +327,7 @@ test('a pocket position reads on the canvas or in its bin', async () => {
   const fixed = (n: number): string => n.toFixed(1).replace(/^-(0\.0)$/, '$1')
 
   // A pocket in the bin, left of center. Drawing leaves it selected.
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(
     toScreen({ x: bin.x + bin.width * 0.2, y: bin.y - bin.height * 0.7 }),
     toScreen({ x: bin.x + bin.width * 0.4, y: bin.y - bin.height * 0.5 })

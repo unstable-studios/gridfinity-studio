@@ -46,7 +46,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   // ── Draw a rectangle on empty canvas ────────────────────────────────────
   const looseFrom = { x: 820, y: 180 }
   const looseTo = { x: 880, y: 230 }
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(looseFrom, looseTo)
   await app.expectShapeCount(1)
 
@@ -70,7 +70,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   const pocketTo = toScreen({ x: bin.x + bin.width * 0.7, y: bin.y - bin.height * 0.3 })
 
   // ── Draw a pocket inside the bin ────────────────────────────────────────
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag(pocketFrom, pocketTo)
   await app.expectShapeCount(2)
 

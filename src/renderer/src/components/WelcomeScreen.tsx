@@ -26,7 +26,7 @@ export default function WelcomeScreen(): React.JSX.Element {
             New project
           </Button>
           <Button variant="outline" className="w-full" onClick={() => void loadProject()}>
-            Open project
+            Open project…
           </Button>
         </div>
 

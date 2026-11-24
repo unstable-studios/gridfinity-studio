@@ -2,7 +2,8 @@
  * Centralized theme color configuration for canvas and viewport elements.
  *
  * All hex values are stored in localStorage and editable via Preferences.
- * A refresh is required for changes to take effect in Three.js canvases.
+ * The design canvas reads them when it starts or the theme changes, so Preferences tells the
+ * person to restart the app to apply a change.
  */
 
 const STORAGE_KEY = 'gfstudio:themeColors'
@@ -70,7 +71,7 @@ export function saveThemeConfig(config: ThemeConfig): void {
 
 /**
  * Resolve the active color set based on the current theme.
- * Call once at component mount — changes require refresh.
+ * It reads the saved colors each time it is called.
  */
 export function resolveColors(resolvedTheme: string | undefined): CanvasThemeColors {
   const config = loadThemeConfig()

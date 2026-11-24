@@ -19,7 +19,7 @@ test('drawing a shape is one undo step and leaves no preview behind', async () =
 
   await page.getByRole('button', { name: 'New project' }).click()
 
-  for (const tool of ['Rect', 'Circle'] as const) {
+  for (const tool of ['Rectangle', 'Ellipse'] as const) {
     await app.selectTool(tool)
     await app.drag({ x: 700, y: 300 }, { x: 780, y: 360 })
     await app.expectShapeCount(1)
@@ -33,7 +33,7 @@ test('drawing a shape is one undo step and leaves no preview behind', async () =
   }
 
   // A drag too small to make a shape changes nothing.
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag({ x: 700, y: 300 }, { x: 701, y: 301 })
   await app.expectShapeCount(0)
   await openEditMenu()
@@ -44,7 +44,7 @@ test('drawing a shape is one undo step and leaves no preview behind', async () =
   // created and assigned to the bin.
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
   await app.expectBinCount(1)
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
   await app.expectShapeCount(1)
   await page.mouse.move(421, 621)
@@ -68,7 +68,7 @@ test('drawing a shape is one undo step and leaves no preview behind', async () =
 
   // A second pocket: one undo removes it, and redo brings it back inside
   // the bin.
-  await app.selectTool('Rect')
+  await app.selectTool('Rectangle')
   await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
   await app.expectShapeCount(2)
   await app.menu('Edit', /^Undo/)

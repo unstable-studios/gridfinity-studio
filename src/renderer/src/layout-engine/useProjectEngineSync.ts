@@ -58,7 +58,7 @@ export function useProjectEngineSync(): void {
     loadedProjectRef.current = projectId
 
     if (!isValidSnapshot(project.layoutSnapshot)) {
-      console.warn('Invalid layout snapshot in project file — skipping restore')
+      console.warn('Invalid layout snapshot in project file. Skipping restore.')
       return
     }
 

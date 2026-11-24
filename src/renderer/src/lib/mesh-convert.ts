@@ -38,7 +38,7 @@ export function bufferGeometryToMeshData(geometry: THREE.BufferGeometry): MeshDa
 
   const indexAttr = geometry.getIndex()
   if (!indexAttr) {
-    throw new Error('BufferGeometry has no index — convert to indexed geometry first')
+    throw new Error('BufferGeometry has no index. Convert it to indexed geometry first.')
   }
 
   const indices = new Uint32Array(indexAttr.array)

@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { useLayoutEngineContext, useEngineState, isBinGroup } from '@/layout-engine'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
+import { shapeTypeLabel } from '@/lib/shape-labels'
 import { computeDefaultPocketDepth, DEFAULT_GRIDFINITY_CONFIG } from '../../../shared/types/project'
 
 interface HoverState {
@@ -69,19 +70,19 @@ export default function ShapeTooltip(): React.JSX.Element | null {
   const shape = engine.getShape(hover.shapeId)
   if (!shape) return null
 
-  const name = (shape.metadata?.name as string | undefined) ?? shape.type
+  const name = (shape.metadata?.name as string | undefined) ?? shapeTypeLabel(shape.type)
   const meta = shape.metadata as { pocket?: { depth?: number | null } } | undefined
   const depthVal = meta?.pocket?.depth
 
-  let depthLabel = '—'
+  let depthLabel: string | null = null
   if (shape.groupId) {
     const bin = engine.getGroup(shape.groupId)
     if (bin && isBinGroup(bin)) {
       if (depthVal === null || depthVal === undefined) {
         const auto = computeDefaultPocketDepth(bin.metadata.heightUnits, unitHeight)
-        depthLabel = `Auto (${auto}mm)`
+        depthLabel = `Auto (${auto} mm)`
       } else {
-        depthLabel = `${depthVal}mm`
+        depthLabel = `${depthVal} mm`
       }
     }
   }
@@ -96,7 +97,9 @@ export default function ShapeTooltip(): React.JSX.Element | null {
       className="fixed z-50 pointer-events-none rounded-md bg-zinc-900/95 px-2 py-1 text-xs text-zinc-100 shadow-lg ring-1 ring-zinc-700 backdrop-blur-sm"
     >
       <div className="font-medium">{name}</div>
-      <div className="text-zinc-400">Depth: {depthLabel}</div>
+      <div className="text-zinc-400">
+        {depthLabel === null ? 'Not in a bin' : `Depth: ${depthLabel}`}
+      </div>
     </div>
   )
 }
