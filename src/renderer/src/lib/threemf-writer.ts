@@ -132,5 +132,5 @@ export async function export3MF(geometry: THREE.BufferGeometry, name = 'model'):
   zip.folder('_rels')!.file('.rels', RELS_XML)
   zip.folder('3D')!.file('3dmodel.model', buildModelXml(geometry, name))
 
-  return zip.generateAsync({ type: 'blob' })
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE' })
 }

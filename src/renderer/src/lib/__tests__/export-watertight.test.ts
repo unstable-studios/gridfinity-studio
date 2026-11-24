@@ -116,6 +116,14 @@ describe('3MF export of a baked bin', () => {
     expect(volume(mesh)).toBeGreaterThan(0)
   })
 
+  it('compresses the model', async () => {
+    const buffer = await build3MFArrayBuffer(new Map([['a', bake(binParams())]]), 'bin')
+    const zip = await JSZip.loadAsync(buffer!)
+    const xml = await zip.file('3D/3dmodel.model')!.async('string')
+
+    expect(buffer!.byteLength).toBeLessThan(xml.length / 2)
+  })
+
   it('has no repeated vertices or collapsed triangles', async () => {
     const buffer = await build3MFArrayBuffer(new Map([['a', bake(binParams())]]), 'bin')
     const mesh = await readMesh(buffer!)
