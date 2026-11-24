@@ -1,6 +1,6 @@
 /**
  * Subscribes to the main process's autoUpdater state and exposes it to the
- * renderer along with an `installNow` action.
+ * renderer along with the `installNow` and `check` actions.
  *
  * The state machine lives in main (`src/main/index.ts` + `src/shared/types/
  * updates.ts`); this hook is just a thin React wrapper.
@@ -14,6 +14,8 @@ import { IDLE_STATE, type UpdateState } from '../../../shared/types/updates'
 export interface UseAppUpdate {
   state: UpdateState
   installNow: () => void
+  /** Look for an update now. */
+  check: () => void
 }
 
 export function useAppUpdate(): UseAppUpdate {
@@ -48,5 +50,11 @@ export function useAppUpdate(): UseAppUpdate {
     })
   }, [])
 
-  return { state, installNow }
+  const check = useCallback(() => {
+    window.api?.updates?.check()?.catch((err) => {
+      console.warn('[useAppUpdate] check failed:', err)
+    })
+  }, [])
+
+  return { state, installNow, check }
 }

@@ -4,7 +4,8 @@ import { readFileSync, writeFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
 import log from 'electron-log/main'
-import { IDLE_STATE, UPDATE_CHANNELS, type UpdateState } from '../shared/types/updates'
+import { UPDATE_CHANNELS } from '../shared/types/updates'
+import { createUpdateController } from './update-controller'
 import icon from '../../resources/icon.png?asset'
 import {
   saveProject,
@@ -182,25 +183,37 @@ app.whenReady().then(() => {
   // Update IPC: renderer can read current state and trigger install. Register
   // BEFORE createWindow() so the renderer's mount-time getState() call can't
   // race ahead of `ipcMain.handle` and reject.
-  let updateState: UpdateState = IDLE_STATE
-  const broadcast = (next: UpdateState): void => {
-    updateState = next
-    for (const win of BrowserWindow.getAllWindows()) {
-      win.webContents.send(UPDATE_CHANNELS.state, next)
-    }
-  }
-  ipcMain.handle(UPDATE_CHANNELS.getState, () => updateState)
+  // The updater only does anything in an installed build of a kind that can update
+  // itself. `isUpdaterActive` logs each time it is asked, so it is asked once.
+  const canUpdate = !is.dev && autoUpdater.isUpdaterActive()
+  const updates = createUpdateController({
+    // Asking for `autoUpdater` builds the updater, so a build that cannot update gets a
+    // stand-in that never reports anything.
+    updater: canUpdate
+      ? autoUpdater
+      : { on: () => undefined, checkForUpdatesAndNotify: () => Promise.resolve(null) },
+    active: canUpdate,
+    onState: (next) => {
+      for (const win of BrowserWindow.getAllWindows()) {
+        win.webContents.send(UPDATE_CHANNELS.state, next)
+      }
+    },
+    logError: (...args) => log.error(...args)
+  })
+  ipcMain.handle(UPDATE_CHANNELS.getState, () => updates.state())
   ipcMain.handle(UPDATE_CHANNELS.installNow, () => {
     // Guard: only valid when an update is staged AND we're in a real packaged
     // build. Calling quitAndInstall outside those conditions would be a
     // surprising restart triggered by an exposed IPC channel.
-    if (is.dev || updateState.kind !== 'downloaded') return
+    if (!canUpdate || updates.state().kind !== 'downloaded') return
     // quitAndInstall starts the installer before any window is asked to close, so unsaved
     // work has to be dealt with first.
     void settleUnsavedWork().then((mayClose) => {
       if (mayClose) autoUpdater.quitAndInstall(false, true)
     })
   })
+
+  ipcMain.handle(UPDATE_CHANNELS.check, () => updates.check())
 
   createWindow()
 
@@ -214,7 +227,7 @@ app.whenReady().then(() => {
   // the `publish: github` block from electron-builder.yml, so no extra config
   // needed. Disabled in dev so it doesn't try to fetch a release from GitHub
   // every time we run pnpm dev.
-  if (!is.dev) {
+  if (canUpdate) {
     // Route electron-updater's internal logs through electron-log so they
     // land in ~/Library/Logs/gridfinity-studio/main.log on macOS (platform
     // equivalent elsewhere). Without this, autoUpdater falls back to
@@ -229,30 +242,7 @@ app.whenReady().then(() => {
     autoUpdater.autoDownload = true
     autoUpdater.autoInstallOnAppQuit = true
 
-    autoUpdater.on('checking-for-update', () => broadcast({ kind: 'checking' }))
-    autoUpdater.on('update-not-available', () => broadcast(IDLE_STATE))
-    autoUpdater.on('update-available', (info) => {
-      broadcast({ kind: 'downloading', version: info.version, progress: 0 })
-    })
-    autoUpdater.on('download-progress', (info) => {
-      const version = updateState.kind === 'downloading' ? updateState.version : ''
-      broadcast({ kind: 'downloading', version, progress: info.percent })
-    })
-    autoUpdater.on('update-downloaded', (info) => {
-      broadcast({ kind: 'downloaded', version: info.version })
-    })
-    autoUpdater.on('error', (err) => {
-      log.error('[autoUpdater]', err)
-      broadcast({ kind: 'error', message: err.message ?? String(err) })
-    })
-
-    void autoUpdater.checkForUpdatesAndNotify()
-    setInterval(
-      () => {
-        void autoUpdater.checkForUpdatesAndNotify()
-      },
-      60 * 60 * 1000
-    )
+    updates.start()
   }
 })
 

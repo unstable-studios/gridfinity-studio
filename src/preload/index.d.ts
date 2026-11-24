@@ -8,6 +8,7 @@ interface UpdatesAPI {
   getState: () => Promise<UpdateState>
   onStateChange: (handler: (state: UpdateState) => void) => () => void
   installNow: () => Promise<void>
+  check: () => Promise<void>
 }
 
 interface CloseGuardAPI {
