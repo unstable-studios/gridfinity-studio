@@ -28,6 +28,15 @@ const DEFAULT_GRID_COLOR = '#27272a'
 const DEFAULT_GRID_ORIGIN = 'rgba(113, 113, 122, 0.35)'
 const GRID_EXTENT = 10000
 
+const CORNER_ANCHORS = ['top-left', 'top-right', 'bottom-left', 'bottom-right']
+const ALL_ANCHORS = [
+  ...CORNER_ANCHORS,
+  'top-center',
+  'middle-left',
+  'middle-right',
+  'bottom-center'
+]
+
 // ─── Helpers ────────────────────────────────────────────────────────────────────
 
 function layoutShapeToKonva(shape: LayoutShape): Konva.Shape {
@@ -395,6 +404,8 @@ export class KonvaEngine implements LayoutEngine {
           this.emit('shapeUpdated', { id })
         }
       }
+      // Turning a selection changes which of its handles are safe to offer.
+      this.limitResizeHandles()
       this.transformer?.forceUpdate()
       this.mainLayer?.batchDraw()
     })
@@ -1116,14 +1127,47 @@ export class KonvaEngine implements LayoutEngine {
     } else {
       this.transformer.resizeEnabled(true)
       this.transformer.rotateEnabled(true)
-      // Lock ratio only when ALL selected shapes have lockAspectRatio explicitly set
-      const shouldLock =
-        ids.length > 0 && ids.every((id) => this.shapeMap.get(id)?.lockAspectRatio === true)
-      this.transformer.keepRatio(shouldLock)
     }
+    this.limitResizeHandles()
 
     this.mainLayer?.batchDraw()
     this.emit('selectionChanged', { ids: [...ids] })
+  }
+
+  /**
+   * Which resize handles the selected shapes get.
+   *
+   * Stretching a selection along one side squashes any shape in it that is turned against
+   * the selection's frame into a parallelogram. A rectangle or an ellipse cannot be stored
+   * as one, so the canvas would show a shape that is not the one saved and cut. Such a
+   * selection gets the corner handles only, and keeps its proportions: growing it evenly
+   * leaves every shape the kind of shape it was.
+   */
+  private limitResizeHandles(): void {
+    if (!this.transformer) return
+    const nodes = this.transformer.nodes()
+    const shapes = nodes.filter((node) => node.name() === 'shape')
+    // A bin is not turned, and sets its own rule in `select`.
+    if (shapes.length !== nodes.length) {
+      this.transformer.enabledAnchors(ALL_ANCHORS)
+      return
+    }
+
+    const frame = shapes.length > 1 ? this.transformer.rotation() : null
+    const againstFrame =
+      frame !== null &&
+      shapes.some((node) => {
+        // A quarter turn against the frame only swaps width and height.
+        const turn = Math.abs(node.rotation() - frame) % 90
+        return Math.min(turn, 90 - turn) > 1e-6
+      })
+    // Otherwise the ratio is kept only when every shape asks for it.
+    const allLocked =
+      shapes.length > 0 &&
+      shapes.every((node) => this.shapeMap.get(node.id())?.lockAspectRatio === true)
+
+    this.transformer.enabledAnchors(againstFrame ? CORNER_ANCHORS : ALL_ANCHORS)
+    this.transformer.keepRatio(againstFrame || allLocked)
   }
 
   selectIds(ids: string[]): void {
