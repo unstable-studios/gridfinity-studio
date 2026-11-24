@@ -102,6 +102,7 @@ export function useProjectEngineSync(): void {
       engine.on('shapeDeleted', onMutation),
       engine.on('shapeMoved', onMutation),
       engine.on('shapeResized', onMutation),
+      engine.on('shapeUpdated', onMutation),
       engine.on('groupChanged', onMutation),
       engine.on('groupMoved', onMutation),
       engine.on('groupResized', onMutation)

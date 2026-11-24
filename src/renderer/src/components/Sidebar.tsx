@@ -76,7 +76,7 @@ function LayoutSidebar(): React.JSX.Element {
     const dy = current.y - start.y
     if (dx === 0 && dy === 0) return
     engine.batch(() => {
-      engine.updateShape(start.id, { x: start.x, y: start.y })
+      engine.updateShape(start.id, { x: start.x, y: start.y }, { transient: true })
       engine.translateShapes([{ id: start.id, dx, dy }])
     })
   }
@@ -91,7 +91,7 @@ function LayoutSidebar(): React.JSX.Element {
       if (!current) return
       positionEditRef.current = { id: current.id, x: current.x, y: current.y }
     }
-    engine.updateShape(selectedShape.id, to)
+    engine.updateShape(selectedShape.id, to, { transient: true })
   }
 
   // Which arrange buttons to offer. Follows shapes and groups so it is not
@@ -521,6 +521,7 @@ function ShapeDepthField({
 }): React.JSX.Element | null {
   const project = useProject((s) => s.project)
   const config = project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
+  const adjustingRef = useRef<{ id: string; before: string } | null>(null)
 
   if (!shape.groupId) return null
   const bin = engine.getGroup(shape.groupId)
@@ -533,7 +534,7 @@ function ShapeDepthField({
   const effectiveDepth = isAuto ? maxSafe : pocket.depth!
   const nearMax = !isAuto && effectiveDepth >= maxSafe - DEPTH_WARN_MARGIN
 
-  const writeDepth = (next: number | null): void => {
+  const writeDepth = (next: number | null, options?: { transient?: boolean }): void => {
     const nextMeta = {
       ...meta,
       pocket: {
@@ -541,7 +542,22 @@ function ShapeDepthField({
         ...(next === null ? {} : { depth: next })
       }
     }
-    engine.updateShape(shape.id, { metadata: nextMeta })
+    engine.updateShape(shape.id, { metadata: nextMeta }, options)
+  }
+
+  // Each step of a depth adjustment is shown live. The adjustment is
+  // recorded once, when it ends, so it is a single undo step.
+  const adjustDepth = (next: number): void => {
+    adjustingRef.current ??= { id: shape.id, before: JSON.stringify(shape.metadata) }
+    writeDepth(next, { transient: true })
+  }
+  const commitDepth = (): void => {
+    const start = adjustingRef.current
+    adjustingRef.current = null
+    const current = start && engine.getShape(start.id)
+    // Ending where it began is not a change.
+    if (!start || !current || JSON.stringify(current.metadata) === start.before) return
+    engine.updateShape(current.id, { metadata: current.metadata })
   }
 
   return (
@@ -565,7 +581,8 @@ function ShapeDepthField({
           precision={1}
           min={0.1}
           max={maxSafe}
-          onChange={(v) => writeDepth(v)}
+          onChange={adjustDepth}
+          onCommit={commitDepth}
         />
       )}
       {nearMax && (

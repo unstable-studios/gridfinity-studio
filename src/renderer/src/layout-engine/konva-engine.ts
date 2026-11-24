@@ -373,7 +373,7 @@ export class KonvaEngine implements LayoutEngine {
     this.emit('shapeCreated', { shape: { ...shape } })
   }
 
-  updateShape(id: string, patch: Partial<LayoutShape>): void {
+  updateShape(id: string, patch: Partial<LayoutShape>, options?: { transient?: boolean }): void {
     if (this.disposed) return
     const existing = this.shapeMap.get(id)
     if (!existing) return
@@ -423,9 +423,7 @@ export class KonvaEngine implements LayoutEngine {
 
     this.mainLayer?.batchDraw()
 
-    // A generic update: listeners refresh from it, but it is not an undo
-    // step. A move that should be one goes through translateShapes.
-    this.emit('shapeUpdated', { id })
+    this.emit(options?.transient ? 'shapeAdjusting' : 'shapeUpdated', { id })
   }
 
   /**

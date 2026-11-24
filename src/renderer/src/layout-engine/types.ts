@@ -188,11 +188,15 @@ export type EngineEventMap = {
   shapeCreated: { shape: LayoutShape }
   shapeDeleted: { id: string }
   /**
-   * Emitted by `updateShape` for any patch that doesn't fall under
-   * `shapeMoved` or `shapeResized` — primarily metadata mutations
-   * (depth, name, etc.). Subscribers can re-read engine data to refresh.
+   * A finished change made through `updateShape`, such as a pocket's depth
+   * or name. Recorded for undo and saved with the project.
    */
   shapeUpdated: { id: string }
+  /**
+   * One step of a change still in progress, made through `updateShape` with
+   * `transient`. Listeners refresh what they show; nothing is recorded.
+   */
+  shapeAdjusting: { id: string }
   groupChanged: { groupId: string; childIds: string[] }
   groupMoved: { id: string; x: number; y: number }
   groupResized: { id: string; width: number; height: number }

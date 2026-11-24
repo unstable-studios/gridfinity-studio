@@ -150,18 +150,23 @@ describe('LayoutEngine contract', () => {
       expect(shape!.x).toBe(100)
     })
 
-    it('C3b: updateShape asks listeners to refresh without reporting a move', () => {
+    it('C3b: updateShape reports a finished change, or a step when transient', () => {
       engine.addShape(makeRect())
       const events: string[] = []
       engine.on('shapeMoved', () => events.push('moved'))
       engine.on('shapeResized', () => events.push('resized'))
       engine.on('shapeUpdated', () => events.push('updated'))
+      engine.on('shapeAdjusting', () => events.push('adjusting'))
 
-      engine.updateShape('rect-1', { x: 100 })
-      engine.updateShape('rect-1', { width: 30, height: 12 })
       engine.updateShape('rect-1', { metadata: { name: 'Pocket' } })
+      engine.updateShape('rect-1', { x: 100 })
+      engine.updateShape('rect-1', { metadata: { name: 'Live' } }, { transient: true })
+      engine.updateShape('rect-1', { x: 5 }, { transient: true })
 
-      expect(events).toEqual(['updated', 'updated', 'updated'])
+      expect(events).toEqual(['updated', 'updated', 'adjusting', 'adjusting'])
+      // A transient change is still applied.
+      expect(engine.getShape('rect-1')!.x).toBe(5)
+      expect(engine.getShape('rect-1')!.metadata).toEqual({ name: 'Live' })
     })
 
     it('C4: removeShape(id) → getShape(id) returns undefined', () => {
