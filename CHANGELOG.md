@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.12.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.12.0...v1.12.1) (2026-11-24)
+
+
+### Bug Fixes
+
+* **core:** cut circles and holes finely enough to print smooth ([#438](https://github.com/unstable-studios/gridfinity-studio/issues/438)) ([0fa5f41](https://github.com/unstable-studios/gridfinity-studio/commit/0fa5f413c38890e359bf3fa530295256acf023cb))
+* **core:** share vertices between triangles in 3mf export ([#437](https://github.com/unstable-studios/gridfinity-studio/issues/437)) ([a3f2c34](https://github.com/unstable-studios/gridfinity-studio/commit/a3f2c345d6ac5e2c51022d310153ae4876d2020b))
+
 ## [1.12.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.11.0...v1.12.0) (2026-11-24)
 
 
