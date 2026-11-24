@@ -22,7 +22,7 @@ function untilDismissed(id: string): { id: string; duration: number } {
  */
 function firstProblem(detail: string | undefined): string {
   if (!detail) return ''
-  console.error(detail)
+  console.warn(detail)
   const first = detail.split('\n').find((line) => line.trimStart().startsWith('\u2022'))
   return first ? ` Details: ${first.replace(/^\s*\u2022\s*/, '')}` : ''
 }

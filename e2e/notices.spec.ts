@@ -56,6 +56,58 @@ test('failed and cancelled file operations tell the person what happened', async
   await app.expectBinCount(1) // the project that was open is untouched
   await dismissAll()
 
+  // ── Open a project whose layout is damaged: the notice says what is wrong ─
+  const damaged = join(app.dir, 'damaged.gfstudio')
+  await writeFile(
+    damaged,
+    JSON.stringify({
+      schemaVersion: '0.5.0',
+      settings: {
+        name: 'Damaged',
+        createdAt: '2026-11-24T17:00:00.000Z',
+        modifiedAt: '2026-11-24T17:00:00.000Z',
+        units: 'mm'
+      },
+      gridfinity: {
+        baseUnit: 42,
+        gridSpacing: 42,
+        unitHeight: 7,
+        tolerance: 0.5,
+        magnetHoles: { enabled: true, diameter: 6.5, depth: 2.4 },
+        screwHoles: { enabled: false, diameter: 3, depth: 6 }
+      },
+      layoutSnapshot: {
+        version: '1.0.0',
+        // A rectangle with no width.
+        shapes: [
+          {
+            id: 'rect',
+            type: 'rect',
+            x: 0,
+            y: 0,
+            height: 10,
+            rotation: 0,
+            fill: '#fff',
+            stroke: '#000',
+            strokeWidth: 1,
+            groupId: null
+          }
+        ],
+        groups: [],
+        gridConfig: { size: 42, enabled: true, visible: true }
+      }
+    })
+  )
+  await app.stubOpenDialog(damaged)
+  await app.menu('File', /^Open project/)
+  await expect(
+    page.getByText(
+      'It isn’t a Gridfinity Studio project, or it is damaged. Details: layoutSnapshot.shapes[0].width: width must be a number'
+    )
+  ).toBeVisible()
+  await app.expectBinCount(1) // the project that was open is untouched
+  await dismissAll()
+
   // ── Export: failure, then success ───────────────────────────────────────
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
   await expect(page.getByText(/\bReady$/)).toBeVisible({ timeout: 30_000 })
