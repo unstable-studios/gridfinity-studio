@@ -2,7 +2,7 @@
  * Exporting the baked bins: which ones, whether they are ready, and writing the file.
  * The sidebar and the File menu both export through this, so they always agree.
  */
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { create } from 'zustand'
 import { useLayoutEngine, useEngineState, isBinGroup } from '@/layout-engine'
 import type { BinMetadata, LayoutGroup } from '@/layout-engine'
@@ -20,11 +20,10 @@ export type ExportFiles = 'one' | 'perBin'
 
 type Bin = LayoutGroup & { metadata: BinMetadata }
 
-/** What the person last asked for. Kept while the app is open, across projects. */
-const useExportOptions = create<{ scope: ExportScope; files: ExportFiles }>(() => ({
-  scope: 'all',
-  files: 'one'
-}))
+  /** `perBin` only while the project has more than one bin. */
+  files: ExportFiles
+  setFiles: (files: ExportFiles) => void
+  /** Whether every chosen bin has been built, in Preview. */
 
 export interface ExportCommands {
   /** Every bin in the project. */
@@ -36,10 +35,16 @@ export interface ExportCommands {
   /** `selected` only while there are selected bins to export. */
   scope: ExportScope
   setScope: (scope: ExportScope) => void
+<<<<<<< HEAD
   /** `perBin` only while the project has more than one bin. */
   files: ExportFiles
   setFiles: (files: ExportFiles) => void
   /** Whether every chosen bin is built and up to date. */
+||||||| 74ed2b6
+  /** Whether every chosen bin is built and up to date. */
+=======
+  /** Whether every chosen bin has been built, in Preview. */
+>>>>>>> feat/export-selected-bins
   canExport: boolean
   exportAs: (format: ExportFormat) => Promise<void>
 }
@@ -130,4 +135,17 @@ export function useExport(): ExportCommands {
     canExport,
     exportAs
   }
+}
+
+/**
+ * Go back to exporting every bin when the person leaves Preview or the project changes.
+ * "Selected" is then always a choice made with the bins in view, never one left over from
+ * earlier that would quietly export part of a project. Mount once.
+ */
+export function useExportScopeReset(): void {
+  const { mode } = useAppMode()
+  const projectKey = useProject((s) => s.project?.settings.createdAt)
+  useEffect(() => {
+    useExportOptions.setState({ scope: 'all' })
+  }, [mode, projectKey])
 }

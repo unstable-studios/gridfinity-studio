@@ -106,6 +106,15 @@ test('export every bin or only the selected ones', async () => {
   await expect(scope('Selected (0)')).toBeDisabled()
   await expect(scope('All bins')).toBeChecked()
 
+  // "Selected" does not outlive a visit to Preview: coming back, an export takes every bin.
+  await page.getByRole('button', { name: /^Bin 2/ }).click()
+  await scope('Selected (1)').click()
+  await expect(scope('Selected (1)')).toBeChecked()
+  await page.getByRole('radio', { name: 'Design', exact: true }).click()
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await expect(scope('All bins')).toBeChecked()
+  await expect(scope('Selected (1)')).toBeEnabled()
+
   expect(app.errors, 'no renderer errors').toEqual([])
 })
 
