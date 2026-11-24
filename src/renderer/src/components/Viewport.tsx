@@ -9,10 +9,12 @@ import {
   useEngineUndoRedo,
   useEngineState,
   useProjectEngineSync,
-  useBinArtwork
+  useBinArtwork,
+  useLayoutEngine
 } from '@/layout-engine'
 import type { UndoRedoDebugState } from '@/layout-engine/useEngineUndoRedo'
 import DrawingToolLayer from './DrawingToolLayer'
+import EditContextMenu from './EditContextMenu'
 import { removeItems } from '@/lib/remove-items'
 import ShapeTooltip from './ShapeTooltip'
 import HintCard from './HintCard'
@@ -129,24 +131,41 @@ function UndoRedoDebugOverlay({ debugState }: { debugState: UndoRedoDebugState }
 // ─── Main Viewport ──────────────────────────────────────────────────────────
 
 export default function Viewport(): React.JSX.Element {
-  const { mode } = useAppMode()
+  const { mode, activeTool } = useAppMode()
   const { project, bakeResults } = useProject()
+  const engine = useLayoutEngine()
 
   const baseUnit = project?.gridfinity.baseUnit ?? 42
+
+  // The right-click menu belongs to the Select tool. A drawing tool keeps its own clicks.
+  const canUseMenu = mode === 'layout' && (activeTool === 'select' || activeTool === null)
+  /** The menu acts on the selection, so a right-click first selects what is under it. */
+  const selectUnderPointer = (e: React.MouseEvent): void => {
+    if (!engine || !canUseMenu) return
+    // The engine measures from the corner of the canvas, which this element covers.
+    const canvas = e.currentTarget.getBoundingClientRect()
+    const world = engine.screenToWorld(e.clientX - canvas.left, e.clientY - canvas.top)
+    const hit = engine.objectAt(world.x, world.y)
+    if (!hit) engine.clearSelection()
+    else if (!engine.getSelectedIds().includes(hit.id)) engine.select([hit.id])
+  }
 
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* Layout canvas always mounted so engine survives mode switches */}
-      <div
-        className={
-          mode === 'layout' ? 'relative h-full' : 'absolute inset-0 invisible pointer-events-none'
-        }
-      >
-        <LayoutEngineCanvas />
-        {mode === 'layout' && <LayoutViewport />}
-        {mode === 'layout' && <DrawingToolLayer />}
-        {mode === 'layout' && <ShapeTooltip />}
-      </div>
+      <EditContextMenu disabled={!canUseMenu}>
+        <div
+          className={
+            mode === 'layout' ? 'relative h-full' : 'absolute inset-0 invisible pointer-events-none'
+          }
+          onContextMenu={selectUnderPointer}
+        >
+          <LayoutEngineCanvas />
+          {mode === 'layout' && <LayoutViewport />}
+          {mode === 'layout' && <DrawingToolLayer />}
+          {mode === 'layout' && <ShapeTooltip />}
+        </div>
+      </EditContextMenu>
       <div className={mode === 'review' ? 'h-full' : 'hidden'}>
         <ReviewCanvas bakeResults={bakeResults} baseUnit={baseUnit} />
       </div>

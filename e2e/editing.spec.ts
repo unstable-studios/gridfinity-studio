@@ -649,3 +649,59 @@ test('cut, copy and paste bins and shapes', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('right-click a bin or shape for its menu', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+  const menuItem = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('menuitem', { name, exact: true })
+  const selectedRows = page.locator('aside button[aria-pressed="true"]')
+  const emptyCanvas = { x: 900, y: 250 }
+
+  // A bin with a pocket in it.
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(1)
+
+  // In the sidebar: a right-click selects the row and opens the menu.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y)
+  await expect(selectedRows).toHaveCount(0)
+  await row('Bin 1').click({ button: 'right' })
+  await expect(row('Bin 1')).toHaveAttribute('aria-pressed', 'true')
+  await menuItem('Duplicate').click()
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  await row('Bin 1 copy').click({ button: 'right' })
+  await menuItem('Delete').click()
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+
+  // On the canvas: a right-click on the pocket selects it. Rename types in the sidebar row.
+  await page.mouse.click(420, 620, { button: 'right' })
+  await expect(row('Rectangle 1')).toHaveAttribute('aria-pressed', 'true')
+  await menuItem('Rename').click()
+  await page.keyboard.type('Slot')
+  await page.keyboard.press('Enter')
+  await expect(row('Slot')).toBeVisible()
+
+  // On empty canvas nothing is selected, so only what needs no selection is offered.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(selectedRows).toHaveCount(0)
+  await expect(menuItem('Rename')).toBeDisabled()
+  await expect(menuItem('Delete')).toBeDisabled()
+  await menuItem('Select all').click()
+  await expect(row('Bin 1')).toHaveAttribute('aria-pressed', 'true')
+
+  // A drawing tool keeps its clicks: no menu.
+  await app.selectTool('Rectangle')
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await app.selectTool('Select')
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})

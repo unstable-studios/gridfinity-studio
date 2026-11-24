@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
@@ -8,6 +8,8 @@ import { NumericInput } from '@/components/ui/numeric-input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
 import NameField from './NameField'
+import EditContextMenu from './EditContextMenu'
+import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
 import { removeItems } from '@/lib/remove-items'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
@@ -99,7 +101,12 @@ function LayoutSidebar(): React.JSX.Element {
   }
 
   // The row being renamed in place, after a double-click.
-  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const renamingId = useRenaming((state) => state.id)
+  const setRenamingId = (id: string | null): void => useRenaming.setState({ id })
+  /** A right-click acts on the row under it: select that row unless it already is. */
+  const selectForMenu = (id: string): void => {
+    if (!selectedIds.includes(id)) engine?.select([id])
+  }
   const renameGroup = (id: string, name: string): void => {
     const group = engine?.getGroup(id)
     if (group) engine?.updateGroup(id, { metadata: { ...group.metadata, name } })
@@ -259,79 +266,85 @@ function LayoutSidebar(): React.JSX.Element {
       {/* Bin list */}
       {binGroups.length > 0 && (
         <SidebarSection title={`Bins (${binGroups.length})`}>
-          <div className="space-y-0.5">
-            {binGroups.map((group) => {
-              const meta = group.metadata as BinMetadata
-              const isSelected = selectedIds.includes(group.id)
-              if (renamingId === group.id) {
+          <EditContextMenu>
+            <div className="space-y-0.5">
+              {binGroups.map((group) => {
+                const meta = group.metadata as BinMetadata
+                const isSelected = selectedIds.includes(group.id)
+                if (renamingId === group.id) {
+                  return (
+                    <NameField
+                      key={group.id}
+                      autoFocus
+                      aria-label="Bin name"
+                      className={RENAME_ROW_CLASS}
+                      value={storedName(meta) ?? 'Bin'}
+                      onRename={(name) => renameGroup(group.id, name)}
+                      onDone={() => setRenamingId(null)}
+                    />
+                  )
+                }
                 return (
-                  <NameField
+                  <button
                     key={group.id}
-                    autoFocus
-                    aria-label="Bin name"
-                    className={RENAME_ROW_CLASS}
-                    value={storedName(meta) ?? 'Bin'}
-                    onRename={(name) => renameGroup(group.id, name)}
-                    onDone={() => setRenamingId(null)}
-                  />
+                    type="button"
+                    aria-pressed={isSelected}
+                    className={listRowClass(isSelected)}
+                    onClick={(e) => handleRowClick(group.id, e)}
+                    onDoubleClick={() => setRenamingId(group.id)}
+                    onContextMenu={() => selectForMenu(group.id)}
+                  >
+                    <span className="font-medium">{storedName(meta) ?? 'Bin'}</span>
+                    <span className="ml-2 opacity-60">
+                      {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
+                    </span>
+                  </button>
                 )
-              }
-              return (
-                <button
-                  key={group.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  className={listRowClass(isSelected)}
-                  onClick={(e) => handleRowClick(group.id, e)}
-                  onDoubleClick={() => setRenamingId(group.id)}
-                >
-                  <span className="font-medium">{storedName(meta) ?? 'Bin'}</span>
-                  <span className="ml-2 opacity-60">
-                    {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+              })}
+            </div>
+          </EditContextMenu>
         </SidebarSection>
       )}
 
       {/* Shape list */}
       {shapes.length > 0 && (
         <SidebarSection title={`Shapes (${shapes.length})`}>
-          <div className="space-y-0.5">
-            {shapes.map((shape) => {
-              const isSelected = selectedIds.includes(shape.id)
-              if (renamingId === shape.id) {
+          <EditContextMenu>
+            <div className="space-y-0.5">
+              {shapes.map((shape) => {
+                const isSelected = selectedIds.includes(shape.id)
+                if (renamingId === shape.id) {
+                  return (
+                    <NameField
+                      key={shape.id}
+                      autoFocus
+                      aria-label="Shape name"
+                      className={RENAME_ROW_CLASS}
+                      value={storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
+                      onRename={(name) => renameShape(shape.id, name)}
+                      onDone={() => setRenamingId(null)}
+                    />
+                  )
+                }
                 return (
-                  <NameField
+                  <button
                     key={shape.id}
-                    autoFocus
-                    aria-label="Shape name"
-                    className={RENAME_ROW_CLASS}
-                    value={storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
-                    onRename={(name) => renameShape(shape.id, name)}
-                    onDone={() => setRenamingId(null)}
-                  />
+                    type="button"
+                    aria-pressed={isSelected}
+                    className={listRowClass(isSelected)}
+                    onClick={(e) => handleRowClick(shape.id, e)}
+                    onDoubleClick={() => setRenamingId(shape.id)}
+                    onContextMenu={() => selectForMenu(shape.id)}
+                  >
+                    <span className="font-medium">
+                      {storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
+                    </span>
+                    <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
+                  </button>
                 )
-              }
-              return (
-                <button
-                  key={shape.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  className={listRowClass(isSelected)}
-                  onClick={(e) => handleRowClick(shape.id, e)}
-                  onDoubleClick={() => setRenamingId(shape.id)}
-                >
-                  <span className="font-medium">
-                    {storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
-                  </span>
-                  <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
-                </button>
-              )
-            })}
-          </div>
+              })}
+            </div>
+          </EditContextMenu>
         </SidebarSection>
       )}
 
