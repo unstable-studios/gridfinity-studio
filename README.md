@@ -4,7 +4,7 @@ A desktop app for designing [Gridfinity](https://gridfinity.xyz) bins with custo
 
 Runs on macOS, Windows and Linux.
 
-![Design view: three bins on the grid, with a rectangle, an ellipse and a polygon drawn in the first](docs/images/design.png)
+![Design view: three bins on the grid, with a rectangle, an ellipse and a polygon drawn in the first and a rectangle in the third](docs/images/design.png)
 
 ![Preview: the same bins in 3D, with their pockets cut](docs/images/preview.png)
 
@@ -26,12 +26,12 @@ Download the latest version from [Releases](https://github.com/unstable-studios/
 | Windows  | `gridfinity-studio-<version>-setup.exe` | Not code signed, so Windows may ask before running it. |
 | Linux    | `.AppImage`, `.deb` or `.snap`          | x64.                                                   |
 
-The app checks for updates when it starts and offers to restart when one is ready.
+The app checks for updates when it starts and every hour, and offers to restart when one is ready. **Help > Check for updates** checks at once. The snap does not update itself: install a new one from Releases.
 
 ## Using it
 
 1. **Start a project.** Choose **New project**, then give it a name, a base unit and a tolerance.
-2. **Add a bin.** Pick a size in the sidebar, or choose the **Bin** tool and drag on the canvas. Select a bin to change its width, depth and height, or to turn the stacking lip off.
+2. **Add a bin.** Open **Add bin** in the sidebar and pick a size, or choose the **Bin** tool and drag on the canvas. Select a bin to change its width, depth and height, or to turn the stacking lip off.
 3. **Draw pockets.** Choose **Rectangle**, **Ellipse** or **Polygon** and draw inside the bin. Hold Shift for a square or circle, and Alt (Option on a Mac) to draw from the center. Select a pocket to set its depth and position.
 4. **Preview.** Switch to **Preview** to see the bins in 3D. Drag to orbit and scroll to zoom.
 5. **Export.** In Preview, choose **Export 3MF…** or **Export STL…**. With more than one bin you can export only the selected bins, or one file per bin.
