@@ -246,7 +246,12 @@ export class StudioApp {
     await this.stubSaveDialog(filePath)
     await this.menu('File', /^Save(?! as)/)
     await expect(this.page.getByText('Unsaved', { exact: true })).toHaveCount(0)
-    return JSON.parse(await readFile(filePath, 'utf8')) as SavedProject
+    // When nothing had changed, "Unsaved" was never showing, so this can get here while the
+    // file is still being written. Read until it is whole.
+    return readWhenComplete(
+      filePath,
+      async (bytes) => JSON.parse(bytes.toString('utf8')) as SavedProject
+    )
   }
 }
 
