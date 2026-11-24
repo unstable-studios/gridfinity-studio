@@ -191,4 +191,4 @@ See [.github/COPILOT_COMMIT_STANDARDS.md](.github/COPILOT_COMMIT_STANDARDS.md) f
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the project's license.
+By contributing, you agree that your contributions are licensed under the [MIT License](LICENSE).
