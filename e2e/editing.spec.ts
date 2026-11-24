@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { StudioApp, mappingFromDrawnRect } from './app'
@@ -529,6 +530,17 @@ test('bins and shapes can be renamed', async () => {
   await shapeName.press('Enter')
   await expect(row('Caliper')).toBeVisible()
   await app.expectShapeCount(1)
+
+  // Saving while a name is still being typed keeps the name: no Enter, straight to save.
+  const file = join(app.dir, 'renamed.gfstudio')
+  await app.stubSaveDialog(file)
+  await shapeName.fill('Wrench')
+  await page.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+s`)
+  await expect(page.getByText('Unsaved', { exact: true })).toHaveCount(0)
+  const saved = JSON.parse(await readFile(file, 'utf8')) as SavedProject
+  expect(saved.layoutSnapshot.shapes[0].metadata?.name, 'the typed name is in the file').toBe(
+    'Wrench'
+  )
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })

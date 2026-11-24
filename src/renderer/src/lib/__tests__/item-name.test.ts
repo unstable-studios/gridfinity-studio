@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_NAME_LENGTH, nameToStore } from '../item-name'
+import { MAX_NAME_LENGTH, nameToStore, storedName } from '../item-name'
 
 describe('nameToStore', () => {
   it('returns the typed name', () => {
@@ -26,5 +26,28 @@ describe('nameToStore', () => {
 
   it('cuts a very long name', () => {
     expect(nameToStore('a'.repeat(200), 'Bin 1')).toHaveLength(MAX_NAME_LENGTH)
+  })
+})
+
+describe('nameToStore with wide characters', () => {
+  it('does not cut an emoji in half at the limit', () => {
+    const name = nameToStore('a'.repeat(MAX_NAME_LENGTH - 1) + '🔩🔩', 'Bin 1')!
+
+    expect(name.endsWith('🔩')).toBe(true)
+    expect(Array.from(name)).toHaveLength(MAX_NAME_LENGTH)
+  })
+})
+
+describe('storedName', () => {
+  it('returns a name that is text', () => {
+    expect(storedName({ name: 'Screws' })).toBe('Screws')
+  })
+
+  it('ignores a missing, empty or non-text name', () => {
+    expect(storedName(undefined)).toBeUndefined()
+    expect(storedName({})).toBeUndefined()
+    expect(storedName({ name: '' })).toBeUndefined()
+    expect(storedName({ name: 42 })).toBeUndefined()
+    expect(storedName({ name: { first: 'x' } })).toBeUndefined()
   })
 })

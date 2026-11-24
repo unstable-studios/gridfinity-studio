@@ -165,6 +165,11 @@ function AppMenubar({
     (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey
       if (!mod) return
+      // A value still being typed in a field is stored when the field loses the keyboard.
+      // Do that first, so saving includes it.
+      if (e.code === 'KeyS' && document.activeElement instanceof HTMLInputElement) {
+        document.activeElement.blur()
+      }
       if (e.code === 'KeyN' && !e.shiftKey) {
         e.preventDefault()
         onNewProject()
