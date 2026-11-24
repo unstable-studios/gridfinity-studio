@@ -544,3 +544,108 @@ test('bins and shapes can be renamed', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('cut, copy and paste bins and shapes', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'clipboard.gfstudio')
+  const mod = process.platform === 'darwin' ? 'Meta' : 'Control'
+  const editItem = async (name: string): Promise<ReturnType<typeof page.getByRole>> => {
+    await page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
+    return page.getByRole('menuitem', { name: new RegExp(`^${name}`) })
+  }
+
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // Nothing to paste or copy yet.
+  await expect(await editItem('Paste')).toBeDisabled()
+  await expect(page.getByRole('menuitem', { name: /^Copy/ })).toBeDisabled()
+  await page.keyboard.press('Escape')
+
+  // A bin with a pocket in it. Find the pocket's bin from the saved file.
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(1)
+  let saved = await app.save(file)
+  expect(saved.layoutSnapshot.shapes[0].groupId, 'pocket is in the bin').not.toBeNull()
+
+  // Copy the bin and paste it: a second bin with its own pocket, clear of the first.
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await page.keyboard.press(`${mod}+c`)
+  await page.keyboard.press(`${mod}+v`)
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+  saved = await app.save(file)
+  const [first, second] = [...saved.layoutSnapshot.groups].sort((a, b) => a.x - b.x)
+  expect(second.x, 'pasted bin is clear of the first').toBeGreaterThanOrEqual(first.x + first.width)
+  expect(second.childIds, 'pasted bin has its own pocket').toHaveLength(1)
+  expect(first.childIds).toHaveLength(1)
+  expect(second.childIds[0]).not.toBe(first.childIds[0])
+  await expect(page.getByRole('button', { name: /^Bin 1 copy/ })).toBeVisible()
+
+  // The paste is one undo step, and redo brings it back.
+  await app.menu('Edit', /^Undo/)
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+  await app.menu('Edit', /^Redo/)
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  // Cut the copy from the menu: it goes, pocket and all.
+  await page.getByRole('button', { name: /^Bin 1 copy/ }).click()
+  await (await editItem('Cut')).click()
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+
+  // Copy the pocket on its own and paste it: the copy lands beside it, in the same bin.
+  await page.getByRole('button', { name: /^Rectangle 1/ }).click()
+  await (await editItem('Copy')).click()
+  await (await editItem('Paste')).click()
+  await app.expectShapeCount(2)
+  saved = await app.save(file)
+  const [bin] = saved.layoutSnapshot.groups
+  expect(bin.childIds, 'the pasted pocket joins the bin it lands in').toHaveLength(2)
+  const [original, copy] = saved.layoutSnapshot.shapes
+  expect(copy.x, 'the paste lands beside the original').not.toBe(original.x)
+
+  // Typing in a field keeps the keys for the text.
+  const binName = page.getByRole('textbox', { name: 'Bin name' })
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await binName.focus()
+  await page.keyboard.press(`${mod}+a`)
+  await page.keyboard.press(`${mod}+v`)
+  await app.expectShapeCount(2)
+  await app.expectBinCount(1)
+  await page.keyboard.press('Escape')
+
+  // Select all picks the bin. Its pockets come along with it, so they are not picked again.
+  await page.keyboard.press(`${mod}+a`)
+  await expect(page.locator('aside button[aria-pressed="true"]')).toHaveCount(1)
+  await expect(page.getByRole('button', { name: /^Bin 1/ })).toHaveAttribute('aria-pressed', 'true')
+
+  // Delete takes the bin with everything in it, as one undo step.
+  await page.keyboard.press('Delete')
+  await app.expectShapeCount(0)
+  await expect(page.getByText(/^Bins \(\d+\)$/)).toHaveCount(0)
+  await app.menu('Edit', /^Undo/)
+  await app.expectBinCount(1)
+  await app.expectShapeCount(2)
+
+  // A cut bin pastes back where it was.
+  const before = (await app.save(file)).layoutSnapshot.groups[0]
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await page.keyboard.press(`${mod}+x`)
+  await app.expectShapeCount(0)
+  await page.keyboard.press(`${mod}+v`)
+  await app.expectBinCount(1)
+  await app.expectShapeCount(2)
+  const after = (await app.save(file)).layoutSnapshot.groups[0]
+  expect({ x: after.x, y: after.y }, 'cut and paste puts the bin back').toEqual({
+    x: before.x,
+    y: before.y
+  })
+  expect(after.childIds).toHaveLength(2)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
