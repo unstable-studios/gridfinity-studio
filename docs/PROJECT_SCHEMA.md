@@ -15,7 +15,7 @@ interface ProjectData {
 }
 ```
 
-All lengths are in millimeters, whatever unit the app shows.
+All lengths are in millimeters.
 
 ## `settings`
 
@@ -26,7 +26,7 @@ All lengths are in millimeters, whatever unit the app shows.
 | `author`      | string                   | Optional.                                                                                          |
 | `createdAt`   | string                   | ISO 8601. Set once, when the project is created.                                                   |
 | `modifiedAt`  | string                   | ISO 8601.                                                                                          |
-| `units`       | `"mm"`, `"cm"` or `"in"` | The unit lengths are shown in. Stored values stay in millimeters.                                  |
+| `units`       | `"mm"`, `"cm"` or `"in"` | Set in Preferences. It has no effect yet: lengths are shown and stored in millimeters.             |
 
 ## `gridfinity`
 
@@ -54,7 +54,7 @@ interface LayoutSnapshotData {
 }
 ```
 
-`gridConfig.size` is the grid the canvas draws and snaps bins to. It matches `gridfinity.baseUnit`.
+`gridConfig.size` is the grid the canvas draws and snaps bins to. The app writes it equal to `gridfinity.baseUnit`.
 
 ### Coordinates
 
@@ -89,23 +89,24 @@ A shape in a bin is a pocket cut into it. A shape in no bin is only a drawing.
 
 Fields every shape has:
 
-| Field                           | Type                   | Notes                                                                                                                   |
-| ------------------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `id`                            | string                 | Unique.                                                                                                                 |
-| `type`                          | string                 | `"rect"`, `"circle"`, `"polygon"`, `"svgPath"` or `"meshImport"`.                                                       |
-| `x`, `y`                        | number                 | The shape's center. For a shape in a bin, measured **from the center of the bin**. Otherwise, a position on the canvas. |
-| `rotation`                      | number                 | Degrees, clockwise as seen on screen, about the shape's center.                                                         |
-| `groupId`                       | string or null         | The bin the shape is in. Must agree with that bin's `childIds`.                                                         |
-| `fill`, `stroke`, `strokeWidth` | string, string, number | How the shape is drawn on the canvas.                                                                                   |
-| `metadata`                      | object                 | Optional. See below.                                                                                                    |
+| Field                           | Type                   | Notes                                                                                                                                                          |
+| ------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                            | string                 | Unique.                                                                                                                                                        |
+| `type`                          | string                 | `"rect"`, `"circle"`, `"polygon"`, `"svgPath"` or `"meshImport"`.                                                                                              |
+| `x`, `y`                        | number                 | The shape's center, or for an `svgPath` the path's origin. For a shape in a bin, measured **from the center of the bin**. Otherwise, a position on the canvas. |
+| `rotation`                      | number                 | Degrees, clockwise as seen on screen, about the shape's center.                                                                                                |
+| `groupId`                       | string or null         | The bin the shape is in. The app keeps it in step with that bin's `childIds`. When a file is opened the shape goes where its `groupId` says.                   |
+| `fill`, `stroke`, `strokeWidth` | string, string, number | How the shape is drawn on the canvas.                                                                                                                          |
+| `metadata`                      | object                 | Optional. See below.                                                                                                                                           |
+| `lockAspectRatio`               | boolean                | Optional. Keeps the shape's proportions when it is resized.                                                                                                    |
 
 Fields by type:
 
 | Type         | Fields                                                   | Notes                                                                                                                           |
 | ------------ | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `rect`       | `width`, `height`                                        |                                                                                                                                 |
+| `rect`       | `width`, `height`, optional `cornerRadius`               | The corner radius is drawn on the canvas but not cut. The app has no control for it.                                            |
 | `circle`     | `radiusX`, `radiusY`                                     | An ellipse. Equal radii make a circle.                                                                                          |
-| `polygon`    | `points`                                                 | `{ x, y }` pairs. The shape's `x`, `y` is the center of the box around the points, wherever the points themselves are centered. |
+| `polygon`    | `points`                                                 | `{ x, y }` pairs. The shape's `x`, `y` is the center of the box around the points. The points do not have to be centered on it. |
 | `svgPath`    | `pathData`, optional `viewBox`, `scaleX`, `scaleY`       | Not cut into bins yet.                                                                                                          |
 | `meshImport` | `meshRef`, optional `silhouettePath`, `scaleX`, `scaleY` | Not cut into bins yet.                                                                                                          |
 
@@ -115,7 +116,7 @@ Shape `metadata`:
 | ------------------ | ------ | ------------------------------------------------------------------------------------------------------------------- |
 | `name`             | string | Optional. Shown in the sidebar.                                                                                     |
 | `pocket.depth`     | number | Optional. How deep the pocket is cut from the top of the bin. When absent, the pocket goes down to the bin's floor. |
-| `pocket.clearance` | number | Extra room around the shape. New shapes get 0.25.                                                                   |
+| `pocket.clearance` | number | Optional. Extra room around the shape. 0.25 when absent, and what a shape drawn in a bin is given.                  |
 
 ## Example
 
@@ -189,17 +190,21 @@ A 2×1 bin with one rectangular pocket in the middle of its left half.
 
 The bin's lower-left corner is at (0, 0), so it covers x from 0 to 84 and y from -42 to 0. Its center is (42, -21), and the pocket's center is 21 mm to the left of that.
 
-## What is checked when a file is opened
+## What is checked
 
-[`project-validator.ts`](../src/shared/validation/project-validator.ts) checks:
+[`project-validator.ts`](../src/shared/validation/project-validator.ts) runs when a file is opened and again before it is saved. It checks:
 
-- The four top-level fields are present.
-- `schemaVersion` is text in the form `1.2.3`.
-- `settings`: a name, both dates, and a known unit.
+- The four top-level fields exist.
+- `schemaVersion`, when it has a value, is text in the form `1.2.3`.
+- `settings`: a name, two dates as text, and a known unit.
 - `gridfinity`: the four numbers, with `baseUnit`, `gridSpacing` and `unitHeight` greater than 0, and both hole settings.
 
-It does not check what is inside `layoutSnapshot`.
+A file that fails is not opened.
 
-## Older files
+The validator does not look inside `layoutSnapshot`. Before the layout is put on the canvas, the app checks only its outline: `version` is text, `shapes` and `groups` are lists, and `gridConfig` has its three fields. If that fails, the project opens with an empty canvas.
 
-Files from `0.1.0` to `0.4.0` are converted when opened, by [`migrations.ts`](../src/shared/validation/migrations.ts). Those versions stored bins and entities in their own lists instead of a `layoutSnapshot`. A converted project is written as `0.5.0` the next time it is saved.
+## Other versions
+
+A file with a different `schemaVersion` that passes the checks above is opened as it is, and saved as `0.5.0`.
+
+Files from before `0.5.0` kept bins and entities in their own lists and have no `layoutSnapshot`, so they fail the first check and do not open. [`migrations.ts`](../src/shared/validation/migrations.ts) can convert them, but the app does not call it.

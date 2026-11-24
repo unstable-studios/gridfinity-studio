@@ -14,7 +14,7 @@ src/shared/
 │   └── ...
 └── validation/
     ├── project-validator.ts  # Checks a project when it is opened or saved
-    └── migrations.ts         # Converts older project files to the current schema
+    └── migrations.ts         # Converts pre-0.5.0 project files. Not called by the app
 ```
 
 ## Usage
