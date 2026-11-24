@@ -6,14 +6,13 @@ import type {
   CSGBinParams
 } from '../../../shared/types/worker'
 
-interface PendingRequest {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resolve: (value: any) => void
-  reject: (reason: Error) => void
-}
-
 export interface BakePocketsResult extends BakedMesh {
   warnings: string[]
+}
+
+interface PendingRequest {
+  resolve: (value: BakePocketsResult) => void
+  reject: (reason: Error) => void
 }
 
 export interface UseGeometryWorkerResult {

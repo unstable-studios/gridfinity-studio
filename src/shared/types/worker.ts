@@ -6,18 +6,13 @@
 
 // ─── Mesh transfer format ─────────────────────────────────────────
 
-export interface MeshData {
+/** A baked bin, as it crosses from the worker. */
+export interface BakedMesh {
   positions: Float32Array
   indices: Uint32Array
-}
-
-export interface MeshDataWithNormals extends MeshData {
   normals: Float32Array
   colors: Float32Array
-}
-
-/** A baked bin. `solidVertices` names the vertex of the closed solid each vertex came from. */
-export interface BakedMesh extends MeshDataWithNormals {
+  /** For each vertex, the vertex of the closed solid it came from. */
   solidVertices: Uint32Array
 }
 
