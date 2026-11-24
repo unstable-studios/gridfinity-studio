@@ -88,3 +88,63 @@ test('drawing a shape is one undo step and leaves no preview behind', async () =
 
   expect(app.errors).toEqual([])
 })
+
+test('rectangles and ellipses fit the drag, from a corner or the center', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const file = join(app.dir, 'modes.gfstudio')
+  const from = { x: 700, y: 300 }
+  const to = { x: 780, y: 340 }
+  /** Draw one shape, save, and return it. Each shape is deleted before the next. */
+  const draw = async (
+    tool: 'Rectangle' | 'Ellipse',
+    keys: Array<'Shift' | 'Alt'>
+  ): Promise<{ width: number; height: number; x: number; y: number }> => {
+    await app.selectTool(tool)
+    await app.dragHolding(keys, from, to)
+    await app.expectShapeCount(1)
+    const [shape] = (await app.save(file)).layoutSnapshot.shapes
+    await page.keyboard.press('Delete')
+    await app.expectShapeCount(0)
+    return {
+      width: shape.width ?? shape.radiusX! * 2,
+      height: shape.height ?? shape.radiusY! * 2,
+      x: shape.x,
+      y: shape.y
+    }
+  }
+
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // Corner to corner: the drag is twice as wide as it is tall, and so is the shape.
+  const rect = await draw('Rectangle', [])
+  expect(rect.width / rect.height, 'rectangle fits the drag').toBeCloseTo(2, 1)
+
+  // The ellipse tool draws an ellipse in the same box, not a circle.
+  const ellipse = await draw('Ellipse', [])
+  expect(ellipse.width, 'ellipse is as wide as the drag').toBeCloseTo(rect.width, 1)
+  expect(ellipse.height, 'ellipse is as tall as the drag').toBeCloseTo(rect.height, 1)
+  expect(ellipse.x, 'ellipse sits in the dragged box').toBeCloseTo(rect.x, 1)
+
+  // Shift: a square and a circle, as wide as the longer side of the drag.
+  const square = await draw('Rectangle', ['Shift'])
+  expect(square.width, 'square takes the longer side').toBeCloseTo(rect.width, 1)
+  expect(square.height, 'square has equal sides').toBeCloseTo(square.width, 1)
+  const circle = await draw('Ellipse', ['Shift'])
+  expect(circle.height, 'circle has equal radii').toBeCloseTo(circle.width, 1)
+
+  // Alt: the drag starts at the middle, so the shape is twice the size and is centered on
+  // the corner the others started from.
+  const centered = await draw('Rectangle', ['Alt'])
+  expect(centered.width, 'from center: twice as wide').toBeCloseTo(rect.width * 2, 1)
+  expect(centered.height, 'from center: twice as tall').toBeCloseTo(rect.height * 2, 1)
+  expect(centered.x, 'from center: centered on the start').toBeCloseTo(rect.x - rect.width / 2, 1)
+  expect(centered.y, 'from center: centered on the start').toBeCloseTo(rect.y - rect.height / 2, 1)
+
+  // Both together: a circle around the start point.
+  const centeredCircle = await draw('Ellipse', ['Shift', 'Alt'])
+  expect(centeredCircle.width, 'from center, 1:1').toBeCloseTo(rect.width * 2, 1)
+  expect(centeredCircle.height, 'from center, 1:1').toBeCloseTo(rect.width * 2, 1)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
