@@ -223,6 +223,105 @@ describe('the end of a transform', () => {
     expect(engine.getShapeBounds('a')!.maxX).toBeCloseTo(25, 6)
   })
 
+  describe('resize handles', () => {
+    const handles = (): string[] => [...internals().transformer.enabledAnchors()].sort()
+    const corners = ['bottom-left', 'bottom-right', 'top-left', 'top-right']
+
+    it('offers every handle for one shape, turned or not', () => {
+      engine.addShape({ ...makeRect('rect', 200), rotation: 30 } as LayoutShape)
+      engine.select(['rect'])
+      expect(handles()).toHaveLength(8)
+      expect(internals().transformer.keepRatio()).toBe(false)
+    })
+
+    it('offers every handle for several shapes that are not turned', () => {
+      engine.addShape(makeRect('a', 200))
+      engine.addShape(makeRect('b', 230))
+      engine.select(['a', 'b'])
+      expect(handles()).toHaveLength(8)
+      expect(internals().transformer.keepRatio()).toBe(false)
+    })
+
+    it('offers only the corners, in proportion, when one of several shapes is turned', () => {
+      // Stretched along one side, the turned one would be shown as a parallelogram, which
+      // is not what is stored or cut.
+      engine.addShape({ ...makeRect('a', 200), rotation: 30 } as LayoutShape)
+      engine.addShape(makeRect('b', 230))
+      engine.select(['a', 'b'])
+      expect(handles()).toEqual(corners)
+      expect(internals().transformer.keepRatio()).toBe(true)
+    })
+
+    it('treats a quarter turn as not turned: it only swaps width and height', () => {
+      engine.addShape({ ...makeRect('a', 200), rotation: 90 } as LayoutShape)
+      engine.addShape({ ...makeRect('b', 230), rotation: -180 } as LayoutShape)
+      engine.select(['a', 'b'])
+      expect(handles()).toHaveLength(8)
+    })
+
+    it('goes back to every handle when the turned shape leaves the selection', () => {
+      engine.addShape({ ...makeRect('a', 200), rotation: 30 } as LayoutShape)
+      engine.addShape(makeRect('b', 230))
+      engine.select(['a', 'b'])
+      engine.select(['b'])
+      expect(handles()).toHaveLength(8)
+      expect(internals().transformer.keepRatio()).toBe(false)
+    })
+
+    it('keeps every handle while a selection turned as one is still selected', () => {
+      // The handle turns every shape and the frame by the same amount, so none is turned
+      // against the frame.
+      engine.addShape(makeRect('a', 200))
+      engine.addShape(makeRect('b', 230))
+      engine.select(['a', 'b'])
+      grab()
+      node('a').rotation(25)
+      node('b').rotation(25)
+      internals().transformer.rotation(25)
+      letGo()
+      expect(handles()).toHaveLength(8)
+
+      // Selected afresh, the frame is square to the canvas again and both are turned
+      // against it.
+      engine.select(['a', 'b'])
+      expect(handles()).toEqual(corners)
+      expect(internals().transformer.keepRatio()).toBe(true)
+    })
+
+    it('works the handles out again when a selected shape is turned or unlocked by a change', () => {
+      engine.addShape(makeRect('a', 200))
+      engine.addShape(makeRect('b', 230))
+      engine.select(['a', 'b'])
+      engine.updateShape('a', { rotation: 30 })
+      expect(handles()).toEqual(corners)
+      // Unlocking the ratio of one shape must not unlock a selection that needs it kept.
+      engine.updateShape('a', { lockAspectRatio: false })
+      expect(internals().transformer.keepRatio()).toBe(true)
+      engine.updateShape('a', { rotation: 0 })
+      expect(handles()).toHaveLength(8)
+      expect(internals().transformer.keepRatio()).toBe(false)
+    })
+
+    it('leaves no skew on a shape when a transform ends', () => {
+      engine.addShape(makeRect('a', 200))
+      engine.select(['a'])
+      grab()
+      node('a').skewX(0.3)
+      node('a').rotation(10)
+      letGo()
+      expect(node('a').skewX()).toBe(0)
+      expect(node('a').skewY()).toBe(0)
+    })
+
+    it('gives a bin every handle, also after a turned selection', () => {
+      engine.addShape({ ...makeRect('a', 200), rotation: 30 } as LayoutShape)
+      engine.addShape(makeRect('b', 230))
+      engine.select(['a', 'b'])
+      engine.select(['bin'])
+      expect(handles()).toHaveLength(8)
+    })
+  })
+
   it('leaves the shapes in a bin alone when the bin is resized', () => {
     engine.addShape(makeRect('rect', 40))
     engine.addToGroup('rect', 'bin')
