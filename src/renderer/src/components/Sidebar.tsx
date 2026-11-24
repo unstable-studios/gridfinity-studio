@@ -12,6 +12,7 @@ import EditContextMenu from './EditContextMenu'
 import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
 import { removeItems } from '@/lib/remove-items'
+import { addBin } from '@/lib/new-bin'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -197,43 +198,10 @@ function LayoutSidebar(): React.JSX.Element {
 
   const handleAddBin = (widthUnits: number, depthUnits: number): void => {
     if (!engine) return
-    const id = crypto.randomUUID()
-    const width = widthUnits * baseUnit
-    const height = depthUnits * baseUnit
-    const existingCount = binGroups.length
-
-    // Place new bin to the right of the rightmost existing bin (with one grid unit gap).
-    // x,y = lower-left corner: left edge at x, bottom edge at y.
+    // To the right of the rightmost bin, with one grid unit between them.
     const rightEdge = binGroups.reduce((max, g) => Math.max(max, g.x + g.width), 0)
     const x = binGroups.length === 0 ? 0 : rightEdge + baseUnit
-    const y = 0
-
-    const metadata: BinMetadata = {
-      widthUnits,
-      depthUnits,
-      heightUnits: 3,
-      hasLip: true,
-      name: `Bin ${existingCount + 1}`
-    }
-
-    engine.createGroup({
-      id,
-      x,
-      y,
-      width,
-      height,
-      rotation: 0,
-      childIds: [],
-      style: {
-        fill: 'rgba(96, 165, 250, 0.05)',
-        stroke: '#60a5fa',
-        strokeWidth: 1,
-        cornerRadius: 4
-      },
-      metadata
-    })
-
-    engine.select([id])
+    addBin(engine, { x, y: 0, widthUnits, depthUnits }, baseUnit)
   }
 
   const handleUpdateBinMetadata = (groupId: string, patch: Partial<BinMetadata>): void => {

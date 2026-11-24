@@ -148,3 +148,101 @@ test('rectangles and ellipses fit the drag, from a corner or the center', async 
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('drag on the canvas to draw a bin on the grid', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const { mouse } = page
+  const file = join(app.dir, 'bins.gfstudio')
+  const UNIT = 42
+  const origin = { x: 700, y: 300 }
+
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // Draw and delete a rectangle to learn where the grid is on screen.
+  await app.selectTool('Rectangle')
+  await app.drag(origin, { x: 780, y: 340 })
+  await app.expectShapeCount(1)
+  const [rect] = (await app.save(file)).layoutSnapshot.shapes
+  await page.keyboard.press('Delete')
+  await app.expectShapeCount(0)
+  const scale = 80 / rect.width!
+  const unitPx = UNIT * scale
+  const worldAt = (screen: { x: number; y: number }): { x: number; y: number } => ({
+    x: rect.x - rect.width! / 2 + (screen.x - origin.x) / scale,
+    y: rect.y - rect.height! / 2 + (screen.y - origin.y) / scale
+  })
+  const column = (screen: { x: number; y: number }): number => Math.floor(worldAt(screen).x / UNIT)
+  const row = (screen: { x: number; y: number }): number => Math.floor(worldAt(screen).y / UNIT)
+
+  // Drag a little over one cell to the right: the bin covers every cell the drag touched,
+  // and says how big it is on the way.
+  // Whole pixels, so the app and this test agree on which cell a point is in.
+  const end = { x: Math.round(origin.x + unitPx * 1.2), y: Math.round(origin.y + unitPx * 0.2) }
+  const columns = column(end) - column(origin) + 1
+  const rows = row(end) - row(origin) + 1
+  await app.selectTool('Bin')
+  await mouse.move(origin.x, origin.y)
+  await mouse.down()
+  await mouse.move(end.x, end.y, { steps: 6 })
+  await expect(page.getByText(`${columns}×${rows}`, { exact: true })).toBeVisible()
+  await mouse.up()
+  await app.expectBinCount(1)
+  await expect(app.tool('Select')).toBeChecked()
+  await expect(page.getByRole('button', { name: /^Bin 1/ })).toHaveAttribute('aria-pressed', 'true')
+
+  const [first] = (await app.save(file)).layoutSnapshot.groups
+  expect(first.x, 'left edge is on the grid').toBe(column(origin) * UNIT)
+  expect(first.y, 'bottom edge is on the grid').toBe((row(end) + 1) * UNIT)
+  expect(first.width).toBe(columns * UNIT)
+  expect(first.height).toBe(rows * UNIT)
+
+  // A drag that would land on that bin shows there is no room and draws nothing.
+  await app.selectTool('Bin')
+  await mouse.move(origin.x, origin.y)
+  await mouse.down()
+  await mouse.move(Math.round(origin.x - unitPx * 0.5), origin.y, { steps: 4 })
+  await expect(page.getByText('No room', { exact: true })).toBeVisible()
+  await mouse.up()
+  await app.expectBinCount(1)
+  await expect(app.tool('Bin')).toBeChecked()
+
+  // Esc calls a drag off.
+  await mouse.move(Math.round(origin.x - unitPx * 3), origin.y)
+  await mouse.down()
+  await mouse.move(Math.round(origin.x - unitPx * 4), origin.y, { steps: 4 })
+  await page.keyboard.press('Escape')
+  await mouse.up()
+  await app.expectBinCount(1)
+
+  // A click in the cell to the left of the bin draws a 1×1 bin that touches it.
+  const leftEdge = origin.x - (worldAt(origin).x - first.x) * scale
+  await mouse.click(Math.round(leftEdge - unitPx * 0.5), origin.y)
+  await app.expectBinCount(2)
+  const second = (await app.save(file)).layoutSnapshot.groups.find((g) => g.id !== first.id)!
+  expect(second.x + second.width, 'touches the first bin').toBe(first.x)
+  expect(second.width).toBe(UNIT)
+  expect(second.height).toBe(UNIT)
+
+  // Drawing a bin is one undo step.
+  await app.menu('Edit', /^Undo/)
+  await app.expectBinCount(1)
+  await app.menu('Edit', /^Redo/)
+  await app.expectBinCount(2)
+
+  // A bin drawn around a loose shape takes it in, and the bins are not named twice.
+  const below = Math.round(origin.y + unitPx * 3)
+  await app.selectTool('Rectangle')
+  await app.drag({ x: origin.x + 8, y: below }, { x: origin.x + 24, y: below + 12 })
+  await app.expectShapeCount(1)
+  await app.selectTool('Bin')
+  await mouse.click(origin.x + 16, below + 6)
+  await app.expectBinCount(3)
+  await expect(page.getByRole('button', { name: /^Bin 3/ })).toBeVisible()
+  const withPocket = await app.save(file)
+  const third = withPocket.layoutSnapshot.groups.find((g) => g.childIds.length > 0)
+  expect(third, 'the new bin holds the shape').toBeDefined()
+  expect(withPocket.layoutSnapshot.shapes[0].groupId).toBe(third!.id)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})

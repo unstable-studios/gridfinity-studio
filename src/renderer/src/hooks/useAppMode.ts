@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
 export type AppMode = 'layout' | 'review'
-export type ActiveTool = 'select' | 'circle' | 'rectangle' | 'polygon' | null
+export type ActiveTool = 'select' | 'bin' | 'circle' | 'rectangle' | 'polygon' | null
 
 export interface AppModeContext {
   mode: AppMode

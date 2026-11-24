@@ -1,6 +1,6 @@
 /**
  * Transparent DOM overlay that captures pointer events when a drawing tool
- * is active (rectangle, circle, polygon). Converts screen coordinates to
+ * is active (bin, rectangle, circle, polygon). Converts screen coordinates to
  * engine world coordinates and drives tool-specific state machines.
  *
  * Mounted on top of the engine canvas in layout mode only.
@@ -14,6 +14,9 @@ import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/type
 import { findBestBinForShape, type ShapeAABB } from '@/layout-engine/containment'
 import { shapeTypeLabel } from '@/lib/shape-labels'
 import { boxFromDrag, type DrawOptions, type Point } from '@/lib/draw-box'
+import { binFromDrag, type DrawnBin } from '@/lib/draw-bin'
+import { addBin } from '@/lib/new-bin'
+import { checkGroupCollision } from '@/layout-engine/collision'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
 
@@ -197,11 +200,15 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   }, [])
 
   // Pressing or letting go of a modifier key during a drag changes the shape straight away,
-  // without waiting for the pointer to move.
+  // without waiting for the pointer to move. Esc calls the drag off.
   const isDragging = dragPreview !== null
   useEffect(() => {
     if (!isDragging) return
     const onKey = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        if (e.type === 'keydown') cleanupPreview()
+        return
+      }
       if (!MODIFIER_KEYS.has(e.key)) return
       const start = dragStartRef.current
       const pointer = dragCurrentRef.current
@@ -210,6 +217,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       if (e.key === 'Alt') e.preventDefault()
       // A held key repeats its keydown. Nothing has changed since the first one.
       if (e.repeat) return
+      // A bin fills whole grid cells whatever keys are held.
+      if (activeTool === 'bin') return
       setDragPreview({ start, current: snapShapePoint(pointer, e), options: drawOptions(e) })
     }
     window.addEventListener('keydown', onKey)
@@ -218,7 +227,7 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       window.removeEventListener('keydown', onKey)
       window.removeEventListener('keyup', onKey)
     }
-  }, [isDragging])
+  }, [isDragging, activeTool, cleanupPreview])
 
   useEffect(() => {
     return () => {
@@ -318,7 +327,13 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
       const snapped = snapShapePoint(world, e)
 
-      if (activeTool === 'rectangle' || activeTool === 'circle') {
+      if (activeTool === 'bin') {
+        // A bin snaps to whole grid cells, so the pointer is used as it is.
+        dragStartRef.current = world
+        dragCurrentRef.current = world
+        setDragPreview({ start: world, current: world, options: drawOptions(e) })
+        ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+      } else if (activeTool === 'rectangle' || activeTool === 'circle') {
         dragStartRef.current = snapped
         dragCurrentRef.current = world
         setDragPreview({ start: snapped, current: snapped, options: drawOptions(e) })
@@ -357,7 +372,10 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       if (!engine || !overlay) return
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
 
-      if ((activeTool === 'rectangle' || activeTool === 'circle') && dragStartRef.current) {
+      if (activeTool === 'bin' && dragStartRef.current) {
+        dragCurrentRef.current = world
+        setDragPreview({ start: dragStartRef.current, current: world, options: drawOptions(e) })
+      } else if ((activeTool === 'rectangle' || activeTool === 'circle') && dragStartRef.current) {
         dragCurrentRef.current = world
         setDragPreview({
           start: dragStartRef.current,
@@ -390,10 +408,22 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
     (e: React.PointerEvent) => {
       const overlay = overlayRef.current
       if (!engine || !overlay) return
-      if (activeTool !== 'rectangle' && activeTool !== 'circle') return
+      if (activeTool !== 'bin' && activeTool !== 'rectangle' && activeTool !== 'circle') return
       if (!dragStartRef.current) return
 
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
+      if (activeTool === 'bin') {
+        const cell = engine.getGridConfig().size
+        const bin = binFromDrag(dragStartRef.current, world, cell)
+        setDragPreview(null)
+        dragStartRef.current = null
+        dragCurrentRef.current = null
+        // A bin can't sit on another. The preview has already shown there is no room.
+        if (binOverlaps(engine, bin)) return
+        addBin(engine, bin, cell, { adoptShapes: true })
+        setActiveTool('select')
+        return
+      }
       const snapped = snapShapePoint(world, e)
       const start = dragStartRef.current
 
@@ -447,6 +477,13 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       onPointerCancel={cleanupPreview}
       onLostPointerCapture={cleanupPreview}
     >
+      {dragPreview && activeTool === 'bin' && (
+        <BinPreviewSvg
+          bin={binFromDrag(dragPreview.start, dragPreview.current, engine.getGridConfig().size)}
+          engine={engine}
+          viewport={viewport}
+        />
+      )}
       {dragPreview && (activeTool === 'rectangle' || activeTool === 'circle') && (
         <DragPreviewSvg tool={activeTool} preview={dragPreview} viewport={viewport} />
       )}
@@ -503,6 +540,51 @@ function DragPreviewSvg({
           {...style}
         />
       )}
+    </svg>
+  )
+}
+
+// ─── SVG Overlay for the bin drag preview ───────────────────────────────────
+
+const BIN_PREVIEW = { fill: 'rgba(59, 130, 246, 0.15)', stroke: '#3b82f6' }
+const BIN_PREVIEW_BLOCKED = { fill: 'rgba(239, 68, 68, 0.15)', stroke: '#ef4444' }
+
+/** Whether a drawn bin would sit on a bin that is already there. */
+function binOverlaps(engine: LayoutEngine, bin: DrawnBin): boolean {
+  return checkGroupCollision(bin, '', engine.getAllGroups()) !== null
+}
+
+/** The bin being drawn, with its size in grid units. Red when there is no room for it. */
+function BinPreviewSvg({
+  bin,
+  engine,
+  viewport
+}: {
+  bin: DrawnBin
+  engine: LayoutEngine
+  viewport: { panX: number; panY: number; zoom: number }
+}): React.JSX.Element {
+  const x = bin.x * viewport.zoom - viewport.panX
+  const y = (bin.y - bin.height) * viewport.zoom - viewport.panY
+  const width = bin.width * viewport.zoom
+  const height = bin.height * viewport.zoom
+  const blocked = binOverlaps(engine, bin)
+  const colors = blocked ? BIN_PREVIEW_BLOCKED : BIN_PREVIEW
+
+  return (
+    <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%">
+      <rect x={x} y={y} width={width} height={height} rx={4} strokeWidth={1.5} {...colors} />
+      <text
+        x={x + width / 2}
+        y={y + height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        fontSize={12}
+        fontWeight={600}
+        fill={colors.stroke}
+      >
+        {blocked ? 'No room' : `${bin.widthUnits}×${bin.depthUnits}`}
+      </text>
     </svg>
   )
 }
