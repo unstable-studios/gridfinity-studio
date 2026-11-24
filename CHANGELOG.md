@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.17.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.1...v1.17.2) (2026-11-24)
+
+
+### Bug Fixes
+
+* **core:** do not let a resize skew a turned shape ([#527](https://github.com/unstable-studios/gridfinity-studio/issues/527)) ([9a91a61](https://github.com/unstable-studios/gridfinity-studio/commit/9a91a615f1f604dd2d027ba2729d6f7a40d824d5))
+* **ui:** make preview status and warnings readable in the light theme ([#529](https://github.com/unstable-studios/gridfinity-studio/issues/529)) ([af05bfb](https://github.com/unstable-studios/gridfinity-studio/commit/af05bfbbb5cfa15e38327a2c15f68bb7df5dc1f1))
+
+
+### Documentation
+
+* add screenshots to the readme ([#528](https://github.com/unstable-studios/gridfinity-studio/issues/528)) ([3e11ce0](https://github.com/unstable-studios/gridfinity-studio/commit/3e11ce0df73793b434ef9343e73d78e241d2ed33))
+
 ## [1.17.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.0...v1.17.1) (2026-11-24)
 
 
