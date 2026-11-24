@@ -11,6 +11,8 @@ export interface SavedShape {
   y: number
   width?: number
   height?: number
+  radiusX?: number
+  radiusY?: number
   groupId: string | null
   metadata?: { name?: string; pocket?: { depth?: number | null; clearance?: number } }
 }
@@ -118,6 +120,21 @@ export class StudioApp {
     await mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 4 })
     await mouse.move(to.x, to.y, { steps: 4 })
     await mouse.up()
+  }
+
+  /**
+   * Drag with modifier keys held. The keys go down after the drag has started and come up
+   * after it ends, as when a person decides halfway through.
+   */
+  async dragHolding(keys: Array<'Shift' | 'Alt'>, from: Point, to: Point): Promise<void> {
+    const { mouse, keyboard } = this.page
+    await mouse.move(from.x, from.y)
+    await mouse.down()
+    await mouse.move((from.x + to.x) / 2, (from.y + to.y) / 2, { steps: 4 })
+    for (const key of keys) await keyboard.down(key)
+    await mouse.move(to.x, to.y, { steps: 4 })
+    await mouse.up()
+    for (const key of keys) await keyboard.up(key)
   }
 
   async expectBinCount(count: number): Promise<void> {
