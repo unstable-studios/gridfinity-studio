@@ -41,7 +41,7 @@ export interface GroupRenderer {
    */
   highlight(): void
 
-  /** Restore the original stroke after highlight(). Idempotent. */
+  /** Restore the group's own fill and stroke after highlight(). Idempotent. */
   unhighlight(): void
 
   /** Remove from canvas/layer and clean up all native objects. */

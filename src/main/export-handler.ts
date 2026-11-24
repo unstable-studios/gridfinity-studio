@@ -25,18 +25,29 @@ export interface BatchExportResult {
   directory?: string
 }
 
+/** Names Windows keeps for devices. A file can't have one, with or without an extension. */
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+
+/** Longest name offered, without the extension. File systems stop at 255 bytes. */
+const MAX_NAME_LENGTH = 120
+
 /**
  * File name to offer in the save dialog. `suggestedName` comes from the renderer, so anything
  * that could point at another folder or is not allowed in a file name is taken out.
  */
-export function exportFileName(suggestedName: string | undefined, extension: string): string {
-  const withoutExtension = (suggestedName ?? '').replace(new RegExp(`\\.${extension}$`, 'i'), '')
-  const safe = withoutExtension
-    // eslint-disable-next-line no-control-regex
-    .replace(/[<>:"/\\|?*\u0000-\u001f]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .replace(/^[.\s]+|[.\s]+$/g, '')
-  return `${safe || 'gridfinity-bin'}.${extension}`
+export function exportFileName(suggestedName: unknown, extension: string): string {
+  const given = typeof suggestedName === 'string' ? suggestedName : ''
+  const clean = (text: string): string =>
+    text
+      // Path separators, characters Windows refuses, control and invisible characters.
+      // eslint-disable-next-line no-control-regex
+      .replace(/[<>:"/\\|?*\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .replace(/^[.\s]+|[.\s]+$/g, '')
+  const withoutExtension = clean(given).replace(new RegExp(`\\.${extension}$`, 'i'), '')
+  let name = clean(withoutExtension).slice(0, MAX_NAME_LENGTH).trim()
+  if (WINDOWS_RESERVED_NAME.test(name)) name = `${name} export`
+  return `${name || 'gridfinity-bin'}.${extension}`
 }
 
 /**
