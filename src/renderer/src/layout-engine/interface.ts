@@ -44,7 +44,11 @@ export interface LayoutEngine {
 
   // ─── Group Operations ───────────────────────────────────────────────────────
   createGroup(group: LayoutGroup): void
-  updateGroup(id: string, patch: Partial<LayoutGroup>): void
+  /**
+   * Change a group. A change of position or size that would put it on top of another group is
+   * refused: nothing changes, `collisionRejected` is emitted and the result is false.
+   */
+  updateGroup(id: string, patch: Partial<LayoutGroup>): boolean
   removeGroup(id: string): void
   addToGroup(shapeId: string, groupId: string): void
   removeFromGroup(shapeId: string): void

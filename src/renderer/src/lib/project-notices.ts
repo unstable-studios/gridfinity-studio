@@ -53,3 +53,11 @@ export function notifyExportFailed(detail: string | undefined): void {
 export function notifyExported(what: string): void {
   toast.success(`Exported ${what}`)
 }
+
+/** A bin could not be resized because another bin is where it would grow. */
+export function notifyResizeBlocked(): void {
+  toast.error('Not enough room to resize', {
+    description: 'Another bin is in the way. Move one of them, then try again.',
+    id: 'resize-blocked'
+  })
+}
