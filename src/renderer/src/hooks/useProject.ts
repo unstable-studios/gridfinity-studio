@@ -21,6 +21,7 @@ import type {
 import type { BakedMesh } from '../../../shared/types/worker'
 import type { BatchExportFile, ExportFormat } from '../../../shared/types/export'
 import { downloadBlob } from '../lib/download-blob'
+import type { ExampleProject } from '../lib/example-projects'
 import { fileName } from '../lib/file-errors'
 import {
   notifyExported,
@@ -70,6 +71,8 @@ interface ProjectState {
   saveProjectAs: () => Promise<boolean>
   loadProject: (targetPath?: string) => Promise<boolean>
   createNewProject: (config?: { name?: string; baseUnit?: number; tolerance?: number }) => void
+  /** Open a bundled example as a new project with no file. */
+  openExample: (example: ExampleProject) => void
   loadRecentProjects: () => Promise<void>
 
   // Export operations
@@ -262,6 +265,17 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         project,
         filePath: null,
         isModified: true,
+        bakeResults: new Map(),
+        bakeStatus: new Map()
+      })
+    },
+
+    openExample: (example) => {
+      set({
+        project: repairProject(example.build()),
+        filePath: null,
+        // Nothing of the person's is in it yet, so closing it does not ask to save.
+        isModified: false,
         bakeResults: new Map(),
         bakeStatus: new Map()
       })
