@@ -13,6 +13,7 @@ import type { LayoutEngine } from '@/layout-engine'
 import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/types'
 import { findBestBinForShape, type ShapeAABB } from '@/layout-engine/containment'
 import { shapeTypeLabel } from '@/lib/shape-labels'
+import { boxFromDrag, type DrawOptions, type Point } from '@/lib/draw-box'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
 
@@ -32,24 +33,35 @@ function screenToWorld(
 
 // ─── Shape snap grid ────────────────────────────────────────────────────────
 // Shapes snap to a finer grid than bins. Default: no snap (free draw).
-// Hold Shift for fine snap (1mm). This is separate from the engine's bin grid.
+// Hold Ctrl or Cmd for fine snap (1mm). This is separate from the engine's bin grid.
 
 const FINE_SNAP = 1 // mm
 
-function snapShape(value: number, shiftHeld: boolean): number {
-  if (!shiftHeld) return value
+/** The modifier keys a drawing tool reads from a pointer or key event. */
+interface ModifierKeys {
+  shiftKey: boolean
+  altKey: boolean
+  ctrlKey: boolean
+  metaKey: boolean
+}
+
+function snapShape(value: number, snap: boolean): number {
+  if (!snap) return value
   const size = FINE_SNAP
   return Math.round(value / size) * size
 }
 
-function snapShapePoint(
-  world: { x: number; y: number },
-  shiftHeld: boolean
-): { x: number; y: number } {
+function snapShapePoint(world: Point, keys: ModifierKeys): Point {
+  const snap = keys.ctrlKey || keys.metaKey
   return {
-    x: snapShape(world.x, shiftHeld),
-    y: snapShape(world.y, shiftHeld)
+    x: snapShape(world.x, snap),
+    y: snapShape(world.y, snap)
   }
+}
+
+/** Alt draws out from the center. Shift keeps the shape square. */
+function drawOptions(keys: ModifierKeys): DrawOptions {
+  return { fromCenter: keys.altKey, square: keys.shiftKey }
 }
 
 // ─── Shape defaults ─────────────────────────────────────────────────────────
@@ -137,6 +149,9 @@ const INITIAL_STATE: DrawingState = {
 
 const CLOSE_SNAP_DISTANCE_PX = 10
 
+/** A drag must make a shape wider and taller than this, in mm, or nothing is drawn. */
+const MIN_DRAWN_SIZE = 2
+
 // ─── Main Component ─────────────────────────────────────────────────────────
 
 export default function DrawingToolLayer(): React.JSX.Element | null {
@@ -159,7 +174,9 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
   /* eslint-enable react-hooks/refs */
 
   // Refs for drag state (rect/circle) — not rendered, so ref is fine
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null)
+  const dragStartRef = useRef<Point | null>(null)
+  // Where the pointer last was, so a modifier key pressed mid-drag can redraw the preview.
+  const dragCurrentRef = useRef<Point | null>(null)
   // Rect/circle preview while dragging. Drawn in the overlay, never added to
   // the engine, so it cannot reach undo history, the sidebar or a saved file.
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null)
@@ -171,8 +188,31 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 
   const cleanupPreview = useCallback(() => {
     dragStartRef.current = null
+    dragCurrentRef.current = null
     setDragPreview(null)
   }, [])
+
+  // Pressing or letting go of Alt or Shift during a drag changes the shape straight away,
+  // without waiting for the pointer to move.
+  const isDragging = dragPreview !== null
+  useEffect(() => {
+    if (!isDragging) return
+    const onKey = (e: KeyboardEvent): void => {
+      if (e.key !== 'Alt' && e.key !== 'Shift') return
+      const start = dragStartRef.current
+      const current = dragCurrentRef.current
+      if (!start || !current) return
+      // Alt on its own would otherwise move focus to the window menu on Windows and Linux.
+      if (e.key === 'Alt') e.preventDefault()
+      setDragPreview({ start, current, options: drawOptions(e) })
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('keyup', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('keyup', onKey)
+    }
+  }, [isDragging])
 
   useEffect(() => {
     return () => {
@@ -268,11 +308,12 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const overlay = overlayRef.current
       if (!engine || !overlay || e.button !== 0) return
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
-      const snapped = snapShapePoint(world, e.shiftKey)
+      const snapped = snapShapePoint(world, e)
 
       if (activeTool === 'rectangle' || activeTool === 'circle') {
         dragStartRef.current = snapped
-        setDragPreview({ start: snapped, current: snapped })
+        dragCurrentRef.current = snapped
+        setDragPreview({ start: snapped, current: snapped, options: drawOptions(e) })
         ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
       } else if (activeTool === 'polygon') {
         setState((prev) => {
@@ -309,12 +350,11 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
 
       if ((activeTool === 'rectangle' || activeTool === 'circle') && dragStartRef.current) {
-        setDragPreview({
-          start: dragStartRef.current,
-          current: snapShapePoint(world, e.shiftKey)
-        })
+        const current = snapShapePoint(world, e)
+        dragCurrentRef.current = current
+        setDragPreview({ start: dragStartRef.current, current, options: drawOptions(e) })
       } else if (activeTool === 'polygon') {
-        const snapped = snapShapePoint(world, e.shiftKey)
+        const snapped = snapShapePoint(world, e)
         setState((prev) => {
           if (prev.polygonVertices.length === 0) return prev
           let nearClose = false
@@ -343,77 +383,40 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
       if (!dragStartRef.current) return
 
       const world = screenToWorld(e.clientX, e.clientY, overlay, engine)
-      const snapped = snapShapePoint(world, e.shiftKey)
+      const snapped = snapShapePoint(world, e)
       const start = dragStartRef.current
 
       setDragPreview(null)
 
-      if (activeTool === 'rectangle') {
-        const w = Math.abs(snapped.x - start.x)
-        const h = Math.abs(snapped.y - start.y)
-        if (w > 2 && h > 2) {
-          const x = Math.min(start.x, snapped.x)
-          const y = Math.min(start.y, snapped.y)
-          const cx = x + w / 2
-          const cy = y + h / 2
-          const bin = findBinForDrawnShape(engine, {
-            minX: x,
-            minY: y,
-            maxX: x + w,
-            maxY: y + h
-          })
-          const id = crypto.randomUUID()
-          const name = nextShapeName(engine, 'rect')
-          engine.batch(() => {
-            engine.addShape({
-              id,
-              type: 'rect',
-              x: cx,
-              y: cy,
-              width: w,
-              height: h,
-              ...baseShapeProps(),
-              groupId: null,
-              metadata: { ...pocketMetadata(bin), name }
-            })
-            if (bin) engine.addToGroup(id, bin.id)
-          })
-          engine.select([id])
-          setActiveTool('select')
+      const box = boxFromDrag(start, snapped, drawOptions(e))
+      const w = box.maxX - box.minX
+      const h = box.maxY - box.minY
+      if (w > MIN_DRAWN_SIZE && h > MIN_DRAWN_SIZE) {
+        const type = activeTool === 'rectangle' ? 'rect' : 'circle'
+        const center = { x: box.minX + w / 2, y: box.minY + h / 2 }
+        const bin = findBinForDrawnShape(engine, box)
+        const id = crypto.randomUUID()
+        const common = {
+          id,
+          ...center,
+          ...baseShapeProps(),
+          groupId: null,
+          metadata: { ...pocketMetadata(bin), name: nextShapeName(engine, type) }
         }
-      } else {
-        const dx = snapped.x - start.x
-        const dy = snapped.y - start.y
-        const radius = Math.sqrt(dx * dx + dy * dy)
-        if (radius > 2) {
-          const bin = findBinForDrawnShape(engine, {
-            minX: start.x - radius,
-            minY: start.y - radius,
-            maxX: start.x + radius,
-            maxY: start.y + radius
-          })
-          const id = crypto.randomUUID()
-          const name = nextShapeName(engine, 'circle')
-          engine.batch(() => {
-            engine.addShape({
-              id,
-              type: 'circle',
-              x: start.x,
-              y: start.y,
-              radiusX: radius,
-              radiusY: radius,
-              ...baseShapeProps(),
-              groupId: null,
-              metadata: { ...pocketMetadata(bin), name }
-            })
-            if (bin) engine.addToGroup(id, bin.id)
-          })
-          engine.select([id])
-          setActiveTool('select')
-        }
+        engine.batch(() => {
+          engine.addShape(
+            type === 'rect'
+              ? { ...common, type, width: w, height: h }
+              : { ...common, type, radiusX: w / 2, radiusY: h / 2 }
+          )
+          if (bin) engine.addToGroup(id, bin.id)
+        })
+        engine.select([id])
+        setActiveTool('select')
       }
 
       dragStartRef.current = null
+      dragCurrentRef.current = null
     },
     [engine, activeTool, setActiveTool]
   )
@@ -451,8 +454,9 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
 // ─── SVG Overlay for rect/circle drag preview ───────────────────────────────
 
 interface DragPreview {
-  start: { x: number; y: number }
-  current: { x: number; y: number }
+  start: Point
+  current: Point
+  options: DrawOptions
 }
 
 function DragPreviewSvg({
@@ -466,7 +470,9 @@ function DragPreviewSvg({
 }): React.JSX.Element {
   const sx = (wx: number): number => wx * viewport.zoom - viewport.panX
   const sy = (wy: number): number => wy * viewport.zoom - viewport.panY
-  const { start, current } = preview
+  const box = boxFromDrag(preview.start, preview.current, preview.options)
+  const width = (box.maxX - box.minX) * viewport.zoom
+  const height = (box.maxY - box.minY) * viewport.zoom
   const style = {
     fill: PREVIEW_FILL,
     stroke: PREVIEW_STROKE,
@@ -476,18 +482,13 @@ function DragPreviewSvg({
   return (
     <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%">
       {tool === 'rectangle' ? (
-        <rect
-          x={sx(Math.min(start.x, current.x))}
-          y={sy(Math.min(start.y, current.y))}
-          width={Math.abs(current.x - start.x) * viewport.zoom}
-          height={Math.abs(current.y - start.y) * viewport.zoom}
-          {...style}
-        />
+        <rect x={sx(box.minX)} y={sy(box.minY)} width={width} height={height} {...style} />
       ) : (
-        <circle
-          cx={sx(start.x)}
-          cy={sy(start.y)}
-          r={Math.hypot(current.x - start.x, current.y - start.y) * viewport.zoom}
+        <ellipse
+          cx={sx(box.minX) + width / 2}
+          cy={sy(box.minY) + height / 2}
+          rx={width / 2}
+          ry={height / 2}
           {...style}
         />
       )}
