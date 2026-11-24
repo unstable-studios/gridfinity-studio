@@ -247,7 +247,7 @@ test('drag on the canvas to draw a bin on the grid', async () => {
   expect(app.errors, 'no renderer errors').toEqual([])
 })
 
-test('a pocket with no area leaves its bin whole and says so in Preview', async () => {
+test('a pocket with no area leaves its bin whole, and Preview says which shape', async () => {
   app = await StudioApp.launch()
   const { page } = app
   const { mouse } = page
@@ -274,7 +274,9 @@ test('a pocket with no area leaves its bin whole and says so in Preview', async 
   // The bin is built, and the shape that could not be cut is named as the reason.
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
   await expect(page.getByText(/\bReady$/)).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('A shape with no area was not cut.')).toBeVisible()
+  await expect(
+    page.getByText('Bin 1: Polygon 1 could not be cut. Redraw or delete it in Design.')
+  ).toBeVisible()
 
   // An export of it has a bin in it.
   const stlPath = join(app.dir, 'flat.stl')

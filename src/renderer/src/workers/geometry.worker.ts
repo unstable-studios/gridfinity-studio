@@ -253,11 +253,14 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
         )
 
         const skipped = csgResult.skippedPockets
-        if (skipped > 0) {
+        if (skipped.length > 0) {
+          const { name: binName, pockets } = msg.binParams
+          const where = binName ? `${binName}: ` : ''
+          const shapeName = pockets[skipped[0]]?.name
           warnings.push(
-            skipped === 1
-              ? 'A shape with no area was not cut.'
-              : `${skipped} shapes with no area were not cut.`
+            skipped.length === 1
+              ? `${where}${shapeName ?? 'A shape'} could not be cut. Redraw or delete it in Design.`
+              : `${where}${skipped.length} shapes could not be cut. Redraw or delete them in Design.`
           )
         }
 
