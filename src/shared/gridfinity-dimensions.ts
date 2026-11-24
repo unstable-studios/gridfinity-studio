@@ -34,6 +34,12 @@ export const LIP_HEIGHT = 4.4
 /** Gap between the outer wall and the lip's groove at the top. */
 export const LIP_OFFSET = 0.25
 
+/** How far in from the outer wall the stacking lip reaches, at its widest. */
+export const LIP_INSET = LIP_OFFSET + LIP_PROFILE[LIP_PROFILE.length - 1][0]
+
+/** Thickness of a bin's outer wall. */
+export const WALL_THICKNESS = 0.95
+
 /** Radius of a bin's outer corners. */
 export const OUTER_CORNER_RADIUS = 3.75
 

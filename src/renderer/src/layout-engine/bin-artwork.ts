@@ -11,7 +11,7 @@
 
 import type { GridfinityConfig } from '../../../shared/types/project'
 import type { BinMetadata } from './types'
-import { MAGNET_HOLE_OFFSET as HOLE_OFFSET } from '../../../shared/gridfinity-dimensions'
+import { LIP_INSET, MAGNET_HOLE_OFFSET as HOLE_OFFSET } from '../../../shared/gridfinity-dimensions'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,9 +33,6 @@ export interface BinArtwork {
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-
-/** Lip inset distance (mm) — from gridfinity spec */
-const LIP_INSET = 2.85
 
 // ─── Computation ────────────────────────────────────────────────────────────
 

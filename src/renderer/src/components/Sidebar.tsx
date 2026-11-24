@@ -12,6 +12,7 @@ import NameField from './NameField'
 import EditContextMenu from './EditContextMenu'
 import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
+import { shapeWallIssue, wallIssueText, type WallIssue } from '@/lib/wall-clearance'
 import { removeItems } from '@/lib/remove-items'
 import { addBin, placeForNewBin } from '@/lib/new-bin'
 import {
@@ -66,6 +67,11 @@ export default function Sidebar(): React.JSX.Element {
 const RENAME_ROW_CLASS = 'px-2 py-1 text-xs'
 
 /** A row in the bin or shape list. `select-none` keeps a Shift-click from selecting text. */
+/** "leaves a thin wall" -> "Leaves a thin wall." */
+function sentence(text: string): string {
+  return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`
+}
+
 function listRowClass(isSelected: boolean): string {
   return `w-full select-none rounded px-2 py-1 text-left text-xs transition-colors ${
     isSelected
@@ -86,6 +92,18 @@ function LayoutSidebar(): React.JSX.Element {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const shapes = useMemo(() => engine?.getAllShapes() ?? [], [engine, selectedIds, tick])
   const binGroups = useMemo(() => groups.filter(isBinGroup), [groups])
+
+  // Shapes that come too close to their bin's wall. A warning, never a block.
+  const gridfinity = project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
+  const wallIssues = useMemo(() => {
+    const found = new Map<string, WallIssue>()
+    for (const shape of shapes) {
+      const bin = binGroups.find((group) => group.id === shape.groupId)
+      const issue = bin && shapeWallIssue(bin, shape, gridfinity)
+      if (issue) found.set(shape.id, issue)
+    }
+    return found
+  }, [shapes, binGroups, gridfinity])
 
   // Clicking rows in the two lists selects as in a file manager. The lists count as one,
   // bins first, so a Shift-click can reach from a bin down into the shapes.
@@ -325,6 +343,17 @@ function LayoutSidebar(): React.JSX.Element {
                       {storedName(shape.metadata) ?? shapeTypeLabel(shape.type)}
                     </span>
                     <span className="ml-2 opacity-60">{shapeTypeLabel(shape.type)}</span>
+                    {wallIssues.has(shape.id) && (
+                      <span
+                        className={`float-right pl-2 ${isSelected ? 'text-white' : 'text-amber-700 dark:text-amber-400'}`}
+                        title={sentence(wallIssueText(wallIssues.get(shape.id)!))}
+                      >
+                        <span aria-hidden="true">⚠</span>
+                        <span className="sr-only">
+                          , {sentence(wallIssueText(wallIssues.get(shape.id)!))}
+                        </span>
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -458,6 +487,12 @@ function LayoutSidebar(): React.JSX.Element {
               onCommit={commitPositionEdit}
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
+            {wallIssues.has(selectedShape.id) && (
+              <div className="flex items-start gap-1 text-amber-700 dark:text-amber-400 text-[10px] leading-tight">
+                <span aria-hidden="true">⚠</span>
+                <span>{sentence(wallIssueText(wallIssues.get(selectedShape.id)!))}</span>
+              </div>
+            )}
           </div>
         </SidebarSection>
       )}
