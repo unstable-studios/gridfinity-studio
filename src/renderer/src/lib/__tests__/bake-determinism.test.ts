@@ -107,6 +107,14 @@ describe('baking a bin', () => {
     expect(second.solidVertices).toEqual(first.solidVertices)
   })
 
+  it('gives every vertex a normal of length 1', () => {
+    const { normals } = buildBinCSG(binParams({ pockets: [rectPocket()] }), manifold)
+    expect(normals.length).toBeGreaterThan(0)
+    for (let i = 0; i < normals.length; i += 3) {
+      expect(Math.hypot(normals[i], normals[i + 1], normals[i + 2])).toBeCloseTo(1, 5)
+    }
+  })
+
   it('does not depend on the bins baked before it', () => {
     const alone = buildBinCSG(binParams(), manifold)
     buildBinCSG(binParams({ widthUnits: 3, depthUnits: 2, hasLip: false }), manifold)

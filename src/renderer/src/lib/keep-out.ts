@@ -6,6 +6,7 @@
  */
 
 import type { GridfinityConfig } from '../../../shared/types/project'
+import { MAGNET_HOLE_OFFSET as HOLE_OFFSET } from '../../../shared/gridfinity-dimensions'
 
 export interface KeepOutCircle {
   cx: number
@@ -23,8 +24,6 @@ export interface KeepOutRegions {
   circles: KeepOutCircle[]
   lipInset: KeepOutInset | null
 }
-
-const HOLE_OFFSET = 8 // mm from cell edge to hole center
 
 /**
  * Compute keep-out regions for a bin.
