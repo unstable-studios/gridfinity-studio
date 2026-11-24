@@ -59,7 +59,7 @@ describe('shapeToPocketVertices', () => {
     expect(signedArea2(outline)).toBeGreaterThan(0)
   })
 
-  it('flips a polygon from screen y-down to y-up', () => {
+  it('flips a polygon from screen y-down to y-up, centered on the box around it', () => {
     // A right triangle whose right angle is at the top left on screen.
     const polygon = {
       ...base,
@@ -71,10 +71,33 @@ describe('shapeToPocketVertices', () => {
       ]
     } as LayoutShape
     const outline = points(shapeToPocketVertices(polygon))
-    // On screen the third point is below the first. In y-up it has the lowest y.
-    expect(outline).toContainEqual([0, -6])
-    expect(outline).toContainEqual([10, -0])
+    // The right angle is top left on screen: left and, in y-up, at the highest y.
+    const sorted = [...outline].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    expectClose(sorted, [
+      [-5, -3],
+      [-5, 3],
+      [5, 3]
+    ])
     expect(signedArea2(outline)).toBeGreaterThan(0)
+  })
+
+  it('cuts a polygon where the canvas draws it, wherever its points are centered', () => {
+    const square = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 }
+    ]
+    const moved = square.map((p) => ({ x: p.x + 40, y: p.y - 7 }))
+    const a = points(
+      shapeToPocketVertices({ ...base, type: 'polygon', points: square } as LayoutShape)
+    )
+    const b = points(
+      shapeToPocketVertices({ ...base, type: 'polygon', points: moved } as LayoutShape)
+    )
+    expectClose(a, b)
+    expect(Math.max(...a.map(([x]) => x))).toBeCloseTo(5, 4)
+    expect(Math.min(...a.map(([x]) => x))).toBeCloseTo(-5, 4)
   })
 
   it('gives a counter-clockwise outline whichever way the polygon was drawn', () => {
@@ -112,8 +135,8 @@ describe('shapeToPocketVertices', () => {
   })
 
   it('turns a polygon clockwise as seen on screen', () => {
-    // An arrow pointing right on screen. Turned 90° clockwise it points down the screen,
-    // which is toward negative y once flipped to y-up.
+    // An arrow pointing right on screen, 15 long, so its tip is 7.5 from the middle of its
+    // box. Turned 90° clockwise it points down the screen: toward negative y in y-up.
     const arrow = {
       ...base,
       type: 'polygon',
@@ -125,9 +148,10 @@ describe('shapeToPocketVertices', () => {
       ]
     } as LayoutShape
     const outline = points(shapeToPocketVertices(arrow))
-    const tip = outline.reduce((far, p) => (Math.hypot(...p) > Math.hypot(...far) ? p : far))
+    // The tip is the one point on the arrow's axis.
+    const tip = outline.find(([x]) => Math.abs(x) < 1e-4)!
     expect(tip[0]).toBeCloseTo(0, 4)
-    expect(tip[1]).toBeCloseTo(-10, 4)
+    expect(tip[1]).toBeCloseTo(-7.5, 4)
     expect(signedArea2(outline)).toBeGreaterThan(0)
   })
 })

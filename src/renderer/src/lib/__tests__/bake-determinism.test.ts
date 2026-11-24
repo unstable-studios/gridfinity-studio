@@ -141,8 +141,8 @@ describe('baking a bin', () => {
     )
     // 20 × 12 mm, 8 mm deep, no clearance.
     expect(solid.volume - cut.volume).toBeCloseTo(20 * 12 * 8, 1)
-    expect(cut.min).toEqual(solid.min)
-    expect(cut.max).toEqual(solid.max)
+    expectBox(cut.min, solid.min)
+    expectBox(cut.max, solid.max)
   })
 
   it('cuts a turned pocket the same size as a straight one', () => {

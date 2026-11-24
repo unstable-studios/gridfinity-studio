@@ -1,4 +1,5 @@
 import type { LayoutShape } from '@/layout-engine/types'
+import { polygonBboxCenter } from '@/layout-engine/polygon-center'
 import { circleSegments } from './curve-segments'
 
 /**
@@ -61,7 +62,10 @@ function unrotatedVertices(shape: LayoutShape): Float32Array | null {
       // the way out so the polygon ends up in math y-up convention,
       // matching the rect/circle output. Mirroring across X reverses
       // winding, so reuse the post-flip vertices for the area test.
-      const flipped = pts.map((p) => ({ x: p.x, y: -p.y }))
+      // The shape's position is the center of the box around its points, as the canvas
+      // draws it, wherever the points themselves are centered.
+      const center = polygonBboxCenter(pts)
+      const flipped = pts.map((p) => ({ x: p.x - center.x, y: -(p.y - center.y) }))
       let area2 = 0
       for (let i = 0; i < flipped.length; i++) {
         const a = flipped[i]
