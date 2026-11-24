@@ -106,7 +106,7 @@ function weld(
     let root = solid
     for (let next = joined.get(root); next !== undefined; next = joined.get(root)) root = next
     // Point everything on the way at the root, so a long run of joins stays fast.
-    for (let at = solid; at !== root; ) {
+    for (let at = solid; at !== root;) {
       const next = joined.get(at)!
       joined.set(at, root)
       at = next
