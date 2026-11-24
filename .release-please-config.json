@@ -27,6 +27,11 @@
       "hidden": false
     },
     {
+      "type": "build",
+      "section": "Build",
+      "hidden": false
+    },
+    {
       "type": "chore",
       "section": "Miscellaneous",
       "hidden": true

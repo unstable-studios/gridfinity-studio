@@ -132,7 +132,7 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 - **3D Preview**: Three.js via @react-three/fiber and @react-three/drei
 - **CSG**: Manifold (WASM) for solid geometry, earcut for triangulation
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
-- **Release**: release-please for automated versioning and CHANGELOG
+- **Release**: release-please for automated versioning and CHANGELOG. `feat`, `fix`, `perf`, `docs`, `refactor` and `build` commits appear in the changelog and trigger a release; `chore`, `ci`, `test` and `style` do not
 - **Project files**: `.gfstudio` (JSON, schema v0.5.0)
 
 ## Verifying Changes
