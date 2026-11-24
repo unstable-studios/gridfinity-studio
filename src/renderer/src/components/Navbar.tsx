@@ -383,7 +383,8 @@ function UpdateBadge({ state }: { state: UpdateState }): React.JSX.Element | nul
         aria-hidden="true"
         className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${style.color}`}
       />
-      <span className="sr-only">{style.srLabel}</span>
+      {/* The comma keeps it apart from "Help" when the two are read as one name. */}
+      <span className="sr-only">, {style.srLabel}</span>
     </>
   )
 }
