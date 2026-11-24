@@ -4,6 +4,10 @@ A desktop app for designing [Gridfinity](https://gridfinity.xyz) bins with custo
 
 Runs on macOS, Windows and Linux.
 
+![Design view: three bins on the grid, with a rectangle, an ellipse and a polygon drawn in the first](docs/images/design.png)
+
+![Preview: the same bins in 3D, with their pockets cut](docs/images/preview.png)
+
 ## What it does
 
 - **Bins on a grid.** Add bins from a size picker or draw them on the canvas. Bins snap to the grid and can't overlap.
@@ -62,7 +66,7 @@ pnpm verify
 
 To package an installer for your platform, run `pnpm build:mac`, `pnpm build:win` or `pnpm build:linux`.
 
-[CLAUDE.md](CLAUDE.md) describes the architecture.
+[CLAUDE.md](CLAUDE.md) describes the architecture, and [docs/PROJECT_SCHEMA.md](docs/PROJECT_SCHEMA.md) the project file format.
 
 ## Contributing
 
