@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.13.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.12.1...v1.13.0) (2026-11-24)
+
+
+### Features
+
+* **ui:** draw rectangles and ellipses from a corner or the center ([#466](https://github.com/unstable-studios/gridfinity-studio/issues/466)) ([5493c5f](https://github.com/unstable-studios/gridfinity-studio/commit/5493c5f591c78a8fa2ef319cc53c43f2119f3b6d))
+
+
+### Bug Fixes
+
+* **core:** keep touching pockets closed in 3mf export ([#442](https://github.com/unstable-studios/gridfinity-studio/issues/442)) ([610b843](https://github.com/unstable-studios/gridfinity-studio/commit/610b843ffa9e6789df27599d013d09c612cf73f4))
+* **core:** make bin walls straight between rounded corners ([#444](https://github.com/unstable-studios/gridfinity-studio/issues/444)) ([51c5291](https://github.com/unstable-studios/gridfinity-studio/commit/51c52911a0aa72db06d1af0f3032fcfcf3e38394))
+* **ui:** make the bin under a dragged shape stand out ([#462](https://github.com/unstable-studios/gridfinity-studio/issues/462)) ([a0ff092](https://github.com/unstable-studios/gridfinity-studio/commit/a0ff0925e8472c651ae5c2b3f8bc3ce340ce66e0))
+* **ui:** name exports after the project ([#460](https://github.com/unstable-studios/gridfinity-studio/issues/460)) ([702853a](https://github.com/unstable-studios/gridfinity-studio/commit/702853abc431e476a53cb47123abbe3bf5f411bc))
+* **ui:** stop a sidebar resize from overlapping another bin ([#463](https://github.com/unstable-studios/gridfinity-studio/issues/463)) ([96ecb2e](https://github.com/unstable-studios/gridfinity-studio/commit/96ecb2e688fc0a8acaee1119cc60c3fc96a3e021))
+* **ui:** tidy the add bin picker, shape labels and sidebar scrolling ([#461](https://github.com/unstable-studios/gridfinity-studio/issues/461)) ([d130f36](https://github.com/unstable-studios/gridfinity-studio/commit/d130f3647286890da10e14204f27e12e590210e4))
+
+
+### Documentation
+
+* **ui:** tighten ui copy and remove em dashes ([#464](https://github.com/unstable-studios/gridfinity-studio/issues/464)) ([1d8b819](https://github.com/unstable-studios/gridfinity-studio/commit/1d8b8195be2f7f284a530bca4789984e523ab231))
+
 ## [1.12.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.12.0...v1.12.1) (2026-11-24)
 
 

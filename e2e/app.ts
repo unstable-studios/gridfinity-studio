@@ -64,8 +64,80 @@ export class StudioApp {
     return app
   }
 
+  /** Close the app, dropping any unsaved work. Safe to call when it has already quit. */
   async close(): Promise<void> {
+    try {
+      await this.answerUnsavedPrompt('discard')
+    } catch {
+      // The app is already gone.
+      return
+    }
     await this.electronApp.close()
+  }
+
+  /**
+   * Make the "Save your changes?" question answer itself, and count how often it is asked.
+   * Without this a test that closes a window with unsaved work would wait on a native dialog.
+   */
+  async answerUnsavedPrompt(answer: 'save' | 'discard' | 'cancel'): Promise<void> {
+    const response = { save: 0, discard: 1, cancel: 2 }[answer]
+    await this.electronApp.evaluate(({ dialog }, choice) => {
+      const counter = globalThis as { unsavedPrompts?: number }
+      dialog.showMessageBox = () => {
+        counter.unsavedPrompts = (counter.unsavedPrompts ?? 0) + 1
+        return Promise.resolve({ response: choice, checkboxChecked: false })
+      }
+    }, response)
+  }
+
+  /** How many times the "Save your changes?" question has been asked. */
+  async unsavedPromptCount(): Promise<number> {
+    return this.electronApp.evaluate(
+      () => (globalThis as { unsavedPrompts?: number }).unsavedPrompts ?? 0
+    )
+  }
+
+  /** How many save dialogs the cancelled stub has dismissed. */
+  async cancelledSaveDialogCount(): Promise<number> {
+    return this.electronApp.evaluate(
+      () => (globalThis as { cancelledSaveDialogs?: number }).cancelledSaveDialogs ?? 0
+    )
+  }
+
+  /** Ask the window to close, as the close button does. */
+  async requestWindowClose(): Promise<void> {
+    // The close can end the app. It is put off a moment so this call gets its reply first.
+    await this.electronApp.evaluate(({ BrowserWindow }) => {
+      setImmediate(() => BrowserWindow.getAllWindows()[0]?.close())
+    })
+  }
+
+  /** Ask the app to quit, as Cmd+Q or the app menu does. */
+  async requestQuit(): Promise<void> {
+    await this.electronApp.evaluate(({ app }) => {
+      setImmediate(() => app.quit())
+    })
+  }
+
+  /** Whether the app is still running, with or without a window. */
+  async isRunning(): Promise<boolean> {
+    try {
+      await this.electronApp.evaluate(() => true)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  /** Whether the app still has a window. */
+  async hasWindow(): Promise<boolean> {
+    try {
+      return await this.electronApp.evaluate(
+        ({ BrowserWindow }) => BrowserWindow.getAllWindows().length > 0
+      )
+    } catch {
+      return false
+    }
   }
 
   /** Make the next native save dialog return `filePath`. */
@@ -98,7 +170,11 @@ export class StudioApp {
   /** Make the next native save and open dialogs behave as if dismissed. */
   async stubDialogsCancelled(): Promise<void> {
     await this.electronApp.evaluate(({ dialog }) => {
-      dialog.showSaveDialog = () => Promise.resolve({ canceled: true, filePath: '' })
+      dialog.showSaveDialog = () => {
+        const counter = globalThis as { cancelledSaveDialogs?: number }
+        counter.cancelledSaveDialogs = (counter.cancelledSaveDialogs ?? 0) + 1
+        return Promise.resolve({ canceled: true, filePath: '' })
+      }
       dialog.showOpenDialog = () => Promise.resolve({ canceled: true, filePaths: [] })
     })
   }

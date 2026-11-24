@@ -24,6 +24,7 @@ import NewProjectDialog from '@/components/settings/NewProjectDialog'
 import { useProject } from '@/hooks/useProject'
 import { useProjectName } from '@/hooks/useProjectName'
 import { useEditShortcuts } from '@/hooks/useEditCommands'
+import { useCloseGuard } from '@/hooks/useCloseGuard'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { useAppMode } from '@/hooks/useAppMode'
 import { MOD_KEY } from '@/lib/platform'
@@ -131,6 +132,7 @@ function AppMenubar({
   } = useProject()
   const { undo, redo, canUndo, canRedo } = useUndoRedo()
   const edit = useEditShortcuts()
+  useCloseGuard()
   const projectName = useProjectName()
   const { state: updateState, installNow } = useAppUpdate()
 
