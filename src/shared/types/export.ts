@@ -8,7 +8,7 @@ export interface BatchExportFile {
   data: ArrayBuffer
 }
 
-/** What an export of several files wrote. */
+/** What an export of several files wrote. On a failure, the files written before it. */
 export interface BatchExport {
   directory: string
   /** The file names written, in the order the files were given. */

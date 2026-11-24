@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -42,6 +42,8 @@ describe('exportFileName', () => {
     expect(exportFileName('CON', 'stl')).toBe('CON export.stl')
     expect(exportFileName('lpt1.3mf', '3mf')).toBe('lpt1 export.3mf')
     expect(exportFileName('Console', 'stl')).toBe('Console.stl')
+    expect(exportFileName('nul.v2', 'stl')).toBe('nul export.v2.stl')
+    expect(exportFileName('COM1.left.3mf', '3mf')).toBe('COM1 export.left.3mf')
   })
 
   it('shortens a very long name', () => {
@@ -84,6 +86,11 @@ describe('batchFileNames', () => {
 
   it('names a file "Bin" when there is nothing usable', () => {
     expect(batchFileNames(['', '///', 7], 'stl')).toEqual(['Bin.stl', 'Bin 2.stl', 'Bin 3.stl'])
+  })
+
+  it('treats two spellings of an accented name as one', () => {
+    expect(batchFileNames(['Caf\u00e9', 'Cafe\u0301'], 'stl')).toHaveLength(2)
+    expect(batchFileNames(['Caf\u00e9', 'Cafe\u0301'], 'stl')[1]).toBe('Cafe\u0301 2.stl')
   })
 
   it('keeps every file inside the folder', () => {
@@ -151,6 +158,36 @@ describe('exportBatch', () => {
     const result = await exportBatch(win, [{ name: 'Pliers', data: bytes('new') }], 'stl')
     expect(result.success).toBe(true)
     expect(await readFile(join(dir, 'Pliers.stl'), 'utf8')).toBe('new')
+  })
+
+  it('says which files were written before a failure', async () => {
+    // A folder where the second file should go: writing it fails.
+    await mkdir(join(dir, 'Bits.stl'))
+    dialog.showMessageBox.mockResolvedValue({ response: 0 })
+    const result = await exportBatch(
+      win,
+      [
+        { name: 'Pliers', data: bytes('one') },
+        { name: 'Bits', data: bytes('two') }
+      ],
+      'stl'
+    )
+    expect(result.success).toBe(false)
+    expect(result.data).toEqual({ directory: dir, files: ['Pliers.stl'] })
+  })
+
+  it('refuses a request that is not files, before asking for a folder', async () => {
+    const bad = [
+      [null],
+      [{ name: 'Pliers', data: 'text' }],
+      [{ name: 'Pliers' }],
+      'files',
+      []
+    ] as unknown as Array<Parameters<typeof exportBatch>[1]>
+    for (const files of bad) {
+      expect((await exportBatch(win, files, 'stl')).success).toBe(false)
+    }
+    expect(dialog.showOpenDialog).not.toHaveBeenCalled()
   })
 
   it('reports a failure to write', async () => {

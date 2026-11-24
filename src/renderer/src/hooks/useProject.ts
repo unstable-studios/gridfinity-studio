@@ -320,14 +320,22 @@ const useProjectStore = create<ProjectState>()((set, get) => {
         const result = await window.api.export.batch(files, format)
         if (result.success) {
           if (result.data) {
+            const { directory } = result.data
             const count = result.data.files.length
             notifyExported(
-              `${count} file${count === 1 ? '' : 's'} to ${fileName(result.data.directory)}`
+              // A drive or the root folder has no last part to its path.
+              `${count} file${count === 1 ? '' : 's'} to ${fileName(directory) || directory}`
             )
           }
           return true
         }
-        if (result.reason !== 'cancelled') notifyExportFailed(result.error)
+        if (result.reason !== 'cancelled') {
+          const written = result.data?.files.length ?? 0
+          notifyExportFailed(
+            result.error,
+            written > 0 ? `${written} of ${files.length}` : undefined
+          )
+        }
         return false
       } catch (err) {
         notifyExportFailed(err instanceof Error ? err.message : undefined)

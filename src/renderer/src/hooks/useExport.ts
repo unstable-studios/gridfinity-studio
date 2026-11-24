@@ -36,6 +36,7 @@ export interface ExportCommands {
   /** `selected` only while there are selected bins to export. */
   scope: ExportScope
   setScope: (scope: ExportScope) => void
+  /** `perBin` only while the project has more than one bin. */
   files: ExportFiles
   setFiles: (files: ExportFiles) => void
   /** Whether every chosen bin is built and up to date. */
@@ -54,7 +55,7 @@ export function useExport(): ExportCommands {
   const exportBatch = useProject((s) => s.exportBatch)
   const projectName = useProjectName()
   const wantedScope = useExportOptions((s) => s.scope)
-  const files = useExportOptions((s) => s.files)
+  const wantedFiles = useExportOptions((s) => s.files)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
@@ -66,6 +67,8 @@ export function useExport(): ExportCommands {
   const scope: ExportScope =
     wantedScope === 'selected' && selectedBins.length > 0 ? 'selected' : 'all'
   const chosen = scope === 'selected' ? selectedBins : bins
+  // With one bin there is nothing to choose, and the choice is not shown.
+  const files: ExportFiles = bins.length > 1 ? wantedFiles : 'one'
 
   // Bins are only built in Preview. In Design the last build can be out of date.
   const canExport =

@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import JSZip from 'jszip'
@@ -123,7 +123,7 @@ test('export one file per bin into a folder', async () => {
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
   await expect(page.getByText(/\bReady$/)).toHaveCount(3, { timeout: 30_000 })
 
-  // One file with every bin, to compare with. The third bin is two units right of the first.
+  // One file with every bin, to compare with. The third bin is four units right of the first.
   const allPath = join(app.dir, 'all.stl')
   await app.stubSaveDialog(allPath)
   await exportStl.click()
@@ -147,10 +147,14 @@ test('export one file per bin into a folder', async () => {
 
   // Exporting there again asks before replacing. Cancel leaves the files alone.
   await writeFile(join(folder, 'Bin 1.stl'), 'old')
+  const untouched = (await stat(join(folder, 'Bin 2.stl'))).mtimeMs
   await app.answerReplacePrompt('cancel')
   await exportStl.click()
   await expect.poll(() => app.promptCount()).toBe(1)
+  // Long enough for a write that should not happen to show up.
+  await page.waitForTimeout(300)
   expect(await readFile(join(folder, 'Bin 1.stl'), 'utf8')).toBe('old')
+  expect((await stat(join(folder, 'Bin 2.stl'))).mtimeMs, 'Bin 2 untouched').toBe(untouched)
 
   await app.answerReplacePrompt('replace')
   await exportStl.click()

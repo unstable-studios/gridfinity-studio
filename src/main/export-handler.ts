@@ -13,8 +13,11 @@ export type ExportResult = OperationResult<string>
 /** Result of exporting several files to a folder. */
 export type BatchExportResult = OperationResult<BatchExport>
 
-/** Names Windows keeps for devices. A file can't have one, with or without an extension. */
-const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i
+/**
+ * Names Windows keeps for devices. A file can't have one, whatever follows its first dot:
+ * "nul.v2.stl" is still the device.
+ */
+const WINDOWS_RESERVED_NAME = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])\s*(\.|$)/i
 
 /** Longest name offered, without the extension. File systems stop at 255 bytes. */
 const MAX_NAME_LENGTH = 120
@@ -39,7 +42,7 @@ export function exportFileName(
       .replace(/^[.\s]+|[.\s]+$/g, '')
   const withoutExtension = clean(given).replace(new RegExp(`\\.${extension}$`, 'i'), '')
   let name = clean(withoutExtension).slice(0, MAX_NAME_LENGTH).trim()
-  if (WINDOWS_RESERVED_NAME.test(name)) name = `${name} export`
+  if (WINDOWS_RESERVED_NAME.test(name)) name = name.replace(/^[^.]*?(?=\s*(\.|$))/, '$& export')
   return `${name || fallback}.${extension}`
 }
 
@@ -109,16 +112,21 @@ export async function export3MF(
 export function batchFileNames(names: unknown[], extension: string): string[] {
   const taken = new Set<string>()
   return names.map((given) => {
+    // Two spellings of one accented name are one file on a Mac, so they count as the same.
+    const key = (fileName: string): string => fileName.normalize('NFC').toLowerCase()
     const first = exportFileName(given, extension, 'Bin')
     const stem = first.slice(0, -(extension.length + 1))
     let name = first
-    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${stem} ${n}.${extension}`
-    taken.add(name.toLowerCase())
+    for (let n = 2; taken.has(key(name)); n++) name = `${stem} ${n}.${extension}`
+    taken.add(key(name))
     return name
   })
 }
 
 const EXPORT_FORMATS: readonly ExportFormat[] = ['stl', '3mf']
+
+/** More files than a project could hold bins. A request for more is not a real export. */
+const MAX_FILES = 1000
 
 /** At most this many file names are listed when asking to replace files. */
 const NAMES_LISTED = 5
@@ -141,9 +149,16 @@ export async function exportBatch(
   files: BatchExportFile[],
   format: ExportFormat
 ): Promise<BatchExportResult> {
-  if (!EXPORT_FORMATS.includes(format) || !Array.isArray(files) || files.length === 0) {
-    return { success: false, error: 'Nothing to export' }
-  }
+  // The request comes from the renderer. Check all of it before asking the person anything.
+  const wellFormed =
+    EXPORT_FORMATS.includes(format) &&
+    Array.isArray(files) &&
+    files.length > 0 &&
+    files.length <= MAX_FILES &&
+    files.every(
+      (file) => file !== null && typeof file === 'object' && file.data instanceof ArrayBuffer
+    )
+  if (!wellFormed) return { success: false, error: 'Nothing to export' }
 
   const result = await dialog.showOpenDialog(win, {
     title: 'Export to folder',
@@ -155,6 +170,8 @@ export async function exportBatch(
   }
 
   const directory = result.filePaths[0]
+  // A drive or the root folder has no last part to its path.
+  const folderName = basename(directory) || directory
   const names = batchFileNames(
     files.map((file) => file.name),
     format
@@ -169,8 +186,8 @@ export async function exportBatch(
       type: 'warning',
       message:
         replaced.length === 1
-          ? `Replace “${replaced[0]}” in “${basename(directory)}”?`
-          : `Replace ${replaced.length} files in “${basename(directory)}”?`,
+          ? `Replace “${replaced[0]}” in “${folderName}”?`
+          : `Replace ${replaced.length} files in “${folderName}”?`,
       detail:
         (replaced.length === 1 ? '' : `${listed}${more > 0 ? `\nand ${more} more` : ''}\n\n`) +
         'This can’t be undone.',
@@ -182,12 +199,22 @@ export async function exportBatch(
     if (answer.response !== 0) return { success: false, reason: 'cancelled' }
   }
 
+  const written: string[] = []
   try {
     for (const [i, file] of files.entries()) {
-      await writeFile(join(directory, names[i]), Buffer.from(file.data))
+      // Only the files the person agreed to replace may be written over. One that appeared
+      // since the check fails instead.
+      const flag = replaced.includes(names[i]) ? 'w' : 'wx'
+      await writeFile(join(directory, names[i]), Buffer.from(file.data), { flag })
+      written.push(names[i])
     }
     return { success: true, data: { directory, files: names } }
   } catch (err) {
-    return { success: false, error: err instanceof Error ? err.message : String(err) }
+    // `data` says what was written before the failure, so the person can be told.
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+      data: { directory, files: written }
+    }
   }
 }
