@@ -42,14 +42,15 @@ export function notifyOpenFailed(
   })
 }
 
-export function notifyExportFailed(detail: string | undefined): void {
+/** `written` is how far an export of several files got, such as "2 of 5". */
+export function notifyExportFailed(detail: string | undefined, written?: string): void {
   toast.error('Couldn’t export', {
-    description: describeFileError(detail),
+    description: (written ? `Wrote ${written} files. ` : '') + describeFileError(detail),
     ...untilDismissed('export-failed')
   })
 }
 
-/** `what` is a file name or a count such as "3 files". */
+/** `what` is a file name, or a count and folder such as "3 files to Parts". */
 export function notifyExported(what: string): void {
   toast.success(`Exported ${what}`)
 }

@@ -80,7 +80,16 @@ export class StudioApp {
    * Without this a test that closes a window with unsaved work would wait on a native dialog.
    */
   async answerUnsavedPrompt(answer: 'save' | 'discard' | 'cancel'): Promise<void> {
-    const response = { save: 0, discard: 1, cancel: 2 }[answer]
+    await this.answerMessageBox({ save: 0, discard: 1, cancel: 2 }[answer])
+  }
+
+  /** Make the "Replace files?" question of a folder export answer itself, and count it. */
+  async answerReplacePrompt(answer: 'replace' | 'cancel'): Promise<void> {
+    await this.answerMessageBox({ replace: 0, cancel: 1 }[answer])
+  }
+
+  /** Answer every native question with the button at `response`, counting each one. */
+  private async answerMessageBox(response: number): Promise<void> {
     await this.electronApp.evaluate(({ dialog }, choice) => {
       const counter = globalThis as { unsavedPrompts?: number }
       dialog.showMessageBox = () => {
@@ -90,8 +99,8 @@ export class StudioApp {
     }, response)
   }
 
-  /** How many times the "Save your changes?" question has been asked. */
-  async unsavedPromptCount(): Promise<number> {
+  /** How many times a question has been asked: "Save your changes?" or "Replace files?". */
+  async promptCount(): Promise<number> {
     return this.electronApp.evaluate(
       () => (globalThis as { unsavedPrompts?: number }).unsavedPrompts ?? 0
     )

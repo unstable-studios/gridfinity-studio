@@ -25,13 +25,13 @@ test('closing with unsaved work asks first, and Cancel keeps the app open', asyn
   await app.answerUnsavedPrompt('cancel')
   await app.requestWindowClose()
 
-  await expect.poll(() => app.unsavedPromptCount(), 'the question was asked').toBe(1)
+  await expect.poll(() => app.promptCount(), 'the question was asked').toBe(1)
   expect(await app.hasWindow(), 'the window stays open').toBe(true)
   await app.expectBinCount(1)
 
   // Asking again works: the first Cancel did not leave the window stuck.
   await app.requestWindowClose()
-  await expect.poll(() => app.unsavedPromptCount()).toBe(2)
+  await expect.poll(() => app.promptCount()).toBe(2)
   expect(await app.hasWindow()).toBe(true)
 })
 
@@ -62,7 +62,7 @@ test('choosing Save keeps the app open when the save is dismissed', async () => 
   // The window is not left waiting on that save: closing asks again.
   await app.answerUnsavedPrompt('cancel')
   await app.requestWindowClose()
-  await expect.poll(() => app.unsavedPromptCount(), 'the question is asked again').toBe(2)
+  await expect.poll(() => app.promptCount(), 'the question is asked again').toBe(2)
   expect(await app.hasWindow()).toBe(true)
 })
 
@@ -81,12 +81,12 @@ test('quitting with unsaved work asks, and Cancel calls the quit off', async () 
   await app.answerUnsavedPrompt('cancel')
   await app.requestQuit()
 
-  await expect.poll(() => app.unsavedPromptCount(), 'the question was asked').toBe(1)
+  await expect.poll(() => app.promptCount(), 'the question was asked').toBe(1)
   expect(await app.hasWindow(), 'the window stays open').toBe(true)
 
   // The quit is forgotten: closing the window later asks again and nothing quits.
   await app.requestWindowClose()
-  await expect.poll(() => app.unsavedPromptCount()).toBe(2)
+  await expect.poll(() => app.promptCount()).toBe(2)
   expect(await app.isRunning(), 'the app is still running').toBe(true)
   expect(await app.hasWindow()).toBe(true)
 })

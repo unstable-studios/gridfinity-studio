@@ -19,6 +19,7 @@ import type {
   LayoutSnapshotData
 } from '../../../shared/types/project'
 import type { BakedMesh } from '../../../shared/types/worker'
+import type { BatchExportFile, ExportFormat } from '../../../shared/types/export'
 import { downloadBlob } from '../lib/download-blob'
 import { fileName } from '../lib/file-errors'
 import {
@@ -74,9 +75,8 @@ interface ProjectState {
   // Export operations
   exportSTL: (stlData: ArrayBuffer, suggestedFilename?: string) => Promise<boolean>
   export3MF: (data: ArrayBuffer, suggestedFilename?: string) => Promise<boolean>
-  exportBatch: (
-    files: Array<{ filename: string; data: ArrayBuffer }>
-  ) => Promise<{ success: boolean; exported: number }>
+  /** Write one file per entry to a folder the person chooses. */
+  exportBatch: (files: BatchExportFile[], format: ExportFormat) => Promise<boolean>
 
   // Layout snapshot (synced from engine)
   setLayoutSnapshot: (snapshot: LayoutSnapshotData) => void
@@ -315,18 +315,31 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       }
     },
 
-    exportBatch: async (files) => {
+    exportBatch: async (files, format) => {
       try {
-        const result = await window.api.export.batch(files)
+        const result = await window.api.export.batch(files, format)
         if (result.success) {
-          notifyExported(`${result.exported} file${result.exported === 1 ? '' : 's'}`)
-          return { success: true, exported: result.exported }
+          if (result.data) {
+            const { directory } = result.data
+            const count = result.data.files.length
+            notifyExported(
+              // A drive or the root folder has no last part to its path.
+              `${count} file${count === 1 ? '' : 's'} to ${fileName(directory) || directory}`
+            )
+          }
+          return true
         }
-        if (result.reason !== 'cancelled') notifyExportFailed(result.error)
-        return { success: false, exported: result.exported }
+        if (result.reason !== 'cancelled') {
+          const written = result.data?.files.length ?? 0
+          notifyExportFailed(
+            result.error,
+            written > 0 ? `${written} of ${files.length}` : undefined
+          )
+        }
+        return false
       } catch (err) {
         notifyExportFailed(err instanceof Error ? err.message : undefined)
-        return { success: false, exported: 0 }
+        return false
       }
     },
 

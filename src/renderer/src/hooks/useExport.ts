@@ -13,13 +13,18 @@ import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '
 import { binsInSelection, exportTitle } from '@/lib/export-plan'
 import type { ExportScope } from '@/lib/export-plan'
 import { storedName } from '@/lib/item-name'
+import type { BatchExportFile, ExportFormat } from '../../../shared/types/export'
 
-export type ExportFormat = 'stl' | '3mf'
+/** One file holding every exported bin, or a file for each. */
+export type ExportFiles = 'one' | 'perBin'
 
 type Bin = LayoutGroup & { metadata: BinMetadata }
 
-/** What the person asked for, until `useExportScopeReset` puts it back. */
-const useExportOptions = create<{ scope: ExportScope }>(() => ({ scope: 'all' }))
+/** What the person asked for. `useExportScopeReset` puts the scope back. */
+const useExportOptions = create<{ scope: ExportScope; files: ExportFiles }>(() => ({
+  scope: 'all',
+  files: 'one'
+}))
 
 export interface ExportCommands {
   /** Every bin in the project. */
@@ -31,6 +36,9 @@ export interface ExportCommands {
   /** `selected` only while there are selected bins to export. */
   scope: ExportScope
   setScope: (scope: ExportScope) => void
+  /** `perBin` only while the project has more than one bin. */
+  files: ExportFiles
+  setFiles: (files: ExportFiles) => void
   /** Whether every chosen bin has been built, in Preview. */
   canExport: boolean
   exportAs: (format: ExportFormat) => Promise<void>
@@ -44,8 +52,10 @@ export function useExport(): ExportCommands {
   const bakeStatus = useProject((s) => s.bakeStatus)
   const exportSTL = useProject((s) => s.exportSTL)
   const export3MF = useProject((s) => s.export3MF)
+  const exportBatch = useProject((s) => s.exportBatch)
   const projectName = useProjectName()
   const wantedScope = useExportOptions((s) => s.scope)
+  const wantedFiles = useExportOptions((s) => s.files)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
@@ -57,6 +67,8 @@ export function useExport(): ExportCommands {
   const scope: ExportScope =
     wantedScope === 'selected' && selectedBins.length > 0 ? 'selected' : 'all'
   const chosen = scope === 'selected' ? selectedBins : bins
+  // With one bin there is nothing to choose, and the choice is not shown.
+  const files: ExportFiles = bins.length > 1 ? wantedFiles : 'one'
 
   // Bins are only built in Preview. In Design the last build can be out of date.
   const canExport =
@@ -64,27 +76,47 @@ export function useExport(): ExportCommands {
 
   const exportAs = useCallback(
     async (format: ExportFormat) => {
-      const meshes = new Map(
-        chosen.flatMap((bin) => {
-          const baked = bakeResults.get(bin.id)
-          return baked ? [[bin.id, baked] as const] : []
-        })
-      )
+      /** One file holding `binsInFile`. Without `placed`, a bin sits at the origin. */
+      const build = async (
+        binsInFile: Bin[],
+        title: string,
+        placed: boolean
+      ): Promise<ArrayBuffer | null> => {
+        const meshes = new Map(
+          binsInFile.flatMap((bin) => {
+            const baked = bakeResults.get(bin.id)
+            return baked ? [[bin.id, baked] as const] : []
+          })
+        )
+        const placements = placed ? placementsFromGroups(binsInFile) : undefined
+        return format === 'stl'
+          ? buildSTLArrayBuffer(meshes, placements)
+          : build3MFArrayBuffer(meshes, title, placements)
+      }
+      const save = format === 'stl' ? exportSTL : export3MF
+      const binName = (bin: Bin): string => storedName(bin.metadata) ?? 'Bin'
+
+      if (files === 'perBin') {
+        const built: BatchExportFile[] = []
+        for (const bin of chosen) {
+          const data = await build([bin], binName(bin), false)
+          if (data) built.push({ name: binName(bin), data })
+        }
+        // A single file needs no folder: it goes through the ordinary save dialog.
+        if (built.length === 1) await save(built[0].data, `${built[0].name}.${format}`)
+        else if (built.length > 1) await exportBatch(built, format)
+        return
+      }
+
       const title = exportTitle(
         projectName,
         bins,
         chosen.map((bin) => ({ id: bin.id, name: storedName(bin.metadata) }))
       )
-      const placements = placementsFromGroups(chosen)
-      if (format === 'stl') {
-        const data = await buildSTLArrayBuffer(meshes, placements)
-        if (data) await exportSTL(data, `${title}.stl`)
-      } else {
-        const data = await build3MFArrayBuffer(meshes, title, placements)
-        if (data) await export3MF(data, `${title}.3mf`)
-      }
+      const data = await build(chosen, title, true)
+      if (data) await save(data, `${title}.${format}`)
     },
-    [bakeResults, bins, chosen, export3MF, exportSTL, projectName]
+    [bakeResults, bins, chosen, export3MF, exportBatch, exportSTL, files, projectName]
   )
 
   return {
@@ -93,6 +125,8 @@ export function useExport(): ExportCommands {
     chosen,
     scope,
     setScope: (next) => useExportOptions.setState({ scope: next }),
+    files,
+    setFiles: (next) => useExportOptions.setState({ files: next }),
     canExport,
     exportAs
   }
