@@ -85,6 +85,8 @@ export default function NameField({
       className={className}
       onChange={(e) => setText(e.target.value)}
       onBlur={finish}
+      // A right-click in the text is about the text, not the bin or shape being named.
+      onContextMenu={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         // Enter that confirms a choice in an input method is not the end of the name.
         if (e.nativeEvent.isComposing) return

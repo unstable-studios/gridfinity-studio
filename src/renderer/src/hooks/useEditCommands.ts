@@ -17,14 +17,25 @@ interface ClipboardState {
 const useClipboard = create<ClipboardState>(() => ({ content: null, nextOffset: 0 }))
 
 export interface EditCommands {
+  /** Something is selected, so it can be cut, copied, duplicated or deleted. */
   canCopy: boolean
   canPaste: boolean
   canSelectAll: boolean
+  /** Exactly one bin or shape is selected. */
+  canRename: boolean
   copy: () => void
   cut: () => void
   paste: () => void
+  /** Paste a copy of the selection without changing what is on the clipboard. */
+  duplicate: () => void
+  remove: () => void
+  /** Start typing a new name for the selected bin or shape, in the sidebar list. */
+  rename: () => void
   selectAll: () => void
 }
+
+/** The row in the sidebar lists whose name is being typed, if any. */
+export const useRenaming = create<{ id: string | null }>(() => ({ id: null }))
 
 /** Whether a key press belongs to a text field and must be left to it. */
 function isTyping(target: EventTarget | null): boolean {
@@ -33,8 +44,8 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /**
- * Cut, copy, paste and select all for bins and shapes, with their keyboard shortcuts. They
- * work in Design only. Mount this once.
+ * Cut, copy, paste and the other edit commands for bins and shapes. They work in Design
+ * only. Use `useEditShortcuts` in the one place that should also listen for the keys.
  */
 export function useEditCommands(): EditCommands {
   const engine = useLayoutEngine()
@@ -42,12 +53,6 @@ export function useEditCommands(): EditCommands {
   const { mode } = useAppMode()
   const baseUnit = useProject((s) => s.project?.gridfinity.baseUnit ?? 42)
   const hasContent = useClipboard((s) => s.content !== null)
-  // What was copied belongs to the project it came from. Another project can have a
-  // different grid, where a pasted bin would not fit.
-  const projectKey = useProject((s) => s.project?.settings.createdAt)
-  useEffect(() => {
-    useClipboard.setState({ content: null, nextOffset: 0 })
-  }, [projectKey])
   const designing = mode === 'layout' && engine !== null
 
   const copyToClipboard = useCallback(
@@ -73,37 +78,64 @@ export function useEditCommands(): EditCommands {
     if (copyToClipboard(0)) removeItems(engine, selected)
   }, [engine, copyToClipboard])
 
+  const pasteContent = useCallback(
+    (content: ClipboardContent, offset: number): void => {
+      if (!engine) return
+      const plan = planPaste(content, engine.getAllGroups(), baseUnit, offset, () =>
+        crypto.randomUUID()
+      )
+      const pasted: string[] = plan.groups.map((g) => g.id)
+      engine.batch(() => {
+        for (const group of plan.groups) engine.createGroup(group)
+        for (const shape of plan.shapes) {
+          engine.addShape(shape)
+          let groupId = plan.shapeGroup.get(shape.id)
+          if (!groupId) {
+            // A shape pasted on its own joins the bin its center lands in, the same rule a
+            // dragged shape follows.
+            pasted.push(shape.id)
+            const bounds = engine.getShapeBounds(shape.id)
+            groupId = bounds
+              ? findContainingBinGroup(
+                  engine.getAllGroups(),
+                  (bounds.minX + bounds.maxX) / 2,
+                  (bounds.minY + bounds.maxY) / 2
+                )?.id
+              : undefined
+          }
+          if (groupId) engine.addToGroup(shape.id, groupId)
+        }
+      })
+      engine.select(pasted)
+    },
+    [engine, baseUnit]
+  )
+
   const paste = useCallback(() => {
     const { content, nextOffset } = useClipboard.getState()
-    if (!engine || !content) return
-    const plan = planPaste(content, engine.getAllGroups(), baseUnit, nextOffset, () =>
-      crypto.randomUUID()
-    )
-    const pasted: string[] = plan.groups.map((g) => g.id)
-    engine.batch(() => {
-      for (const group of plan.groups) engine.createGroup(group)
-      for (const shape of plan.shapes) {
-        engine.addShape(shape)
-        let groupId = plan.shapeGroup.get(shape.id)
-        if (!groupId) {
-          // A shape pasted on its own joins the bin its center lands in, the same rule a
-          // dragged shape follows.
-          pasted.push(shape.id)
-          const bounds = engine.getShapeBounds(shape.id)
-          groupId = bounds
-            ? findContainingBinGroup(
-                engine.getAllGroups(),
-                (bounds.minX + bounds.maxX) / 2,
-                (bounds.minY + bounds.maxY) / 2
-              )?.id
-            : undefined
-        }
-        if (groupId) engine.addToGroup(shape.id, groupId)
-      }
-    })
-    engine.select(pasted)
+    if (!content) return
+    pasteContent(content, nextOffset)
     useClipboard.setState({ nextOffset: nextOffset + 1 })
-  }, [engine, baseUnit])
+  }, [pasteContent])
+
+  const duplicate = useCallback(() => {
+    if (!engine) return
+    const content = copySelection(
+      engine.getAllGroups(),
+      engine.getAllShapes(),
+      engine.getSelectedIds()
+    )
+    if (content) pasteContent(content, 1)
+  }, [engine, pasteContent])
+
+  const remove = useCallback(() => {
+    if (engine) removeItems(engine, engine.getSelectedIds())
+  }, [engine])
+
+  const rename = useCallback(() => {
+    const ids = engine?.getSelectedIds() ?? []
+    if (ids.length === 1) useRenaming.setState({ id: ids[0] })
+  }, [engine])
 
   const selectAll = useCallback(() => {
     if (!engine) return
@@ -118,6 +150,43 @@ export function useEditCommands(): EditCommands {
     designing && (engine.getAllGroups().length > 0 || engine.getAllShapes().length > 0)
   const canCopy = designing && selectedIds.length > 0
   const canPaste = designing && hasContent
+  const canRename = designing && selectedIds.length === 1
+
+  return {
+    canCopy,
+    canPaste,
+    canSelectAll,
+    canRename,
+    copy,
+    cut,
+    paste,
+    duplicate,
+    remove,
+    rename,
+    selectAll
+  }
+}
+
+/**
+ * The edit commands, plus their keyboard shortcuts. Mount this once: two would run every
+ * shortcut twice.
+ */
+export function useEditShortcuts(): EditCommands {
+  const commands = useEditCommands()
+  const engine = useLayoutEngine()
+  const { mode } = useAppMode()
+  const designing = mode === 'layout' && engine !== null
+  const { copy, cut, paste, selectAll } = commands
+
+  // What was copied belongs to the project it came from. Another project can have a
+  // different grid, where a pasted bin would not fit. This lives here, in the one hook that
+  // is mounted once: in `useEditCommands` it would run again, and empty the clipboard, each
+  // time a menu appeared.
+  const projectKey = useProject((s) => s.project?.settings.createdAt)
+  useEffect(() => {
+    useClipboard.setState({ content: null, nextOffset: 0 })
+    useRenaming.setState({ id: null })
+  }, [projectKey])
 
   useEffect(() => {
     if (!designing) return
@@ -144,5 +213,5 @@ export function useEditCommands(): EditCommands {
     return () => window.removeEventListener('keydown', onKey)
   }, [designing, engine, copy, cut, paste, selectAll])
 
-  return { canCopy, canPaste, canSelectAll, copy, cut, paste, selectAll }
+  return commands
 }

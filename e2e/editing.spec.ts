@@ -649,3 +649,88 @@ test('cut, copy and paste bins and shapes', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('right-click a bin or shape for its menu', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+  const menuItem = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('menuitem', { name, exact: true })
+  const selectedRows = page.locator('aside button[aria-pressed="true"]')
+  const emptyCanvas = { x: 900, y: 250 }
+
+  // A bin with a pocket in it.
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(1)
+
+  // In the sidebar: a right-click selects the row and opens the menu.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y)
+  await expect(selectedRows).toHaveCount(0)
+  // While the menu is open the page behind it is hidden from lookups by role, so the
+  // selected row is counted by its attribute instead.
+  await row('Bin 1').click({ button: 'right' })
+  await expect(selectedRows).toHaveCount(1)
+  await menuItem('Duplicate').click()
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  await row('Bin 1 copy').click({ button: 'right' })
+  await menuItem('Delete').click()
+  await app.expectBinCount(1)
+  await app.expectShapeCount(1)
+
+  // On the canvas: a right-click on the pocket selects it. Rename types in the sidebar row.
+  await page.mouse.click(420, 620, { button: 'right' })
+  await expect(selectedRows).toHaveText(/^Rectangle 1/)
+  await menuItem('Rename').click()
+  // The rename starts once the menu has closed. The row's field is the first of the two.
+  await expect(page.getByRole('textbox', { name: 'Shape name' }).first()).toBeFocused()
+  await page.keyboard.type('Slot')
+  await page.keyboard.press('Enter')
+  await expect(row('Slot')).toBeVisible()
+
+  // On empty canvas nothing is selected, so only what needs no selection is offered.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(selectedRows).toHaveCount(0)
+  await expect(menuItem('Rename')).toBeDisabled()
+  await expect(menuItem('Delete')).toBeDisabled()
+  await menuItem('Select all').click()
+  await expect(row('Bin 1')).toHaveAttribute('aria-pressed', 'true')
+
+  // A drawing tool keeps its clicks: no menu.
+  await app.selectTool('Rectangle')
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(page.getByRole('menu')).toHaveCount(0)
+  await app.selectTool('Select')
+
+  // With the bin selected, a right-click on its pocket keeps the bin selected: Delete takes
+  // the bin and the pocket, not the pocket alone.
+  await row('Bin 1').click()
+  await page.mouse.click(420, 620, { button: 'right' })
+  await expect(selectedRows).toHaveText(/^Bin 1/)
+  await menuItem('Copy').click()
+
+  // What was copied is still there after the lists have gone away and come back.
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await page.getByRole('radio', { name: 'Design', exact: true }).click()
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await menuItem('Paste').click()
+  await app.expectBinCount(2)
+  await app.expectShapeCount(2)
+
+  // After a right-click, an ordinary drag still moves a shape: the menu did not leave the
+  // canvas thinking a button was held.
+  const file = join(app.dir, 'menu.gfstudio')
+  const before = (await app.save(file)).layoutSnapshot.shapes.find((s) => s.groupId !== null)!
+  await page.mouse.click(420, 620, { button: 'right' })
+  await page.keyboard.press('Escape')
+  await app.drag({ x: 420, y: 620 }, { x: 440, y: 640 })
+  const after = (await app.save(file)).layoutSnapshot.shapes.find((s) => s.id === before.id)!
+  expect(after.x, 'the pocket moved').not.toBe(before.x)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
