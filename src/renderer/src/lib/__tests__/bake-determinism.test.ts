@@ -198,9 +198,28 @@ describe('baking a bin', () => {
       { widthUnits: 2, screwHoles: { enabled: true, diameter: 3, depth: 6 } }
     ],
     ['1×1 with a pocket', { pockets: [rectPocket()] }],
-    ['1×1 with a turned pocket', { pockets: [rectPocket(30)] }]
+    ['1×1 with a turned pocket', { pockets: [rectPocket(30)] }],
+    ['2×1 at the tight tolerance', { widthUnits: 2, tolerance: 0.3, hasLip: false }],
+    ['2×1 at the tight tolerance, with a lip', { widthUnits: 2, tolerance: 0.3 }],
+    ['5×5 at the tight tolerance', { widthUnits: 5, depthUnits: 5, tolerance: 0.3, hasLip: false }],
+    ['3×2 on a 37.3 mm grid', { widthUnits: 3, depthUnits: 2, baseUnit: 37.3, tolerance: 0.15 }],
+    // 20.5 less the 2.85 mm the groove is in from the wall: the pocket's side is the groove's.
+    [
+      '1×1 with a pocket wall on the lip groove wall',
+      { pockets: [{ ...rectPocket(), posX: 7.65 }] }
+    ]
   ])('leaves no flat triangles and no open edges: %s', (_name, overrides) => {
     expect(flaws(buildBinCSG(binParams(overrides), manifold))).toEqual({ flat: 0, openEdges: 0 })
+  })
+
+  it('keeps a low bin with a lip open at the top', () => {
+    // 5 mm units: the bin is lower than its 7 mm base, and the lip starts at 5 mm.
+    const low = buildBinCSG(binParams({ unitHeight: 5, heightUnits: 1 }), manifold)
+    const { max, volume } = measure(low)
+    expect(max[2]).toBeCloseTo(9.4, 4)
+    // A cap over the groove would add most of 4.4 mm of solid bin.
+    expect(volume).toBeLessThan(8500)
+    expect(flaws(low)).toEqual({ flat: 0, openEdges: 0 })
   })
 
   it('makes a bin one unit high exactly one unit high', () => {

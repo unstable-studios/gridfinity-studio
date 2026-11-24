@@ -188,10 +188,11 @@ function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
 
   const hw = (widthUnits * baseUnit - tolerance * 2) / 2
   const hd = (depthUnits * baseUnit - tolerance * 2) / 2
-  // A bin is never lower than its base.
-  const totalH = Math.max(heightUnits * unitHeight, BASE_HEIGHT)
-  // The trunk runs through the lip height: the groove is cut out of it afterwards.
-  const topZ = hasLip ? totalH + LIP_HEIGHT : totalH
+  const totalH = heightUnits * unitHeight
+  // The trunk runs through the lip height: the groove is cut out of it afterwards. The
+  // groove and the pockets are placed from `totalH`, so the height itself is not changed
+  // here: only a bin that would end below the top of its base is brought up to it.
+  const topZ = Math.max(hasLip ? totalH + LIP_HEIGHT : totalH, BASE_HEIGHT)
   const outline = new CrossSection([roundedRectPolygon(hw, hd, OUTER_CORNER_RADIUS)])
   return Manifold.extrude(outline, topZ - BASE_PROFILE_HEIGHT).translate([
     0,
@@ -202,9 +203,9 @@ function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
 
 /**
  * Build the lip groove cutter — the tapered inner volume to subtract from
- * the solid body so the stacking lip profile remains.
+ * the solid trunk so the stacking lip profile remains.
  *
- * The body now extends through the full lip height as a solid block, so we
+ * The trunk extends through the full lip height as a solid block, so we
  * subtract the groove (the inner tapered shape that follows LIP_PROFILE)
  * to leave the correct annular lip behind.
  *
@@ -455,14 +456,18 @@ function computeCreaseNormals(positions: Float32Array, indices: Uint32Array): CS
   return { positions: outPos, indices: outIdx, normals: outNorm, solidVertices }
 }
 
-/** Corners closer together than this are one corner, in mm. */
-const SAME_POINT = 1e-6
+/**
+ * Corners this close on every axis are one corner, in mm. Positions are 32-bit, so at a few
+ * hundred mm two values for the same point can differ by this much. It is a fiftieth of a
+ * micron: nothing printable is lost.
+ */
+const SAME_POINT = 2e-5
 
 /**
  * Where two parts of a solid met along a shared edge, the union can leave the corners of
- * both, in the same place, joined by triangles with no area. Join each such pair into one
- * corner and drop those triangles. Only corners already joined by an edge are merged, so
- * surfaces that merely touch stay separate.
+ * both, in the same place, joined by triangles with no area. Join each such pair
+ * into one corner and drop those triangles. Only corners already joined by an edge are
+ * merged, so surfaces that merely touch stay separate.
  */
 function collapseZeroLengthEdges(positions: Float32Array, indices: Uint32Array): Uint32Array {
   const standsFor = new Uint32Array(positions.length / 3).map((_, i) => i)
@@ -474,9 +479,9 @@ function collapseZeroLengthEdges(positions: Float32Array, indices: Uint32Array):
     return v
   }
   const samePlace = (a: number, b: number): boolean =>
-    Math.abs(positions[a * 3] - positions[b * 3]) < SAME_POINT &&
-    Math.abs(positions[a * 3 + 1] - positions[b * 3 + 1]) < SAME_POINT &&
-    Math.abs(positions[a * 3 + 2] - positions[b * 3 + 2]) < SAME_POINT
+    Math.abs(positions[a * 3] - positions[b * 3]) <= SAME_POINT &&
+    Math.abs(positions[a * 3 + 1] - positions[b * 3 + 1]) <= SAME_POINT &&
+    Math.abs(positions[a * 3 + 2] - positions[b * 3 + 2]) <= SAME_POINT
 
   for (let t = 0; t < indices.length; t += 3) {
     for (let e = 0; e < 3; e++) {
@@ -495,6 +500,83 @@ function collapseZeroLengthEdges(positions: Float32Array, indices: Uint32Array):
     if (a !== b && b !== c && c !== a) kept.push(a, b, c)
   }
   return new Uint32Array(kept)
+}
+
+/** A triangle lower than this over its longest side has no area, in mm. */
+const FLAT_HEIGHT = 1e-6
+
+/** At most this many rounds of flipping. Each round clears the flat triangles it finds. */
+const MAX_FLIP_ROUNDS = 16
+
+/**
+ * A union can also leave a triangle whose three corners are in a line: one corner sits on
+ * the opposite side, between its ends. The triangle across that side is split at that
+ * corner instead, which covers the same surface without the flat triangle.
+ *
+ *     u ───── w ───── v          u ───── w ───── v
+ *      ╲             ╱     →      ╲      │      ╱
+ *        ╲         ╱                ╲    │    ╱
+ *             x                          x
+ */
+function flipFlatTriangles(positions: Float32Array, indices: Uint32Array): Uint32Array {
+  const tris = Array.from(indices)
+  const point = (v: number): [number, number, number] => [
+    positions[v * 3],
+    positions[v * 3 + 1],
+    positions[v * 3 + 2]
+  ]
+  const distance = (a: number, b: number): number => {
+    const [ax, ay, az] = point(a)
+    const [bx, by, bz] = point(b)
+    return Math.hypot(ax - bx, ay - by, az - bz)
+  }
+  /** For a flat triangle, which corner (0 to 2) starts its longest side. Otherwise -1. */
+  const longestSideIfFlat = (t: number): number => {
+    const sides = [0, 1, 2].map((e) => distance(tris[t + e], tris[t + ((e + 1) % 3)]))
+    const longest = sides.indexOf(Math.max(...sides))
+    const [a, b, c] = [point(tris[t]), point(tris[t + 1]), point(tris[t + 2])]
+    const u = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+    const v = [c[0] - a[0], c[1] - a[1], c[2] - a[2]]
+    const twiceArea = Math.hypot(
+      u[1] * v[2] - u[2] * v[1],
+      u[2] * v[0] - u[0] * v[2],
+      u[0] * v[1] - u[1] * v[0]
+    )
+    return twiceArea < FLAT_HEIGHT * sides[longest] ? longest : -1
+  }
+
+  for (let round = 0; round < MAX_FLIP_ROUNDS; round++) {
+    // Each side of a triangle, as "from>to", to the triangle and corner it starts at.
+    const sideOf = new Map<string, number>()
+    for (let t = 0; t < tris.length; t += 3) {
+      for (let e = 0; e < 3; e++) sideOf.set(`${tris[t + e]}>${tris[t + ((e + 1) % 3)]}`, t + e)
+    }
+
+    const changed = new Set<number>()
+    for (let t = 0; t < tris.length; t += 3) {
+      if (changed.has(t)) continue
+      const side = longestSideIfFlat(t)
+      if (side === -1) continue
+      const u = tris[t + side]
+      const v = tris[t + ((side + 1) % 3)]
+      const w = tris[t + ((side + 2) % 3)]
+      // The triangle on the other side of the long side runs along it the other way.
+      const across = sideOf.get(`${v}>${u}`)
+      if (across === undefined) continue
+      const n = across - (across % 3)
+      if (changed.has(n) || n === t) continue
+      // Several corners in one line make flat triangles side by side. Splitting one flat
+      // triangle with another only moves the problem, so start from the one whose
+      // neighbor has area. The rest follow in later rounds.
+      if (longestSideIfFlat(n) !== -1) continue
+      const x = tris[n + ((across - n + 2) % 3)]
+      tris.splice(t, 3, w, u, x)
+      tris.splice(n, 3, v, w, x)
+      changed.add(t).add(n)
+    }
+    if (changed.size === 0) break
+  }
+  return new Uint32Array(tris)
 }
 
 // ─── Main Entry Point ────────────────────────────────────────────
@@ -517,14 +599,14 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
   // Step 2: Build everything above the feet, and join the two
   let bin = Manifold.union([feet, buildTrunk(params, M)])
 
-  // Step 5: Subtract lip groove (body extends through lip; groove carves the profile)
+  // Step 3: Subtract lip groove (the trunk extends through the lip; the groove carves it)
   const lipGroove = buildLipGroove(params, M)
   if (lipGroove) bin = Manifold.difference(bin, lipGroove)
 
-  // Step 6: Subtract magnet/screw holes
+  // Step 4: Subtract magnet/screw holes
   bin = subtractHoles(bin, params, M)
 
-  // Step 7: Subtract pockets (cut down from top surface)
+  // Step 5: Subtract pockets (cut down from top surface)
   bin = subtractPockets(bin, params, M)
 
   // Extract raw mesh from Manifold
@@ -538,7 +620,10 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
     rawPositions[i * 3 + 1] = mesh.vertProperties[off + 1]
     rawPositions[i * 3 + 2] = mesh.vertProperties[off + 2]
   }
-  const rawIndices = collapseZeroLengthEdges(rawPositions, new Uint32Array(mesh.triVerts))
+  const rawIndices = flipFlatTriangles(
+    rawPositions,
+    collapseZeroLengthEdges(rawPositions, new Uint32Array(mesh.triVerts))
+  )
 
   // Compute normals with crease-angle vertex splitting
   return computeCreaseNormals(rawPositions, rawIndices)
