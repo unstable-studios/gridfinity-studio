@@ -4,6 +4,7 @@ import { join } from 'path'
 import { createEmptyProject } from '../shared/types/project'
 import type { ProjectData } from '../shared/types/project'
 import { validateProject, formatValidationErrors } from '../shared/validation/project-validator'
+import { bringUpToDate } from '../shared/validation/migrations'
 import type { OperationResult } from '../shared/types/results'
 
 /**
@@ -197,6 +198,13 @@ export async function loadProject(
         error: parseError instanceof Error ? parseError.message : String(parseError)
       }
     }
+
+    // Convert a file from an earlier format, before checking it against the current one.
+    const upToDate = bringUpToDate(projectData)
+    if (!upToDate.ok) {
+      return { success: false, reason: upToDate.reason, error: upToDate.version }
+    }
+    projectData = upToDate.project
 
     // Validate project data
     const validationResult = validateProject(projectData)

@@ -36,7 +36,7 @@ src/renderer/       → React SPA: UI components, Three.js viewport, hooks
 src/shared/         → Shared across all processes: types, validation
 ```
 
-IPC communication flows through `window.api.project.*` methods (save, load, validate). All IPC handlers return `OperationResult<T>` (`src/shared/types/results.ts`). A failure carries the underlying `error` detail and, where it applies, a `reason`: `cancelled` (dialog dismissed, not an error) or `invalid` (not a valid project file). The project store turns failures into notices (`lib/project-notices.ts`), so every save, open and export shows its outcome.
+IPC communication flows through `window.api.project.*` methods (save, load, validate). All IPC handlers return `OperationResult<T>` (`src/shared/types/results.ts`). A failure carries the underlying `error` detail and, where it applies, a `reason`: `cancelled` (dialog dismissed, not an error), `invalid` (not a valid project file), or `too-new` / `too-old` (a project file from a version of the format this app does not read). The project store turns failures into notices (`lib/project-notices.ts`), so every save, open and export shows its outcome.
 
 Closing a window or quitting with unsaved work asks first (`src/main/close-guard.ts`). The renderer tells the main process whether there is unsaved work (`useCloseGuard`) and saves on request, since only it holds the project. Anything that closes the windows without giving them a say, such as installing an update, calls `settleUnsavedWork()` first and goes ahead only if it resolves to true.
 
@@ -62,6 +62,8 @@ CSG Pipeline (3D preview)
 ```
 
 The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnapshot` field containing all shapes, groups, and grid config. The validator (`src/shared/validation/project-validator.ts`) checks `settings`, `gridfinity` and the layout: ids are unique, positions and sizes are numbers, and each shape has its type's fields. Bins and shapes are put back in step on open (`repairLayout`), not refused. `docs/PROJECT_SCHEMA.md` describes the file format.
+
+**Changing the file format** needs a migration, so files people have already saved still open: raise `CURRENT_SCHEMA_VERSION`, add a step to `MIGRATIONS` in `src/shared/validation/migrations.ts` keyed by the version it converts from, and test it. Files older than 0.5.0 are not supported.
 
 ### Renderer Architecture
 

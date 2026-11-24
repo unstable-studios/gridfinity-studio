@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   ProjectValidator,
-  migrateProject,
+  repairProject,
   repairLayout,
   validateProject
 } from '../project-validator'
@@ -342,7 +342,10 @@ describe('ProjectValidator', () => {
     it('runs when a project is opened', () => {
       const project = createEmptyProject()
       project.layoutSnapshot = layout([{ id: 's', groupId: 'bin' }], [{ id: 'bin', childIds: [] }])
-      expect(migrateProject(project).layoutSnapshot.groups[0].childIds).toEqual(['s'])
+      expect(repairProject(project).layoutSnapshot.groups[0].childIds).toEqual(['s'])
+      // A project with nothing to repair comes back as it is.
+      const sound = createEmptyProject()
+      expect(repairProject(sound)).toBe(sound)
     })
   })
 })

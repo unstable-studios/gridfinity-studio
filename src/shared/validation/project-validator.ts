@@ -1,5 +1,4 @@
 import type { LayoutSnapshotData, ProjectData } from '../types/project'
-import { SUPPORTED_SCHEMA_VERSIONS, CURRENT_SCHEMA_VERSION } from '../types/project'
 
 export interface ValidationError {
   field: string
@@ -68,12 +67,6 @@ export class ProjectValidator {
         message: 'Schema version must follow semver format (e.g., "0.1.0")',
         value: project.schemaVersion
       })
-    }
-
-    if (!SUPPORTED_SCHEMA_VERSIONS.includes(project.schemaVersion)) {
-      console.warn(
-        `Project schema version (${project.schemaVersion}) is not in supported versions. Migration may be needed.`
-      )
     }
   }
 
@@ -384,20 +377,12 @@ export function validateProject(data: unknown): ValidationResult {
 }
 
 /**
- * Migrate a loaded project to the current schema version.
- * Old entity/bin data is handled by migrations.ts (which converts to layoutSnapshot).
- * This function handles any remaining fixups on the canonical ProjectData shape: the
- * version number, and bins' lists of their shapes.
+ * A project just read from a file, with its bins and shapes put back in step. Returns the
+ * same project when nothing needed repair.
  */
-export function migrateProject(project: ProjectData): ProjectData {
+export function repairProject(project: ProjectData): ProjectData {
   const layoutSnapshot = repairLayout(project.layoutSnapshot)
-  if (
-    project.schemaVersion === CURRENT_SCHEMA_VERSION &&
-    layoutSnapshot === project.layoutSnapshot
-  ) {
-    return project
-  }
-  return { ...project, schemaVersion: CURRENT_SCHEMA_VERSION, layoutSnapshot }
+  return layoutSnapshot === project.layoutSnapshot ? project : { ...project, layoutSnapshot }
 }
 
 export function formatValidationErrors(errors: ValidationError[]): string {

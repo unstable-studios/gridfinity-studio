@@ -11,7 +11,7 @@
 
 import { create } from 'zustand'
 import { createEmptyProject } from '../../../shared/types/project'
-import { migrateProject } from '../../../shared/validation/project-validator'
+import { repairProject } from '../../../shared/validation/project-validator'
 import type {
   ProjectData,
   GlobalSettings,
@@ -224,7 +224,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       try {
         const result = await window.api.project.load(targetPath)
         if (result.success && result.data) {
-          const project = migrateProject(result.data.project)
+          const project = repairProject(result.data.project)
           set({
             project,
             filePath: result.data.filePath,
