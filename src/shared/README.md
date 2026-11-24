@@ -6,13 +6,15 @@ This directory contains code shared between the main process, preload, and rende
 
 ```
 src/shared/
-├── types/           # TypeScript type definitions
-│   └── project.ts   # Project data model types
-├── schemas/         # JSON schemas for validation
-│   └── project.schema.json
-└── validation/      # Validation utilities
-    ├── project-validator.ts
-    └── test-validation.ts
+├── types/           # Types used by more than one process
+│   ├── project.ts   # The project file: settings, Gridfinity config, layout snapshot
+│   ├── results.ts   # OperationResult, returned by every IPC handler
+│   ├── export.ts    # Export formats and folder exports
+│   ├── worker.ts    # Messages to and from the geometry worker
+│   └── ...
+└── validation/
+    ├── project-validator.ts  # Checks a project when it is opened or saved
+    └── migrations.ts         # Converts pre-0.5.0 project files. Not called by the app
 ```
 
 ## Usage
@@ -22,7 +24,7 @@ src/shared/
 Import project types in any layer:
 
 ```typescript
-import type { ProjectData, Entity, Bin } from '../shared/types/project'
+import type { ProjectData, LayoutShapeData } from '../shared/types/project'
 import { createEmptyProject, CURRENT_SCHEMA_VERSION } from '../shared/types/project'
 ```
 
@@ -50,6 +52,7 @@ From each layer:
 ## Why Shared?
 
 Sharing type definitions ensures:
+
 - Single source of truth for data structures
 - Type safety across IPC boundaries
 - Consistent validation in main and renderer

@@ -14,7 +14,7 @@ Repository structure (authoritative):
 - `src/renderer/` — UI
   - `src/renderer/src/components/`, `hooks/`, `lib/`, `types/`
 - `src/shared/` — shared domain logic and contracts
-  - `schemas/`, `types/`, `validation/`
+  - `types/`, `validation/`
 
 ## Product mission
 
@@ -48,7 +48,7 @@ Help users generate **custom-fitted Gridfinity bins** from:
   - **No** `enableRemoteModule`
 - IPC rules:
   - IPC APIs must be **explicit, minimal, and typed**
-  - Validate inputs at the boundary using `src/shared/schemas` / `validation`
+  - Validate inputs at the boundary using `src/shared/validation`
   - No “generic invoke” channels (e.g., `ipcRenderer.invoke('doAnything', ...)`)
 - Filesystem and OS access belong in `src/main/`; renderer requests actions via preload API.
 
@@ -64,7 +64,7 @@ When assigned a task:
 
 1. Identify which layer(s) it touches: `shared` (domain), `renderer` (UI), `preload` (bridge), `main` (privileged).
 2. Put domain logic in `src/shared/` first when possible.
-3. Add or update schemas/validation for any inputs crossing IPC or coming from user files.
+3. Add or update validation for any inputs crossing IPC or coming from user files.
 4. Add tests alongside the domain logic and any risky parsing/transform steps.
 5. Keep diffs small and avoid unrelated formatting.
 

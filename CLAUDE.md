@@ -33,7 +33,7 @@ The app follows Electron's strict process separation:
 src/main/           → Main process (Node.js): window management, IPC handlers, file I/O
 src/preload/        → Preload scripts: context bridge exposing window.api to renderer
 src/renderer/       → React SPA: UI components, Three.js viewport, hooks
-src/shared/         → Shared across all processes: types, schemas, validation
+src/shared/         → Shared across all processes: types, validation
 ```
 
 IPC communication flows through `window.api.project.*` methods (save, load, validate). All IPC handlers return `OperationResult<T>` (`src/shared/types/results.ts`). A failure carries the underlying `error` detail and, where it applies, a `reason`: `cancelled` (dialog dismissed, not an error) or `invalid` (not a valid project file). The project store turns failures into notices (`lib/project-notices.ts`), so every save, open and export shows its outcome.
@@ -61,7 +61,7 @@ CSG Pipeline (3D preview)
   └─ ReviewCanvas renders meshes via R3F
 ```
 
-The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnapshot` field containing all shapes, groups, and grid config. The validator (`src/shared/validation/project-validator.ts`) enforces schema correctness including duplicate ID detection.
+The project schema (`src/shared/types/project.ts`, v0.5.0) stores a `layoutSnapshot` field containing all shapes, groups, and grid config. The validator (`src/shared/validation/project-validator.ts`) checks the top-level fields, `settings` and `gridfinity`; it does not look inside `layoutSnapshot`. `docs/PROJECT_SCHEMA.md` describes the file format.
 
 ### Renderer Architecture
 
