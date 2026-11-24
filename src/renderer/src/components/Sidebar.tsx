@@ -530,10 +530,13 @@ function PreviewSidebar(): React.JSX.Element {
               const isSelected = selectedBinIds.includes(bin.id)
               const pip =
                 status === 'ready'
-                  ? { color: 'text-emerald-500', label: '● Ready' }
+                  ? { color: 'text-emerald-700 dark:text-emerald-500', label: '● Ready' }
                   : status === 'error'
-                    ? { color: 'text-red-500', label: '⚠ Failed' }
-                    : { color: 'text-amber-500 animate-pulse', label: '◌ Building…' }
+                    ? { color: 'text-red-700 dark:text-red-400', label: '⚠ Failed' }
+                    : {
+                        color: 'text-amber-700 dark:text-amber-500 animate-pulse',
+                        label: '◌ Building…'
+                      }
               return (
                 <button
                   key={bin.id}
@@ -563,13 +566,13 @@ function PreviewSidebar(): React.JSX.Element {
       </SidebarSection>
 
       {anyError && (
-        <p className="text-[10px] text-red-500">
+        <p className="text-[10px] text-red-700 dark:text-red-400">
           Couldn’t build one or more bins. Edit them in Design to try again.
         </p>
       )}
 
       {warnings.length > 0 && (
-        <ul className="space-y-0.5 text-[10px] text-amber-500">
+        <ul className="space-y-0.5 text-[10px] text-amber-700 dark:text-amber-500">
           {warnings.map((warning, i) => (
             <li key={i}>{warning}</li>
           ))}
@@ -786,7 +789,7 @@ function ShapeDepthField({
         />
       )}
       {nearMax && (
-        <div className="flex items-start gap-1 text-amber-600 dark:text-amber-400 text-[10px] leading-tight">
+        <div className="flex items-start gap-1 text-amber-700 dark:text-amber-400 text-[10px] leading-tight">
           <span aria-hidden="true">⚠</span>
           <span>Leaves a thin floor. Max {maxSafe.toFixed(1)} mm.</span>
         </div>

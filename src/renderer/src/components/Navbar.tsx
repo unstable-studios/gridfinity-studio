@@ -383,7 +383,8 @@ function UpdateBadge({ state }: { state: UpdateState }): React.JSX.Element | nul
         aria-hidden="true"
         className={`absolute right-1 top-1 h-1.5 w-1.5 rounded-full ${style.color}`}
       />
-      <span className="sr-only">{style.srLabel}</span>
+      {/* The comma keeps it apart from "Help" when the two are read as one name. */}
+      <span className="sr-only">, {style.srLabel}</span>
     </>
   )
 }
@@ -397,8 +398,10 @@ function UpdateMenuItems({
   actions: Record<UpdateAction, () => void>
 }): React.JSX.Element {
   const tones = {
-    good: 'text-green-600 dark:text-green-400 font-medium',
-    bad: 'text-red-500'
+    good: 'text-green-700 dark:text-green-400 font-medium',
+    // A line that only says something is disabled, and a disabled line is dimmed. This one
+    // has to be read, so it is not.
+    bad: 'text-red-700 dark:text-red-400 data-[disabled]:opacity-100'
   }
   return (
     <>
