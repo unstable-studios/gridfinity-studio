@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.12.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.11.0...v1.12.0) (2026-11-24)
+
+
+### Features
+
+* **ui:** align selected pockets ([#427](https://github.com/unstable-studios/gridfinity-studio/issues/427)) ([de01d01](https://github.com/unstable-studios/gridfinity-studio/commit/de01d01689ecbdf7eb0405dbded1d0fedf70179b))
+* **ui:** distribute selected shapes with equal gaps ([#428](https://github.com/unstable-studios/gridfinity-studio/issues/428)) ([0269932](https://github.com/unstable-studios/gridfinity-studio/commit/02699324cc73202ea5cc3772f92e62e380183ad4))
+* **ui:** show shape position from the lower left, on the canvas or in its bin ([#434](https://github.com/unstable-studios/gridfinity-studio/issues/434)) ([3b1df20](https://github.com/unstable-studios/gridfinity-studio/commit/3b1df20217892a2211fa2aa775bef574bac59abc))
+
+
+### Bug Fixes
+
+* **core:** rebake a bin edited during a failed bake ([#422](https://github.com/unstable-studios/gridfinity-studio/issues/422)) ([ba3a95e](https://github.com/unstable-studios/gridfinity-studio/commit/ba3a95e4d97af3d3e96f37b8020b7347f9db5dce))
+* **core:** record bin assignment for undo and session restore ([#421](https://github.com/unstable-studios/gridfinity-studio/issues/421)) ([edc1e18](https://github.com/unstable-studios/gridfinity-studio/commit/edc1e18245088779b22c7a46bbc706af67d2c30e))
+* **core:** record pocket depth changes for undo and saving ([#433](https://github.com/unstable-studios/gridfinity-studio/issues/433)) ([cf2e2f9](https://github.com/unstable-studios/gridfinity-studio/commit/cf2e2f9fbc6afcebec6c40a2540909ffc9d1c463))
+* **ui:** keep bin size inputs inside the sidebar ([#423](https://github.com/unstable-studios/gridfinity-studio/issues/423)) ([93cecb3](https://github.com/unstable-studios/gridfinity-studio/commit/93cecb310a98ff1fb68725d39fd5bdce5c003f9f))
+* **ui:** make a typed shape position an undo step ([#431](https://github.com/unstable-studios/gridfinity-studio/issues/431)) ([d971579](https://github.com/unstable-studios/gridfinity-studio/commit/d971579825d32add843779fe62ff61b4c09be979))
+
 ## [1.11.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.10.1...v1.11.0) (2026-11-23)
 
 
