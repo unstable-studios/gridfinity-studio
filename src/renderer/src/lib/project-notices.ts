@@ -16,6 +16,17 @@ function untilDismissed(id: string): { id: string; duration: number } {
   return { id, duration: Infinity }
 }
 
+/**
+ * The first problem in a validation report, to end a notice with. The whole report goes to
+ * the console for whoever looks into it.
+ */
+function firstProblem(detail: string | undefined): string {
+  if (!detail) return ''
+  console.error(detail)
+  const first = detail.split('\n').find((line) => line.trimStart().startsWith('\u2022'))
+  return first ? ` Details: ${first.replace(/^\s*\u2022\s*/, '')}` : ''
+}
+
 export function notifySaveFailed(
   reason: FailureReason | undefined,
   detail: string | undefined
@@ -23,7 +34,7 @@ export function notifySaveFailed(
   toast.error('Couldn’t save the project', {
     description:
       reason === 'invalid'
-        ? 'Something in it isn’t valid. Undo your last change, then save again.'
+        ? `Something in it isn’t valid. Undo your last change, then save again.${firstProblem(detail)}`
         : describeFileError(detail),
     ...untilDismissed('save-failed')
   })
@@ -36,7 +47,7 @@ export function notifyOpenFailed(
   toast.error('Couldn’t open that file', {
     description:
       reason === 'invalid'
-        ? 'It isn’t a Gridfinity Studio project, or it is damaged.'
+        ? `It isn’t a Gridfinity Studio project, or it is damaged.${firstProblem(detail)}`
         : describeFileError(detail),
     ...untilDismissed('open-failed')
   })

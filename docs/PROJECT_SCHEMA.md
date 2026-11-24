@@ -95,7 +95,7 @@ Fields every shape has:
 | `type`                          | string                 | `"rect"`, `"circle"`, `"polygon"`, `"svgPath"` or `"meshImport"`.                                                                                              |
 | `x`, `y`                        | number                 | The shape's center, or for an `svgPath` the path's origin. For a shape in a bin, measured **from the center of the bin**. Otherwise, a position on the canvas. |
 | `rotation`                      | number                 | Degrees, clockwise as seen on screen, about the shape's center.                                                                                                |
-| `groupId`                       | string or null         | The bin the shape is in, or null. It must be a bin in the file. A bin's `childIds` follows from it.                                                            |
+| `groupId`                       | string or null         | The bin the shape is in, or null. A bin's `childIds` follows from it.                                                                                          |
 | `fill`, `stroke`, `strokeWidth` | string, string, number | How the shape is drawn on the canvas.                                                                                                                          |
 | `metadata`                      | object                 | Optional. See below.                                                                                                                                           |
 | `lockAspectRatio`               | boolean                | Optional. Keeps the shape's proportions when it is resized.                                                                                                    |
@@ -201,11 +201,10 @@ The bin's lower-left corner is at (0, 0), so it covers x from 0 to 84 and y from
 - `layoutSnapshot`: `version` is text, `gridConfig` has a size greater than 0 and its two switches, and `shapes` and `groups` are lists.
 - Every bin and shape has an id, and no id is used twice.
 - Positions, sizes and rotations are numbers. A shape has a known `type` and the fields that type needs.
-- A shape's `groupId` is null or the id of a bin in the file.
 
-A file that fails is not opened, and the notice names the first problems found.
+A file that fails is not opened. The notice gives the first problem found, and the console has the rest.
 
-A bin's `childIds` is not checked against its shapes. The shapes' `groupId` decides, and each bin's list is rebuilt from them when the file is opened.
+Bins and shapes are not checked against each other. When a file is opened they are put back in step: a shape whose `groupId` names no bin is in no bin, and each bin's `childIds` is rebuilt from its shapes.
 
 ## Other versions
 

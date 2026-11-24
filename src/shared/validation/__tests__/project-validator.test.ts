@@ -200,10 +200,36 @@ describe('ProjectValidator', () => {
       expect(validateProject(shapeAndBin).errors[0].message).toBe('Duplicate id: bin')
     })
 
-    it('rejects a shape that says it is in a bin that is not there', () => {
-      expect(fields(withLayout([rect({ groupId: 'gone' })], [bin()]))).toEqual([
-        'layoutSnapshot.shapes[0].groupId'
+    it('accepts a shape that says it is in a bin that is not there', () => {
+      // `repairLayout` puts it in no bin. Refusing would stop the project being saved.
+      expect(fields(withLayout([rect({ groupId: 'gone' })], [bin()]))).toEqual([])
+    })
+
+    it('rejects a groupId that is not an id', () => {
+      const shapes = [
+        rect({ id: 'a', groupId: 5 as unknown as string }),
+        rect({ id: 'b', groupId: undefined as unknown as string })
+      ]
+      expect(fields(withLayout(shapes, [bin()]))).toEqual([
+        'layoutSnapshot.shapes[0].groupId',
+        'layoutSnapshot.shapes[1].groupId'
       ])
+    })
+
+    it('accepts metadata left undefined but not metadata set to nothing', () => {
+      const shapes = [
+        rect({ id: 'a', metadata: undefined }),
+        rect({ id: 'b', metadata: null as never })
+      ]
+      expect(fields(withLayout(shapes, [bin()]))).toEqual(['layoutSnapshot.shapes[1].metadata'])
+    })
+
+    it('leaves lists and objects out of what it reports', () => {
+      const { errors } = validateProject(withLayout([], [], { shapes: { a: 1 } }))
+      expect(errors[0]).toEqual({
+        field: 'layoutSnapshot.shapes',
+        message: 'shapes must be a list'
+      })
     })
 
     it('rejects a position or size that is not a number', () => {
@@ -283,6 +309,34 @@ describe('ProjectValidator', () => {
       expect(repairLayout(drifted).groups[0].childIds).toEqual(['d', 'a', 'b'])
       // The file as read is left alone.
       expect(drifted.groups[0].childIds).toHaveLength(5)
+    })
+
+    it('puts a shape in no bin when its bin is not in the file', () => {
+      const dangling = layout(
+        [
+          { id: 'a', groupId: 'gone' },
+          { id: 'b', groupId: 'bin' }
+        ],
+        [{ id: 'bin', childIds: ['a', 'b'] }]
+      )
+      const repaired = repairLayout(dangling)
+      expect(repaired.shapes.map((shape) => shape.groupId)).toEqual([null, 'bin'])
+      expect(repaired.groups[0].childIds).toEqual(['b'])
+      expect(dangling.shapes[0].groupId).toBe('gone')
+    })
+
+    it('keeps the shapes of each bin apart when there are several bins', () => {
+      const two = layout(
+        [
+          { id: 'a', groupId: 'one' },
+          { id: 'b', groupId: 'two' }
+        ],
+        [
+          { id: 'one', childIds: ['b'] },
+          { id: 'two', childIds: [] }
+        ]
+      )
+      expect(repairLayout(two).groups.map((group) => group.childIds)).toEqual([['a'], ['b']])
     })
 
     it('runs when a project is opened', () => {

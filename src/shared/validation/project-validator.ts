@@ -219,14 +219,25 @@ function isLength(value: unknown): value is number {
 /**
  * Check the layout: the bins, the shapes, and that they point at each other.
  *
- * This is what the canvas and the 3D model rely on. It does not check that a bin's
- * `childIds` list matches its shapes' `groupId`: the shapes decide, and `repairLayout`
- * rebuilds the lists when a file is opened.
+ * This is what the canvas and the 3D model rely on. It does not check that bins and shapes
+ * agree about which shape is in which bin: `repairLayout` puts that right when a file is
+ * opened, so drift never stops a project from being saved or opened.
  */
 function validateLayout(layout: unknown, all: ValidationError[]): void {
   const errors: ValidationError[] = []
   const add = (field: string, message: string, value?: unknown): void => {
-    errors.push({ field: `layoutSnapshot.${field}`, message, value })
+    // A whole list or shape is no help in a message, and can be very large.
+    const short =
+      value === null || ['number', 'boolean'].includes(typeof value)
+        ? value
+        : typeof value === 'string'
+          ? value.slice(0, 60)
+          : undefined
+    errors.push({
+      field: `layoutSnapshot.${field}`,
+      message,
+      ...(short !== undefined && { value: short })
+    })
   }
 
   if (!isRecord(layout)) {
@@ -271,11 +282,10 @@ function validateLayout(layout: unknown, all: ValidationError[]): void {
     }
   }
 
-  const groupIds = new Set<string>()
   groups?.forEach((group, i) => {
     const field = `groups[${i}]`
     if (!isRecord(group)) return add(field, 'A group must be an object', group)
-    if (checkId(field, group.id)) groupIds.add(group.id)
+    checkId(field, group.id)
     checkNumbers(field, group, ['x', 'y', 'width', 'height', 'rotation'])
     if (!Array.isArray(group.childIds) || group.childIds.some((id) => typeof id !== 'string')) {
       add(`${field}.childIds`, 'childIds must be a list of ids', group.childIds)
@@ -321,10 +331,9 @@ function validateLayout(layout: unknown, all: ValidationError[]): void {
       }
     }
 
+    // A `groupId` that names no bin is put right by `repairLayout`, like a drifted list.
     if (shape.groupId !== null && typeof shape.groupId !== 'string') {
       add(`${field}.groupId`, 'groupId must be an id or null', shape.groupId)
-    } else if (shape.groupId !== null && groups && !groupIds.has(shape.groupId)) {
-      add(`${field}.groupId`, `groupId points at a bin that does not exist: ${shape.groupId}`)
     }
   })
 
@@ -334,17 +343,28 @@ function validateLayout(layout: unknown, all: ValidationError[]): void {
 }
 
 /**
- * Make each bin's `childIds` list the shapes that say they are in it. A shape's `groupId`
- * is what the canvas goes by, so a list that has drifted from it is put right, not refused.
- * A bin keeps the order it had, with shapes it did not list added at the end.
+ * Put a layout's bins and shapes back in step. A shape's `groupId` is what the canvas goes
+ * by, so drift is put right, not refused:
+ * - A shape whose `groupId` names no bin is in no bin.
+ * - Each bin's `childIds` lists the shapes that say they are in it. A bin keeps the order
+ *   it had, with shapes it did not list added at the end.
+ *
+ * Returns the same layout when nothing needed repair.
  */
 export function repairLayout(layout: LayoutSnapshotData): LayoutSnapshotData {
+  const groupIds = new Set(layout.groups.map((group) => group.id))
+  let changed = false
+  const shapes = layout.shapes.map((shape) => {
+    if (shape.groupId === null || groupIds.has(shape.groupId)) return shape
+    changed = true
+    return { ...shape, groupId: null }
+  })
+
   const members = new Map<string, string[]>()
-  for (const shape of layout.shapes) {
+  for (const shape of shapes) {
     if (shape.groupId === null) continue
     members.set(shape.groupId, [...(members.get(shape.groupId) ?? []), shape.id])
   }
-  let changed = false
   const groups = layout.groups.map((group) => {
     const mine = members.get(group.id) ?? []
     const kept = group.childIds.filter((id, i, ids) => mine.includes(id) && ids.indexOf(id) === i)
@@ -356,7 +376,7 @@ export function repairLayout(layout: LayoutSnapshotData): LayoutSnapshotData {
     changed = true
     return { ...group, childIds }
   })
-  return changed ? { ...layout, groups } : layout
+  return changed ? { ...layout, shapes, groups } : layout
 }
 
 export function validateProject(data: unknown): ValidationResult {
