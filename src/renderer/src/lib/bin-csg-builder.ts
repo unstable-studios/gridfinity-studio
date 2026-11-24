@@ -70,6 +70,26 @@ type ManifoldModule = any
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Manifold = any
 
+// ─── Memory ──────────────────────────────────────────────────────
+
+/** Something Manifold made on its own heap. JavaScript never frees it: `delete` does. */
+interface Disposable {
+  delete(): void
+}
+
+/**
+ * Everything the bake in progress has made. The geometry worker keeps one Manifold module
+ * for as long as the app is open, so a bake that left its solids behind would use the
+ * module's memory up, and after a few hundred bakes every bake would fail.
+ */
+let madeThisBake: Disposable[] | null = null
+
+/** Note a solid or outline so it is freed when the bake ends. Returns it. */
+function keep<T extends Disposable>(made: T): T {
+  madeThisBake?.push(made)
+  return made
+}
+
 // ─── Rounded Rectangle CrossSection ─────────────────────────────
 
 /**
@@ -170,12 +190,12 @@ function buildBaseFeet(params: CSGBinParams, M: ManifoldModule): Manifold {
       }
 
       for (let step = 0; step < BASE_PROFILE.length - 1; step++) {
-        feet.push(Manifold.hull([...ring(step), ...ring(step + 1)]))
+        feet.push(keep(Manifold.hull([...ring(step), ...ring(step + 1)])))
       }
     }
   }
 
-  return Manifold.union(feet)
+  return keep(Manifold.union(feet))
 }
 
 /**
@@ -193,12 +213,9 @@ function buildTrunk(params: CSGBinParams, M: ManifoldModule): Manifold {
   // groove and the pockets are placed from `totalH`, so the height itself is not changed
   // here: only a bin that would end below the top of its base is brought up to it.
   const topZ = Math.max(hasLip ? totalH + LIP_HEIGHT : totalH, BASE_HEIGHT)
-  const outline = new CrossSection([roundedRectPolygon(hw, hd, OUTER_CORNER_RADIUS)])
-  return Manifold.extrude(outline, topZ - BASE_PROFILE_HEIGHT).translate([
-    0,
-    0,
-    BASE_PROFILE_HEIGHT
-  ])
+  const outline = keep(new CrossSection([roundedRectPolygon(hw, hd, OUTER_CORNER_RADIUS)]))
+  const prism = keep(Manifold.extrude(outline, topZ - BASE_PROFILE_HEIGHT))
+  return keep(prism.translate([0, 0, BASE_PROFILE_HEIGHT]))
 }
 
 /**
@@ -240,14 +257,16 @@ function buildLipGroove(params: CSGBinParams, M: ManifoldModule): Manifold | nul
     const r1 = Math.max(0.01, OUTER_CORNER_RADIUS - innerInset1)
 
     grooveParts.push(
-      Manifold.hull([
-        ...ringAt(hw - innerInset0, hd - innerInset0, r0, 0, 0, totalH + z0),
-        ...ringAt(hw - innerInset1, hd - innerInset1, r1, 0, 0, totalH + z1)
-      ])
+      keep(
+        Manifold.hull([
+          ...ringAt(hw - innerInset0, hd - innerInset0, r0, 0, 0, totalH + z0),
+          ...ringAt(hw - innerInset1, hd - innerInset1, r1, 0, 0, totalH + z1)
+        ])
+      )
     )
   }
 
-  return Manifold.union(grooveParts)
+  return keep(Manifold.union(grooveParts))
 }
 
 function subtractHoles(bin: Manifold, params: CSGBinParams, M: ManifoldModule): Manifold {
@@ -280,19 +299,16 @@ function subtractHoles(bin: Manifold, params: CSGBinParams, M: ManifoldModule): 
 
       for (const [hx, hy] of positions) {
         for (const { diameter, depth } of holeConfigs) {
-          const hole = Manifold.cylinder(
-            depth,
-            diameter / 2,
-            diameter / 2,
-            circleSegments(diameter / 2)
-          ).translate([hx, hy, 0])
-          holes.push(hole)
+          const cylinder = keep(
+            Manifold.cylinder(depth, diameter / 2, diameter / 2, circleSegments(diameter / 2))
+          )
+          holes.push(keep(cylinder.translate([hx, hy, 0])))
         }
       }
     }
   }
 
-  return Manifold.difference(bin, Manifold.union(holes))
+  return keep(Manifold.difference(bin, keep(Manifold.union(holes))))
 }
 
 function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule): Manifold {
@@ -310,14 +326,13 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
       poly.push([pocket.posX + pocket.vertices[i * 2], pocket.posY + pocket.vertices[i * 2 + 1]])
     }
 
-    let cs = new CrossSection([poly])
+    let cs = keep(new CrossSection([poly]))
 
     if (pocket.clearance > 0) {
       // The offset leaves pairs of points a few nanometers apart where a rounded corner
       // meets an edge. simplify() removes them, so they don't become zero-area triangles.
-      cs = cs
-        .offset(pocket.clearance, 'Round', 2, circleSegments(pocket.clearance))
-        .simplify(OFFSET_CLEANUP)
+      const grown = keep(cs.offset(pocket.clearance, 'Round', 2, circleSegments(pocket.clearance)))
+      cs = keep(grown.simplify(OFFSET_CLEANUP))
     }
 
     // Extend upward through the lip (+ 1mm overshoot) so edge pockets
@@ -325,12 +340,12 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
     const lipExtension = params.hasLip ? LIP_HEIGHT + 1 : 0
     const cutHeight = pocket.depth + lipExtension
     const cutBase = pocket.zTop - pocket.depth
-    const solid = Manifold.extrude(cs, cutHeight).translate([0, 0, cutBase])
-    cutters.push(solid)
+    const prism = keep(Manifold.extrude(cs, cutHeight))
+    cutters.push(keep(prism.translate([0, 0, cutBase])))
   }
 
   if (cutters.length === 0) return bin
-  return Manifold.difference(bin, Manifold.union(cutters))
+  return keep(Manifold.difference(bin, keep(Manifold.union(cutters))))
 }
 
 // ─── Crease-Angle Normal Computation ─────────────────────────────
@@ -590,25 +605,40 @@ function flipFlatTriangles(positions: Float32Array, indices: Uint32Array): Uint3
  * rounded corners get smooth shading.
  */
 export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule): CSGMeshResult {
-  const M = manifoldModule
+  const made: Disposable[] = []
+  madeThisBake = made
+  try {
+    return meshOf(buildSolid(params, manifoldModule))
+  } finally {
+    // Also when the bake threw: what was made up to then is still on Manifold's heap.
+    madeThisBake = null
+    for (const item of made) item.delete()
+  }
+}
+
+/** The finished bin as one solid. Everything it makes is noted with `keep`. */
+function buildSolid(params: CSGBinParams, M: ManifoldModule): Manifold {
   const { Manifold } = M
 
   // Step 1: Build base feet
   const feet = buildBaseFeet(params, M)
 
   // Step 2: Build everything above the feet, and join the two
-  let bin = Manifold.union([feet, buildTrunk(params, M)])
+  let bin = keep(Manifold.union([feet, buildTrunk(params, M)]))
 
   // Step 3: Subtract lip groove (the trunk extends through the lip; the groove carves it)
   const lipGroove = buildLipGroove(params, M)
-  if (lipGroove) bin = Manifold.difference(bin, lipGroove)
+  if (lipGroove) bin = keep(Manifold.difference(bin, lipGroove))
 
   // Step 4: Subtract magnet/screw holes
   bin = subtractHoles(bin, params, M)
 
   // Step 5: Subtract pockets (cut down from top surface)
-  bin = subtractPockets(bin, params, M)
+  return subtractPockets(bin, params, M)
+}
 
+/** A solid's triangles, copied off Manifold's heap and ready for Three.js. */
+function meshOf(bin: Manifold): CSGMeshResult {
   // Extract raw mesh from Manifold
   const mesh = bin.getMesh()
   const numProp = mesh.numProp
