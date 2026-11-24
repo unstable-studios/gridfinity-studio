@@ -9,6 +9,13 @@ import type { LayoutGroup, LayoutShape, BinMetadata } from './types'
 import { isBinGroup } from './types'
 
 /**
+ * A point on a bin's edge is inside it. A point computed to be on the edge,
+ * such as the center of a shape placed there, can come out a rounding error
+ * away, so allow that much. In millimeters.
+ */
+const EDGE_TOLERANCE = 1e-6
+
+/**
  * Find the bin group whose AABB contains the given world-space point.
  *
  * Uses the lower-left corner convention:
@@ -31,10 +38,10 @@ export function findContainingBinGroup(
   for (const group of groups) {
     if (!isBinGroup(group)) continue
     if (
-      worldX >= group.x &&
-      worldX <= group.x + group.width &&
-      worldY <= group.y &&
-      worldY >= group.y - group.height
+      worldX >= group.x - EDGE_TOLERANCE &&
+      worldX <= group.x + group.width + EDGE_TOLERANCE &&
+      worldY <= group.y + EDGE_TOLERANCE &&
+      worldY >= group.y - group.height - EDGE_TOLERANCE
     ) {
       // Tie-break by distance to bin center
       const cx = group.x + group.width / 2
@@ -131,10 +138,10 @@ export function findBestBinForShape(
  * as inside (not evicted) — matches `findContainingBinGroup`'s convention.
  */
 export function findChildrenOutsideBin(bin: LayoutGroup, children: LayoutShape[]): string[] {
-  const minX = bin.x
-  const maxX = bin.x + bin.width
-  const minY = bin.y - bin.height
-  const maxY = bin.y
+  const minX = bin.x - EDGE_TOLERANCE
+  const maxX = bin.x + bin.width + EDGE_TOLERANCE
+  const minY = bin.y - bin.height - EDGE_TOLERANCE
+  const maxY = bin.y + EDGE_TOLERANCE
   const cxBin = bin.x + bin.width / 2
   const cyBin = bin.y - bin.height / 2
 

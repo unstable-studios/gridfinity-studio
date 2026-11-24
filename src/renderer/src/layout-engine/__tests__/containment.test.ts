@@ -9,8 +9,13 @@
  *   - bin spans x ∈ [x, x+width], y ∈ [y-height, y]
  */
 import { describe, it, expect } from 'vitest'
-import type { LayoutGroup } from '../types'
-import { findContainingBinGroup, findBestBinForShape, type ShapeAABB } from '../containment'
+import type { LayoutGroup, LayoutShape } from '../types'
+import {
+  findContainingBinGroup,
+  findBestBinForShape,
+  findChildrenOutsideBin,
+  type ShapeAABB
+} from '../containment'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -192,5 +197,37 @@ describe('findBestBinForShape', () => {
     // zero area. With area > 0 required, it falls through to null even
     // though geometrically the point is inside the bin.
     expect(findBestBinForShape([BIN_A], aabb(50, 50, 50, 50))).toBeNull()
+  })
+})
+
+describe('findContainingBinGroup at an edge', () => {
+  const bin = makeBin('bin', 0, 84, 84, 84)
+
+  it('counts a point a rounding error past the edge as inside', () => {
+    expect(findContainingBinGroup([bin], 84 + 1e-9, 42)?.id).toBe('bin')
+    expect(findContainingBinGroup([bin], -1e-9, 42)?.id).toBe('bin')
+    expect(findContainingBinGroup([bin], 42, 84 + 1e-9)?.id).toBe('bin')
+    expect(findContainingBinGroup([bin], 42, -1e-9)?.id).toBe('bin')
+  })
+
+  it('counts a point clearly past the edge as outside', () => {
+    expect(findContainingBinGroup([bin], 84.01, 42)).toBeNull()
+    expect(findContainingBinGroup([bin], 42, -0.01)).toBeNull()
+  })
+})
+
+describe('findChildrenOutsideBin at an edge', () => {
+  const bin = makeBin('bin', 0, 84, 84, 84)
+  const child = (id: string, x: number, y: number): LayoutShape =>
+    ({ id, type: 'rect', x, y, width: 10, height: 10, groupId: 'bin' }) as LayoutShape
+
+  it('keeps a child a rounding error past the edge and evicts one clearly past it', () => {
+    expect(
+      findChildrenOutsideBin(bin, [
+        child('on-edge', 42 + 1e-9, 0),
+        child('inside', 0, 0),
+        child('outside', 42.01, 0)
+      ])
+    ).toEqual(['outside'])
   })
 })

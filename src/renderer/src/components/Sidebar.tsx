@@ -3,8 +3,16 @@ import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
 import { NumericInput } from '@/components/ui/numeric-input'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
+import {
+  shownPositionLimits,
+  toShownPosition,
+  toStoredPosition
+} from '@/layout-engine/position-frame'
+import type { PositionFrame } from '@/layout-engine/position-frame'
+import { usePositionFrame } from '@/hooks/usePositionFrame'
 import { useProject } from '@/hooks/useProject'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
@@ -59,6 +67,28 @@ function LayoutSidebar(): React.JSX.Element {
     if (selectedIds.length !== 1) return null
     return shapes.find((s) => s.id === selectedIds[0]) ?? null
   }, [selectedIds, shapes])
+
+  // X and Y are shown on the canvas unless the person asks for them relative
+  // to the bin. On the canvas the numbers keep their meaning when a shape
+  // moves into or out of a bin.
+  const positionFrame = usePositionFrame((s) => s.frame)
+  const setPositionFrame = usePositionFrame((s) => s.setFrame)
+  const selectedShapeBin = selectedShape
+    ? groups.find((g) => g.id === selectedShape.groupId)
+    : undefined
+  // Shown with the origin at the lower left and Y increasing upward.
+  const shownPosition = selectedShape
+    ? toShownPosition(selectedShape, selectedShapeBin, positionFrame)
+    : { x: 0, y: 0 }
+  const positionLimits = selectedShape
+    ? shownPositionLimits(selectedShape, selectedShapeBin, positionFrame)
+    : null
+  const editShownPosition = (shown: { x?: number; y?: number }): void => {
+    if (!selectedShape) return
+    editSelectedShapePosition(
+      toStoredPosition(shown, selectedShape, selectedShapeBin, positionFrame)
+    )
+  }
 
   // Editing a shape's X or Y. Each step moves the shape for live feedback.
   // When the adjustment is finished the whole move is replayed as one change,
@@ -301,20 +331,44 @@ function LayoutSidebar(): React.JSX.Element {
               <span className="text-zinc-500">Type</span>
               <span className="text-zinc-300 font-mono">{selectedShape.type}</span>
             </div>
+            {selectedShape.groupId && (
+              <div className="flex items-center justify-between">
+                <span className="text-zinc-500">Relative to</span>
+                <ToggleGroup
+                  type="single"
+                  aria-label="Relative to"
+                  value={positionFrame}
+                  onValueChange={(value) => {
+                    if (value) setPositionFrame(value as PositionFrame)
+                  }}
+                >
+                  <ToggleGroupItem value="canvas" className="px-2 py-0.5">
+                    Canvas
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="bin" className="px-2 py-0.5">
+                    Bin
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+            )}
             <NumericInput
               label="X"
-              value={selectedShape.x}
+              value={shownPosition.x}
               step={1}
               precision={1}
-              onChange={(v) => editSelectedShapePosition({ x: v })}
+              min={positionLimits?.min.x}
+              max={positionLimits?.max.x}
+              onChange={(v) => editShownPosition({ x: v })}
               onCommit={commitPositionEdit}
             />
             <NumericInput
               label="Y"
-              value={selectedShape.y}
+              value={shownPosition.y}
               step={1}
               precision={1}
-              onChange={(v) => editSelectedShapePosition({ y: v })}
+              min={positionLimits?.min.y}
+              max={positionLimits?.max.y}
+              onChange={(v) => editShownPosition({ y: v })}
               onCommit={commitPositionEdit}
             />
             {engine && <ShapeDepthField shape={selectedShape} engine={engine} />}
