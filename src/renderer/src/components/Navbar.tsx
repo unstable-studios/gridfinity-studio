@@ -31,6 +31,7 @@ import { MOD_KEY } from '@/lib/platform'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import type { UpdateState } from '../../../shared/types/updates'
 import { updateMenuItems, type UpdateAction } from '@/lib/update-menu'
+import { cn } from '@/lib/utils'
 import { useExport, useExportScopeReset } from '@/hooks/useExport'
 import {
   SquareDashedIcon,
@@ -365,7 +366,7 @@ function badgeStyle(state: UpdateState): { color: string; srLabel: string } | nu
     case 'downloaded':
       return { color: 'bg-green-500', srLabel: 'Update ready to install' }
     case 'error':
-      return { color: 'bg-red-500', srLabel: 'Update failed' }
+      return { color: 'bg-red-500', srLabel: 'Couldn’t update' }
     default:
       return null
   }
@@ -399,11 +400,13 @@ function UpdateMenuItems({
   }
   return (
     <>
-      {updateMenuItems(state).map(({ label, action, tone }) => (
+      {updateMenuItems(state).map(({ label, action, tone }, place) => (
         <MenubarItem
-          key={label}
+          // By place, not by label: the line stays the same element as its words change, so
+          // the keyboard does not lose its place when a check starts.
+          key={place}
           disabled={!action}
-          className={`text-xs ${action ? '' : 'cursor-default opacity-70'} ${tone ? tones[tone] : ''}`}
+          className={cn('text-xs', tone && tones[tone])}
           onSelect={
             action
               ? (e) => {

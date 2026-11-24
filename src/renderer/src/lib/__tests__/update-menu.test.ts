@@ -23,6 +23,20 @@ describe('updateMenuItems', () => {
     ])
   })
 
+  it('shows 0% for a progress that is not a number', () => {
+    expect(labels({ kind: 'downloading', version: '1.2.3', progress: NaN })).toEqual([
+      'Downloading v1.2.3… 0%'
+    ])
+  })
+
+  it('does not call it a connection failure because the message mentions a network', () => {
+    const message = 'Cannot parse releases feed: unexpected token in network section'
+    expect(labels({ kind: 'error', message })[0]).toBe('Couldn’t update')
+    expect(labels({ kind: 'error', message: 'ETIMEDOUT: no answer' })[0]).toBe(
+      'Couldn’t reach the update server'
+    )
+  })
+
   it('says it is up to date and offers to check again', () => {
     expect(labels({ kind: 'up-to-date' })).toEqual(['Up to date', 'Check again'])
     expect(actions({ kind: 'up-to-date' })).toEqual([undefined, 'check'])
@@ -38,7 +52,7 @@ describe('updateMenuItems', () => {
     expect(labels({ kind: 'error', message: 'net::ERR_INTERNET_DISCONNECTED' })).toEqual([
       'Couldn’t reach the update server',
       'Try again',
-      'Download the installer…'
+      'Get the installer from GitHub'
     ])
     expect(actions({ kind: 'error', message: 'sha512 checksum mismatch' })).toEqual([
       undefined,

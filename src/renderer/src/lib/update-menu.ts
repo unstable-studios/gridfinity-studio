@@ -13,11 +13,13 @@ export interface UpdateMenuItem {
   tone?: 'good' | 'bad'
 }
 
-/** Why an update failed, in a few words. The full message is in the log file. */
+/**
+ * Why an update failed, in a few words. The full message is in the log file. Only the codes
+ * of a connection that could not be made count as that: a message that merely has "network"
+ * in it does not.
+ */
 function failure(message: string): string {
-  if (
-    /net::|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN|network|offline/i.test(message)
-  ) {
+  if (/net::ERR_|ENOTFOUND|ECONNREFUSED|ECONNRESET|ETIMEDOUT|EAI_AGAIN/.test(message)) {
     return 'Couldn’t reach the update server'
   }
   return 'Couldn’t update'
@@ -34,7 +36,9 @@ export function updateMenuItems(state: UpdateState): UpdateMenuItem[] {
     case 'up-to-date':
       return [{ label: 'Up to date' }, { label: 'Check again', action: 'check' }]
     case 'downloading': {
-      const percent = Math.max(0, Math.min(100, Math.round(state.progress)))
+      // The updater can report a progress that is not a number, before it knows the size.
+      const progress = Number.isFinite(state.progress) ? state.progress : 0
+      const percent = Math.max(0, Math.min(100, Math.round(progress)))
       const what = state.version ? `v${state.version}` : 'update'
       return [{ label: `Downloading ${what}… ${percent}%` }]
     }
@@ -44,7 +48,7 @@ export function updateMenuItems(state: UpdateState): UpdateMenuItem[] {
       return [
         { label: failure(state.message), tone: 'bad' },
         { label: 'Try again', action: 'check' },
-        { label: 'Download the installer…', action: 'download' }
+        { label: 'Get the installer from GitHub', action: 'download' }
       ]
   }
 }
