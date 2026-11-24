@@ -670,8 +670,10 @@ test('right-click a bin or shape for its menu', async () => {
   // In the sidebar: a right-click selects the row and opens the menu.
   await page.mouse.click(emptyCanvas.x, emptyCanvas.y)
   await expect(selectedRows).toHaveCount(0)
+  // While the menu is open the page behind it is hidden from lookups by role, so the
+  // selected row is counted by its attribute instead.
   await row('Bin 1').click({ button: 'right' })
-  await expect(row('Bin 1')).toHaveAttribute('aria-pressed', 'true')
+  await expect(selectedRows).toHaveCount(1)
   await menuItem('Duplicate').click()
   await app.expectBinCount(2)
   await app.expectShapeCount(2)
@@ -683,8 +685,10 @@ test('right-click a bin or shape for its menu', async () => {
 
   // On the canvas: a right-click on the pocket selects it. Rename types in the sidebar row.
   await page.mouse.click(420, 620, { button: 'right' })
-  await expect(row('Rectangle 1')).toHaveAttribute('aria-pressed', 'true')
+  await expect(selectedRows).toHaveText(/^Rectangle 1/)
   await menuItem('Rename').click()
+  // The rename starts once the menu has closed. The row's field is the first of the two.
+  await expect(page.getByRole('textbox', { name: 'Shape name' }).first()).toBeFocused()
   await page.keyboard.type('Slot')
   await page.keyboard.press('Enter')
   await expect(row('Slot')).toBeVisible()
