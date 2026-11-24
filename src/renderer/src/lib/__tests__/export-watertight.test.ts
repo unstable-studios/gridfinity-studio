@@ -248,16 +248,8 @@ describe('3MF export of a baked bin', () => {
     expect(onHole.length).toBeGreaterThanOrEqual(64)
   })
 
-  it('bakes a small round pocket without collapsed triangles', () => {
-    for (const radius of [0.3, 1.5, 3, 4]) {
-      const circle = { type: 'circle', radiusX: radius, radiusY: radius } as LayoutShape
-      const vertices = shapeToPocketVertices(circle)!
-      const params = binParams({
-        widthUnits: 1,
-        depthUnits: 1,
-        magnetHoles: { enabled: false, diameter: 6.5, depth: 2.4 },
-        pockets: [{ vertices, depth: 8, clearance: 0.25, posX: 0, posY: 0, zTop: 21 }]
-      })
+  it('bakes a small round pocket without adding collapsed triangles', () => {
+    const collapsedIn = (params: CSGBinParams): number => {
       const { positions, indices } = buildBinCSG(params, manifold)
       const at = (i: number): string =>
         `${positions[i * 3]},${positions[i * 3 + 1]},${positions[i * 3 + 2]}`
@@ -267,8 +259,22 @@ describe('3MF export of a baked bin', () => {
         const [a, b, c] = [at(indices[t]), at(indices[t + 1]), at(indices[t + 2])]
         if (a === b || b === c || c === a) collapsed++
       }
-      // A plain bin has 4 at the lip. A pocket must not add any.
-      expect(collapsed, `radius ${radius}`).toBeLessThanOrEqual(4)
+      return collapsed
+    }
+    const plain = binParams({
+      widthUnits: 1,
+      depthUnits: 1,
+      magnetHoles: { enabled: false, diameter: 6.5, depth: 2.4 }
+    })
+    // A plain bin has a few where the parts of the lip meet.
+    const withoutPocket = collapsedIn(plain)
+
+    for (const radius of [0.3, 1.5, 3, 4]) {
+      const circle = { type: 'circle', radiusX: radius, radiusY: radius } as LayoutShape
+      const vertices = shapeToPocketVertices(circle)!
+      const pockets = [{ vertices, depth: 8, clearance: 0.25, posX: 0, posY: 0, zTop: 21 }]
+
+      expect(collapsedIn({ ...plain, pockets }), `radius ${radius}`).toBe(withoutPocket)
     }
   })
 })

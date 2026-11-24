@@ -32,9 +32,6 @@ const MAGNET_HOLE_OFFSET = 8
 /** Points closer to the outline than this are dropped after an offset, in mm. */
 const OFFSET_CLEANUP = 1e-5
 
-/** Arc resolution for rounded rect corners (higher = smoother) */
-const CORNER_SEGMENTS = 16
-
 // ─── Types ───────────────────────────────────────────────────────
 
 export interface CSGBinParams {
@@ -84,32 +81,50 @@ type CrossSection = any
  * Build a rounded rectangle polygon (CCW) as an array of [x,y] points.
  * hw/hd = half-width/half-depth of the rectangle.
  * cornerRadius is clamped to fit within the rectangle.
+ *
+ * Each corner is a full quarter arc, so the walls between corners are straight and parallel
+ * to the axes.
  */
-function roundedRectPolygon(
+export function roundedRectPolygon(
   hw: number,
   hd: number,
-  cornerRadius: number,
-  segments: number = CORNER_SEGMENTS
+  cornerRadius: number
 ): Array<[number, number]> {
   const r = Math.min(Math.max(0, cornerRadius), hw, hd)
+  const segments = circleSegments(r) / 4
   const points: Array<[number, number]> = []
 
-  // Four corners CCW: top-right, top-left, bottom-left, bottom-right
-  const corners: Array<{ cx: number; cy: number; startAngle: number }> = [
-    { cx: hw - r, cy: hd - r, startAngle: 0 },
-    { cx: -(hw - r), cy: hd - r, startAngle: Math.PI / 2 },
-    { cx: -(hw - r), cy: -(hd - r), startAngle: Math.PI },
-    { cx: hw - r, cy: -(hd - r), startAngle: (3 * Math.PI) / 2 }
+  // Four corners CCW: top-right, top-left, bottom-left, bottom-right.
+  // `from` and `to` are the [x, y] directions from the center to the two ends of the arc.
+  const corners: Array<{ cx: number; cy: number; from: [number, number]; to: [number, number] }> = [
+    { cx: hw - r, cy: hd - r, from: [1, 0], to: [0, 1] },
+    { cx: -(hw - r), cy: hd - r, from: [0, 1], to: [-1, 0] },
+    { cx: -(hw - r), cy: -(hd - r), from: [-1, 0], to: [0, -1] },
+    { cx: hw - r, cy: -(hd - r), from: [0, -1], to: [1, 0] }
   ]
 
-  for (const { cx, cy, startAngle } of corners) {
-    for (let i = 0; i <= segments; i++) {
-      // Include endpoint of each arc except the last corner's last point (closes naturally)
-      if (i === segments) continue // next corner's i=0 covers this
-      const angle = startAngle + (i / segments) * (Math.PI / 2)
-      points.push([cx + r * Math.cos(angle), cy + r * Math.sin(angle)])
-    }
+  const add = (x: number, y: number): void => {
+    const last = points[points.length - 1]
+    if (last && last[0] === x && last[1] === y) return
+    points.push([x, y])
   }
+
+  for (const { cx, cy, from, to } of corners) {
+    const startAngle = Math.atan2(from[1], from[0])
+    // The two ends are placed without sin and cos, so both ends of a wall get the same
+    // coordinate.
+    add(cx + r * from[0], cy + r * from[1])
+    for (let i = 1; i < segments; i++) {
+      const angle = startAngle + (i / segments) * (Math.PI / 2)
+      add(cx + r * Math.cos(angle), cy + r * Math.sin(angle))
+    }
+    add(cx + r * to[0], cy + r * to[1])
+  }
+
+  // A corner that fills the whole side ends where the first one began.
+  const first = points[0]
+  const last = points[points.length - 1]
+  if (points.length > 1 && first[0] === last[0] && first[1] === last[1]) points.pop()
 
   return points
 }
@@ -119,11 +134,9 @@ function roundedRectCS(
   hw: number,
   hd: number,
   cornerRadius: number,
-  CSConstructor: CrossSection,
-  segments: number = CORNER_SEGMENTS
+  CSConstructor: CrossSection
 ): CrossSection {
-  const poly = roundedRectPolygon(hw, hd, cornerRadius, segments)
-  return new CSConstructor([poly])
+  return new CSConstructor([roundedRectPolygon(hw, hd, cornerRadius)])
 }
 
 // ─── Build Steps ─────────────────────────────────────────────────
