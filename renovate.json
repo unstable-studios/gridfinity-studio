@@ -1,16 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended", ":enableVulnerabilityAlerts", ":maintainLockFilesWeekly"],
-  "packageRules": [
-    {
-      "description": "pnpm refuses a release less than a day old, so wait before proposing one.",
-      "matchDatasources": ["npm"],
-      "minimumReleaseAge": "3 days"
-    },
-    {
-      "description": "Our own packages need no waiting period.",
-      "matchPackageNames": ["@unstable-studios/**"],
-      "minimumReleaseAge": null
-    }
-  ]
+  "minimumReleaseAge": "3 days",
+  "lockFileMaintenance": {
+    "minimumReleaseAge": null
+  }
 }
