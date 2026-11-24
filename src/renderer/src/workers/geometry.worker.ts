@@ -252,6 +252,18 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
           `[worker] CSG bake complete: ${verts} verts, ${tris} tris, ${msg.binParams.pockets.length} pockets (${totalMs}ms)`
         )
 
+        const skipped = csgResult.skippedPockets
+        if (skipped.length > 0) {
+          const { name: binName, pockets } = msg.binParams
+          const where = binName ? `${binName}: ` : ''
+          const shapeName = pockets[skipped[0]]?.name
+          warnings.push(
+            skipped.length === 1
+              ? `${where}${shapeName ?? 'A shape'} could not be cut. Redraw or delete it in Design.`
+              : `${where}${skipped.length} shapes could not be cut. Redraw or delete them in Design.`
+          )
+        }
+
         const colors = new Float32Array(0)
         const response: WorkerResponse = {
           type: 'bake-pockets',

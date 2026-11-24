@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { beforeAll, describe, expect, it } from 'vitest'
 import Module from 'manifold-3d'
-import { buildBinCSG } from '../bin-csg-builder'
+import { buildBinCSG, pocketPoints } from '../bin-csg-builder'
 import type { CSGBinParams } from '../bin-csg-builder'
 import { shapeToPocketVertices } from '../pocket-vertices'
 import type { LayoutShape } from '@/layout-engine/types'
@@ -225,5 +225,108 @@ describe('baking a bin', () => {
   it('makes a bin one unit high exactly one unit high', () => {
     const { max } = measure(buildBinCSG(binParams({ heightUnits: 1, hasLip: false }), manifold))
     expect(max[2]).toBeCloseTo(7, 6)
+  })
+})
+
+describe('a pocket with nothing to cut', () => {
+  const pocket = (
+    vertices: number[],
+    more: Partial<CSGBinParams['pockets'][number]> = {}
+  ): CSGBinParams['pockets'][number] => ({
+    vertices: new Float32Array(vertices),
+    depth: 8,
+    clearance: 0,
+    posX: 0,
+    posY: 0,
+    zTop: 21,
+    ...more
+  })
+  const plain = binParams({ hasLip: false })
+  const square = [-5, -5, 5, -5, 5, 5, -5, 5]
+  /** Volume a bin loses to its pockets. */
+  const cutVolume = (pockets: CSGBinParams['pockets']): number =>
+    measure(buildBinCSG(plain, manifold)).volume -
+    measure(buildBinCSG({ ...plain, pockets }, manifold)).volume
+
+  it.each<[string, CSGBinParams['pockets'][number]]>([
+    ['three points in a line', pocket([-5, 0, 0, 0, 5, 0])],
+    ['three points in a slanted line', pocket([-5, -5, 0, 0, 5, 5])],
+    ['every point in one place', pocket([0, 0, 0, 0, 0, 0, 0, 0])],
+    ['a rectangle with no height', pocket([-5, 0, 5, 0, 5, 0, -5, 0])],
+    ['two points', pocket([-5, 0, 5, 0])],
+    ['a point that is not a number', pocket([NaN, 0, 5, 0, 5, 5])],
+    ['no depth', pocket(square, { depth: 0 })],
+    ['a depth below zero', pocket(square, { depth: -3 })],
+    ['a depth that is not a number', pocket(square, { depth: NaN })],
+    ['a top that is not a number', pocket(square, { zTop: NaN })]
+  ])('leaves the bin whole and says which pocket: %s', (_name, bad) => {
+    const whole = buildBinCSG(plain, manifold)
+    for (const clearance of [0, 0.25]) {
+      const baked = buildBinCSG({ ...plain, pockets: [{ ...bad, clearance }] }, manifold)
+      // The bin used to bake to nothing at all.
+      expect(baked.positions).toEqual(whole.positions)
+      expect(baked.skippedPockets).toEqual([0])
+    }
+    expect(whole.skippedPockets).toEqual([])
+  })
+
+  it('still cuts the good pockets beside one with no area', () => {
+    const mixed = buildBinCSG(
+      { ...plain, pockets: [pocket(square), pocket([-5, 0, 0, 0, 5, 0]), pocket(square)] },
+      manifold
+    )
+    expect(measure(buildBinCSG(plain, manifold)).volume - measure(mixed).volume).toBeCloseTo(
+      cutVolume([pocket(square)]),
+      3
+    )
+    expect(mixed.skippedPockets).toEqual([1])
+  })
+
+  it('cuts an outline that runs clockwise the same as one that does not', () => {
+    const clockwise = [-5, -5, -5, 5, 5, 5, 5, -5]
+    // A clockwise outline used to remove the whole bin.
+    expect(cutVolume([pocket(clockwise)])).toBeCloseTo(10 * 10 * 8, 2)
+    expect(cutVolume([pocket(square)])).toBeCloseTo(10 * 10 * 8, 2)
+  })
+
+  it('cuts everything an outline that crosses itself goes around', () => {
+    // A bow tie: two triangles of 25 mm² each, wound opposite ways.
+    const bowTie = [-5, -5, 5, 5, 5, -5, -5, 5]
+    const baked = buildBinCSG({ ...plain, pockets: [pocket(bowTie)] }, manifold)
+    expect(cutVolume([pocket(bowTie)])).toBeCloseTo(50 * 8, 2)
+    expect(baked.skippedPockets).toEqual([])
+  })
+
+  it('fails, and does not pass for a bin, when the pockets leave nothing', () => {
+    // Bigger than the bin and as deep as it is tall.
+    const everything = pocket([-50, -50, 50, -50, 50, 50, -50, 50], { depth: 21 })
+    expect(() => buildBinCSG({ ...plain, pockets: [everything] }, manifold)).toThrow(
+      /Nothing is left/
+    )
+  })
+})
+
+describe('pocketPoints', () => {
+  const spec = (vertices: number[], posX = 0, posY = 0): CSGBinParams['pockets'][number] => ({
+    vertices: new Float32Array(vertices),
+    depth: 5,
+    clearance: 0,
+    posX,
+    posY,
+    zTop: 21
+  })
+
+  it('moves the points to where the pocket is in the bin', () => {
+    expect(pocketPoints(spec([0, 0, 2, 0, 0, 2], 10, -4))).toEqual([
+      [10, -4],
+      [12, -4],
+      [10, -2]
+    ])
+  })
+
+  it('has nothing for too few points or a point that is not a number', () => {
+    expect(pocketPoints(spec([0, 0, 1, 0]))).toBeNull()
+    expect(pocketPoints(spec([]))).toBeNull()
+    expect(pocketPoints(spec([0, 0, Infinity, 0, 0, 1]))).toBeNull()
   })
 })

@@ -38,6 +38,7 @@ const shape = (overrides: Record<string, unknown>): LayoutShape =>
 describe('buildBinParams', () => {
   it('takes the size from the bin and the rest from the project settings', () => {
     expect(buildBinParams(bin, [], config)).toEqual({
+      name: 'Bin 1',
       widthUnits: 2,
       depthUnits: 2,
       heightUnits: 4,
@@ -72,6 +73,12 @@ describe('buildBinParams', () => {
     const [set] = buildBinParams(bin, [own], config).pockets
     expect(set.depth).toBe(6)
     expect(set.clearance).toBe(0.5)
+  })
+
+  it('names each pocket after its shape, so a warning can say which one', () => {
+    const named = shape({ metadata: { name: 'Pliers' } })
+    const pockets = buildBinParams(bin, [named, shape({})], config).pockets
+    expect(pockets.map((pocket) => pocket.name)).toEqual(['Pliers', undefined])
   })
 
   it('leaves out shapes that cannot be cut', () => {

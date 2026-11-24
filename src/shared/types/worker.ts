@@ -25,6 +25,8 @@ export interface BakedMesh extends MeshDataWithNormals {
 // ─── Request types ────────────────────────────────────────────────
 
 export interface PocketSpec {
+  /** The shape's name, to say which one could not be cut. */
+  name?: string
   vertices: Float32Array
   depth: number
   clearance: number
@@ -35,6 +37,8 @@ export interface PocketSpec {
 
 /** Full bin parameters for CSG building in the worker */
 export interface CSGBinParams {
+  /** The bin's name, to say which bin a warning is about. */
+  name?: string
   widthUnits: number
   depthUnits: number
   heightUnits: number

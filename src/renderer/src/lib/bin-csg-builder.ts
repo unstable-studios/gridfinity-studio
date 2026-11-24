@@ -32,6 +32,8 @@ const OFFSET_CLEANUP = 1e-5
 // ─── Types ───────────────────────────────────────────────────────
 
 export interface CSGBinParams {
+  /** The bin's name, to say which bin a warning is about. */
+  name?: string
   widthUnits: number
   depthUnits: number
   heightUnits: number
@@ -45,6 +47,8 @@ export interface CSGBinParams {
 }
 
 export interface PocketSpec {
+  /** The shape's name, to say which one could not be cut. */
+  name?: string
   vertices: Float32Array
   depth: number
   clearance: number
@@ -53,7 +57,8 @@ export interface PocketSpec {
   zTop: number
 }
 
-export interface CSGMeshResult {
+/** A solid's triangles, ready for Three.js. */
+export interface CSGMesh {
   positions: Float32Array
   indices: Uint32Array
   normals: Float32Array
@@ -62,6 +67,11 @@ export interface CSGMeshResult {
    * for shading, so this is the only record of which triangles the solid joins.
    */
   solidVertices: Uint32Array
+}
+
+export interface CSGMeshResult extends CSGMesh {
+  /** Which pockets, by their place in `pockets`, were left out because they cut nothing. */
+  skippedPockets: number[]
 }
 
 // ─── Manifold type aliases (avoid importing manifold-3d types) ───
@@ -93,8 +103,12 @@ function keep<T extends Disposable>(made: T): T {
   return made
 }
 
-/** manifold-3d's number for the "Positive" fill rule, the one `new CrossSection` defaults to. */
-const FILL_POSITIVE = 2
+/**
+ * manifold-3d's number for the "NonZero" fill rule: everything an outline goes around is
+ * inside it, whichever way it runs and even where it crosses itself. That is also how the
+ * canvas fills a shape. The default, "Positive", reads a clockwise outline as empty.
+ */
+const FILL_NON_ZERO = 1
 
 /**
  * An outline from one polygon's points.
@@ -112,13 +126,13 @@ function outlineOf(polygon: Array<[number, number]>, M: ManifoldModule): CrossSe
     typeof M.Vector2_vec2 === 'function' &&
     typeof Underneath === 'function' &&
     Underneath !== Object
-  if (!usable) return keep(new M.CrossSection([polygon]))
+  if (!usable) return keep(new M.CrossSection([polygon], 'NonZero'))
 
   const points = keep(new M.Vector_vec2())
   for (const [x, y] of polygon) points.push_back({ x, y })
   const polygons = keep(new M.Vector2_vec2())
   polygons.push_back(points)
-  return keep(new Underneath(polygons, FILL_POSITIVE))
+  return keep(new Underneath(polygons, FILL_NON_ZERO))
 }
 
 /**
@@ -357,22 +371,57 @@ function subtractHoles(bin: Manifold, params: CSGBinParams, M: ManifoldModule): 
   return keep(Manifold.difference(bin, keep(Manifold.union(holes))))
 }
 
-function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule): Manifold {
+/** An outline enclosing less than this is not a pocket, in mm². */
+const MIN_POCKET_AREA = 1e-6
+
+/**
+ * A pocket's points in the bin, or null when they cannot make an outline: fewer than three,
+ * or one that is not a number.
+ */
+export function pocketPoints(pocket: PocketSpec): Array<[number, number]> | null {
+  const count = Math.floor(pocket.vertices.length / 2)
+  if (count < 3) return null
+
+  const points: Array<[number, number]> = []
+  for (let i = 0; i < count; i++) {
+    const x = pocket.posX + pocket.vertices[i * 2]
+    const y = pocket.posY + pocket.vertices[i * 2 + 1]
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null
+    points.push([x, y])
+  }
+  return points
+}
+
+/**
+ * Cut the pockets out of the bin. A pocket that would cut nothing is left out and reported:
+ * no outline, an outline enclosing no area (three points in a line), or no depth. Manifold
+ * turns any of those into a solid it calls invalid, and cutting that from a bin leaves no
+ * bin at all.
+ */
+function subtractPockets(
+  bin: Manifold,
+  params: CSGBinParams,
+  M: ManifoldModule
+): { bin: Manifold; skipped: number[] } {
   const { Manifold } = M
-  if (params.pockets.length === 0) return bin
-
   const cutters: Manifold[] = []
+  const skipped: number[] = []
 
-  for (const pocket of params.pockets) {
-    const vertCount = pocket.vertices.length / 2
-    if (vertCount < 3) continue
-
-    const poly: Array<[number, number]> = []
-    for (let i = 0; i < vertCount; i++) {
-      poly.push([pocket.posX + pocket.vertices[i * 2], pocket.posY + pocket.vertices[i * 2 + 1]])
+  params.pockets.forEach((pocket, index) => {
+    const points = pocketPoints(pocket)
+    const hasDepth =
+      pocket.depth > 0 && Number.isFinite(pocket.depth) && Number.isFinite(pocket.zTop)
+    if (!points || !hasDepth) {
+      skipped.push(index)
+      return
     }
 
-    let cs = outlineOf(poly, M)
+    let cs = outlineOf(points, M)
+    // What Manifold made of the outline is what counts, not what the points look like.
+    if (cs.isEmpty() || cs.area() < MIN_POCKET_AREA) {
+      skipped.push(index)
+      return
+    }
 
     if (pocket.clearance > 0) {
       // The offset leaves pairs of points a few nanometers apart where a rounded corner
@@ -388,10 +437,10 @@ function subtractPockets(bin: Manifold, params: CSGBinParams, M: ManifoldModule)
     const cutBase = pocket.zTop - pocket.depth
     const prism = extrudeOutline(cs, cutHeight, M)
     cutters.push(keep(prism.translate([0, 0, cutBase])))
-  }
+  })
 
-  if (cutters.length === 0) return bin
-  return keep(Manifold.difference(bin, keep(Manifold.union(cutters))))
+  if (cutters.length === 0) return { bin, skipped }
+  return { bin: keep(Manifold.difference(bin, keep(Manifold.union(cutters)))), skipped }
 }
 
 // ─── Crease-Angle Normal Computation ─────────────────────────────
@@ -417,7 +466,7 @@ const CREASE_ANGLE_DEG = 30
  * a single vertex position may need different normals for different faces.
  * `solidVertices` keeps the input index of each output vertex.
  */
-function computeCreaseNormals(positions: Float32Array, indices: Uint32Array): CSGMeshResult {
+function computeCreaseNormals(positions: Float32Array, indices: Uint32Array): CSGMesh {
   const triCount = indices.length / 3
   const cosThreshold = Math.cos((CREASE_ANGLE_DEG * Math.PI) / 180)
 
@@ -654,7 +703,8 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
   const made: Disposable[] = []
   madeThisBake = made
   try {
-    return meshOf(buildSolid(params, manifoldModule))
+    const { bin, skippedPockets } = buildSolid(params, manifoldModule)
+    return { ...meshOf(bin), skippedPockets }
   } finally {
     // Also when the bake threw: what was made up to then is still on Manifold's heap.
     madeThisBake = null
@@ -669,8 +719,14 @@ export function buildBinCSG(params: CSGBinParams, manifoldModule: ManifoldModule
   }
 }
 
-/** The finished bin as one solid. Everything it makes is noted with `keep`. */
-function buildSolid(params: CSGBinParams, M: ManifoldModule): Manifold {
+/**
+ * The finished bin as one solid, and the pockets that were left out of it. Everything it
+ * makes is noted with `keep`.
+ */
+function buildSolid(
+  params: CSGBinParams,
+  M: ManifoldModule
+): { bin: Manifold; skippedPockets: number[] } {
   const { Manifold } = M
 
   // Step 1: Build base feet
@@ -687,11 +743,19 @@ function buildSolid(params: CSGBinParams, M: ManifoldModule): Manifold {
   bin = subtractHoles(bin, params, M)
 
   // Step 5: Subtract pockets (cut down from top surface)
-  return subtractPockets(bin, params, M)
+  const cut = subtractPockets(bin, params, M)
+
+  // A bin with nothing left, or one Manifold could not build, must not pass for a good one:
+  // it would show as ready and export as an empty file.
+  const status = cut.bin.status()
+  if (status !== 'NoError') throw new Error(`The bin could not be built (${status}).`)
+  if (cut.bin.isEmpty()) throw new Error('Nothing is left of the bin after cutting its pockets.')
+
+  return { bin: cut.bin, skippedPockets: cut.skipped }
 }
 
 /** A solid's triangles, copied off Manifold's heap and ready for Three.js. */
-function meshOf(bin: Manifold): CSGMeshResult {
+function meshOf(bin: Manifold): CSGMesh {
   // Extract raw mesh from Manifold
   const mesh = bin.getMesh()
   const numProp = mesh.numProp

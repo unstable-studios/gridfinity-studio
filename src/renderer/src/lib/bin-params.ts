@@ -3,6 +3,7 @@
  */
 import type { LayoutGroup, LayoutShape, BinMetadata } from '@/layout-engine/types'
 import { shapeToPocketVertices } from './pocket-vertices'
+import { storedName } from './item-name'
 import type { CSGBinParams, PocketSpec } from '../../../shared/types/worker'
 import type { GridfinityConfig } from '../../../shared/types/project'
 import { computeDefaultPocketDepth } from '../../../shared/types/project'
@@ -35,6 +36,7 @@ export function buildBinParams(
     const clearance = meta?.pocket?.clearance ?? DEFAULT_CLEARANCE
 
     pockets.push({
+      name: storedName(shape.metadata),
       vertices: verts,
       depth,
       clearance,
@@ -51,6 +53,7 @@ export function buildBinParams(
   }
 
   return {
+    name: storedName(bin.metadata),
     widthUnits: bin.metadata.widthUnits,
     depthUnits: bin.metadata.depthUnits,
     heightUnits: bin.metadata.heightUnits,
