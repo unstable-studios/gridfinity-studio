@@ -31,7 +31,7 @@ import {
   isBinGroup
 } from '@/layout-engine'
 import type { BinMetadata, LayoutGroup, LayoutShape, LayoutEngine } from '@/layout-engine'
-import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
+import { useExport } from '@/hooks/useExport'
 import { computeDefaultPocketDepth, DEFAULT_GRIDFINITY_CONFIG } from '../../../shared/types/project'
 
 /** Depth threshold (mm) below the bin's max safe depth at which we warn. */
@@ -505,35 +505,32 @@ function LayoutSidebar(): React.JSX.Element {
 
 function PreviewSidebar(): React.JSX.Element {
   const engine = useLayoutEngine()
-  const { tick } = useEngineState()
   const bakeResults = useProject((s) => s.bakeResults)
   const bakeStatus = useProject((s) => s.bakeStatus)
-  const exportSTL = useProject((s) => s.exportSTL)
-  const export3MF = useProject((s) => s.export3MF)
-  const projectName = useProjectName()
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
+  const { bins, selectedBins, chosen, scope, setScope, canExport, exportAs } = useExport()
 
   const totalBins = bins.length
-  // Export only when every bin has finished its latest bake successfully — no
-  // partial / stale / errored exports.
-  const allReady = totalBins > 0 && bins.every((b) => bakeStatus.get(b.id) === 'ready')
-  const anyError = bins.some((b) => bakeStatus.get(b.id) === 'error')
+  const anyError = chosen.some((b) => bakeStatus.get(b.id) === 'error')
   const warnings = useMemo(
-    () => [...bakeResults.values()].flatMap((r) => r.warnings),
-    [bakeResults]
+    () => chosen.flatMap((bin) => bakeResults.get(bin.id)?.warnings ?? []),
+    [bakeResults, chosen]
   )
 
-  const handleExportSTL = async (): Promise<void> => {
-    const placements = placementsFromGroups(bins)
-    const data = await buildSTLArrayBuffer(bakeResults, placements)
-    if (data) await exportSTL(data, `${projectName}.stl`)
-  }
-  const handleExport3MF = async (): Promise<void> => {
-    const placements = placementsFromGroups(bins)
-    const data = await build3MFArrayBuffer(bakeResults, projectName, placements)
-    if (data) await export3MF(data, `${projectName}.3mf`)
+  // Clicking rows selects bins as in Design, to export only those.
+  const selectedBinIds = selectedBins.map((bin) => bin.id)
+  const listAnchorRef = useRef<string | null>(null)
+  const handleRowClick = (id: string, e: React.MouseEvent): void => {
+    if (!engine) return
+    const next = selectionAfterClick({
+      order: bins.map((bin) => bin.id),
+      selected: selectedBinIds,
+      clicked: id,
+      anchor: listAnchorRef.current,
+      shift: e.shiftKey,
+      toggle: e.metaKey || e.ctrlKey
+    })
+    listAnchorRef.current = next.anchor
+    engine.select(next.selected)
   }
 
   return (
@@ -548,30 +545,35 @@ function PreviewSidebar(): React.JSX.Element {
             {bins.map((bin) => {
               const status = bakeStatus.get(bin.id) ?? 'baking'
               const meta = bin.metadata as BinMetadata
+              const isSelected = selectedBinIds.includes(bin.id)
               const pip =
                 status === 'ready'
-                  ? { className: 'text-[10px] text-emerald-500', label: '● Ready' }
+                  ? { color: 'text-emerald-500', label: '● Ready' }
                   : status === 'error'
-                    ? { className: 'text-[10px] text-red-500', label: '⚠ Failed' }
-                    : {
-                        className: 'text-[10px] text-amber-500 animate-pulse',
-                        label: '◌ Building…'
-                      }
+                    ? { color: 'text-red-500', label: '⚠ Failed' }
+                    : { color: 'text-amber-500 animate-pulse', label: '◌ Building…' }
               return (
-                <div
+                <button
                   key={bin.id}
-                  className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 bg-zinc-100/60 dark:bg-zinc-800/60"
+                  type="button"
+                  aria-pressed={isSelected}
+                  className={`flex w-full select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
+                    isSelected
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-zinc-100/60 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-200 dark:hover:bg-zinc-800'
+                  }`}
+                  onClick={(e) => handleRowClick(bin.id, e)}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium truncate text-zinc-800 dark:text-zinc-200">
-                      {storedName(meta) ?? 'Bin'}
-                    </p>
-                    <p className="text-[10px] text-zinc-500">
+                    <p className="truncate text-xs font-medium">{storedName(meta) ?? 'Bin'}</p>
+                    <p className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-zinc-500'}`}>
                       {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                     </p>
                   </div>
-                  <span className={pip.className}>{pip.label}</span>
-                </div>
+                  <span className={`text-[10px] ${isSelected ? 'text-white' : pip.color}`}>
+                    {pip.label}
+                  </span>
+                </button>
               )
             })}
           </div>
@@ -594,23 +596,52 @@ function PreviewSidebar(): React.JSX.Element {
 
       <SidebarSection title="Export">
         <div className="space-y-2">
+          {totalBins > 1 && (
+            <>
+              <ToggleGroup
+                type="single"
+                aria-label="Bins to export"
+                className="flex w-full"
+                value={scope}
+                onValueChange={(value) => {
+                  if (value === 'all' || value === 'selected') setScope(value)
+                }}
+              >
+                <ToggleGroupItem value="all" className="flex-1 justify-center">
+                  All bins
+                </ToggleGroupItem>
+                <ToggleGroupItem
+                  value="selected"
+                  className="flex-1 justify-center disabled:opacity-50"
+                  disabled={selectedBins.length === 0}
+                >
+                  Selected ({selectedBins.length})
+                </ToggleGroupItem>
+              </ToggleGroup>
+              {selectedBins.length === 0 && (
+                <p className="text-[10px] text-zinc-500">
+                  Click bins in the list to export only those.
+                </p>
+              )}
+            </>
+          )}
           <Button
             variant="default"
             className="w-full"
-            disabled={!allReady}
-            onClick={() => void handleExport3MF()}
+            disabled={!canExport}
+            onClick={() => void exportAs('3mf')}
           >
             Export 3MF…
           </Button>
           <Button
             variant="outline"
             className="w-full"
-            disabled={!allReady}
-            onClick={() => void handleExportSTL()}
+            disabled={!canExport}
+            onClick={() => void exportAs('stl')}
           >
             Export STL…
           </Button>
-          {!allReady && !anyError && totalBins > 0 && (
+          {!canExport && !anyError && totalBins > 0 && (
             <p className="text-[10px] text-zinc-500">Building the model…</p>
           )}
         </div>

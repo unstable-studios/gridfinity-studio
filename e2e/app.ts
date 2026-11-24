@@ -256,3 +256,19 @@ export function mappingFromDrawnRect(
     y: dragFrom.y + (world.y - top) * scaleY
   })
 }
+
+/**
+ * Wait for an exported file to be completely written, then return what
+ * `parse` makes of it. The app writes after an IPC round trip and the write
+ * is not atomic, so retry until the content parses.
+ */
+export async function readWhenComplete<T>(
+  path: string,
+  parse: (bytes: Buffer) => Promise<T>
+): Promise<T> {
+  let parsed: T | undefined
+  await expect(async () => {
+    parsed = await parse(await readFile(path))
+  }, `export written to ${path}`).toPass({ timeout: 30_000 })
+  return parsed as T
+}
