@@ -446,10 +446,19 @@ export class KonvaEngine implements LayoutEngine {
     node.opacity(opacity)
   }
 
+  /** Take the drop-target highlight off whichever bin has it. */
+  private clearDropHighlight(): void {
+    if (!this.highlightedGroupId) return
+    this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
+    this.highlightedGroupId = null
+  }
+
   removeShape(id: string): void {
     if (this.disposed) return
     const node = this.konvaMap.get(id)
     if (!node) return
+    // A shape removed in the middle of a drag never gets a dragend to clear it.
+    this.clearDropHighlight()
 
     const shape = this.shapeMap.get(id)
     if (shape?.groupId) {
@@ -701,6 +710,7 @@ export class KonvaEngine implements LayoutEngine {
     if (this.disposed || !this.mainLayer) return
     const group = this.groupMap.get(id)
     if (!group) return
+    if (this.highlightedGroupId === id) this.clearDropHighlight()
 
     const renderer = this.rendererMap.get(id)
     if (renderer) {
@@ -1008,10 +1018,7 @@ export class KonvaEngine implements LayoutEngine {
    */
   private evaluateShapeReassignment(shapeId: string): void {
     // Clear any drag highlight
-    if (this.highlightedGroupId) {
-      this.rendererMap.get(this.highlightedGroupId)?.unhighlight()
-      this.highlightedGroupId = null
-    }
+    this.clearDropHighlight()
 
     // Skip during multi-select drag
     if ((this.transformer?.nodes().length ?? 0) > 1) return

@@ -539,8 +539,13 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.deps.layer.batchDraw()
     this.flashTimeout = setTimeout(() => {
       this.flashTimeout = null
-      bgRect.stroke(this.origStroke)
-      bgRect.strokeWidth(this.origStrokeWidth)
+      if (this.highlighted) {
+        // A shape was dragged over the bin while it flashed: go back to the highlight.
+        bgRect.setAttrs(DROP_TARGET_STYLE)
+      } else {
+        bgRect.stroke(this.origStroke)
+        bgRect.strokeWidth(this.origStrokeWidth)
+      }
       this.deps.layer.batchDraw()
     }, 300)
   }
