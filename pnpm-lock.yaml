@@ -14,12 +14,43 @@ importers:
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@42.11.18(supports-color@7.2.0))
+      electron-log:
+        specifier: ^5.4.4
+        version: 5.4.4
+      electron-updater:
+        specifier: ^6.8.11
+        version: 6.8.11(supports-color@7.2.0)
+    devDependencies:
+      '@commitlint/cli':
+        specifier: ^21.2.4
+        version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@6.0.3)
+      '@commitlint/config-conventional':
+        specifier: ^21.2.4
+        version: 21.2.4
+      '@commitlint/cz-commitlint':
+        specifier: ^21.2.4
+        version: 21.2.4(commitizen@4.3.2(@types/node@25.9.9)(typescript@6.0.3))(inquirer@9.3.8(@types/node@25.9.9))(typescript@6.0.3)
+      '@commitlint/prompt':
+        specifier: ^21.2.4
+        version: 21.2.4(@types/node@25.9.9)(typescript@6.0.3)
+      '@commitlint/prompt-cli':
+        specifier: ^21.2.4
+        version: 21.2.4(@types/node@25.9.9)(typescript@6.0.3)
+      '@electron-toolkit/tsconfig':
+        specifier: ^2.0.0
+        version: 2.0.0(@types/node@25.9.9)
+      '@eslint/js':
+        specifier: ^9.39.5
+        version: 9.39.5
       '@headlessui/react':
         specifier: ^2.2.10
         version: 2.2.10(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       '@heroicons/react':
         specifier: ^2.2.0
         version: 2.2.0(react@19.3.1)
+      '@playwright/test':
+        specifier: ^1.65.1
+        version: 1.65.1
       '@radix-ui/react-checkbox':
         specifier: ^1.4.1
         version: 1.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
@@ -59,94 +90,15 @@ importers:
       '@react-three/drei':
         specifier: ^10.7.9
         version: 10.7.9(@react-three/fiber@9.8.2(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(three@0.184.0))(@types/react@19.3.0)(@types/three@0.184.1)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(three@0.184.0)
+      '@react-three/eslint-plugin':
+        specifier: ^0.1.2
+        version: 0.1.2(supports-color@7.2.0)
       '@react-three/fiber':
         specifier: ^9.8.2
         version: 9.8.2(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(three@0.184.0)
       '@tailwindcss/vite':
         specifier: ^4.3.5
         version: 4.3.5(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
-      '@unstable-studios/ui':
-        specifier: ^1.6.1
-        version: 1.6.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.5)(vitest@4.1.12)
-      class-variance-authority:
-        specifier: ^0.7.1
-        version: 0.7.1
-      clsx:
-        specifier: ^2.1.1
-        version: 2.1.1
-      cmdk:
-        specifier: ^1.1.1
-        version: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      earcut:
-        specifier: ^3.2.4
-        version: 3.2.4
-      electron-log:
-        specifier: ^5.4.4
-        version: 5.4.4
-      electron-updater:
-        specifier: ^6.8.11
-        version: 6.8.11(supports-color@7.2.0)
-      jszip:
-        specifier: ^3.10.2
-        version: 3.10.2
-      konva:
-        specifier: ^10.10.0
-        version: 10.10.0
-      lucide-react:
-        specifier: ^1.77.0
-        version: 1.77.0(@types/react@19.3.0)(react@19.3.1)
-      manifold-3d:
-        specifier: ^3.5.5
-        version: 3.5.5
-      mitt:
-        specifier: ^3.0.1
-        version: 3.0.1
-      motion:
-        specifier: ^12.43.0
-        version: 12.43.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      react-colorful:
-        specifier: ^5.8.1
-        version: 5.8.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
-      tailwind-merge:
-        specifier: ^3.7.1
-        version: 3.7.1
-      tailwindcss:
-        specifier: ^4.3.5
-        version: 4.3.5
-      three:
-        specifier: ^0.184.0
-        version: 0.184.0
-      zustand:
-        specifier: ^5.1.0
-        version: 5.1.0(@types/react@19.3.0)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
-    devDependencies:
-      '@commitlint/cli':
-        specifier: ^21.2.4
-        version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@6.0.3)
-      '@commitlint/config-conventional':
-        specifier: ^21.2.4
-        version: 21.2.4
-      '@commitlint/cz-commitlint':
-        specifier: ^21.2.4
-        version: 21.2.4(commitizen@4.3.2(@types/node@25.9.9)(typescript@6.0.3))(inquirer@9.3.8(@types/node@25.9.9))(typescript@6.0.3)
-      '@commitlint/prompt':
-        specifier: ^21.2.4
-        version: 21.2.4(@types/node@25.9.9)(typescript@6.0.3)
-      '@commitlint/prompt-cli':
-        specifier: ^21.2.4
-        version: 21.2.4(@types/node@25.9.9)(typescript@6.0.3)
-      '@electron-toolkit/tsconfig':
-        specifier: ^2.0.0
-        version: 2.0.0(@types/node@25.9.9)
-      '@eslint/js':
-        specifier: ^9.39.5
-        version: 9.39.5
-      '@playwright/test':
-        specifier: ^1.65.1
-        version: 1.65.1
-      '@react-three/eslint-plugin':
-        specifier: ^0.1.2
-        version: 0.1.2(supports-color@7.2.0)
       '@types/earcut':
         specifier: ^3.0.0
         version: 3.0.0
@@ -162,15 +114,30 @@ importers:
       '@types/three':
         specifier: ^0.184.1
         version: 0.184.1
+      '@unstable-studios/ui':
+        specifier: ^1.6.1
+        version: 1.6.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.5)(vitest@4.1.12)
       '@vitejs/plugin-react':
         specifier: ^6.3.0
         version: 6.3.0(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
       '@vitest/coverage-v8':
         specifier: ^4.1.12
         version: 4.1.12(vitest@4.1.12)
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      cmdk:
+        specifier: ^1.1.1
+        version: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       commitizen:
         specifier: ^4.3.2
         version: 4.3.2(@types/node@25.9.9)(typescript@6.0.3)
+      earcut:
+        specifier: ^3.2.4
+        version: 3.2.4
       electron:
         specifier: ^42.11.18
         version: 42.11.18(supports-color@7.2.0)
@@ -210,6 +177,24 @@ importers:
       jsdom:
         specifier: ^31.0.1
         version: 31.0.1(@noble/hashes@1.8.0)
+      jszip:
+        specifier: ^3.10.2
+        version: 3.10.2
+      konva:
+        specifier: ^10.10.0
+        version: 10.10.0
+      lucide-react:
+        specifier: ^1.77.0
+        version: 1.77.0(@types/react@19.3.0)(react@19.3.1)
+      manifold-3d:
+        specifier: ^3.5.5
+        version: 3.5.5
+      mitt:
+        specifier: ^3.0.1
+        version: 3.0.1
+      motion:
+        specifier: ^12.43.0
+        version: 12.43.0(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       node:
         specifier: runtime:^24.22.3
         version: runtime:24.22.3
@@ -219,9 +204,21 @@ importers:
       react:
         specifier: ^19.3.1
         version: 19.3.1
+      react-colorful:
+        specifier: ^5.8.1
+        version: 5.8.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       react-dom:
         specifier: ^19.3.1
         version: 19.3.1(react@19.3.1)
+      tailwind-merge:
+        specifier: ^3.7.1
+        version: 3.7.1
+      tailwindcss:
+        specifier: ^4.3.5
+        version: 4.3.5
+      three:
+        specifier: ^0.184.0
+        version: 0.184.0
       tw-animate-css:
         specifier: ^1.4.0
         version: 1.4.0
@@ -246,6 +243,9 @@ importers:
       vitest-canvas-mock:
         specifier: ^1.2.0
         version: 1.2.0(vitest@4.1.12)
+      zustand:
+        specifier: ^5.1.0
+        version: 5.1.0(@types/react@19.3.0)(react@19.3.1)(use-sync-external-store@1.7.0(react@19.3.1))
 
 packages:
 

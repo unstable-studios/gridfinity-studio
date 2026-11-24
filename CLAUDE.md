@@ -114,6 +114,10 @@ Conventional commits are **strictly enforced** by commitlint in CI and Husky pre
 - **Scopes**: core, ui, middleware, ci, test, docs, repo, infra, deps, release (scope is optional)
 - Subject: imperative mood, lowercase, no period, max 72 chars
 
+## Dependencies
+
+`dependencies` holds only the packages the main and preload processes import (`electron-updater`, `electron-log`, `@electron-toolkit/*`). electron-builder packs everything listed there into the installers. Everything the renderer uses goes under `devDependencies`: electron-vite bundles it into `out/renderer`. `runtime-dependencies.test.ts` fails when the two lists drift.
+
 ## Code Style
 
 - Prettier: single quotes, no semicolons, 100 char width, no trailing commas
