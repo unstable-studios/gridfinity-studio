@@ -1,5 +1,5 @@
 /**
- * Canonical Project Data Model (v0.3.0)
+ * Canonical Project Data Model. docs/PROJECT_SCHEMA.md describes the file it is saved as.
  * Single source of truth for Gridfinity Studio projects
  */
 
