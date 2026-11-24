@@ -12,6 +12,7 @@ import { useLayoutEngineContext, useEngineState } from '@/layout-engine'
 import type { LayoutEngine } from '@/layout-engine'
 import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/types'
 import { findBestBinForShape, type ShapeAABB } from '@/layout-engine/containment'
+import { shapeTypeLabel } from '@/lib/shape-labels'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
 
@@ -76,14 +77,8 @@ function baseShapeProps(): Pick<
 
 // ─── Shape naming ───────────────────────────────────────────────────────────
 
-const SHAPE_TYPE_LABELS: Record<string, string> = {
-  rect: 'Rectangle',
-  circle: 'Ellipse',
-  polygon: 'Polygon'
-}
-
-function nextShapeName(engine: LayoutEngine, type: string): string {
-  const label = SHAPE_TYPE_LABELS[type] ?? type
+function nextShapeName(engine: LayoutEngine, type: LayoutShape['type']): string {
+  const label = shapeTypeLabel(type)
   const shapes = engine.getAllShapes()
   let max = 0
   for (const s of shapes) {
