@@ -3,6 +3,8 @@
  * Single source of truth for Gridfinity Studio projects
  */
 
+import { BASE_PROFILE_HEIGHT, FLOOR_THICKNESS } from '../gridfinity-dimensions'
+
 /**
  * Schema version for project file format. It is not the app's version: raise it only when
  * the format changes in a way an older app would misread. Raising it needs a step in
@@ -159,11 +161,6 @@ export interface ProjectData {
 }
 
 // ─── Defaults & factories ──────────────────────────────────────────
-
-/** Base profile height from Gridfinity spec (mm) */
-const BASE_PROFILE_HEIGHT = 4.95
-/** Internal floor thickness (mm) */
-const FLOOR_THICKNESS = 1.0
 
 /**
  * Compute the default pocket depth for a bin: the full interior cavity height.

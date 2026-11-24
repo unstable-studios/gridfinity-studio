@@ -6,6 +6,7 @@ This directory contains code shared between the main process, preload, and rende
 
 ```
 src/shared/
+├── gridfinity-dimensions.ts  # Dimensions from the Gridfinity specification
 ├── types/           # Types used by more than one process
 │   ├── project.ts   # The project file: settings, Gridfinity config, layout snapshot
 │   ├── results.ts   # OperationResult, returned by every IPC handler
