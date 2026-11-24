@@ -162,6 +162,7 @@ export class KonvaEngine implements LayoutEngine {
       padding: 2
     })
     this.mainLayer.add(this.transformer)
+    this.transformer.on('transformend', () => this.finishShapeTransform())
 
     // Visible background on grid layer (beneath grid lines)
     this.gridBgRect = new Konva.Rect({
@@ -282,64 +283,8 @@ export class KonvaEngine implements LayoutEngine {
     })
 
     // Rects and ellipses: reset scale live so they stay crisp and corner radii don't distort.
-    // Polygons/paths are natively vector — let them keep scale.
-    const resetScaleForPrimitives = (): void => {
-      const data = this.shapeMap.get(shape.id)
-      if (!data) return
-      const sx = node.scaleX()
-      const sy = node.scaleY()
-      if (sx === 1 && sy === 1) return
-
-      if (data.type === 'rect') {
-        node.scaleX(1)
-        node.scaleY(1)
-        data.width = (node as Konva.Rect).width() * sx
-        data.height = (node as Konva.Rect).height() * sy
-        ;(node as Konva.Rect).width(data.width)
-        ;(node as Konva.Rect).height(data.height)
-        node.offsetX(data.width / 2)
-        node.offsetY(data.height / 2)
-      } else if (data.type === 'circle') {
-        node.scaleX(1)
-        node.scaleY(1)
-        const ellipse = node as Konva.Ellipse
-        data.radiusX = ellipse.radiusX() * sx
-        data.radiusY = ellipse.radiusY() * sy
-        ellipse.radiusX(data.radiusX)
-        ellipse.radiusY(data.radiusY)
-      }
-    }
-
-    node.on('transform', resetScaleForPrimitives)
-
-    node.on('transformend', () => {
-      resetScaleForPrimitives()
-
-      const data = this.shapeMap.get(shape.id)
-      if (!data) return
-      data.x = node.x()
-      data.y = node.y()
-      data.rotation = node.rotation()
-
-      if (data.type === 'rect') {
-        this.emit('shapeResized', { id: shape.id, width: data.width, height: data.height })
-      } else if (data.type === 'circle') {
-        this.emit('shapeResized', {
-          id: shape.id,
-          radiusX: data.radiusX,
-          radiusY: data.radiusY
-        })
-      } else if (data.type === 'polygon') {
-        const sx = node.scaleX()
-        const sy = node.scaleY()
-        const pts = (node as Konva.Line).points()
-        data.points = []
-        for (let i = 0; i < pts.length; i += 2) {
-          data.points.push({ x: pts[i] * sx, y: pts[i + 1] * sy })
-        }
-      }
-      // svgPath/meshImport: scale tracked implicitly
-    })
+    // The end of a transform is handled once for every shape in it: `finishShapeTransform`.
+    node.on('transform', () => this.foldScaleIntoSize(shape.id))
 
     if (shape.groupId && this.rendererMap.has(shape.groupId)) {
       this.rendererMap.get(shape.groupId)!.konvaGroup.add(node)
@@ -352,6 +297,86 @@ export class KonvaEngine implements LayoutEngine {
     this.applyDepthOpacity(shape, node)
     this.mainLayer.batchDraw()
     this.emit('shapeCreated', { shape: { ...shape } })
+  }
+
+  /**
+   * Rects and ellipses take a resize as a new size, not a scale, so they stay crisp and
+   * corner radii don't distort. Polygons and paths are vector shapes and keep their scale.
+   */
+  private foldScaleIntoSize(id: string): void {
+    const data = this.shapeMap.get(id)
+    const node = this.konvaMap.get(id)
+    if (!data || !node) return
+    const sx = node.scaleX()
+    const sy = node.scaleY()
+    if (sx === 1 && sy === 1) return
+
+    if (data.type === 'rect') {
+      node.scaleX(1)
+      node.scaleY(1)
+      data.width = (node as Konva.Rect).width() * sx
+      data.height = (node as Konva.Rect).height() * sy
+      ;(node as Konva.Rect).width(data.width)
+      ;(node as Konva.Rect).height(data.height)
+      node.offsetX(data.width / 2)
+      node.offsetY(data.height / 2)
+    } else if (data.type === 'circle') {
+      node.scaleX(1)
+      node.scaleY(1)
+      const ellipse = node as Konva.Ellipse
+      data.radiusX = ellipse.radiusX() * sx
+      data.radiusY = ellipse.radiusY() * sy
+      ellipse.radiusX(data.radiusX)
+      ellipse.radiusY(data.radiusY)
+    }
+  }
+
+  /**
+   * The handles were let go after turning or resizing the selected shapes. Each shape goes
+   * to the bin its center is now in, then all of them are stored and reported together, so
+   * the whole transform is one change and one undo step.
+   */
+  private finishShapeTransform(): void {
+    if (this.disposed || !this.transformer) return
+    const ids = this.transformer
+      .nodes()
+      .filter((node) => node.name() === 'shape')
+      .map((node) => node.id())
+    if (ids.length === 0) return
+
+    this.batch(() => {
+      for (const id of ids) this.foldScaleIntoSize(id)
+      for (const id of ids) this.reassignByCentroid(id)
+      for (const id of ids) {
+        const data = this.shapeMap.get(id)
+        const node = this.konvaMap.get(id)
+        if (!data || !node) continue
+        // Read after reassigning: a shape's position is measured from its bin.
+        data.x = node.x()
+        data.y = node.y()
+        data.rotation = node.rotation()
+
+        if (data.type === 'rect') {
+          this.emit('shapeResized', { id, width: data.width, height: data.height })
+        } else if (data.type === 'circle') {
+          this.emit('shapeResized', { id, radiusX: data.radiusX, radiusY: data.radiusY })
+        } else {
+          if (data.type === 'polygon') {
+            const sx = node.scaleX()
+            const sy = node.scaleY()
+            const pts = (node as Konva.Line).points()
+            data.points = []
+            for (let i = 0; i < pts.length; i += 2) {
+              data.points.push({ x: pts[i] * sx, y: pts[i + 1] * sy })
+            }
+          }
+          // A polygon or path has no size to report, but it has changed all the same.
+          this.emit('shapeUpdated', { id })
+        }
+      }
+      this.transformer?.forceUpdate()
+      this.mainLayer?.batchDraw()
+    })
   }
 
   updateShape(id: string, patch: Partial<LayoutShape>, options?: { transient?: boolean }): void {
