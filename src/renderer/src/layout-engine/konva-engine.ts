@@ -796,6 +796,8 @@ export class KonvaEngine implements LayoutEngine {
 
     newGroup.childIds = [...newGroup.childIds, shapeId]
     shape.groupId = groupId
+    // How deep a pocket looks depends on the bin it is in.
+    this.applyDepthOpacity(shape, node)
 
     this.mainLayer?.batchDraw()
     return true
@@ -828,6 +830,7 @@ export class KonvaEngine implements LayoutEngine {
 
     group.childIds = group.childIds.filter((id) => id !== shapeId)
     shape.groupId = null
+    this.applyDepthOpacity(shape, node)
 
     this.transformer?.moveToTop()
     this.mainLayer.batchDraw()

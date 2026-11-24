@@ -13,6 +13,7 @@ import {
 } from '@/layout-engine'
 import type { UndoRedoDebugState } from '@/layout-engine/useEngineUndoRedo'
 import DrawingToolLayer from './DrawingToolLayer'
+import { removeItems } from '@/lib/remove-items'
 import ShapeTooltip from './ShapeTooltip'
 import HintCard from './HintCard'
 import { MOD_KEY } from '@/lib/platform'
@@ -46,16 +47,7 @@ function LayoutViewport(): React.JSX.Element {
       if ((e.target as HTMLElement).tagName === 'INPUT') return
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault()
-        const ids = engine.getSelectedIds()
-        if (ids.length === 0) return
-        engine.clearSelection()
-        for (const id of ids) {
-          if (engine.getGroup(id)) {
-            engine.removeGroup(id)
-          } else {
-            engine.removeShape(id)
-          }
-        }
+        removeItems(engine, engine.getSelectedIds())
       }
     }
     window.addEventListener('keydown', handler)

@@ -9,6 +9,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import ArrangeControls from './ArrangeControls'
 import NameField from './NameField'
 import { storedName } from '@/lib/item-name'
+import { removeItems } from '@/lib/remove-items'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -243,16 +244,7 @@ function LayoutSidebar(): React.JSX.Element {
   }
 
   const handleDeleteSelected = (): void => {
-    if (!engine || selectedIds.length === 0) return
-    engine.clearSelection()
-    for (const id of selectedIds) {
-      const group = engine.getGroup(id)
-      if (group) {
-        engine.removeGroup(id)
-      } else {
-        engine.removeShape(id)
-      }
-    }
+    if (engine) removeItems(engine, selectedIds)
   }
 
   return (

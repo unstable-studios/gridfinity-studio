@@ -1,8 +1,9 @@
 import { useCallback, useEffect } from 'react'
 import { create } from 'zustand'
 import { useLayoutEngine, useEngineState } from '@/layout-engine'
-import { findBestBinForShape } from '@/layout-engine/containment'
+import { findContainingBinGroup } from '@/layout-engine/containment'
 import { copySelection, planPaste, type ClipboardContent } from '@/lib/clipboard'
+import { removeItems } from '@/lib/remove-items'
 import { useAppMode } from './useAppMode'
 import { useProject } from './useProject'
 
@@ -41,6 +42,12 @@ export function useEditCommands(): EditCommands {
   const { mode } = useAppMode()
   const baseUnit = useProject((s) => s.project?.gridfinity.baseUnit ?? 42)
   const hasContent = useClipboard((s) => s.content !== null)
+  // What was copied belongs to the project it came from. Another project can have a
+  // different grid, where a pasted bin would not fit.
+  const projectKey = useProject((s) => s.project?.settings.createdAt)
+  useEffect(() => {
+    useClipboard.setState({ content: null, nextOffset: 0 })
+  }, [projectKey])
   const designing = mode === 'layout' && engine !== null
 
   const copyToClipboard = useCallback(
@@ -62,20 +69,8 @@ export function useEditCommands(): EditCommands {
 
   const cut = useCallback(() => {
     if (!engine) return
-    const selected = new Set(engine.getSelectedIds())
-    if (!copyToClipboard(0)) return
-    const shapes = engine.getAllShapes()
-    engine.clearSelection()
-    engine.batch(() => {
-      // A bin goes with what is in it. Removing only the bin would leave its shapes behind.
-      for (const shape of shapes) {
-        const inCutBin = shape.groupId !== null && selected.has(shape.groupId)
-        if (inCutBin || selected.has(shape.id)) engine.removeShape(shape.id)
-      }
-      for (const id of selected) {
-        if (engine.getGroup(id)) engine.removeGroup(id)
-      }
-    })
+    const selected = engine.getSelectedIds()
+    if (copyToClipboard(0)) removeItems(engine, selected)
   }, [engine, copyToClipboard])
 
   const paste = useCallback(() => {
@@ -91,10 +86,17 @@ export function useEditCommands(): EditCommands {
         engine.addShape(shape)
         let groupId = plan.shapeGroup.get(shape.id)
         if (!groupId) {
-          // A shape pasted on its own joins whichever bin it lands in.
+          // A shape pasted on its own joins the bin its center lands in, the same rule a
+          // dragged shape follows.
           pasted.push(shape.id)
           const bounds = engine.getShapeBounds(shape.id)
-          groupId = bounds ? findBestBinForShape(engine.getAllGroups(), bounds)?.id : undefined
+          groupId = bounds
+            ? findContainingBinGroup(
+                engine.getAllGroups(),
+                (bounds.minX + bounds.maxX) / 2,
+                (bounds.minY + bounds.maxY) / 2
+              )?.id
+            : undefined
         }
         if (groupId) engine.addToGroup(shape.id, groupId)
       }
@@ -122,6 +124,10 @@ export function useEditCommands(): EditCommands {
     const onKey = (e: KeyboardEvent): void => {
       if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey) return
       if (isTyping(e.target)) return
+      // With a dialog open, the canvas behind it is out of reach.
+      if (document.querySelector('[role="dialog"]')) return
+      // Text selected on the page is what the person means to copy.
+      if (e.code === 'KeyC' && !window.getSelection()?.isCollapsed) return
       const commands: Record<string, [enabled: boolean, run: () => void]> = {
         KeyC: [engine.getSelectedIds().length > 0, copy],
         KeyX: [engine.getSelectedIds().length > 0, cut],

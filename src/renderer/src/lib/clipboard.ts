@@ -66,6 +66,25 @@ export interface PastePlan {
   shapeGroup: Map<string, string>
 }
 
+/** Whether two groups cover any of the same area. Touching edges do not count. */
+function overlaps(a: LayoutGroup, b: LayoutGroup): boolean {
+  const apart =
+    a.x + a.width <= b.x || b.x + b.width <= a.x || a.y <= b.y - b.height || b.y <= a.y - a.height
+  return !apart
+}
+
+/** A copy of `metadata` under the name a paste gives it. No metadata stays no metadata. */
+function renamed(
+  metadata: Record<string, unknown> | undefined,
+  name: string | undefined
+): Record<string, unknown> | undefined {
+  if (!metadata) return undefined
+  const copy = structuredClone(metadata)
+  if (name === undefined) delete copy.name
+  else copy.name = name
+  return copy
+}
+
 /** "Bin 1" becomes "Bin 1 copy". A name that already says so is left alone. */
 function copyName(name: unknown): string | undefined {
   if (typeof name !== 'string' || name === '') return undefined
@@ -75,9 +94,13 @@ function copyName(name: unknown): string | undefined {
 /**
  * Where a paste puts things.
  *
- * Bins keep their arrangement and go to the right of every bin on the canvas, one grid unit
- * clear, so a pasted bin never lands on another. Shapes copied on their own land a little
- * down and to the right of where they were, further with each paste of the same copy.
+ * Bins keep their arrangement. They go back where they were copied from when that space is
+ * free, as after a cut. Otherwise they go to the right of every bin on the canvas, one grid
+ * unit clear, so a pasted bin never lands on another. Shapes copied on their own land a
+ * little down and to the right of where they were, further with each paste of the same copy.
+ *
+ * `pasteCount` is how many paste offsets to apply: 0 for the first paste after a cut, which
+ * lands in place, and 1 or more for copies.
  */
 export function planPaste(
   content: ClipboardContent,
@@ -86,8 +109,16 @@ export function planPaste(
   pasteCount: number,
   newId: () => string
 ): PastePlan {
+  // The first paste after a cut puts back the things themselves, under their own names.
+  // Every other paste makes a copy, named so it can be told from the original.
+  const nameFor = (name: unknown): string | undefined =>
+    pasteCount === 0 ? (typeof name === 'string' ? name : undefined) : copyName(name)
+
   let binShift = 0
-  if (content.groups.length > 0 && existingGroups.length > 0) {
+  const spaceIsTaken = content.groups.some((copied) =>
+    existingGroups.some((existing) => overlaps(copied, existing))
+  )
+  if (spaceIsTaken) {
     const rightEdge = Math.max(...existingGroups.map((g) => g.x + g.width))
     const leftEdge = Math.min(...content.groups.map((g) => g.x))
     binShift = rightEdge + baseUnit - leftEdge
@@ -98,9 +129,7 @@ export function planPaste(
   const groups = content.groups.map((group) => {
     const id = newId()
     newGroupId.set(group.id, id)
-    const metadata = group.metadata
-      ? { ...structuredClone(group.metadata), name: copyName(group.metadata.name) }
-      : undefined
+    const metadata = renamed(group.metadata, nameFor(group.metadata?.name))
     return { ...structuredClone(group), id, x: group.x + binShift, childIds: [], metadata }
   })
 
@@ -109,14 +138,10 @@ export function planPaste(
     const id = newId()
     const groupId = shape.groupId === null ? undefined : newGroupId.get(shape.groupId)
     if (groupId) shapeGroup.set(id, groupId)
-    const metadata = shape.metadata
-      ? {
-          ...structuredClone(shape.metadata),
-          // A shape pasted along with its bin keeps its name. One pasted beside the original
-          // gets a name that tells them apart.
-          name: groupId ? shape.metadata.name : copyName(shape.metadata.name)
-        }
-      : undefined
+    // A shape pasted along with its bin keeps its name. One pasted beside the original gets
+    // a name that tells them apart.
+    const keptName = typeof shape.metadata?.name === 'string' ? shape.metadata.name : undefined
+    const metadata = renamed(shape.metadata, groupId ? keptName : nameFor(keptName))
     return {
       ...structuredClone(shape),
       id,

@@ -109,6 +109,40 @@ describe('planPaste', () => {
     expect(plan.shapes[0]).toMatchObject({ x: 47, y: 39 })
   })
 
+  it('pastes a cut bin back where it was when that space is still free', () => {
+    const content = copySelection(groups, shapes, ['a'])!
+    // Bin a was cut. Bin b is still there, and not in the way.
+    const plan = planPaste(content, [groups[1]], 42, 0, counter())
+
+    expect(plan.groups[0].x).toBe(0)
+    expect(plan.shapes[0]).toMatchObject({ x: 47, y: 39 })
+  })
+
+  it('moves a pasted bin clear when another bin has taken its place', () => {
+    const content = copySelection(groups, shapes, ['a'])!
+    const squatter = bin('c', 42)
+    const plan = planPaste(content, [groups[1], squatter], 42, 0, counter())
+
+    // Bins end at x = 210, so the paste starts at 252.
+    expect(plan.groups[0].x).toBe(252)
+  })
+
+  it('lets a pasted bin touch another without moving it', () => {
+    const content = copySelection(groups, shapes, ['a'])!
+    const neighbor = bin('c', 84)
+
+    expect(planPaste(content, [neighbor], 42, 0, counter()).groups[0].x).toBe(0)
+  })
+
+  it('does not invent a name for something that had none', () => {
+    const unnamed = [bin('a', 0, { metadata: { widthUnits: 2 } })]
+    const loose = [{ ...rect('s9', 300, 300), metadata: { pocket: { clearance: 0.25 } } }]
+    const plan = planPaste(copySelection(unnamed, loose, ['a', 's9'])!, unnamed, 42, 1, counter())
+
+    expect(plan.groups[0].metadata).toEqual({ widthUnits: 2 })
+    expect(plan.shapes[0].metadata).toEqual({ pocket: { clearance: 0.25 } })
+  })
+
   it('moves a shape copied on its own a step further with each paste', () => {
     const content = copySelection(groups, shapes, ['s2'])!
 
@@ -131,6 +165,14 @@ describe('planPaste', () => {
       planPaste(copySelection(plan.groups, [], ['n1'])!, [], 42, 1, counter()).groups[0].metadata!
         .name
     ).toBe('Bin a copy')
+  })
+
+  it('keeps names on the first paste after a cut', () => {
+    const content = copySelection(groups, shapes, ['a', 's2'])!
+    const plan = planPaste(content, [groups[1]], 42, 0, counter())
+
+    expect(plan.groups[0].metadata!.name).toBe('Bin a')
+    expect(plan.shapes.map((s) => s.metadata!.name)).toEqual(['Rectangle s1', 'Rectangle s2'])
   })
 
   it('gives everything a new id', () => {
