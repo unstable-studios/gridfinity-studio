@@ -652,6 +652,35 @@ describe('LayoutEngine contract', () => {
       expect(engine.getGroup('left')!.metadata).toEqual({ name: 'Screws' })
     })
 
+    it('updateGroup changes nothing when it refuses, metadata included', () => {
+      const metadata = { widthUnits: 2, name: 'Left' }
+      engine.createGroup(makeGroup({ id: 'left', x: 0, y: 84, width: 84, height: 84, metadata }))
+      engine.createGroup(makeGroup({ id: 'right', x: 84, y: 84, width: 84, height: 84 }))
+
+      engine.updateGroup('left', { width: 168, metadata: { widthUnits: 4, name: 'Left' } })
+
+      expect(engine.getGroup('left')!.metadata).toEqual(metadata)
+    })
+
+    it('updateGroup allows touching a neighbor at a base unit that is not a whole number', () => {
+      // 5 × 42.1 reads back from the canvas one digit short of where it was put.
+      const unit = 42.1
+      engine.createGroup(makeGroup({ id: 'left', x: 0, y: unit, width: unit, height: unit }))
+      engine.createGroup(
+        makeGroup({ id: 'right', x: 2 * unit, y: unit, width: 5 * unit, height: unit })
+      )
+
+      expect(engine.updateGroup('left', { width: 2 * unit })).toBe(true)
+    })
+
+    it('updateGroup does not let a group that overlaps another grow further over it', () => {
+      engine.createGroup(makeGroup({ id: 'left', x: 0, y: 84, width: 126, height: 84 }))
+      engine.createGroup(makeGroup({ id: 'right', x: 84, y: 84, width: 84, height: 84 }))
+
+      expect(engine.updateGroup('left', { width: 168 })).toBe(false)
+      expect(engine.getGroup('left')!.width).toBe(126)
+    })
+
     it('updateGroup lets a group that already overlaps another be made smaller', () => {
       engine.createGroup(makeGroup({ id: 'left', x: 0, y: 84, width: 168, height: 84 }))
       engine.createGroup(makeGroup({ id: 'right', x: 84, y: 84, width: 84, height: 84 }))
