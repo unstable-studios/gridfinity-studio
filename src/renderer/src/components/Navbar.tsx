@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useState } from 'react'
+import { useEffect, useCallback, useState } from 'react'
 import Logo from './Logo'
 import {
   Navbar as NavbarRoot,
@@ -30,8 +30,7 @@ import { useAppMode } from '@/hooks/useAppMode'
 import { MOD_KEY } from '@/lib/platform'
 import { useAppUpdate } from '@/hooks/useAppUpdate'
 import type { UpdateState } from '../../../shared/types/updates'
-import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
-import { useLayoutEngine, useEngineState, isBinGroup } from '@/layout-engine'
+import { useExport, useExportScopeReset } from '@/hooks/useExport'
 import {
   SquareDashedIcon,
   BoxIcon,
@@ -118,49 +117,19 @@ function AppMenubar({
   onOpenPreferences: () => void
   onNewProject: () => void
 }) {
-  const {
-    project,
-    saveProject,
-    saveProjectAs,
-    loadProject,
-    recentProjects,
-    loadRecentProjects,
-    bakeResults,
-    bakeStatus,
-    exportSTL,
-    export3MF
-  } = useProject()
+  const { project, saveProject, saveProjectAs, loadProject, recentProjects, loadRecentProjects } =
+    useProject()
   const { undo, redo, canUndo, canRedo } = useUndoRedo()
   const edit = useEditShortcuts()
   useCloseGuard()
-  const projectName = useProjectName()
   const { state: updateState, installNow } = useAppUpdate()
 
   useEffect(() => {
     loadRecentProjects()
   }, [loadRecentProjects])
 
-  // Export only when every known bin has finished its latest bake successfully.
-  // bakeStatus is the source of truth — bakeResults can hold a stale mesh
-  // while a fresh bake is in flight.
-  const allReady = bakeStatus.size > 0 && [...bakeStatus.values()].every((s) => s === 'ready')
-
-  const engine = useLayoutEngine()
-  const { tick } = useEngineState()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
-
-  const handleExportSTL = useCallback(async () => {
-    const placements = placementsFromGroups(bins)
-    const data = await buildSTLArrayBuffer(bakeResults, placements)
-    if (data) await exportSTL(data, `${projectName}.stl`)
-  }, [bakeResults, exportSTL, bins, projectName])
-
-  const handleExport3MF = useCallback(async () => {
-    const placements = placementsFromGroups(bins)
-    const data = await build3MFArrayBuffer(bakeResults, projectName, placements)
-    if (data) await export3MF(data, `${projectName}.3mf`)
-  }, [bakeResults, export3MF, projectName, bins])
+  const { canExport, exportAs } = useExport()
+  useExportScopeReset()
 
   // File keyboard shortcuts (undo/redo handled by useEngineUndoRedo)
   const handleFileKeys = useCallback(
@@ -236,10 +205,10 @@ function AppMenubar({
           <MenubarSeparator />
           <MenubarItem disabled>Import…</MenubarItem>
           <MenubarSub>
-            <MenubarSubTrigger disabled={!allReady}>Export</MenubarSubTrigger>
+            <MenubarSubTrigger disabled={!canExport}>Export</MenubarSubTrigger>
             <MenubarSubContent>
-              <MenubarItem onSelect={() => void handleExportSTL()}>STL…</MenubarItem>
-              <MenubarItem onSelect={() => void handleExport3MF()}>3MF…</MenubarItem>
+              <MenubarItem onSelect={() => void exportAs('stl')}>STL…</MenubarItem>
+              <MenubarItem onSelect={() => void exportAs('3mf')}>3MF…</MenubarItem>
             </MenubarSubContent>
           </MenubarSub>
         </MenubarContent>
