@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.15.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.14.0...v1.15.0) (2026-11-24)
+
+
+### Features
+
+* **ui:** draw a bin on the canvas by dragging ([#477](https://github.com/unstable-studios/gridfinity-studio/issues/477)) ([603569a](https://github.com/unstable-studios/gridfinity-studio/commit/603569a00469c27af614e24faa0e43ea7023cc8d))
+* **ui:** export one file per bin ([#476](https://github.com/unstable-studios/gridfinity-studio/issues/476)) ([cd1bbcb](https://github.com/unstable-studios/gridfinity-studio/commit/cd1bbcb05ebc494a613963e35b5d50845a66962b))
+* **ui:** export only the selected bins ([#475](https://github.com/unstable-studios/gridfinity-studio/issues/475)) ([c52cbce](https://github.com/unstable-studios/gridfinity-studio/commit/c52cbceb96d2840b58d2999c78525a2aa29317fe))
+
 ## [1.14.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.13.0...v1.14.0) (2026-11-24)
 
 
