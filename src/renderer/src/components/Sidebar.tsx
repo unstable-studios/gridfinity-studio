@@ -1,4 +1,5 @@
-import { useMemo, useRef } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
 import { GridPicker } from '@/components/ui/grid-picker'
@@ -13,6 +14,12 @@ import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
 import { removeItems } from '@/lib/remove-items'
 import { addBin, placeForNewBin } from '@/lib/new-bin'
+import {
+  addBinSection,
+  addBinSectionOpen,
+  chooseAddBinOpen,
+  noteAddBinUsed
+} from '@/lib/add-bin-section'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -196,10 +203,14 @@ function LayoutSidebar(): React.JSX.Element {
     [engine, selectedIds, shapes, groups]
   )
 
+  const [addBinState, setAddBinSection] = useState(addBinSection)
+
   const handleAddBin = (widthUnits: number, depthUnits: number): void => {
     if (!engine) return
     const place = placeForNewBin(binGroups, widthUnits, depthUnits, baseUnit)
     addBin(engine, { ...place, widthUnits, depthUnits }, baseUnit)
+    // Someone adding bins from the grid wants it to stay there for the next one.
+    setAddBinSection(noteAddBinUsed())
   }
 
   const handleUpdateBinMetadata = (groupId: string, patch: Partial<BinMetadata>): void => {
@@ -229,7 +240,11 @@ function LayoutSidebar(): React.JSX.Element {
       <ProjectNameHeader />
 
       {/* Bin creation */}
-      <SidebarSection title="Add bin">
+      <SidebarSection
+        title="Add bin"
+        open={addBinSectionOpen(addBinState, binGroups.length)}
+        onOpenChange={(open) => setAddBinSection(chooseAddBinOpen(open))}
+      >
         <GridPicker onChange={handleAddBin} />
       </SidebarSection>
 
@@ -643,19 +658,45 @@ function ProjectNameHeader(): React.JSX.Element {
   )
 }
 
+/**
+ * A titled part of the sidebar. With `open` and `onOpenChange` its title is a button that
+ * shows and hides what is in it.
+ */
 function SidebarSection({
   title,
+  open,
+  onOpenChange,
   children
 }: {
   title: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
   children: React.ReactNode
 }): React.JSX.Element {
+  const titleClass =
+    'text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400'
+  if (open === undefined || !onOpenChange) {
+    return (
+      <div>
+        <p className={`${titleClass} mb-2`}>{title}</p>
+        {children}
+      </div>
+    )
+  }
+
+  const Chevron = open ? ChevronDownIcon : ChevronRightIcon
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400 mb-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => onOpenChange(!open)}
+        className={`${titleClass} -my-1 flex w-full items-center justify-between rounded py-1 text-left outline-none hover:text-zinc-700 focus-visible:ring-2 focus-visible:ring-blue-500 dark:hover:text-zinc-200 ${open ? 'mb-2' : ''}`}
+      >
         {title}
-      </p>
-      {children}
+        <Chevron className="size-3.5" aria-hidden />
+      </button>
+      {open && children}
     </div>
   )
 }
