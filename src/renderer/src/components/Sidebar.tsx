@@ -12,7 +12,7 @@ import EditContextMenu from './EditContextMenu'
 import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
 import { removeItems } from '@/lib/remove-items'
-import { addBin } from '@/lib/new-bin'
+import { addBin, placeForNewBin } from '@/lib/new-bin'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import {
   shownPositionLimits,
@@ -198,10 +198,8 @@ function LayoutSidebar(): React.JSX.Element {
 
   const handleAddBin = (widthUnits: number, depthUnits: number): void => {
     if (!engine) return
-    // To the right of the rightmost bin, with one grid unit between them.
-    const rightEdge = binGroups.reduce((max, g) => Math.max(max, g.x + g.width), 0)
-    const x = binGroups.length === 0 ? 0 : rightEdge + baseUnit
-    addBin(engine, { x, y: 0, widthUnits, depthUnits }, baseUnit)
+    const place = placeForNewBin(binGroups, widthUnits, depthUnits, baseUnit)
+    addBin(engine, { ...place, widthUnits, depthUnits }, baseUnit)
   }
 
   const handleUpdateBinMetadata = (groupId: string, patch: Partial<BinMetadata>): void => {
