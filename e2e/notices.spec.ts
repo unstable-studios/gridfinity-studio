@@ -56,6 +56,27 @@ test('failed and cancelled file operations tell the person what happened', async
   await app.expectBinCount(1) // the project that was open is untouched
   await dismissAll()
 
+  // ── Open a project from another version of the app: the notice says which way ─
+  const fromAnotherVersion = join(app.dir, 'version.gfstudio')
+  await writeFile(fromAnotherVersion, JSON.stringify({ schemaVersion: '99.0.0' }))
+  await app.stubOpenDialog(fromAnotherVersion)
+  await app.menu('File', /^Open project/)
+  await expect(
+    page.getByText(
+      'It was made with a newer version of Gridfinity Studio. Update the app, then open it again.'
+    )
+  ).toBeVisible()
+  await app.expectBinCount(1) // the project that was open is untouched
+  await dismissAll()
+
+  await writeFile(fromAnotherVersion, JSON.stringify({ schemaVersion: '0.4.0', entities: [] }))
+  await app.menu('File', /^Open project/)
+  await expect(
+    page.getByText('It was made with an early version of Gridfinity Studio and can’t be opened.')
+  ).toBeVisible()
+  await app.expectBinCount(1) // the project that was open is untouched
+  await dismissAll()
+
   // ── Open a project whose layout is damaged: the notice says what is wrong ─
   const damaged = join(app.dir, 'damaged.gfstudio')
   await writeFile(

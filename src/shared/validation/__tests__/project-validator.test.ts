@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   ProjectValidator,
-  migrateProject,
+  repairProject,
   repairLayout,
   validateProject
 } from '../project-validator'
@@ -61,6 +61,25 @@ describe('ProjectValidator', () => {
       const result = ProjectValidator.validate(projectWith({ schemaVersion: 'not-a-version' }))
       expect(result.valid).toBe(false)
       expect(result.errors.some((e) => e.field === 'schemaVersion')).toBe(true)
+    })
+
+    it('rejects a version that is missing, empty or not text', () => {
+      // Such a file used to open, and would then skip every conversion.
+      for (const schemaVersion of [
+        '',
+        null,
+        undefined,
+        0,
+        5,
+        false,
+        '0.5',
+        'v0.5.0',
+        '0.6.0-beta.1'
+      ]) {
+        const result = validateProject({ ...createEmptyProject(), schemaVersion })
+        expect(result.valid, String(schemaVersion)).toBe(false)
+        expect(result.errors.map((e) => e.field)).toContain('schemaVersion')
+      }
     })
 
     it('accepts valid semver schema version', () => {
@@ -342,7 +361,10 @@ describe('ProjectValidator', () => {
     it('runs when a project is opened', () => {
       const project = createEmptyProject()
       project.layoutSnapshot = layout([{ id: 's', groupId: 'bin' }], [{ id: 'bin', childIds: [] }])
-      expect(migrateProject(project).layoutSnapshot.groups[0].childIds).toEqual(['s'])
+      expect(repairProject(project).layoutSnapshot.groups[0].childIds).toEqual(['s'])
+      // A project with nothing to repair comes back as it is.
+      const sound = createEmptyProject()
+      expect(repairProject(sound)).toBe(sound)
     })
   })
 })

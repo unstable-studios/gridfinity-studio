@@ -10,8 +10,8 @@
  */
 
 import { create } from 'zustand'
-import { createEmptyProject } from '../../../shared/types/project'
-import { migrateProject } from '../../../shared/validation/project-validator'
+import { CURRENT_SCHEMA_VERSION, createEmptyProject } from '../../../shared/types/project'
+import { repairProject } from '../../../shared/validation/project-validator'
 import type {
   ProjectData,
   GlobalSettings,
@@ -107,7 +107,13 @@ interface SessionData {
 function loadSession(): SessionData {
   try {
     const raw = sessionStorage.getItem(SESSION_KEY)
-    if (raw) return JSON.parse(raw)
+    if (raw) {
+      const session = JSON.parse(raw) as SessionData
+      // A project kept across a reload skips the checks a file goes through. One left by
+      // another format of the app is dropped, not opened as if it were this one.
+      const version = session.project?.schemaVersion
+      if (session.project === null || version === CURRENT_SCHEMA_VERSION) return session
+    }
   } catch {
     // ignore corrupt data
   }
@@ -224,7 +230,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       try {
         const result = await window.api.project.load(targetPath)
         if (result.success && result.data) {
-          const project = migrateProject(result.data.project)
+          const project = repairProject(result.data.project)
           set({
             project,
             filePath: result.data.filePath,

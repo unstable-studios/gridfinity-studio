@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { ProjectData, LayoutSnapshotData } from '../../../../shared/types/project'
-import { createEmptyProject, CURRENT_SCHEMA_VERSION } from '../../../../shared/types/project'
-import { migrateProject } from '../../../../shared/validation/project-validator'
+import { createEmptyProject } from '../../../../shared/types/project'
 
 describe('Layout snapshot persistence', () => {
   it('T052: layoutSnapshot survives project serialization roundtrip', () => {
@@ -72,42 +71,5 @@ describe('Layout snapshot persistence', () => {
       enabled: true,
       visible: true
     })
-  })
-
-  it('T053: pre-migration .gfstudio file loads and migrates to current schema', () => {
-    // Simulate a pre-migration file with old schema version
-    const oldProject = {
-      schemaVersion: '0.3.0',
-      settings: {
-        name: 'Old Project',
-        createdAt: '2025-01-01T00:00:00Z',
-        modifiedAt: '2025-01-01T00:00:00Z',
-        units: 'mm'
-      },
-      gridfinity: {
-        baseUnit: 42,
-        gridSpacing: 42,
-        unitHeight: 7,
-        tolerance: 0.5,
-        magnetHoles: { enabled: true, diameter: 6.5, depth: 2.4 },
-        screwHoles: { enabled: false, diameter: 3, depth: 6 }
-      },
-      layoutSnapshot: {
-        version: '1.0.0',
-        shapes: [],
-        groups: [],
-        gridConfig: { size: 42, enabled: true, visible: true }
-      }
-    }
-
-    // Roundtrip through JSON (simulate file load)
-    const serialized = JSON.stringify(oldProject)
-    const loaded = JSON.parse(serialized) as ProjectData
-
-    // Migration should bump schema version
-    const migrated = migrateProject(loaded)
-
-    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION)
-    expect(migrated.settings.name).toBe('Old Project')
   })
 })

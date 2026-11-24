@@ -195,7 +195,7 @@ The bin's lower-left corner is at (0, 0), so it covers x from 0 to 84 and y from
 [`project-validator.ts`](../src/shared/validation/project-validator.ts) runs when a file is opened and again before it is saved. It checks:
 
 - The four top-level fields exist.
-- `schemaVersion`, when it has a value, is text in the form `1.2.3`.
+- `schemaVersion` is three numbers, such as `0.5.0`.
 - `settings`: a name, two dates as text, and a known unit.
 - `gridfinity`: the four numbers, with `baseUnit`, `gridSpacing` and `unitHeight` greater than 0, and both hole settings.
 - `layoutSnapshot`: `version` is text, `gridConfig` has a size greater than 0 and its two switches, and `shapes` and `groups` are lists.
@@ -208,6 +208,24 @@ Bins and shapes are not checked against each other. When a file is opened they a
 
 ## Other versions
 
-A file with a different `schemaVersion` that passes the checks above is opened as it is, and saved as `0.5.0`.
+A file's `schemaVersion` decides what happens when it is opened.
 
-Files from before `0.5.0` kept bins and entities in their own lists and have no `layoutSnapshot`, so they fail the first check and do not open. [`migrations.ts`](../src/shared/validation/migrations.ts) can convert them, but the app does not call it.
+| The file is            | What happens                                                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| The current version    | Opened as it is                                                                                                                    |
+| Older, from `0.5.0` on | Converted to the current version, one step at a time, then checked. It is written in the current version the next time it is saved |
+| Older than `0.5.0`     | Not opened. The notice says it was made with an early version                                                                      |
+| Newer than the app     | Not opened. The notice says to update the app                                                                                      |
+
+`0.5.0` is the first format with a `layoutSnapshot`. Earlier ones kept bins and entities in their own lists.
+
+### Changing the format
+
+1. Raise `CURRENT_SCHEMA_VERSION` in `src/shared/types/project.ts`.
+2. Add a step to `MIGRATIONS` in [`migrations.ts`](../src/shared/validation/migrations.ts), keyed by the version it converts from. It takes a project of that version and returns it as the next one.
+3. Add a test for the step with a project of the old version.
+4. Update this document.
+
+A test checks that the steps lead from `0.5.0` to the current version, so raising the version without adding a step fails.
+
+Raise the version only when the format changes in a way an older app would misread. It is not the app's version, and an app that meets a newer file refuses to open it. Adding a field that older apps can ignore does not need a new version.

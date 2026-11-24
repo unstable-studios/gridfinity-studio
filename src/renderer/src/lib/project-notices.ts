@@ -44,13 +44,15 @@ export function notifyOpenFailed(
   reason: FailureReason | undefined,
   detail: string | undefined
 ): void {
-  toast.error('Couldn’t open that file', {
-    description:
-      reason === 'invalid'
-        ? `It isn’t a Gridfinity Studio project, or it is damaged.${firstProblem(detail)}`
-        : describeFileError(detail),
-    ...untilDismissed('open-failed')
-  })
+  const description =
+    reason === 'too-new'
+      ? 'It was made with a newer version of Gridfinity Studio. Update the app, then open it again.'
+      : reason === 'too-old'
+        ? 'It was made with an early version of Gridfinity Studio and can’t be opened.'
+        : reason === 'invalid'
+          ? `It isn’t a Gridfinity Studio project, or it is damaged.${firstProblem(detail)}`
+          : describeFileError(detail)
+  toast.error('Couldn’t open that file', { description, ...untilDismissed('open-failed') })
 }
 
 /** `written` is how far an export of several files got, such as "2 of 5". */
