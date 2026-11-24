@@ -83,7 +83,7 @@ ${triangleLines.join('\n')}
  * Without `solidAttr`, corners are the same vertex when they share a position.
  * With it, they are the same vertex when it gives them the same number. Two numbers are also
  * joined where one triangle has both at the same position: that edge has no length, and
- * closing it removes the triangle without opening the surface.
+ * closing it removes the triangle. Manifold leaves a few of these, at the lip of a bin.
  *
  * A triangle that names a vertex twice is left out.
  */
@@ -105,6 +105,12 @@ function weld(
   const standsFor = (solid: number): number => {
     let root = solid
     for (let next = joined.get(root); next !== undefined; next = joined.get(root)) root = next
+    // Point everything on the way at the root, so a long run of joins stays fast.
+    for (let at = solid; at !== root; ) {
+      const next = joined.get(at)!
+      joined.set(at, root)
+      at = next
+    }
     return root
   }
   if (solidAttr) {
