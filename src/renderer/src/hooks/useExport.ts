@@ -20,10 +20,11 @@ export type ExportFiles = 'one' | 'perBin'
 
 type Bin = LayoutGroup & { metadata: BinMetadata }
 
-  /** `perBin` only while the project has more than one bin. */
-  files: ExportFiles
-  setFiles: (files: ExportFiles) => void
-  /** Whether every chosen bin has been built, in Preview. */
+/** What the person asked for. `useExportScopeReset` puts the scope back. */
+const useExportOptions = create<{ scope: ExportScope; files: ExportFiles }>(() => ({
+  scope: 'all',
+  files: 'one'
+}))
 
 export interface ExportCommands {
   /** Every bin in the project. */
@@ -35,16 +36,10 @@ export interface ExportCommands {
   /** `selected` only while there are selected bins to export. */
   scope: ExportScope
   setScope: (scope: ExportScope) => void
-<<<<<<< HEAD
   /** `perBin` only while the project has more than one bin. */
   files: ExportFiles
   setFiles: (files: ExportFiles) => void
-  /** Whether every chosen bin is built and up to date. */
-||||||| 74ed2b6
-  /** Whether every chosen bin is built and up to date. */
-=======
   /** Whether every chosen bin has been built, in Preview. */
->>>>>>> feat/export-selected-bins
   canExport: boolean
   exportAs: (format: ExportFormat) => Promise<void>
 }
