@@ -49,7 +49,7 @@ export function notifyExportFailed(detail: string | undefined): void {
   })
 }
 
-/** `what` is a file name or a count such as "3 files". */
+/** `what` is a file name, or a count and folder such as "3 files to Parts". */
 export function notifyExported(what: string): void {
   toast.success(`Exported ${what}`)
 }

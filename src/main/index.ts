@@ -15,7 +15,7 @@ import {
 } from './project-handler'
 import { exportSTL, export3MF, exportBatch } from './export-handler'
 import { guardUnsavedWork, settleUnsavedWork } from './close-guard'
-import type { BatchExportFile } from './export-handler'
+import type { BatchExportFile, ExportFormat } from '../shared/types/export'
 import type { ProjectData } from '../shared/types/project'
 
 interface WindowBounds {
@@ -173,10 +173,10 @@ app.whenReady().then(() => {
     return export3MF(win, data, suggestedName)
   })
 
-  ipcMain.handle('export:batch', async (event, files: BatchExportFile[]) => {
+  ipcMain.handle('export:batch', async (event, files: BatchExportFile[], format: ExportFormat) => {
     const win = BrowserWindow.fromWebContents(event.sender)
-    if (!win) return { success: false, error: 'No active window', exported: 0 }
-    return exportBatch(win, files)
+    if (!win) return { success: false, error: 'No active window' }
+    return exportBatch(win, files, format)
   })
 
   // Update IPC: renderer can read current state and trigger install. Register

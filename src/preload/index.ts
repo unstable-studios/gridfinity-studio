@@ -3,6 +3,7 @@ import { electronAPI } from '@electron-toolkit/preload'
 import type { ProjectData } from '../shared/types/project'
 import { UPDATE_CHANNELS, type UpdateState } from '../shared/types/updates'
 import { CLOSE_GUARD_CHANNELS } from '../shared/types/close-guard'
+import type { BatchExportFile, ExportFormat } from '../shared/types/export'
 
 // Custom APIs for renderer
 const api = {
@@ -19,8 +20,8 @@ const api = {
       ipcRenderer.invoke('export:stl', stlData, suggestedName),
     threemf: (data: ArrayBuffer, suggestedName?: string) =>
       ipcRenderer.invoke('export:3mf', data, suggestedName),
-    batch: (files: Array<{ filename: string; data: ArrayBuffer }>) =>
-      ipcRenderer.invoke('export:batch', files)
+    batch: (files: BatchExportFile[], format: ExportFormat) =>
+      ipcRenderer.invoke('export:batch', files, format)
   },
   closeGuard: {
     /** Tell the main process whether closing the window would lose work. */

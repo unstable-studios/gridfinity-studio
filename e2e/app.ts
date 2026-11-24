@@ -90,8 +90,16 @@ export class StudioApp {
     }, response)
   }
 
-  /** How many times the "Save your changes?" question has been asked. */
-  async unsavedPromptCount(): Promise<number> {
+  /**
+   * Make the "Replace files?" question of a folder export answer itself. It is counted with
+   * the unsaved prompts, as both are the same native dialog.
+   */
+  async answerReplacePrompt(answer: 'replace' | 'cancel'): Promise<void> {
+    await this.answerUnsavedPrompt(answer === 'replace' ? 'save' : 'discard')
+  }
+
+  /** How many times a question has been asked: "Save your changes?" or "Replace files?". */
+  async promptCount(): Promise<number> {
     return this.electronApp.evaluate(
       () => (globalThis as { unsavedPrompts?: number }).unsavedPrompts ?? 0
     )

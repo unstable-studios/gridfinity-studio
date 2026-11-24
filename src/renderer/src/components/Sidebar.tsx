@@ -507,7 +507,8 @@ function PreviewSidebar(): React.JSX.Element {
   const engine = useLayoutEngine()
   const bakeResults = useProject((s) => s.bakeResults)
   const bakeStatus = useProject((s) => s.bakeStatus)
-  const { bins, selectedBins, chosen, scope, setScope, canExport, exportAs } = useExport()
+  const { bins, selectedBins, chosen, scope, setScope, files, setFiles, canExport, exportAs } =
+    useExport()
 
   const totalBins = bins.length
   const anyError = chosen.some((b) => bakeStatus.get(b.id) === 'error')
@@ -623,6 +624,22 @@ function PreviewSidebar(): React.JSX.Element {
                   Click bins in the list to export only those.
                 </p>
               )}
+              <ToggleGroup
+                type="single"
+                aria-label="Files to export"
+                className="flex w-full"
+                value={files}
+                onValueChange={(value) => {
+                  if (value === 'one' || value === 'perBin') setFiles(value)
+                }}
+              >
+                <ToggleGroupItem value="one" className="flex-1 justify-center">
+                  One file
+                </ToggleGroupItem>
+                <ToggleGroupItem value="perBin" className="flex-1 justify-center">
+                  File per bin
+                </ToggleGroupItem>
+              </ToggleGroup>
             </>
           )}
           <Button
