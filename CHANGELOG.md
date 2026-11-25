@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.18.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.3...v1.18.0) (2026-11-25)
+
+
+### Features
+
+* **ui:** add example projects to the welcome screen ([#542](https://github.com/unstable-studios/gridfinity-studio/issues/542)) ([bd387c0](https://github.com/unstable-studios/gridfinity-studio/commit/bd387c0c398812e20244c10a53a87d9475b60fd0))
+* **ui:** warn when a pocket is too close to the wall ([#540](https://github.com/unstable-studios/gridfinity-studio/issues/540)) ([cbd1cd5](https://github.com/unstable-studios/gridfinity-studio/commit/cbd1cd52b7c557c0d5edbd83ad84662bff083af1))
+
+
+### Documentation
+
+* license the project under MIT ([#536](https://github.com/unstable-studios/gridfinity-studio/issues/536)) ([0352c3e](https://github.com/unstable-studios/gridfinity-studio/commit/0352c3ecca7f4ea67ef6941e4327f6567d104da4))
+
+
+### Refactoring
+
+* remove the old bin mesh generator ([#538](https://github.com/unstable-studios/gridfinity-studio/issues/538)) ([647dd2a](https://github.com/unstable-studios/gridfinity-studio/commit/647dd2a65e23afcf5e254b291b0ffe2adbc16f71))
+
 ## [1.17.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.2...v1.17.3) (2026-11-24)
 
 
