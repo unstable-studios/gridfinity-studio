@@ -27,7 +27,7 @@ export default function ExportMenu({ className }: { className?: string }): React
           type="button"
           disabled={bins.length === 0}
           className={cn(
-            'inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition select-none outline-none hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:opacity-50 dark:focus-visible:ring-offset-zinc-950',
+            'inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white transition select-none outline-none enabled:hover:bg-blue-700 focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 disabled:opacity-50 dark:focus-visible:ring-offset-zinc-950',
             className
           )}
         >
@@ -36,7 +36,7 @@ export default function ExportMenu({ className }: { className?: string }): React
           <ChevronDownIcon className="size-3.5" />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-64 space-y-2 p-3">
+      <PopoverContent align="start" aria-label="Export" className="w-64 space-y-2 p-3">
         {bins.length > 1 && (
           <>
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
@@ -76,7 +76,7 @@ export default function ExportMenu({ className }: { className?: string }): React
         >
           Export STL…
         </Button>
-        {!canExport && (
+        {!canExport && bins.length > 0 && (
           <p className="text-[10px] text-zinc-500">
             {chosen.length === 0
               ? 'Check a bin in the list to export it.'
