@@ -1009,9 +1009,9 @@ test('the right-click menu resizes a bin, sets a depth and moves a pocket', asyn
   await app.expectShapeCount(1)
   expect((await saved()).shapes[0].groupId, 'the rectangle is a pocket').not.toBeNull()
 
-  // ── Bin: one unit wider, one unit taller.
+  // ── Bin: one column wider, one unit taller.
   await openMenu('Bin 1', 'Size')
-  await menuItem('Wider').click()
+  await menuItem('Add a column').click()
   await openMenu('Bin 1', 'Size')
   await menuItem('Taller').click()
   const [bin1] = (await saved()).groups
@@ -1037,6 +1037,7 @@ test('the right-click menu resizes a bin, sets a depth and moves a pocket', asyn
   await app.expectBinCount(2)
   await openMenu('Rectangle 1', 'Move to bin')
   // Its own bin is not somewhere to move it to.
+  await expect(menuItem('Bin 2')).toBeVisible()
   await expect(menuItem('Bin 1')).toHaveCount(0)
   await menuItem('Bin 2').click()
   let layout = await saved()

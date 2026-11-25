@@ -15,7 +15,10 @@ export interface SizeStep {
   enabled: boolean
 }
 
-/** One grid unit more or less each way, and one height unit up or down. */
+/**
+ * One grid unit more or less each way, and one height unit up or down. The ways along the
+ * grid are named as columns and rows: "deeper" would read as how deep a pocket is cut.
+ */
 export function sizeSteps(bin: BinMetadata): SizeStep[] {
   const step = (label: string, key: 'widthUnits' | 'depthUnits' | 'heightUnits', by: number) => ({
     label,
@@ -23,10 +26,10 @@ export function sizeSteps(bin: BinMetadata): SizeStep[] {
     enabled: bin[key] + by >= 1
   })
   return [
-    step('Wider', 'widthUnits', 1),
-    step('Narrower', 'widthUnits', -1),
-    step('Deeper', 'depthUnits', 1),
-    step('Shallower', 'depthUnits', -1),
+    step('Add a column', 'widthUnits', 1),
+    step('Remove a column', 'widthUnits', -1),
+    step('Add a row', 'depthUnits', 1),
+    step('Remove a row', 'depthUnits', -1),
     step('Taller', 'heightUnits', 1),
     step('Shorter', 'heightUnits', -1)
   ]
@@ -62,14 +65,22 @@ function around(boxes: Box[]): ShapeAABB {
   }
 }
 
-/** Moves that put `boxes`, arranged as they are, in the middle of `bin`. */
+/**
+ * Moves that put `boxes` in the middle of `bin`, arranged as they are. If together they are
+ * wider or taller than the bin, each goes to the middle on its own instead: a shape belongs
+ * to the bin its own middle is in, and arranged as they were some would land outside.
+ */
 export function movesIntoBin(boxes: Box[], bin: LayoutGroup): ShapeMove[] {
   if (boxes.length === 0) return []
-  const all = around(boxes)
   // A bin's x and y are its lower-left corner, and y grows downward.
-  const dx = bin.x + bin.width / 2 - (all.minX + all.maxX) / 2
-  const dy = bin.y - bin.height / 2 - (all.minY + all.maxY) / 2
-  return boxes.map(({ id }) => ({ id, dx, dy }))
+  const middle = { x: bin.x + bin.width / 2, y: bin.y - bin.height / 2 }
+  const to = (box: ShapeAABB): { dx: number; dy: number } => ({
+    dx: middle.x - (box.minX + box.maxX) / 2,
+    dy: middle.y - (box.minY + box.maxY) / 2
+  })
+  const all = around(boxes)
+  const fits = all.maxX - all.minX <= bin.width && all.maxY - all.minY <= bin.height
+  return boxes.map((box) => ({ id: box.id, ...to(fits ? all : box) }))
 }
 
 /**

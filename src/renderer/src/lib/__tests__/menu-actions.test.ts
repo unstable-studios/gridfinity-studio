@@ -29,10 +29,10 @@ describe('sizeSteps', () => {
 
   it('offers one unit more or less each way', () => {
     expect(steps(2, 3, 4).map(({ label, patch }) => [label, patch])).toEqual([
-      ['Wider', { widthUnits: 3 }],
-      ['Narrower', { widthUnits: 1 }],
-      ['Deeper', { depthUnits: 4 }],
-      ['Shallower', { depthUnits: 2 }],
+      ['Add a column', { widthUnits: 3 }],
+      ['Remove a column', { widthUnits: 1 }],
+      ['Add a row', { depthUnits: 4 }],
+      ['Remove a row', { depthUnits: 2 }],
       ['Taller', { heightUnits: 5 }],
       ['Shorter', { heightUnits: 3 }]
     ])
@@ -43,7 +43,7 @@ describe('sizeSteps', () => {
     const disabled = steps(1, 1, 1)
       .filter((step) => !step.enabled)
       .map((step) => step.label)
-    expect(disabled).toEqual(['Narrower', 'Shallower', 'Shorter'])
+    expect(disabled).toEqual(['Remove a column', 'Remove a row', 'Shorter'])
   })
 })
 
@@ -76,6 +76,15 @@ describe('movesIntoBin', () => {
     expect(moves).toEqual([
       { id: 's', dx: 22, dy: 37 },
       { id: 't', dx: 22, dy: 37 }
+    ])
+  })
+
+  it('puts each shape in the middle on its own when together they do not fit', () => {
+    // 100 apart on an 84 mm bin: arranged as they are, both would land outside it.
+    const moves = movesIntoBin([box('s', 0, 0, 10, 10), box('t', 100, 0, 110, 10)], bin('b', 0, 84))
+    expect(moves).toEqual([
+      { id: 's', dx: 37, dy: 37 },
+      { id: 't', dx: -63, dy: 37 }
     ])
   })
 
