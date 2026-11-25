@@ -129,7 +129,7 @@ Renovate keeps dependencies current (`renovate.json`): update PRs wait until a r
 ## Tech Stack
 
 - **Runtime**: Electron 45, Node v24 (pinned by `devEngines.runtime`; pnpm downloads it and runs scripts with it), pnpm
-- **Frontend**: React 19, Tailwind CSS 4, Shadcn/ui, Headless UI
+- **Frontend**: React 19, Tailwind CSS 4, Shadcn/ui
 - **2D Canvas**: Konva 10 (imperative), behind the LayoutEngine interface
 - **3D Preview**: Three.js via @react-three/fiber and @react-three/drei
 - **CSG**: Manifold (WASM) for solid geometry
