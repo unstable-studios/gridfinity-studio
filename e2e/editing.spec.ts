@@ -918,3 +918,60 @@ test('a click takes the smallest shape under the pointer', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('the history lists each step by what it did, and goes to the one clicked', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const panel = page.getByRole('region', { name: 'History' })
+  const steps = panel.locator('ol button')
+  const step = (name: string): ReturnType<typeof panel.getByRole> =>
+    panel.getByRole('button', { name, exact: true })
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(1)
+  await page.getByRole('button', { name: '1×1', exact: true }).first().click()
+  await app.expectBinCount(2)
+
+  // Newest first, each named for what it did, with the latest marked as where things are.
+  await expect(panel).toHaveCount(0)
+  await page.getByRole('button', { name: 'History', exact: true }).click()
+  await expect(steps).toHaveText(['Add Bin 2', 'Add rectangle', 'Add Bin 1', 'Start'])
+  await expect(step('Add Bin 2')).toHaveAttribute('aria-current', 'step')
+
+  // Back two steps at once. The steps after it stay, marked as undone.
+  await step('Add Bin 1').click()
+  await app.expectBinCount(1)
+  await app.expectShapeCount(0)
+  await expect(step('Add Bin 1')).toHaveAttribute('aria-current', 'step')
+  await expect(steps).toHaveText(['Add Bin 2Undone', 'Add rectangleUndone', 'Add Bin 1', 'Start'])
+
+  // Forward again to the newest.
+  await steps.first().click()
+  await app.expectBinCount(2)
+  await app.expectShapeCount(1)
+  await expect(steps).toHaveText(['Add Bin 2', 'Add rectangle', 'Add Bin 1', 'Start'])
+
+  // Undo from the keyboard moves the mark, and the list follows.
+  await page.keyboard.press('ControlOrMeta+z')
+  await expect(step('Add rectangle')).toHaveAttribute('aria-current', 'step')
+
+  // Back to the start, then a new change: the steps that were undone are gone.
+  await step('Start').click()
+  await app.expectBinCount(0)
+  await page.getByRole('button', { name: '1×1', exact: true }).first().click()
+  await app.expectBinCount(1)
+  await expect(steps).toHaveText(['Add Bin 1', 'Start'])
+
+  // The Edit menu hides it and shows it again.
+  await app.menu('Edit', 'Hide history')
+  await expect(panel).toHaveCount(0)
+  await app.menu('Edit', 'Show history')
+  await expect(panel).toBeVisible()
+  await panel.getByRole('button', { name: 'Close history' }).click()
+  await expect(panel).toHaveCount(0)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})

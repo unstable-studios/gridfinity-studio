@@ -92,7 +92,7 @@ The `LayoutEngine` interface abstracts all 2D canvas operations. Konva is the on
 | `bin-artwork.ts` | Generates bin decorations (grid lines, screw holes, magnet holes) |
 | `useLayoutEngine.ts` | React hook — reactive engine state via useSyncExternalStore |
 | `useProjectEngineSync.ts` | Syncs engine ↔ project store on save/load |
-| `useEngineUndoRedo.ts` | Snapshot-based undo/redo |
+| `useEngineUndoRedo.ts` | Snapshot-based undo/redo. Each step is named by `lib/describe-change.ts` from the layout before and after it, for the History panel |
 | `LayoutEngineContext.tsx` | React context provider |
 
 **Coordinate convention**: `LayoutGroup.x/y` is the **lower-left corner** (smallest x, largest y in screen coords). Engines use center-based coords internally and convert at the boundary.

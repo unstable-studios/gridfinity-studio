@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
 import { flushPendingCommits } from '@/lib/pending-commits'
+import { describeChange } from '@/lib/describe-change'
 import { UndoRedoStack } from './undo-redo-stack'
-import type { UndoRedoDebugState } from './undo-redo-stack'
+import type { UndoHistory } from './undo-redo-stack'
 import type { LayoutEngine } from './interface'
-
-export type { UndoEntry, UndoRedoDebugState } from './undo-redo-stack'
+import type { LayoutSnapshot } from './types'
 
 /**
  * Engine-snapshot-based undo/redo.
@@ -19,34 +19,33 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
   redo: () => void
   canUndo: boolean
   canRedo: boolean
-  debugState: UndoRedoDebugState
 } {
   const stackRef = useRef(new UndoRedoStack())
   const isUndoingRef = useRef(false)
   const [canUndo, setCanUndo] = useState(false)
   const [canRedo, setCanRedo] = useState(false)
-  const [debugState, setDebugState] = useState<UndoRedoDebugState>({
-    undoStack: [],
-    redoStack: [],
-    cursor: -1
-  })
+  const [history, setHistory] = useState<UndoHistory>({ labels: [], current: -1 })
 
   const syncState = useCallback(() => {
     const s = stackRef.current
     setCanUndo(s.canUndo)
     setCanRedo(s.canRedo)
-    setDebugState(s.debugState)
+    setHistory(s.history)
   }, [])
 
-  const pushSnapshot = useCallback(
-    (label: string) => {
-      if (!engine || isUndoingRef.current) return
-      const json = JSON.stringify(engine.toSnapshot())
-      stackRef.current.push(json, label)
-      syncState()
-    },
-    [engine, syncState]
-  )
+  const pushSnapshot = useCallback(() => {
+    if (!engine || isUndoingRef.current) return
+    const snapshot = engine.toSnapshot()
+    const json = JSON.stringify(snapshot)
+    const before = stackRef.current.currentJson
+    // Several events can report one change. The stack keeps the first and drops the rest,
+    // so only a snapshot that differs needs a name.
+    if (before === json) return
+    // The step is named for what it did, whichever event reported it.
+    const label = before ? describeChange(JSON.parse(before) as LayoutSnapshot, snapshot) : ''
+    stackRef.current.push(json, label)
+    syncState()
+  }, [engine, syncState])
 
   const undo = useCallback(() => {
     if (!engine) return
@@ -69,6 +68,19 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     isUndoingRef.current = false
   }, [engine, syncState])
 
+  const goTo = useCallback(
+    (index: number) => {
+      if (!engine) return
+      flushPendingCommits()
+      isUndoingRef.current = true
+      const json = stackRef.current.goTo(index)
+      if (json) engine.loadSnapshot(JSON.parse(json))
+      syncState()
+      isUndoingRef.current = false
+    },
+    [engine, syncState]
+  )
+
   const reset = useCallback(() => {
     if (!engine) return
     stackRef.current.init(JSON.stringify(engine.toSnapshot()))
@@ -77,8 +89,8 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
 
   // Sync state to zustand store so Navbar and useProjectEngineSync can use it
   useEffect(() => {
-    useUndoRedo.setState({ canUndo, canRedo, undo, redo, reset })
-  }, [canUndo, canRedo, undo, redo, reset])
+    useUndoRedo.setState({ canUndo, canRedo, undo, redo, reset, history, goTo })
+  }, [canUndo, canRedo, undo, redo, reset, history, goTo])
 
   // Initialize baseline snapshot when engine mounts
   useEffect(() => {
@@ -92,16 +104,17 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
   useEffect(() => {
     if (!engine) return
 
-    const unsubs = [
-      engine.on('shapeMoved', () => pushSnapshot('shapeMoved')),
-      engine.on('shapeResized', () => pushSnapshot('shapeResized')),
-      engine.on('groupMoved', () => pushSnapshot('groupMoved')),
-      engine.on('groupResized', () => pushSnapshot('groupResized')),
-      engine.on('shapeCreated', () => pushSnapshot('shapeCreated')),
-      engine.on('shapeDeleted', () => pushSnapshot('shapeDeleted')),
-      engine.on('shapeUpdated', () => pushSnapshot('shapeUpdated')),
-      engine.on('groupChanged', () => pushSnapshot('groupChanged'))
-    ]
+    const events = [
+      'shapeMoved',
+      'shapeResized',
+      'groupMoved',
+      'groupResized',
+      'shapeCreated',
+      'shapeDeleted',
+      'shapeUpdated',
+      'groupChanged'
+    ] as const
+    const unsubs = events.map((event) => engine.on(event, pushSnapshot))
 
     return () => {
       unsubs.forEach((u) => u())
@@ -130,5 +143,5 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     return () => window.removeEventListener('keydown', handler)
   }, [engine, undo, redo])
 
-  return { undo, redo, canUndo, canRedo, debugState }
+  return { undo, redo, canUndo, canRedo }
 }

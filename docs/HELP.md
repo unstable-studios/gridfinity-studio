@@ -33,7 +33,7 @@ Select a pocket to set its depth, size and position. A pocket drawn too close to
 - Right-click a bin or pocket for cut, copy, paste, rename and delete. On a bin the menu also turns its stacking lip on or off and adds an empty bin beside it. On pockets it also aligns and distributes them. On empty canvas it adds a bin there and resets the view.
 - Scroll to zoom, and drag with the middle button to pan.
 
-**Edit > Undo** and **Redo** step through every change.
+**Edit > Undo** and **Redo** step through every change. **History**, in the corner of the canvas, lists the steps by what they did. Click one to go straight to it; the steps after it stay until you make a new change.
 
 ## Preview
 
