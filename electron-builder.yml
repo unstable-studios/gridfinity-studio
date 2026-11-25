@@ -1,5 +1,7 @@
 appId: com.unstablestudios.gridfinity-studio
-productName: gridfinity-studio
+# The name people see. File names, the install folder and the data folder come from `name`
+# in package.json, so they stay `gridfinity-studio`.
+productName: Gridfinity Studio
 directories:
   buildResources: build
 files:
@@ -11,7 +13,7 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   # The app runs from `out/`, `resources/`, `node_modules/` and `package.json`. Nothing else
   # in the repo belongs in an installer: planning notes, tests, docs and tool settings.
-  - '!{docs,specs,e2e,.specify,.claude,.github,.husky}/**'
+  - '!{docs,specs,e2e,scripts,.specify,.claude,.github,.husky}/**'
   - '!{CLAUDE.md,CONTRIBUTING.md,components.json,renovate.json,pnpm-workspace.yaml}'
   - '!{playwright.config.ts,vitest.config.mts,vite.config.ts,commitlint.config.mjs}'
   - '!{.actrc,.nvmrc,.editorconfig,.release-please-config.json,.release-please-manifest.json}'
@@ -25,6 +27,8 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  # The zip the updater downloads. Its default name starts with productName.
+  artifactName: ${name}-${version}-${arch}-mac.${ext}
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.

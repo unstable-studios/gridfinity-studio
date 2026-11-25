@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2B2D3A"/>
+      <stop offset="1" stop-color="#17181F"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F0386B"/>
+      <stop offset="1" stop-color="#D01646"/>
+    </linearGradient>
+    <mask id="holes">
+      <rect x="164" y="164" width="696" height="696" rx="65" fill="#fff"/>
+      <circle cx="297" cy="297" r="67" fill="#000"/>
+      <circle cx="727" cy="297" r="67" fill="#000"/>
+      <circle cx="297" cy="727" r="67" fill="#000"/>
+      <circle cx="727" cy="727" r="67" fill="#000"/>
+    </mask>
+  </defs>
+  <rect width="1024" height="1024" rx="229" fill="url(#tile)"/>
+  <rect x="4" y="4" width="1016" height="1016" rx="225" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="8"/>
+  <rect x="164" y="164" width="696" height="696" fill="url(#mark)" mask="url(#holes)"/>
+</svg>
