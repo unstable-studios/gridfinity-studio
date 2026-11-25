@@ -177,50 +177,104 @@ describe('UndoRedoStack', () => {
     expect(stack.undo()).toBeNull() // A is gone
   })
 
-  // ─── Debug state ───────────────────────────────────────────────────────────
+  // ─── History ───────────────────────────────────────────────────────────────
 
-  it('debugState reflects current stack state', () => {
+  it('lists every step oldest first, with redo steps after the current one', () => {
     const stack = new UndoRedoStack()
     stack.init('A')
-    stack.push('B', 'shapeMoved')
-    stack.push('C', 'shapeResized')
+    stack.push('B', 'Add bin')
+    stack.push('C', 'Move bin')
+    stack.push('D', 'Delete bin')
+    stack.undo()
     stack.undo()
 
-    const state = stack.debugState
-    expect(state.undoStack).toHaveLength(2)
-    expect(state.redoStack).toHaveLength(1)
-    expect(state.cursor).toBe(1)
-    expect(state.undoStack[0].label).toBe('initial')
-    expect(state.undoStack[1].label).toBe('shapeMoved')
-    expect(state.redoStack[0].label).toBe('shapeResized')
+    expect(stack.history).toEqual({
+      labels: ['Start', 'Add bin', 'Move bin', 'Delete bin'],
+      current: 1
+    })
   })
 
-  it('debugState returns copies (mutation-safe)', () => {
-    const stack = new UndoRedoStack()
-    stack.init('A')
-    stack.push('B', 'shapeMoved')
-
-    const state = stack.debugState
-    state.undoStack.pop()
-    expect(stack.debugState.undoStack).toHaveLength(2) // unchanged
+  it('has no steps before it is given a start', () => {
+    expect(new UndoRedoStack().history).toEqual({ labels: [], current: -1 })
   })
 
-  // ─── Labels ────────────────────────────────────────────────────────────────
-
-  it('preserves labels through undo/redo cycles', () => {
+  it('keeps labels through undo and redo', () => {
     const stack = new UndoRedoStack()
     stack.init('A')
-    stack.push('B', 'shapeMoved')
-    stack.push('C', 'shapeResized')
+    stack.push('B', 'Add bin')
+    stack.push('C', 'Move bin')
+    stack.undo()
+    stack.undo()
+    stack.redo()
+    stack.redo()
 
-    stack.undo() // at B, redo has shapeResized
-    stack.undo() // at A, redo has shapeMoved, shapeResized
-    stack.redo() // at B
-    stack.redo() // at C
+    expect(stack.history).toEqual({ labels: ['Start', 'Add bin', 'Move bin'], current: 2 })
+  })
 
-    const state = stack.debugState
-    expect(state.undoStack.map((e) => e.label)).toEqual(['initial', 'shapeMoved', 'shapeResized'])
-    expect(state.redoStack).toHaveLength(0)
+  // ─── Going straight to a step ──────────────────────────────────────────────
+
+  it('goes back several steps at once', () => {
+    const stack = new UndoRedoStack()
+    stack.init('A')
+    stack.push('B', 'one')
+    stack.push('C', 'two')
+    stack.push('D', 'three')
+
+    expect(stack.goTo(1)).toBe('B')
+    expect(stack.history).toEqual({ labels: ['Start', 'one', 'two', 'three'], current: 1 })
+    expect(stack.canUndo).toBe(true)
+    expect(stack.canRedo).toBe(true)
+    // Undo and redo carry on from there.
+    expect(stack.redo()).toBe('C')
+    expect(stack.undo()).toBe('B')
+    expect(stack.undo()).toBe('A')
+  })
+
+  it('goes forward several steps at once, and to either end', () => {
+    const stack = new UndoRedoStack()
+    stack.init('A')
+    stack.push('B', 'one')
+    stack.push('C', 'two')
+    stack.push('D', 'three')
+
+    expect(stack.goTo(0)).toBe('A')
+    expect(stack.canUndo).toBe(false)
+    expect(stack.goTo(3)).toBe('D')
+    expect(stack.canRedo).toBe(false)
+    expect(stack.goTo(2)).toBe('C')
+    expect(stack.history.current).toBe(2)
+  })
+
+  it('does nothing for the current step or a step that is not there', () => {
+    const stack = new UndoRedoStack()
+    stack.init('A')
+    stack.push('B', 'one')
+
+    for (const index of [1, -1, 2, 0.5, NaN]) {
+      expect(stack.goTo(index), String(index)).toBeNull()
+      expect(stack.history.current).toBe(1)
+    }
+  })
+
+  it('drops the steps after the one gone back to when a new change is made', () => {
+    const stack = new UndoRedoStack()
+    stack.init('A')
+    stack.push('B', 'one')
+    stack.push('C', 'two')
+    stack.goTo(0)
+    stack.push('X', 'other')
+
+    expect(stack.history).toEqual({ labels: ['Start', 'other'], current: 1 })
+  })
+
+  it('knows the snapshot the layout is at', () => {
+    const stack = new UndoRedoStack()
+    expect(stack.currentJson).toBeNull()
+    stack.init('A')
+    stack.push('B', 'one')
+    expect(stack.currentJson).toBe('B')
+    stack.undo()
+    expect(stack.currentJson).toBe('A')
   })
 
   // ─── Rapid undo/redo (stress) ──────────────────────────────────────────────
@@ -255,7 +309,7 @@ describe('UndoRedoStack', () => {
     stack.init('X')
     expect(stack.canUndo).toBe(false)
     expect(stack.canRedo).toBe(false)
-    expect(stack.debugState.undoStack).toHaveLength(1)
-    expect(stack.debugState.undoStack[0].json).toBe('X')
+    expect(stack.history).toEqual({ labels: ['Start'], current: 0 })
+    expect(stack.currentJson).toBe('X')
   })
 })

@@ -131,7 +131,14 @@ function AppMenubar({
 }) {
   const { project, saveProject, saveProjectAs, loadProject, recentProjects, loadRecentProjects } =
     useProject()
-  const { undo, redo, canUndo, canRedo } = useUndoRedo()
+  // One value at a time: the store's history changes with every edit, which the menus do
+  // not need to follow.
+  const undo = useUndoRedo((s) => s.undo)
+  const redo = useUndoRedo((s) => s.redo)
+  const canUndo = useUndoRedo((s) => s.canUndo)
+  const canRedo = useUndoRedo((s) => s.canRedo)
+  const historyOpen = useUndoRedo((s) => s.historyOpen)
+  const { mode } = useAppMode()
   const edit = useEditShortcuts()
   useCloseGuard()
   const { state: updateState, installNow, check: checkForUpdates } = useAppUpdate()
@@ -245,6 +252,12 @@ function AppMenubar({
             <MenubarItem disabled={!canRedo} onSelect={redo}>
               Redo
               <MenubarShortcut>{MOD_KEY}+Shift+Z</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem
+              disabled={mode !== 'layout'}
+              onSelect={() => useUndoRedo.setState({ historyOpen: !historyOpen })}
+            >
+              {historyOpen ? 'Hide history' : 'Show history'}
             </MenubarItem>
             <MenubarSeparator />
             <MenubarItem disabled={!edit.canCopy} onSelect={edit.cut}>
