@@ -725,8 +725,9 @@ test('right-click a bin or shape for its menu', async () => {
   // On empty canvas nothing is selected, so only what needs no selection is offered.
   await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
   await expect(selectedRows).toHaveCount(0)
-  await expect(menuItem('Rename')).toBeDisabled()
-  await expect(menuItem('Delete')).toBeDisabled()
+  await expect(menuItem('Paste')).toBeVisible()
+  await expect(menuItem('Rename')).toHaveCount(0)
+  await expect(menuItem('Delete')).toHaveCount(0)
   await menuItem('Select all').click()
   await expect(row('Bin 1')).toHaveAttribute('aria-pressed', 'true')
 
@@ -760,6 +761,120 @@ test('right-click a bin or shape for its menu', async () => {
   await app.drag({ x: 420, y: 620 }, { x: 440, y: 640 })
   const after = (await app.save(file)).layoutSnapshot.shapes.find((s) => s.id === before.id)!
   expect(after.x, 'the pocket moved').not.toBe(before.x)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
+test('the right-click menu changes with what is under it', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+  const menuItem = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('menuitem', { name, exact: true })
+  const lip = page.getByRole('menuitemcheckbox', { name: 'Stacking lip' })
+  const emptyCanvas = { x: 900, y: 250 }
+  const file = join(app.dir, 'menu-target.gfstudio')
+  /** The bins as saved, with what the menu changes about them. */
+  const bins = async (): Promise<
+    Array<{ x: number; y: number; width: number; height: number; hasLip: boolean }>
+  > => {
+    const saved = (await app.save(file)) as unknown as {
+      layoutSnapshot: {
+        groups: Array<{
+          x: number
+          y: number
+          width: number
+          height: number
+          metadata: { hasLip: boolean }
+        }>
+      }
+    }
+    return saved.layoutSnapshot.groups.map(({ x, y, width, height, metadata }) => ({
+      x,
+      y,
+      width,
+      height,
+      hasLip: metadata.hasLip
+    }))
+  }
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.expectBinCount(1)
+  const [first] = await bins()
+
+  // ── Empty canvas: a bin where the pointer is, and the view. Nothing that needs a selection.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y)
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(menuItem('Reset view')).toBeVisible()
+  await expect(menuItem('Rename')).toHaveCount(0)
+  await expect(menuItem('Cut')).toHaveCount(0)
+  await expect(lip).toHaveCount(0)
+  await menuItem('Add bin here').click()
+  await app.expectBinCount(2)
+  const here = (await bins())[1]
+  expect({ width: here.width, height: here.height }, 'one grid square').toEqual({
+    width: 42,
+    height: 42
+  })
+  expect(here.x % 42, 'on the grid').toBe(0)
+  expect(here.y % 42, 'on the grid').toBe(0)
+
+  // The same square is now taken.
+  await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
+  await expect(lip, 'the right-click selected the new bin').toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // ── A bin, from its row: its stacking lip, and an empty bin beside it. No "here".
+  await row('Bin 1').click({ button: 'right' })
+  await expect(menuItem('Add bin here')).toHaveCount(0)
+  await expect(menuItem('Reset view')).toHaveCount(0)
+  await expect(lip).toBeChecked()
+  await lip.click()
+  expect((await bins())[0].hasLip, 'lip turned off').toBe(false)
+
+  await row('Bin 1').click({ button: 'right' })
+  await expect(lip).not.toBeChecked()
+  await menuItem('Add bin beside').click()
+  await app.expectBinCount(3)
+  expect((await bins())[2], 'same size, against the right edge, like the bin it is beside').toEqual(
+    {
+      x: first.x + first.width,
+      y: first.y,
+      width: first.width,
+      height: first.height,
+      hasLip: false
+    }
+  )
+
+  // ── Shapes: align and distribute. Three rectangles of one size, each further right.
+  const starts = [
+    { x: 700, y: 420 },
+    { x: 740, y: 500 },
+    { x: 780, y: 580 }
+  ]
+  for (const start of starts) {
+    await app.selectTool('Rectangle')
+    await app.drag(start, { x: start.x + 60, y: start.y + 40 })
+  }
+  await app.expectShapeCount(3)
+  const shapeXs = async (): Promise<number[]> =>
+    (await app.save(file)).layoutSnapshot.shapes.map((shape) => shape.x)
+  const before = await shapeXs()
+  expect(new Set(before).size, 'they start apart').toBe(3)
+
+  await row('Rectangle 1').click()
+  await row('Rectangle 3').click({ modifiers: ['Shift'] })
+  // A right-click on one of the selected shapes keeps all three selected.
+  await page.mouse.click(starts[0].x + 30, starts[0].y + 20, { button: 'right' })
+  await expect(lip).toHaveCount(0)
+  await menuItem('Arrange').hover()
+  await expect(menuItem('Distribute vertically')).toBeVisible()
+  await menuItem('Align left').click()
+  const after = await shapeXs()
+  expect(new Set(after.map((x) => Math.round(x * 100))).size, 'left edges line up').toBe(1)
+  expect(after[0], 'to the leftmost one').toBeCloseTo(Math.min(...before), 5)
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
