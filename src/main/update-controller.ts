@@ -34,11 +34,23 @@ export const CHECK_TIMEOUT_MS = 2 * 60 * 1000
 /** How long a download may go without progress before it counts as failed. */
 export const DOWNLOAD_STALL_MS = 10 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
+/** How soon to look again when the newest release has no installers yet. They take minutes. */
+export const PREPARING_RETRY_MS = 5 * 60 * 1000
+
+/**
+ * Whether a failed check only means the newest release has no update file yet. The updater
+ * gives this code when the file is missing (HTTP 404), and for nothing else: a release is
+ * published a few minutes before its installers are attached.
+ */
+function isReleaseStillBuilding(err: unknown): boolean {
+  return (err as { code?: unknown } | null)?.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND'
+}
 
 export function createUpdateController(options: UpdateControllerOptions): UpdateController {
   const { updater, active, onState, logError } = options
   let state: UpdateState = active ? IDLE_STATE : { kind: 'unavailable' }
   let stalled: ReturnType<typeof setTimeout> | null = null
+  let retry: ReturnType<typeof setTimeout> | null = null
 
   /**
    * The updater has no time limit of its own under Electron. Without one, a request that
@@ -64,7 +76,19 @@ export function createUpdateController(options: UpdateControllerOptions): Update
   const set = (next: UpdateState): void => {
     state = next
     watch()
+    if (retry) clearTimeout(retry)
+    // The installers are on their way: look again soon, not at the next hourly check.
+    retry = next.kind === 'preparing' ? setTimeout(() => check(), PREPARING_RETRY_MS) : null
     onState(next)
+  }
+
+  /** What a failed check or download becomes. */
+  const fail = (err: unknown): void => {
+    if (isReleaseStillBuilding(err)) {
+      set({ kind: 'preparing' })
+    } else {
+      set({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
+    }
   }
 
   updater.on('checking-for-update', () => set({ kind: 'checking' }))
@@ -81,10 +105,10 @@ export function createUpdateController(options: UpdateControllerOptions): Update
   })
   updater.on('error', (err: Error) => {
     logError('[autoUpdater]', err)
-    set({ kind: 'error', message: err?.message ?? String(err) })
+    fail(err)
   })
 
-  const check = (): void => {
+  function check(): void {
     if (!active || !canCheckForUpdates(state)) return
     // Say so at once: the updater's first report can take a moment.
     set({ kind: 'checking' })
@@ -98,9 +122,7 @@ export function createUpdateController(options: UpdateControllerOptions): Update
         // The updater reports an error before it rejects, so this is usually already
         // shown. It is here so a rejection alone can never leave "Checking" on screen.
         logError('[autoUpdater] check failed', err)
-        if (state.kind === 'checking') {
-          set({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
-        }
+        if (state.kind === 'checking') fail(err)
       }
     )
   }
@@ -114,6 +136,7 @@ export function createUpdateController(options: UpdateControllerOptions): Update
       return () => {
         clearInterval(hourly)
         if (stalled) clearTimeout(stalled)
+        if (retry) clearTimeout(retry)
       }
     }
   }
