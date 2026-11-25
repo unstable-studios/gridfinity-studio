@@ -32,14 +32,15 @@ All lengths are in millimeters.
 
 Settings for every bin in the project.
 
-| Field         | Type   | Default       | Notes                                                                                                                                      |
-| ------------- | ------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `baseUnit`    | number | 42            | Size of one grid square. Greater than 0.                                                                                                   |
-| `gridSpacing` | number | 42            | Kept equal to `baseUnit`.                                                                                                                  |
-| `unitHeight`  | number | 7             | Height of one height unit. Greater than 0.                                                                                                 |
-| `tolerance`   | number | 0.5           | Gap left on each side of a bin: a 1×1 bin is `baseUnit - 2 × tolerance` wide. The presets are 0.5 (standard), 0.6 (loose) and 0.3 (tight). |
-| `magnetHoles` | object | on, 6.5 × 2.4 | `enabled`, `diameter`, `depth`.                                                                                                            |
-| `screwHoles`  | object | off, 3 × 6    | `enabled`, `diameter`, `depth`.                                                                                                            |
+| Field         | Type   | Default       | Notes                                                                                                                                                      |
+| ------------- | ------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `baseUnit`    | number | 42            | Size of one grid square. Greater than 0.                                                                                                                   |
+| `gridSpacing` | number | 42            | Kept equal to `baseUnit`.                                                                                                                                  |
+| `unitHeight`  | number | 7             | Height of one height unit. Greater than 0.                                                                                                                 |
+| `tolerance`   | number | 0.5           | Gap left on each side of a bin: a 1×1 bin is `baseUnit - 2 × tolerance` wide. The presets are 0.5 (standard), 0.6 (loose) and 0.3 (tight).                 |
+| `magnetHoles` | object | on, 6.5 × 2.4 | `enabled`, `diameter`, `depth`.                                                                                                                            |
+| `screwHoles`  | object | off, 3 × 6    | `enabled`, `diameter`, `depth`.                                                                                                                            |
+| `newBin`      | object | 3 high, lip   | Optional. What a bin added to the project starts with: `heightUnits` (a whole number, 1 or more) and `hasLip`. Bins already in the project keep their own. |
 
 ## `layoutSnapshot`
 
@@ -197,7 +198,7 @@ The bin's lower-left corner is at (0, 0), so it covers x from 0 to 84 and y from
 - The four top-level fields exist.
 - `schemaVersion` is three numbers, such as `0.5.0`.
 - `settings`: a name, two dates as text, and a known unit.
-- `gridfinity`: the four numbers, with `baseUnit`, `gridSpacing` and `unitHeight` greater than 0, and both hole settings.
+- `gridfinity`: the four numbers, with `baseUnit`, `gridSpacing` and `unitHeight` greater than 0, both hole settings, and `newBin` if it is there.
 - `layoutSnapshot`: `version` is text, `gridConfig` has a size greater than 0 and its two switches, and `shapes` and `groups` are lists.
 - Every bin and shape has an id, and no id is used twice.
 - Positions, sizes and rotations are numbers. A shape has a known `type` and the fields that type needs.

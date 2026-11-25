@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { StudioApp } from './app'
 
@@ -42,6 +43,84 @@ test('base unit is locked while the project has bins', async () => {
   await expect(baseUnit).toBeEnabled()
 
   expect(app.errors).toEqual([])
+})
+
+test('new bins start with the project defaults, and new projects with the saved ones', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const openGridfinitySettings = async (): Promise<void> => {
+    await app.menu('Edit', /^Preferences/)
+    await page.getByRole('tab', { name: 'Gridfinity' }).click()
+  }
+  const panel = page.getByRole('tabpanel')
+  const newBinHeight = panel.getByRole('spinbutton', { name: 'Height', exact: true })
+  const newBinLip = panel.getByRole('switch').last()
+  const useForNew = panel.getByRole('button', { name: 'Use for new projects' })
+  const addBin = async (): Promise<void> => {
+    await page.getByRole('button', { name: '1×1', exact: true }).first().click()
+  }
+  /** Each bin's height and lip, and the project's defaults for new bins, as saved. */
+  const saved = async (
+    file: string
+  ): Promise<{ bins: Array<{ heightUnits: number; hasLip: boolean }>; newBin: unknown }> => {
+    const project = (await app.save(join(app.dir, file))) as unknown as {
+      gridfinity: { newBin?: unknown }
+      layoutSnapshot: { groups: Array<{ metadata: { heightUnits: number; hasLip: boolean } }> }
+    }
+    return {
+      bins: project.layoutSnapshot.groups.map(({ metadata }) => ({
+        heightUnits: metadata.heightUnits,
+        hasLip: metadata.hasLip
+      })),
+      newBin: project.gridfinity.newBin
+    }
+  }
+
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // A bin starts 3 units high with a lip until the project says otherwise.
+  await addBin()
+  await app.expectBinCount(1)
+
+  await openGridfinitySettings()
+  await expect(newBinHeight).toHaveValue('3')
+  await expect(useForNew).toBeDisabled()
+  await expect(panel.getByText('New projects start with these settings.')).toBeVisible()
+  await newBinHeight.fill('6')
+  await newBinLip.click()
+  await expect(useForNew).toBeEnabled()
+  await expect(panel.getByText('New projects start with different settings.')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // The next bin has them, the first bin keeps its own, and the project file has both.
+  await addBin()
+  await app.expectBinCount(2)
+  expect(await saved('first.gfstudio')).toEqual({
+    bins: [
+      { heightUnits: 3, hasLip: true },
+      { heightUnits: 6, hasLip: false }
+    ],
+    newBin: { heightUnits: 6, hasLip: false }
+  })
+
+  // Kept as the defaults, a new project starts with them.
+  await openGridfinitySettings()
+  await useForNew.click()
+  await expect(useForNew).toBeDisabled()
+  await expect(panel.getByText('New projects start with these settings.')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  await app.menu('File', 'New project')
+  await page.getByRole('button', { name: 'Create' }).click()
+  await app.expectBinCount(0)
+  await addBin()
+  await app.expectBinCount(1)
+  expect(await saved('second.gfstudio')).toEqual({
+    bins: [{ heightUnits: 6, hasLip: false }],
+    newBin: { heightUnits: 6, hasLip: false }
+  })
+
+  expect(app.errors, 'no renderer errors').toEqual([])
 })
 
 test('the user guide and the About dialog open from the Help menu', async () => {

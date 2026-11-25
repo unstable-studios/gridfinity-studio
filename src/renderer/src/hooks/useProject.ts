@@ -12,6 +12,7 @@
 import { create } from 'zustand'
 import { CURRENT_SCHEMA_VERSION, createEmptyProject } from '../../../shared/types/project'
 import { repairProject } from '../../../shared/validation/project-validator'
+import { loadNewProjectDefaults } from '@/lib/new-project-defaults'
 import type {
   ProjectData,
   GlobalSettings,
@@ -253,10 +254,15 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     },
 
     createNewProject: (config) => {
-      const project = createEmptyProject(config?.name ?? 'Untitled project')
+      // A new project starts with the person's saved defaults, or the app's.
+      const project = createEmptyProject(
+        config?.name ?? 'Untitled project',
+        loadNewProjectDefaults()
+      )
       if (config?.baseUnit) {
         project.gridfinity.baseUnit = config.baseUnit
         project.gridfinity.gridSpacing = config.baseUnit
+        project.layoutSnapshot.gridConfig.size = config.baseUnit
       }
       if (config?.tolerance !== undefined) {
         project.gridfinity.tolerance = config.tolerance

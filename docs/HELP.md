@@ -4,7 +4,7 @@ Design Gridfinity bins with pockets shaped for your tools, check them in 3D, and
 
 ## Start a project
 
-Choose **New project** on the welcome screen to start with the usual settings, or **File > New project** to set a name, a base unit and a tolerance first. The welcome screen also has three examples to open and change.
+Choose **New project** on the welcome screen to start right away, or **File > New project** to set a name, a base unit and a tolerance first. The welcome screen also has three examples to open and change.
 
 Work is saved as a `.gfstudio` file. **File > Save** saves it, and the **Unsaved** mark in the top bar does the same.
 
@@ -52,7 +52,11 @@ With more than one bin:
 
 ## Project settings
 
-Tolerance, unit height, and magnet and screw holes are set per project in **Edit > Preferences…**. The base unit can be changed there only while the project has no bins.
+Tolerance, unit height, and magnet and screw holes are set per project in **Edit > Preferences…**, under **Gridfinity**. The base unit can be changed there only while the project has no bins.
+
+**New bins** sets the height and stacking lip a bin starts with. Bins already in the project keep their own.
+
+**Use for new projects** keeps the project's settings as what every new project starts with. Preferences shows the app's settings under **App** and the project's under **This project**.
 
 ## Updates
 
