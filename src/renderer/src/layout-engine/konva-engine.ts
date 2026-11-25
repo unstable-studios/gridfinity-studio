@@ -316,34 +316,46 @@ export class KonvaEngine implements LayoutEngine {
   }
 
   /**
-   * Rects and ellipses take a resize as a new size, not a scale, so they stay crisp and
-   * corner radii don't distort. Polygons and paths are vector shapes and keep their scale.
-   */
-  /**
    * Put the shapes in `parent` (a bin, or the layer for loose shapes) largest at the bottom,
-   * so the smallest shape under the pointer is the one a click or drag takes. Only shapes
-   * trade places: bins, a bin's background and its artwork stay where they are.
+   * so the smallest shape under the pointer is the one a click or drag takes.
+   *
+   * Shapes only trade places with each other: the places that held shapes still hold shapes,
+   * and everything else (bins, a bin's background and its artwork) is left exactly where it
+   * was. In the layer that can put one loose shape above a bin that another was above.
    */
   private restackShapes(parent: Konva.Node | null | undefined): void {
     if (!(parent instanceof Konva.Container)) return
-    const nodes = parent.getChildren((child) => child.name() === 'shape')
+    const nodes = parent
+      .getChildren((child) => child.name() === 'shape')
+      .sort((a, b) => a.zIndex() - b.zIndex())
     if (nodes.length < 2) return
     // The places shapes have now, bottom first. They are handed out again in the new order.
-    const places = nodes.map((node) => node.zIndex()).sort((a, b) => a - b)
+    const places = nodes.map((node) => node.zIndex())
     const order = largestFirst(
-      [...nodes]
-        .sort((a, b) => a.zIndex() - b.zIndex())
-        .map((node) => {
-          const bounds = this.getShapeBounds(node.id())
-          const area = bounds ? (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) : 0
-          return { id: node.id(), area }
-        })
+      nodes.map((node) => {
+        const bounds = this.getShapeBounds(node.id())
+        const area = bounds ? (bounds.maxX - bounds.minX) * (bounds.maxY - bounds.minY) : 0
+        return { id: node.id(), area }
+      })
     )
-    // From the bottom up: moving a node down to its place only shifts nodes above that place,
-    // so the ones already put down stay put.
-    order.forEach((id, i) => this.konvaMap.get(id)?.zIndex(places[i]))
+    order.forEach((id, i) => {
+      const node = this.konvaMap.get(id)
+      if (!node) return
+      const from = node.zIndex()
+      const to = places[i]
+      if (from === to) return
+      // Swap with the shape that is in its place. Moving one node shifts every node between
+      // the two places by one, and moving the other back undoes exactly that shift.
+      const other = parent.children[to]
+      node.zIndex(to)
+      other.zIndex(from)
+    })
   }
 
+  /**
+   * Rects and ellipses take a resize as a new size, not a scale, so they stay crisp and
+   * corner radii don't distort. Polygons and paths are vector shapes and keep their scale.
+   */
   private foldScaleIntoSize(id: string): void {
     const data = this.shapeMap.get(id)
     const node = this.konvaMap.get(id)
@@ -436,7 +448,8 @@ export class KonvaEngine implements LayoutEngine {
         }
       }
       // A resized shape may now be larger or smaller than its neighbors.
-      for (const id of ids) this.restackShapes(this.konvaMap.get(id)?.getParent())
+      const parents = new Set(ids.map((id) => this.konvaMap.get(id)?.getParent()))
+      for (const parent of parents) this.restackShapes(parent)
       // Turning a selection changes which of its handles are safe to offer.
       this.limitResizeHandles()
       this.transformer?.forceUpdate()
@@ -476,8 +489,20 @@ export class KonvaEngine implements LayoutEngine {
     }
 
     node.setAttrs(attrs)
-    // Not while a value is being scrubbed: the order settles when the change does.
-    if (!options?.transient) this.restackShapes(node.getParent())
+    // A change of size or angle can change which shape is the smaller. Not while a value is
+    // being scrubbed: the order settles when the change does.
+    const resized = [
+      'width',
+      'height',
+      'radiusX',
+      'radiusY',
+      'points',
+      'pathData',
+      'rotation',
+      'scaleX',
+      'scaleY'
+    ].some((key) => key in patch)
+    if (resized && !options?.transient) this.restackShapes(node.getParent())
 
     if (patch.metadata !== undefined) {
       this.applyDepthOpacity(updated, node)

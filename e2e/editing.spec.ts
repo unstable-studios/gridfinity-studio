@@ -788,8 +788,8 @@ test('a click takes the smallest shape under the pointer', async () => {
   await page.mouse.click(center.x, center.y)
   await expect(selectedRows).toHaveText(/^Ellipse 1/)
 
-  // Outside the small one, the large one.
-  await page.mouse.click(center.x, center.y - 40)
+  // Outside the small one, the large one. Below it, clear of the small one's rotate handle.
+  await page.mouse.click(center.x, center.y + 35)
   await expect(selectedRows).toHaveText(/^Ellipse 2/)
 
   // A drag from the middle moves the small one and leaves the large one where it was, even
