@@ -27,7 +27,7 @@ Select a pocket to set its depth, size and position. A pocket drawn too close to
 
 ## Select and arrange
 
-- Click to select, and drag to move.
+- Click to select, and drag to move. Where shapes overlap, the smallest one under the pointer is taken.
 - **Shift+click** adds to the selection.
 - Select two or more pockets to align them from the sidebar, and three or more to space them evenly. One pocket can be centered in its bin.
 - Right-click a bin or pocket for cut, copy, paste, rename and delete.

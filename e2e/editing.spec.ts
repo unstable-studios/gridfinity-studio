@@ -763,3 +763,42 @@ test('right-click a bin or shape for its menu', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('a click takes the smallest shape under the pointer', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const selectedRows = page.locator('aside button[aria-pressed="true"]')
+  const center = { x: 710, y: 310 }
+  const file = join(app.dir, 'stacking.gfstudio')
+  const positions = async (): Promise<Array<{ x: number; y: number }>> =>
+    (await app.save(file)).layoutSnapshot.shapes.map(({ x, y }) => ({ x, y }))
+
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // A small ellipse, then a large one drawn around it. Drawn last, the large one used to
+  // sit on top and take every click.
+  await app.selectTool('Ellipse')
+  await app.drag({ x: 700, y: 300 }, { x: 720, y: 320 })
+  await app.selectTool('Ellipse')
+  await app.drag({ x: 660, y: 260 }, { x: 760, y: 360 })
+  await app.expectShapeCount(2)
+  await app.selectTool('Select')
+
+  // In the middle, both are under the pointer: the small one is taken.
+  await page.mouse.click(center.x, center.y)
+  await expect(selectedRows).toHaveText(/^Ellipse 1/)
+
+  // Outside the small one, the large one.
+  await page.mouse.click(center.x, center.y - 40)
+  await expect(selectedRows).toHaveText(/^Ellipse 2/)
+
+  // A drag from the middle moves the small one and leaves the large one where it was, even
+  // though the large one is the one selected.
+  const before = await positions()
+  await app.drag(center, { x: center.x + 20, y: center.y })
+  const after = await positions()
+  expect(after[0].x, 'the small ellipse moved').toBeGreaterThan(before[0].x)
+  expect(after[1], 'the large ellipse did not').toEqual(before[1])
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
