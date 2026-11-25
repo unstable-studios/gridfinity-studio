@@ -37,9 +37,12 @@ jobs:
       - name: Compare with the base branch
         env:
           BASE_REF: ${{ github.base_ref }}
+        # The check comes from the base branch, not from the release branch being checked:
+        # a release branch built before a fix to the check would otherwise run the old one.
         run: |
           git fetch --quiet origin "$BASE_REF"
-          .github/scripts/release-guard.sh "origin/$BASE_REF" HEAD
+          git show "origin/$BASE_REF:.github/scripts/release-guard.sh" > "$RUNNER_TEMP/release-guard.sh"
+          bash "$RUNNER_TEMP/release-guard.sh" "origin/$BASE_REF" HEAD
 
   # Commitlint
   commitlint:
