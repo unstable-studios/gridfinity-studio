@@ -34,6 +34,8 @@ import { updateMenuItems, type UpdateAction } from '@/lib/update-menu'
 import { cn } from '@/lib/utils'
 import { useExport, useExportChoiceReset } from '@/hooks/useExport'
 import ExportMenu from './ExportMenu'
+import HelpDialog from './HelpDialog'
+import AboutDialog from './AboutDialog'
 import {
   SquareDashedIcon,
   BoxIcon,
@@ -133,6 +135,13 @@ function AppMenubar({
   const edit = useEditShortcuts()
   useCloseGuard()
   const { state: updateState, installNow, check: checkForUpdates } = useAppUpdate()
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [aboutOpen, setAboutOpen] = useState(false)
+  const updateActions: Record<UpdateAction, () => void> = {
+    check: checkForUpdates,
+    install: installNow,
+    download: () => window.open(`${GITHUB_REPO}/releases/latest`, '_blank')
+  }
 
   useEffect(() => {
     loadRecentProjects()
@@ -176,119 +185,123 @@ function AppMenubar({
   const hasProject = project !== null
 
   return (
-    <Menubar>
-      {/* ── File ── */}
-      <MenubarMenu>
-        <MenubarTrigger>File</MenubarTrigger>
-        <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <MenubarItem onSelect={onNewProject}>
-            New project
-            <MenubarShortcut>{MOD_KEY}+N</MenubarShortcut>
-          </MenubarItem>
-          <MenubarItem onSelect={() => void loadProject()}>
-            Open project…
-            <MenubarShortcut>{MOD_KEY}+O</MenubarShortcut>
-          </MenubarItem>
-          <MenubarSub>
-            <MenubarSubTrigger>Open recent</MenubarSubTrigger>
-            <MenubarSubContent>
-              {recentProjects.length === 0 ? (
-                <MenubarItem disabled>No recent projects</MenubarItem>
-              ) : (
-                recentProjects.map((filePath) => (
-                  <MenubarItem key={filePath} onSelect={() => void loadProject(filePath)}>
-                    {filePath.split(/[\\/]/).pop() ?? filePath}
-                  </MenubarItem>
-                ))
-              )}
-            </MenubarSubContent>
-          </MenubarSub>
-          <MenubarSeparator />
-          <MenubarItem disabled={!hasProject} onSelect={() => void saveProject()}>
-            Save
-            <MenubarShortcut>{MOD_KEY}+S</MenubarShortcut>
-          </MenubarItem>
-          <MenubarItem disabled={!hasProject} onSelect={() => void saveProjectAs()}>
-            Save as…
-            <MenubarShortcut>{MOD_KEY}+Shift+S</MenubarShortcut>
-          </MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem disabled>Import…</MenubarItem>
-          <MenubarSub>
-            <MenubarSubTrigger disabled={!canExport}>Export</MenubarSubTrigger>
-            <MenubarSubContent>
-              <MenubarItem onSelect={() => void exportAs('stl')}>STL…</MenubarItem>
-              <MenubarItem onSelect={() => void exportAs('3mf')}>3MF…</MenubarItem>
-            </MenubarSubContent>
-          </MenubarSub>
-        </MenubarContent>
-      </MenubarMenu>
+    <>
+      <Menubar>
+        {/* ── File ── */}
+        <MenubarMenu>
+          <MenubarTrigger>File</MenubarTrigger>
+          <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
+            <MenubarItem onSelect={onNewProject}>
+              New project
+              <MenubarShortcut>{MOD_KEY}+N</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem onSelect={() => void loadProject()}>
+              Open project…
+              <MenubarShortcut>{MOD_KEY}+O</MenubarShortcut>
+            </MenubarItem>
+            <MenubarSub>
+              <MenubarSubTrigger>Open recent</MenubarSubTrigger>
+              <MenubarSubContent>
+                {recentProjects.length === 0 ? (
+                  <MenubarItem disabled>No recent projects</MenubarItem>
+                ) : (
+                  recentProjects.map((filePath) => (
+                    <MenubarItem key={filePath} onSelect={() => void loadProject(filePath)}>
+                      {filePath.split(/[\\/]/).pop() ?? filePath}
+                    </MenubarItem>
+                  ))
+                )}
+              </MenubarSubContent>
+            </MenubarSub>
+            <MenubarSeparator />
+            <MenubarItem disabled={!hasProject} onSelect={() => void saveProject()}>
+              Save
+              <MenubarShortcut>{MOD_KEY}+S</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem disabled={!hasProject} onSelect={() => void saveProjectAs()}>
+              Save as…
+              <MenubarShortcut>{MOD_KEY}+Shift+S</MenubarShortcut>
+            </MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem disabled>Import…</MenubarItem>
+            <MenubarSub>
+              <MenubarSubTrigger disabled={!canExport}>Export</MenubarSubTrigger>
+              <MenubarSubContent>
+                <MenubarItem onSelect={() => void exportAs('stl')}>STL…</MenubarItem>
+                <MenubarItem onSelect={() => void exportAs('3mf')}>3MF…</MenubarItem>
+              </MenubarSubContent>
+            </MenubarSub>
+          </MenubarContent>
+        </MenubarMenu>
 
-      {/* ── Edit ── */}
-      <MenubarMenu>
-        <MenubarTrigger>Edit</MenubarTrigger>
-        <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <MenubarItem disabled={!canUndo} onSelect={undo}>
-            Undo
-            <MenubarShortcut>{MOD_KEY}+Z</MenubarShortcut>
-          </MenubarItem>
-          <MenubarItem disabled={!canRedo} onSelect={redo}>
-            Redo
-            <MenubarShortcut>{MOD_KEY}+Shift+Z</MenubarShortcut>
-          </MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem disabled={!edit.canCopy} onSelect={edit.cut}>
-            Cut
-            <MenubarShortcut>{MOD_KEY}+X</MenubarShortcut>
-          </MenubarItem>
-          <MenubarItem disabled={!edit.canCopy} onSelect={edit.copy}>
-            Copy
-            <MenubarShortcut>{MOD_KEY}+C</MenubarShortcut>
-          </MenubarItem>
-          <MenubarItem disabled={!edit.canPaste} onSelect={edit.paste}>
-            Paste
-            <MenubarShortcut>{MOD_KEY}+V</MenubarShortcut>
-          </MenubarItem>
-          <MenubarItem disabled={!edit.canSelectAll} onSelect={edit.selectAll}>
-            Select all
-            <MenubarShortcut>{MOD_KEY}+A</MenubarShortcut>
-          </MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem onSelect={onOpenPreferences}>
-            Preferences…
-            <MenubarShortcut>{MOD_KEY}+,</MenubarShortcut>
-          </MenubarItem>
-        </MenubarContent>
-      </MenubarMenu>
+        {/* ── Edit ── */}
+        <MenubarMenu>
+          <MenubarTrigger>Edit</MenubarTrigger>
+          <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
+            <MenubarItem disabled={!canUndo} onSelect={undo}>
+              Undo
+              <MenubarShortcut>{MOD_KEY}+Z</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem disabled={!canRedo} onSelect={redo}>
+              Redo
+              <MenubarShortcut>{MOD_KEY}+Shift+Z</MenubarShortcut>
+            </MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem disabled={!edit.canCopy} onSelect={edit.cut}>
+              Cut
+              <MenubarShortcut>{MOD_KEY}+X</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem disabled={!edit.canCopy} onSelect={edit.copy}>
+              Copy
+              <MenubarShortcut>{MOD_KEY}+C</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem disabled={!edit.canPaste} onSelect={edit.paste}>
+              Paste
+              <MenubarShortcut>{MOD_KEY}+V</MenubarShortcut>
+            </MenubarItem>
+            <MenubarItem disabled={!edit.canSelectAll} onSelect={edit.selectAll}>
+              Select all
+              <MenubarShortcut>{MOD_KEY}+A</MenubarShortcut>
+            </MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem onSelect={onOpenPreferences}>
+              Preferences…
+              <MenubarShortcut>{MOD_KEY}+,</MenubarShortcut>
+            </MenubarItem>
+          </MenubarContent>
+        </MenubarMenu>
 
-      {/* ── Help ── */}
-      <MenubarMenu>
-        <MenubarTrigger className="relative">
-          Help
-          <UpdateBadge state={updateState} />
-        </MenubarTrigger>
-        <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
-          <MenubarItem onSelect={() => window.open(GITHUB_REPO, '_blank')}>
-            Documentation
-          </MenubarItem>
-          <MenubarItem onSelect={() => window.open(`${GITHUB_REPO}/issues/new`, '_blank')}>
-            Report a bug
-          </MenubarItem>
-          <MenubarSeparator />
-          <MenubarItem disabled className="opacity-80 cursor-default">
-            Version {__APP_VERSION__}
-          </MenubarItem>
-          <UpdateMenuItems
-            state={updateState}
-            actions={{
-              check: checkForUpdates,
-              install: installNow,
-              download: () => window.open(`${GITHUB_REPO}/releases/latest`, '_blank')
-            }}
-          />
-        </MenubarContent>
-      </MenubarMenu>
-    </Menubar>
+        {/* ── Help ── */}
+        <MenubarMenu>
+          <MenubarTrigger className="relative">
+            Help
+            <UpdateBadge state={updateState} />
+          </MenubarTrigger>
+          <MenubarContent onCloseAutoFocus={(e) => e.preventDefault()}>
+            <MenubarItem onSelect={() => setHelpOpen(true)}>User guide</MenubarItem>
+            <MenubarItem onSelect={() => window.open(GITHUB_REPO, '_blank')}>
+              Source code
+            </MenubarItem>
+            <MenubarItem onSelect={() => window.open(`${GITHUB_REPO}/issues/new`, '_blank')}>
+              Report a bug
+            </MenubarItem>
+            <MenubarItem onSelect={() => setAboutOpen(true)}>About Gridfinity Studio</MenubarItem>
+            <MenubarSeparator />
+            <MenubarItem disabled className="opacity-80 cursor-default">
+              Version {__APP_VERSION__}
+            </MenubarItem>
+            <UpdateMenuItems state={updateState} actions={updateActions} />
+          </MenubarContent>
+        </MenubarMenu>
+      </Menubar>
+      <HelpDialog open={helpOpen} onOpenChange={setHelpOpen} />
+      <AboutDialog
+        open={aboutOpen}
+        onOpenChange={setAboutOpen}
+        updateState={updateState}
+        updateActions={updateActions}
+      />
+    </>
   )
 }
 

@@ -14,7 +14,7 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   # The app runs from `out/`, `resources/`, `node_modules/` and `package.json`. Nothing else
   # in the repo belongs in an installer: planning notes, tests, docs and tool settings.
-  - '!{docs,specs,e2e,scripts,.specify,.claude,.github,.husky}/**'
+  - '!{docs,specs,e2e,scripts,tools,.specify,.claude,.github,.husky}/**'
   - '!{CLAUDE.md,CONTRIBUTING.md,components.json,renovate.json,pnpm-workspace.yaml}'
   - '!{playwright.config.ts,vitest.config.mts,vite.config.ts,commitlint.config.mjs}'
   - '!{.actrc,.nvmrc,.editorconfig,.release-please-config.json,.release-please-manifest.json}'

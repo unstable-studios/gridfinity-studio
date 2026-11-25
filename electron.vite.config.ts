@@ -5,6 +5,8 @@ import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import svgr from 'vite-plugin-svgr'
+import type { Plugin } from 'vite'
+import { appLicenses } from './tools/third-party-licenses'
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as {
   version?: string
@@ -33,6 +35,17 @@ function getAppVersion(): string {
 }
 
 const appVersion = getAppVersion()
+
+/** `virtual:third-party-licenses`: what the app is built with, for the About dialog. */
+function thirdPartyLicenses(): Plugin {
+  const id = 'virtual:third-party-licenses'
+  return {
+    name: 'third-party-licenses',
+    resolveId: (source) => (source === id ? `\0${id}` : null),
+    load: (resolved) =>
+      resolved === `\0${id}` ? `export default ${JSON.stringify(appLicenses(__dirname))}` : null
+  }
+}
 
 export default defineConfig({
   main: {},
@@ -76,6 +89,6 @@ export default defineConfig({
     worker: {
       format: 'es'
     },
-    plugins: [react(), svgr(), tailwindcss()]
+    plugins: [react(), svgr(), tailwindcss(), thirdPartyLicenses()]
   }
 })

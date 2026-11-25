@@ -31,13 +31,7 @@ The app checks for updates when it starts and every hour, and offers to restart 
 
 ## Using it
 
-1. **Start a project.** Choose **New project**, then give it a name, a base unit and a tolerance.
-2. **Add a bin.** Open **Add bin** in the sidebar and pick a size, or choose the **Bin** tool and drag on the canvas. Select a bin to change its width, depth and height, or to turn the stacking lip off.
-3. **Draw pockets.** Choose **Rectangle**, **Ellipse** or **Polygon** and draw inside the bin. Hold Shift for a square or circle, and Alt (Option on a Mac) to draw from the center. Select a pocket to set its depth and position.
-4. **Preview.** Switch to **Preview** to see the bins in 3D. Drag to orbit and scroll to zoom.
-5. **Export.** In Preview, choose **Export** in the top bar, then **Export 3MF…** or **Export STL…**. With more than one bin, uncheck the bins to leave out, or export one file per bin.
-
-Tolerance, unit height, and magnet and screw holes are set per project in **Edit > Preferences…**. The base unit can be changed there only while the project has no bins.
+[docs/HELP.md](docs/HELP.md) is the user guide. The app shows the same text under **Help > User guide**.
 
 ## Build from source
 
@@ -76,5 +70,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org), chec
 ## License
 
 [MIT](LICENSE)
+
+**Help > About Gridfinity Studio** lists the open-source packages the app is built with and their licenses.
 
 The app includes the [Inter](src/renderer/public/fonts/Inter-LICENSE.txt) and [JetBrains Mono](src/renderer/public/fonts/JetBrainsMono-LICENSE.txt) fonts, each under the SIL Open Font License 1.1.
