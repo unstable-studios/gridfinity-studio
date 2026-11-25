@@ -2,7 +2,7 @@
   "name": "gridfinity-studio",
   "author": "Mike Hansen <mike@unstablestudios.com>",
   "license": "MIT",
-  "version": "1.22.0",
+  "version": "1.23.0",
   "description": "Gridfinity Studio is an Electron-based application for designing and managing Gridfinity modular storage systems.",
   "main": "./out/main/index.js",
   "scripts": {
