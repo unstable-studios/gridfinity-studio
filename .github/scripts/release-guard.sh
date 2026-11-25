@@ -12,7 +12,10 @@
 set -euo pipefail
 
 head=$2
-base=$(git merge-base "$1" "$head")
+base=$(git merge-base "$1" "$head") || {
+  echo "::error::No common ancestor between $1 and $head"
+  exit 1
+}
 
 allowed='package\.json|CHANGELOG\.md|\.release-please-manifest\.json'
 unexpected=$(git diff --name-only "$base" "$head" | grep -vxE "$allowed" || true)
