@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.20.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.19.0...v1.20.0) (2026-11-25)
+
+
+### Features
+
+* **ui:** move export to the top bar in preview ([#557](https://github.com/unstable-studios/gridfinity-studio/issues/557)) ([4d80458](https://github.com/unstable-studios/gridfinity-studio/commit/4d80458edd235ea441625e425eac0d686da9dfb8))
+* **ui:** pick bins to export with checkboxes ([#560](https://github.com/unstable-studios/gridfinity-studio/issues/560)) ([645e4b6](https://github.com/unstable-studios/gridfinity-studio/commit/645e4b602afad3c3f13b305b6358e6cb00662057))
+
 ## [1.19.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.2...v1.19.0) (2026-11-25)
 
 
