@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.18.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.1...v1.18.2) (2026-11-25)
+
+
+### Documentation
+
+* ship the license of the bundled fonts with them ([#549](https://github.com/unstable-studios/gridfinity-studio/issues/549)) ([b4b1302](https://github.com/unstable-studios/gridfinity-studio/commit/b4b130271003fb12170926a0c6e7d132d4c4aadb))
+
+## [1.18.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.0...v1.18.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* restore the package list the 1.18.0 release commit undid ([#547](https://github.com/unstable-studios/gridfinity-studio/issues/547)) ([b50896d](https://github.com/unstable-studios/gridfinity-studio/commit/b50896d5b22070bd50e7550034affa4d6b77fe0d))
+
+## [1.18.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.3...v1.18.0) (2026-11-25)
+
+
+### Features
+
+* **ui:** add example projects to the welcome screen ([#542](https://github.com/unstable-studios/gridfinity-studio/issues/542)) ([bd387c0](https://github.com/unstable-studios/gridfinity-studio/commit/bd387c0c398812e20244c10a53a87d9475b60fd0))
+* **ui:** warn when a pocket is too close to the wall ([#540](https://github.com/unstable-studios/gridfinity-studio/issues/540)) ([cbd1cd5](https://github.com/unstable-studios/gridfinity-studio/commit/cbd1cd52b7c557c0d5edbd83ad84662bff083af1))
+
+
+### Documentation
+
+* license the project under MIT ([#536](https://github.com/unstable-studios/gridfinity-studio/issues/536)) ([0352c3e](https://github.com/unstable-studios/gridfinity-studio/commit/0352c3ecca7f4ea67ef6941e4327f6567d104da4))
+
+
+### Refactoring
+
+* remove the old bin mesh generator ([#538](https://github.com/unstable-studios/gridfinity-studio/issues/538)) ([647dd2a](https://github.com/unstable-studios/gridfinity-studio/commit/647dd2a65e23afcf5e254b291b0ffe2adbc16f71))
+
 ## [1.17.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.2...v1.17.3) (2026-11-24)
 
 

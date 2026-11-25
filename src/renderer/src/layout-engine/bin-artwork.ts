@@ -11,7 +11,7 @@
 
 import type { GridfinityConfig } from '../../../shared/types/project'
 import type { BinMetadata } from './types'
-import { MAGNET_HOLE_OFFSET as HOLE_OFFSET } from '../../../shared/gridfinity-dimensions'
+import { LIP_INSET, MAGNET_HOLE_OFFSET as HOLE_OFFSET } from '../../../shared/gridfinity-dimensions'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -33,9 +33,6 @@ export interface BinArtwork {
 }
 
 // ─── Constants ──────────────────────────────────────────────────────────────
-
-/** Lip inset distance (mm) — from gridfinity spec */
-const LIP_INSET = 2.85
 
 // ─── Computation ────────────────────────────────────────────────────────────
 
@@ -78,7 +75,11 @@ export function computeBinArtwork(meta: BinMetadata, config: GridfinityConfig): 
     }
   }
 
-  const lipInset: ArtworkLipInset | null = meta.hasLip ? { inset: LIP_INSET } : null
+  // The bin is smaller than its grid squares by the tolerance, and the guide is drawn from
+  // the edge of the grid squares, so the tolerance is part of the distance.
+  const lipInset: ArtworkLipInset | null = meta.hasLip
+    ? { inset: LIP_INSET + config.tolerance }
+    : null
 
   return { circles, lipInset }
 }

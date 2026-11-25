@@ -1,10 +1,15 @@
 import { useEffect } from 'react'
 import { Button } from '@unstable-studios/ui'
 import { useProject } from '@/hooks/useProject'
+import { EXAMPLE_PROJECTS } from '@/lib/example-projects'
 import StudioLogo from '../assets/StudioIcon.svg?react'
 
+const LIST_ROW_CLASS =
+  'w-full truncate rounded-md px-2 py-1.5 text-left text-xs text-zinc-600 transition hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-200'
+
 export default function WelcomeScreen(): React.JSX.Element {
-  const { createNewProject, loadProject, recentProjects, loadRecentProjects } = useProject()
+  const { createNewProject, loadProject, openExample, recentProjects, loadRecentProjects } =
+    useProject()
 
   useEffect(() => {
     loadRecentProjects()
@@ -32,6 +37,25 @@ export default function WelcomeScreen(): React.JSX.Element {
           </Button>
         </div>
 
+        <div className="w-full">
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-2">
+            Examples
+          </p>
+          <div className="space-y-1">
+            {EXAMPLE_PROJECTS.map((example) => (
+              <button
+                key={example.id}
+                type="button"
+                className={LIST_ROW_CLASS}
+                onClick={() => openExample(example)}
+              >
+                <span className="font-medium">{example.name}</span>{' '}
+                <span className="ml-1 opacity-70">{example.description}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {recentProjects.length > 0 && (
           <div className="w-full">
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-zinc-500 mb-2">
@@ -42,7 +66,7 @@ export default function WelcomeScreen(): React.JSX.Element {
                 <button
                   key={filePath}
                   type="button"
-                  className="w-full text-left text-xs text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 rounded-md px-2 py-1.5 transition truncate"
+                  className={LIST_ROW_CLASS}
                   onClick={() => void loadProject(filePath)}
                 >
                   {filePath.split(/[\\/]/).pop() ?? filePath}
