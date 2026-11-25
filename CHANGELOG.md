@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.22.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.21.0...v1.22.0) (2026-11-25)
+
+
+### Features
+
+* **ui:** fit the right-click menu to what is under it ([#565](https://github.com/unstable-studios/gridfinity-studio/issues/565)) ([e5b8720](https://github.com/unstable-studios/gridfinity-studio/commit/e5b87207fc92286c2d2401b4dd489536a30773f9))
+* **ui:** set what new bins and new projects start with ([#564](https://github.com/unstable-studios/gridfinity-studio/issues/564)) ([337485a](https://github.com/unstable-studios/gridfinity-studio/commit/337485a8b2c8b9532a796bf06ef9a4cc10f72948))
+
+
+### Bug Fixes
+
+* **ui:** take the smallest shape under the pointer ([#566](https://github.com/unstable-studios/gridfinity-studio/issues/566)) ([bd3aa13](https://github.com/unstable-studios/gridfinity-studio/commit/bd3aa13fe535784a51ed06074c5b53d68ec32171))
+
 ## [1.21.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.20.0...v1.21.0) (2026-11-25)
 
 
