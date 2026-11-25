@@ -7,7 +7,6 @@ import eslintPluginReact from 'eslint-plugin-react'
 import eslintPluginReactHooks from 'eslint-plugin-react-hooks'
 import eslintPluginReactRefresh from 'eslint-plugin-react-refresh'
 import ReactThree from '@react-three/eslint-plugin'
-import { ReactThreeFiber } from '@react-three/fiber'
 
 export default defineConfig(
   { ignores: ['**/ui/**', '**/node_modules', '**/dist', '**/out', '.husky', '.actrc'] },
@@ -83,7 +82,6 @@ export default defineConfig(
     plugins: {
       'react-hooks': eslintPluginReactHooks,
       'react-refresh': eslintPluginReactRefresh,
-      '@react-three-fiber': ReactThreeFiber,
       '@react-three': ReactThree
     },
     rules: {
