@@ -21,7 +21,7 @@ if [ -n "$unexpected" ]; then
   exit 1
 fi
 
-version_line='^[-+][[:space:]]*"version": "[0-9]+\.[0-9]+\.[0-9]+[^"]*",$'
+version_line='^[-+][[:space:]]*"version": "[0-9]+\.[0-9]+\.[0-9]+[^"]*",?[[:space:]]*$'
 other_lines=$(
   git diff --unified=0 "$base" "$head" -- package.json |
     grep -E '^[-+]' | grep -vE '^(---|\+\+\+) ' | grep -vE "$version_line" || true
