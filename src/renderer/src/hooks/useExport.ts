@@ -10,8 +10,7 @@ import { useAppMode } from './useAppMode'
 import { useProject } from './useProject'
 import { useProjectName } from './useProjectName'
 import { buildSTLArrayBuffer, build3MFArrayBuffer, placementsFromGroups } from '@/lib/export-baked'
-import { binsInSelection, exportTitle } from '@/lib/export-plan'
-import type { ExportScope } from '@/lib/export-plan'
+import { checkedBins, exportTitle } from '@/lib/export-plan'
 import { storedName } from '@/lib/item-name'
 import type { BatchExportFile, ExportFormat } from '../../../shared/types/export'
 
@@ -20,22 +19,22 @@ export type ExportFiles = 'one' | 'perBin'
 
 type Bin = LayoutGroup & { metadata: BinMetadata }
 
-/** What the person asked for. `useExportScopeReset` puts the scope back. */
-const useExportOptions = create<{ scope: ExportScope; files: ExportFiles }>(() => ({
-  scope: 'all',
+/**
+ * What the person asked for. Bins are checked until unchecked, so a new bin starts checked.
+ * `useExportChoiceReset` checks them all again.
+ */
+const useExportOptions = create<{ unchecked: string[]; files: ExportFiles }>(() => ({
+  unchecked: [],
   files: 'one'
 }))
 
 export interface ExportCommands {
   /** Every bin in the project. */
   bins: Bin[]
-  /** The bins the selection points at. */
-  selectedBins: Bin[]
-  /** The bins an export would hold now. */
+  /** The checked bins: what an export would hold now. */
   chosen: Bin[]
-  /** `selected` only while there are selected bins to export. */
-  scope: ExportScope
-  setScope: (scope: ExportScope) => void
+  setChecked: (binId: string, checked: boolean) => void
+  setAllChecked: (checked: boolean) => void
   /** `perBin` only while the project has more than one bin. */
   files: ExportFiles
   setFiles: (files: ExportFiles) => void
@@ -46,7 +45,7 @@ export interface ExportCommands {
 
 export function useExport(): ExportCommands {
   const engine = useLayoutEngine()
-  const { tick, selectedIds } = useEngineState()
+  const { tick } = useEngineState()
   const { mode } = useAppMode()
   const bakeResults = useProject((s) => s.bakeResults)
   const bakeStatus = useProject((s) => s.bakeStatus)
@@ -54,19 +53,12 @@ export function useExport(): ExportCommands {
   const export3MF = useProject((s) => s.export3MF)
   const exportBatch = useProject((s) => s.exportBatch)
   const projectName = useProjectName()
-  const wantedScope = useExportOptions((s) => s.scope)
+  const unchecked = useExportOptions((s) => s.unchecked)
   const wantedFiles = useExportOptions((s) => s.files)
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
-  const selectedBins = useMemo(
-    () => binsInSelection(bins, engine?.getAllShapes() ?? [], selectedIds),
-    [bins, engine, selectedIds]
-  )
-
-  const scope: ExportScope =
-    wantedScope === 'selected' && selectedBins.length > 0 ? 'selected' : 'all'
-  const chosen = scope === 'selected' ? selectedBins : bins
+  const chosen = useMemo(() => checkedBins(bins, unchecked), [bins, unchecked])
   // With one bin there is nothing to choose, and the choice is not shown.
   const files: ExportFiles = bins.length > 1 ? wantedFiles : 'one'
 
@@ -121,10 +113,13 @@ export function useExport(): ExportCommands {
 
   return {
     bins,
-    selectedBins,
     chosen,
-    scope,
-    setScope: (next) => useExportOptions.setState({ scope: next }),
+    setChecked: (binId, checked) =>
+      useExportOptions.setState((s) => ({
+        unchecked: checked ? s.unchecked.filter((id) => id !== binId) : [...s.unchecked, binId]
+      })),
+    setAllChecked: (checked) =>
+      useExportOptions.setState({ unchecked: checked ? [] : bins.map((bin) => bin.id) }),
     files,
     setFiles: (next) => useExportOptions.setState({ files: next }),
     canExport,
@@ -133,14 +128,14 @@ export function useExport(): ExportCommands {
 }
 
 /**
- * Go back to exporting every bin when the person leaves Preview or the project changes.
- * "Selected" is then always a choice made with the bins in view, never one left over from
+ * Check every bin again when the person leaves Preview or the project changes. A bin is then
+ * only ever left out by a choice made with the bins in view, never by one left over from
  * earlier that would quietly export part of a project. Mount once.
  */
-export function useExportScopeReset(): void {
+export function useExportChoiceReset(): void {
   const { mode } = useAppMode()
   const projectKey = useProject((s) => s.project?.settings.createdAt)
   useEffect(() => {
-    useExportOptions.setState({ scope: 'all' })
+    useExportOptions.setState({ unchecked: [] })
   }, [mode, projectKey])
 }

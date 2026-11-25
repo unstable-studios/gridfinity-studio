@@ -12,8 +12,7 @@ import type { ExportFormat } from '../../../shared/types/export'
 export default function ExportMenu({ className }: { className?: string }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const bakeStatus = useProject((s) => s.bakeStatus)
-  const { bins, selectedBins, chosen, scope, setScope, files, setFiles, canExport, exportAs } =
-    useExport()
+  const { bins, chosen, files, setFiles, canExport, exportAs } = useExport()
   const anyError = chosen.some((bin) => bakeStatus.get(bin.id) === 'error')
 
   const run = (format: ExportFormat): void => {
@@ -40,31 +39,9 @@ export default function ExportMenu({ className }: { className?: string }): React
       <PopoverContent align="start" className="w-64 space-y-2 p-3">
         {bins.length > 1 && (
           <>
-            <ToggleGroup
-              type="single"
-              aria-label="Bins to export"
-              className="flex w-full"
-              value={scope}
-              onValueChange={(value) => {
-                if (value === 'all' || value === 'selected') setScope(value)
-              }}
-            >
-              <ToggleGroupItem value="all" className="flex-1 justify-center">
-                All bins
-              </ToggleGroupItem>
-              <ToggleGroupItem
-                value="selected"
-                className="flex-1 justify-center disabled:opacity-50"
-                disabled={selectedBins.length === 0}
-              >
-                Selected ({selectedBins.length})
-              </ToggleGroupItem>
-            </ToggleGroup>
-            {selectedBins.length === 0 && (
-              <p className="text-[10px] text-zinc-500">
-                Click bins in the list to export only those.
-              </p>
-            )}
+            <p className="text-xs text-zinc-600 dark:text-zinc-400">
+              {chosen.length} of {bins.length} bins
+            </p>
             <ToggleGroup
               type="single"
               aria-label="Files to export"
@@ -101,7 +78,11 @@ export default function ExportMenu({ className }: { className?: string }): React
         </Button>
         {!canExport && (
           <p className="text-[10px] text-zinc-500">
-            {anyError ? 'Couldn’t build one or more bins.' : 'Building the model…'}
+            {chosen.length === 0
+              ? 'Check a bin in the list to export it.'
+              : anyError
+                ? 'Couldn’t build one or more bins.'
+                : 'Building the model…'}
           </p>
         )}
       </PopoverContent>

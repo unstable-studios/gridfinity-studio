@@ -46,11 +46,12 @@ async function threeMfModel(path: string): Promise<string> {
   })
 }
 
-test('export every bin or only the selected ones', async () => {
+test('export every bin or only the checked ones', async () => {
   app = await StudioApp.launch()
   const { page } = app
-  const scope = (name: string | RegExp): ReturnType<typeof page.getByRole> =>
-    page.getByRole('radio', { name })
+  const bin = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('checkbox', { name: `Export ${name}` })
+  const allBins = page.getByRole('checkbox', { name: 'All bins' })
 
   await page.getByRole('button', { name: 'New project' }).click()
   for (let i = 0; i < 3; i++) {
@@ -62,20 +63,27 @@ test('export every bin or only the selected ones', async () => {
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
   await expect(page.getByText(/\bReady$/)).toHaveCount(3, { timeout: 30_000 })
 
-  // The bin added last is still selected, but an export takes every bin until asked.
-  await app.openExport()
-  await expect(scope('All bins')).toBeChecked()
-  await expect(scope('Selected (1)')).toBeEnabled()
+  // Every bin starts checked, whatever was selected in Design.
+  await expect(allBins).toBeChecked()
+  for (const name of ['Bin 1', 'Bin 2', 'Bin 3']) await expect(bin(name)).toBeChecked()
   const allPath = join(app.dir, 'all.stl')
   await app.stubSaveDialog(allPath)
   await app.exportAs('STL')
   const allTriangles = await stlTriangles(allPath)
   expect(await app.lastSaveDialogDefault(), 'named after the project').toBe('kit.stl')
 
-  // One bin: a third of the triangles, named after the bin.
-  await page.getByRole('button', { name: /^Bin 2/ }).click()
+  // With nothing checked there is nothing to export.
+  await allBins.click()
+  for (const name of ['Bin 1', 'Bin 2', 'Bin 3']) await expect(bin(name)).not.toBeChecked()
   await app.openExport()
-  await scope('Selected (1)').click()
+  await expect(page.getByText('0 of 3 bins')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Export STL…' })).toBeDisabled()
+  await expect(page.getByText('Check a bin in the list to export it.')).toBeVisible()
+  await page.keyboard.press('Escape')
+
+  // One bin: a third of the triangles, named after the bin.
+  await bin('Bin 2').click()
+  await expect(allBins).toHaveAttribute('aria-checked', 'mixed')
   const onePath = join(app.dir, 'one.stl')
   await app.stubSaveDialog(onePath)
   await app.exportAs('STL')
@@ -88,10 +96,10 @@ test('export every bin or only the selected ones', async () => {
   expect(await threeMfModel(oneModelPath)).toContain('name="Bin 2"')
   expect(await app.lastSaveDialogDefault()).toBe('Bin 2.3mf')
 
-  // Two bins, picked with Shift. The File menu exports the same bins.
-  await page.getByRole('button', { name: /^Bin 3/ }).click({ modifiers: ['Shift'] })
+  // Two bins. The File menu exports the same bins.
+  await bin('Bin 3').click()
   await app.openExport()
-  await expect(scope('Selected (2)')).toBeChecked()
+  await expect(page.getByText('2 of 3 bins')).toBeVisible()
   await page.keyboard.press('Escape')
   const twoPath = join(app.dir, 'two.stl')
   await app.stubSaveDialog(twoPath)
@@ -103,23 +111,18 @@ test('export every bin or only the selected ones', async () => {
   expect(await stlTriangles(twoPath)).toBe((allTriangles / 3) * 2)
   expect(await app.lastSaveDialogDefault()).toBe('kit - 2 bins.stl')
 
-  // With nothing selected there is only one choice left.
-  await page.getByRole('button', { name: /^Bin 2/ }).click()
-  await page.getByRole('button', { name: /^Bin 2/ }).click({ modifiers: ['ControlOrMeta'] })
-  await app.openExport()
-  await expect(scope('Selected (0)')).toBeDisabled()
-  await expect(scope('All bins')).toBeChecked()
+  // The "All bins" box checks the rest.
+  await allBins.click()
+  await expect(allBins).toBeChecked()
+  await expect(bin('Bin 1')).toBeChecked()
 
-  // "Selected" does not outlive a visit to Preview: coming back, an export takes every bin.
-  await page.getByRole('button', { name: /^Bin 2/ }).click()
-  await app.openExport()
-  await scope('Selected (1)').click()
-  await expect(scope('Selected (1)')).toBeChecked()
-  await page.keyboard.press('Escape')
+  // An unchecked bin does not outlive a visit to Preview: coming back, every bin is checked.
+  await bin('Bin 1').click()
+  await expect(bin('Bin 1')).not.toBeChecked()
   await page.getByRole('radio', { name: 'Design', exact: true }).click()
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
-  await app.openExport()
-  await expect(scope('All bins')).toBeChecked()
+  await expect(allBins).toBeChecked()
+  await expect(bin('Bin 1')).toBeChecked()
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
@@ -176,10 +179,9 @@ test('export one file per bin into a folder', async () => {
   expect(await stlTriangles(join(folder, 'Bin 1.stl'))).toBe(allTriangles / 3)
   expect(await app.promptCount()).toBe(2)
 
-  // One selected bin needs no folder: an ordinary save, still at the origin.
-  await page.getByRole('button', { name: /^Bin 3/ }).click()
-  await app.openExport()
-  await page.getByRole('radio', { name: 'Selected (1)' }).click()
+  // One checked bin needs no folder: an ordinary save, still at the origin.
+  await page.getByRole('checkbox', { name: 'Export Bin 1' }).click()
+  await page.getByRole('checkbox', { name: 'Export Bin 2' }).click()
   const onePath = join(app.dir, 'one.stl')
   await app.stubSaveDialog(onePath)
   await app.exportAs('STL')

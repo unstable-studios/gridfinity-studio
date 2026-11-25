@@ -32,7 +32,7 @@ import { useAppUpdate } from '@/hooks/useAppUpdate'
 import type { UpdateState } from '../../../shared/types/updates'
 import { updateMenuItems, type UpdateAction } from '@/lib/update-menu'
 import { cn } from '@/lib/utils'
-import { useExport, useExportScopeReset } from '@/hooks/useExport'
+import { useExport, useExportChoiceReset } from '@/hooks/useExport'
 import ExportMenu from './ExportMenu'
 import {
   SquareDashedIcon,
@@ -139,7 +139,7 @@ function AppMenubar({
   }, [loadRecentProjects])
 
   const { canExport, exportAs } = useExport()
-  useExportScopeReset()
+  useExportChoiceReset()
 
   // File keyboard shortcuts (undo/redo handled by useEngineUndoRedo)
   const handleFileKeys = useCallback(

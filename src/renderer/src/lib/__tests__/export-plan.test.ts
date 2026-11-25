@@ -1,27 +1,37 @@
 import { describe, it, expect } from 'vitest'
-import { binsInSelection, exportTitle } from '../export-plan'
+import { allCheckedState, checkedBins, exportTitle } from '../export-plan'
 
 const bins = [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
-const shapes = [
-  { id: 's1', groupId: 'b' },
-  { id: 's2', groupId: null }
-]
 
-describe('binsInSelection', () => {
-  it('returns selected bins in the order the bins are listed', () => {
-    expect(binsInSelection(bins, shapes, ['c', 'a'])).toEqual([{ id: 'a' }, { id: 'c' }])
+describe('checkedBins', () => {
+  it('takes every bin when none is unchecked', () => {
+    expect(checkedBins(bins, [])).toEqual(bins)
   })
 
-  it('counts a bin when one of its shapes is selected', () => {
-    expect(binsInSelection(bins, shapes, ['s1'])).toEqual([{ id: 'b' }])
+  it('leaves out unchecked bins and keeps the order', () => {
+    expect(checkedBins(bins, ['b'])).toEqual([{ id: 'a' }, { id: 'c' }])
   })
 
-  it('ignores a selected shape that is in no bin', () => {
-    expect(binsInSelection(bins, shapes, ['s2'])).toEqual([])
+  it('ignores an unchecked bin that no longer exists', () => {
+    expect(checkedBins(bins, ['gone'])).toEqual(bins)
   })
 
-  it('lists a bin once when it and its shape are both selected', () => {
-    expect(binsInSelection(bins, shapes, ['b', 's1'])).toEqual([{ id: 'b' }])
+  it('takes nothing when every bin is unchecked', () => {
+    expect(checkedBins(bins, ['c', 'a', 'b'])).toEqual([])
+  })
+})
+
+describe('allCheckedState', () => {
+  it('is checked when every bin is', () => {
+    expect(allCheckedState(3, 3)).toBe(true)
+  })
+
+  it('is unchecked when no bin is', () => {
+    expect(allCheckedState(0, 3)).toBe(false)
+  })
+
+  it('is in between when some are', () => {
+    expect(allCheckedState(1, 3)).toBe('indeterminate')
   })
 })
 
