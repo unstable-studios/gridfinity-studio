@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.22.0...v1.23.0) (2026-11-25)
+
+
+### Features
+
+* **ui:** add a history panel for undo and redo ([#568](https://github.com/unstable-studios/gridfinity-studio/issues/568)) ([9af3369](https://github.com/unstable-studios/gridfinity-studio/commit/9af33693b15b13984e9527db061e0512ab7cdf75))
+
 ## [1.22.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.21.0...v1.22.0) (2026-11-25)
 
 
