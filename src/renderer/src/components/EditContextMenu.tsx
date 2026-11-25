@@ -28,7 +28,6 @@ import { updateBin } from '@/lib/bin-update'
 import { depthChoices, movesIntoBin, movesOutOfBins, sizeSteps } from '@/lib/menu-actions'
 import { withPocketDepth } from '@/lib/pocket-depth'
 import { storedName } from '@/lib/item-name'
-import { notifyResizeBlocked } from '@/lib/project-notices'
 import { useAppMode } from '@/hooks/useAppMode'
 import { exportOnly } from '@/hooks/useExport'
 import { isBinGroup } from '@/layout-engine/types'
@@ -229,9 +228,7 @@ function MenuItems({
                   key={label}
                   disabled={!engine || !enabled}
                   onSelect={() => {
-                    if (engine && !updateBin(engine, target.bin.id, patch, cell)) {
-                      notifyResizeBlocked()
-                    }
+                    if (engine) updateBin(engine, target.bin.id, patch, cell)
                   }}
                 >
                   {label}

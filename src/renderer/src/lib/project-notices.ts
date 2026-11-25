@@ -68,10 +68,18 @@ export function notifyExported(what: string): void {
   toast.success(`Exported ${what}`)
 }
 
-/** A bin could not be resized because another bin is where it would grow. */
-export function notifyResizeBlocked(): void {
+/**
+ * A bin could not be resized: `blocker` is where it would grow, and nowhere nearby is free.
+ * `blocker` is a bin's name, or "Another bin".
+ */
+export function notifyResizeBlocked(blocker: string): void {
   toast.error('Not enough room to resize', {
-    description: 'Another bin is in the way. Move one of them, then try again.',
+    description: `${blocker} is in the way. Move one of them, then try again.`,
     id: 'resize-blocked'
   })
+}
+
+/** A bin was moved so its new size would fit. `bin` is its name, or "The bin". */
+export function notifyBinMoved(bin: string): void {
+  toast.info(`${bin} moved to make room`, { id: 'bin-moved' })
 }

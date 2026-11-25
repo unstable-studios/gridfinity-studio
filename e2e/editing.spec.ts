@@ -417,13 +417,15 @@ test('a pocket position reads on the canvas or in its bin', async () => {
   expect(app.errors).toEqual([])
 })
 
-test('a bin cannot be resized onto its neighbor from the sidebar', async () => {
+test('a bin resized into its neighbor moves to make room', async () => {
   app = await StudioApp.launch()
   const { page } = app
   const file = join(app.dir, 'resize.gfstudio')
-  const firstBinWidth = async (): Promise<number> => {
+  /** The leftmost bin: where it is and how wide. */
+  const firstBin = async (): Promise<{ x: number; width: number }> => {
     const { groups } = (await app.save(file)).layoutSnapshot
-    return [...groups].sort((a, b) => a.x - b.x)[0].width
+    const { x, width } = [...groups].sort((a, b) => a.x - b.x)[0]
+    return { x, width }
   }
 
   // Two 1×1 bins: the second lands one grid unit to the right of the first.
@@ -431,21 +433,31 @@ test('a bin cannot be resized onto its neighbor from the sidebar', async () => {
   await page.getByRole('button', { name: '1×1', exact: true }).first().click()
   await page.getByRole('button', { name: '1×1', exact: true }).first().click()
   await app.expectBinCount(2)
-  const unit = await firstBinWidth()
+  const start = await firstBin()
+  const unit = start.width
 
   // With the first bin selected, the second size grid in the sidebar is its own.
   await page.getByRole('button', { name: /^Bin 1/ }).click()
   const sizeGrid = (size: string): ReturnType<typeof page.getByRole> =>
     page.getByRole('button', { name: size, exact: true }).nth(1)
 
-  // Three wide would cover the second bin: refused, with a notice.
-  await sizeGrid('3×1').click()
-  await expect(page.getByText('Not enough room to resize')).toBeVisible()
-  expect(await firstBinWidth(), 'bin keeps its size').toBe(unit)
-
-  // Two wide only touches it: allowed.
+  // Two wide only touches the second bin: it grows where it is, and nothing is said.
   await sizeGrid('2×1').click()
-  expect(await firstBinWidth(), 'bin grows to meet its neighbor').toBe(unit * 2)
+  expect(await firstBin(), 'grows to meet its neighbor').toEqual({ x: start.x, width: unit * 2 })
+  await expect(page.getByText('Bin 1 moved to make room')).toHaveCount(0)
+
+  // Three wide would cover it. The bin grows the other way: one unit left, and says so.
+  await sizeGrid('3×1').click()
+  await expect(page.getByText('Bin 1 moved to make room')).toBeVisible()
+  expect(await firstBin(), 'three wide, one unit left').toEqual({
+    x: start.x - unit,
+    width: unit * 3
+  })
+  await expect(page.getByText('Not enough room to resize')).toHaveCount(0)
+
+  // The move and the new size are one step to undo.
+  await page.keyboard.press('ControlOrMeta+z')
+  expect(await firstBin(), 'back where and as it was').toEqual({ x: start.x, width: unit * 2 })
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
