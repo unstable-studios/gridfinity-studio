@@ -1,3 +1,4 @@
+import { wallWarnings } from '../lib/wall-clearance'
 import type { WorkerRequest, WorkerResponse } from '../../../shared/types/worker'
 import { buildBinCSG } from '../lib/bin-csg-builder'
 // Imported as a URL so Vite emits a hashed asset (manifold-XXXX.wasm) and
@@ -85,6 +86,8 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
               : `${where}${skipped.length} shapes could not be cut. Redraw or delete them in Design.`
           )
         }
+
+        warnings.push(...wallWarnings(msg.binParams, skipped))
 
         const colors = new Float32Array(0)
         const response: WorkerResponse = {
