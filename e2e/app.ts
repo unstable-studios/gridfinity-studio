@@ -195,11 +195,11 @@ export class StudioApp {
 
   /** Open Export in the top bar, unless it is open already. Its options and formats are inside. */
   async openExport(): Promise<void> {
-    const format = this.page.getByRole('button', { name: 'Export STL…' })
-    if (!(await format.isVisible())) {
-      await this.page.getByRole('button', { name: 'Export', exact: true }).click()
-    }
-    await expect(format).toBeVisible()
+    // Ask the button, not the popover: a popover that is closing is still on the page.
+    const button = this.page.getByRole('button', { name: 'Export', exact: true })
+    if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click()
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+    await expect(this.page.getByRole('button', { name: 'Export STL…' })).toBeVisible()
   }
 
   /** Export from the top bar. */
