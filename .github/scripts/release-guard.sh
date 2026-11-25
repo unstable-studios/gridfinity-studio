@@ -6,12 +6,13 @@
 # merged in between, the stale copy undoes it. That is how the 1.18.0 release put back
 # removed packages and broke every install.
 #
-# Usage: release-guard.sh <base> <head>, both git revisions. The two are compared directly,
-# so a release branch that is behind its base also fails, until it is rebuilt.
+# Usage: release-guard.sh <base> <head>, both git revisions. The head is compared with the
+# commit it branched from, which is what a merge applies. A release branch that is only
+# behind its base passes: merging it brings in nothing but its own changes.
 set -euo pipefail
 
-base=$1
 head=$2
+base=$(git merge-base "$1" "$head")
 
 allowed='package\.json|CHANGELOG\.md|\.release-please-manifest\.json'
 unexpected=$(git diff --name-only "$base" "$head" | grep -vxE "$allowed" || true)

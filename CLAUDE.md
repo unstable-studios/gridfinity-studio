@@ -134,7 +134,7 @@ Renovate keeps dependencies current (`renovate.json`): update PRs wait until a r
 - **3D Preview**: Three.js via @react-three/fiber and @react-three/drei
 - **CSG**: Manifold (WASM) for solid geometry
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
-- **Release**: release-please for automated versioning and CHANGELOG. `feat`, `fix`, `perf`, `docs`, `refactor` and `build` commits appear in the changelog and trigger a release; `chore`, `ci`, `test` and `style` do not. A release PR may change only the version, the changelog and the manifest; CI's "Release changes only the version" check fails otherwise (`.github/scripts/release-guard.sh`), and then the PR must not be merged until Release Please rebuilds it
+- **Release**: release-please for automated versioning and CHANGELOG. `feat`, `fix`, `perf`, `docs`, `refactor` and `build` commits appear in the changelog and trigger a release; `chore`, `ci`, `test` and `style` do not. A release PR may change only the version, the changelog and the manifest; CI's "Release changes only the version" check fails otherwise (`.github/scripts/release-guard.sh`), and then the PR must not be merged until Release Please rebuilds it. It compares the release branch with the commit it was built on
 - **Project files**: `.gfstudio` (JSON, schema v0.5.0)
 
 ## Verifying Changes
