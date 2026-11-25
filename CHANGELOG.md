@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.23.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.23.0...v1.23.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* do not call a release without installers a failed update ([#570](https://github.com/unstable-studios/gridfinity-studio/issues/570)) ([ed4a607](https://github.com/unstable-studios/gridfinity-studio/commit/ed4a607d05c86c76d663fc924b066a73dddec09c))
+
 ## [1.23.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.22.0...v1.23.0) (2026-11-25)
 
 
