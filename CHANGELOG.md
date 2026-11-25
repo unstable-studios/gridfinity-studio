@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.19.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.2...v1.19.0) (2026-11-25)
+
+
+### Features
+
+* add the app icon and show the name as Gridfinity Studio ([#555](https://github.com/unstable-studios/gridfinity-studio/issues/555)) ([378790b](https://github.com/unstable-studios/gridfinity-studio/commit/378790bf9ea63899ba8679e3f31c92fdb2c16677))
+
 ## [1.18.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.1...v1.18.2) (2026-11-25)
 
 
