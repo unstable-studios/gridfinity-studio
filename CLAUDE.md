@@ -122,7 +122,7 @@ Renovate keeps dependencies current (`renovate.json`): update PRs wait until a r
 
 ## App Name and Icon
 
-The app is shown as "Gridfinity Studio" (`productName` in `electron-builder.yml`). File names, the Windows install folder and the data folder come from `name` in `package.json` and stay `gridfinity-studio`; do not add `productName` to `package.json`, which would move the data folder.
+The app is shown as "Gridfinity Studio" (`productName` in `electron-builder.yml`). That names the macOS app bundle, Windows shortcuts and the deb's folder under `/opt`. Installer and executable file names, the Windows install folder, the Linux window class and the data folder come from `name` in `package.json` and stay `gridfinity-studio`; do not add `productName` to `package.json`, which would move the data folder. On macOS the main process sets the app name for the menu and fixes the data folder in place first (`src/main/index.ts`); logs there go to `~/Library/Logs/Gridfinity Studio`.
 
 Every icon is generated from `build/icon-source.svg` by `scripts/build-icons.sh`: `build/icon.icns` (macOS), `build/icon.ico` (Windows), `build/icons/` (Linux) and `resources/icon.png` (the Linux window icon). After changing the source, run the script and commit the results. The mark is the same as the in-app logo (`src/renderer/src/assets/StudioIcon.svg`).
 

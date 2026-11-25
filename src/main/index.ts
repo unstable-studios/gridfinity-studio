@@ -19,6 +19,14 @@ import { guardUnsavedWork, settleUnsavedWork } from './close-guard'
 import type { BatchExportFile, ExportFormat } from '../shared/types/export'
 import type { ProjectData } from '../shared/types/project'
 
+// macOS labels its app menu items ("About ...", "Quit ...") with the app's name, which
+// defaults to the package name. The data folder is derived from the name too, so fix it
+// in place before renaming.
+if (process.platform === 'darwin') {
+  app.setPath('userData', app.getPath('userData'))
+  app.setName('Gridfinity Studio')
+}
+
 interface WindowBounds {
   x: number
   y: number
@@ -229,8 +237,8 @@ app.whenReady().then(() => {
   // every time we run pnpm dev.
   if (canUpdate) {
     // Route electron-updater's internal logs through electron-log so they
-    // land in ~/Library/Logs/gridfinity-studio/main.log on macOS (platform
-    // equivalent elsewhere). Without this, autoUpdater falls back to
+    // land in ~/Library/Logs/Gridfinity Studio/main.log on macOS (the platform
+    // equivalent, under gridfinity-studio, elsewhere). Without this, autoUpdater falls back to
     // console.log which is invisible in a packaged Mac app launched from
     // Finder/Spotlight. Only the updater logger and our explicit log.error
     // calls below go through the file — other console.* in main still go to

@@ -1,6 +1,7 @@
 appId: com.unstablestudios.gridfinity-studio
-# The name people see. File names, the install folder and the data folder come from `name`
-# in package.json, so they stay `gridfinity-studio`.
+# The name people see: the macOS app, shortcuts, and the deb's folder under /opt. Installer
+# and executable file names, the Windows install folder and the data folder come from `name`
+# in package.json and stay `gridfinity-studio`.
 productName: Gridfinity Studio
 directories:
   buildResources: build
@@ -47,6 +48,10 @@ linux:
     - deb
   maintainer: Unstable Studios <info@unstablestudios.com>
   category: Utility
+  desktop:
+    entry:
+      # Windows identify as the package name. This must match, or the dock shows a second icon.
+      StartupWMClass: gridfinity-studio
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
