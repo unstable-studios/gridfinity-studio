@@ -74,7 +74,7 @@ export function notifyExported(what: string): void {
  */
 export function notifyResizeBlocked(blocker: string): void {
   toast.error('Not enough room to resize', {
-    description: `${blocker} is in the way. Move one of them, then try again.`,
+    description: `${blocker} is in the way. Move it, then try again.`,
     id: 'resize-blocked'
   })
 }

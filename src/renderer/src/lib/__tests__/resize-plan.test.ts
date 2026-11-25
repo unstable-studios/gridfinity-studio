@@ -52,6 +52,41 @@ describe('planResize', () => {
     })
   })
 
+  it('grows the other way as far as it must, not to a nearer row', () => {
+    // Three wide from one, with a neighbor right beside it. One square left still covers
+    // the neighbor, and the row above is nearer than two squares left, but two squares left
+    // is growing the other way: the bin still covers where it was.
+    expect(plan(bin('a', 0, 0), 3, 1, [bin('b', 1, 0)])).toEqual({ dx: -2, dy: 0, moved: true })
+    expect(plan(bin('a', 0, 0), 1, 3, [bin('above', 0, -1)])).toEqual({
+      dx: 0,
+      dy: 2,
+      moved: true
+    })
+  })
+
+  it('grows left and down together when it grew both ways and each alone is blocked', () => {
+    // Bigger both ways, with bins to the right and above. Left alone still reaches up into
+    // the one above, and down alone still reaches right.
+    const others = [bin('right', 1, 0), bin('above', 0, -1)]
+    expect(plan(bin('a', 0, 0), 2, 2, others)).toEqual({ dx: -1, dy: 1, moved: true })
+  })
+
+  it('lets a bin that is on another one shrink where it stands', () => {
+    // Two wide, with a bin already under its right half: making it one wide pulls it off.
+    const a = bin('a', 0, 0, 2, 1)
+    expect(plan(a, 1, 1, [bin('under', 1, 0)])).toEqual({ dx: 0, dy: 0, moved: false })
+  })
+
+  it('looks no further than its own width sideways and its own depth up and down', () => {
+    // One deep and four wide: boxed in on both sides and for one row above and below, with
+    // room two rows away that it must not go to.
+    const others = [bin('right', 3, 0, 8, 1), bin('left', -8, 0, 8, 1)]
+    for (let column = -8; column <= 8; column++) {
+      others.push(bin(`up${column}`, column, -1), bin(`down${column}`, column, 1))
+    }
+    expect(plan(bin('a', 0, 0, 3, 1), 4, 1, others)).toEqual({ blockedBy: 'right' })
+  })
+
   it('takes the nearest free place when the near ones are taken', () => {
     const others = [bin('right', 1, 0), bin('left', -2, 0, 2, 1)]
     // Sideways is taken both ways, so it goes up or down a row: up first.

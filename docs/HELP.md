@@ -12,7 +12,7 @@ Work is saved as a `.gfstudio` file. **File > Save** saves it, and the **Unsaved
 
 Open **Add bin** in the sidebar and pick a size, or choose the **Bin** tool and drag on the canvas. Bins snap to the grid and can't overlap.
 
-Select a bin to change its width, depth and height, or to turn the stacking lip off. A bin grows to the right and upward. If another bin is in the way, it moves to the nearest place its new size fits, and says so.
+Select a bin to change its width, depth and height, or to turn the stacking lip off. A bin grows to the right and upward. If another bin is in the way, it grows the other way or moves to the nearest place its new size fits, and says so. With no room nearby it stays as it is, and the notice names the bin in the way.
 
 ## Draw pockets
 
