@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
 import { Button } from '@unstable-studios/ui'
 import { Switch } from '@/components/ui/switch'
+import { Checkbox } from '@/components/ui/checkbox'
+import { allCheckedState } from '@/lib/export-plan'
 import { GridPicker } from '@/components/ui/grid-picker'
 import { shapeTypeLabel } from '@/lib/shape-labels'
 import { selectionAfterClick } from '@/lib/list-selection'
@@ -520,10 +522,10 @@ function LayoutSidebar(): React.JSX.Element {
 // ─── Preview Sidebar ────────────────────────────────────────
 
 function PreviewSidebar(): React.JSX.Element {
-  const engine = useLayoutEngine()
   const bakeResults = useProject((s) => s.bakeResults)
   const bakeStatus = useProject((s) => s.bakeStatus)
-  const { bins, selectedBins, chosen } = useExport()
+  const { bins, chosen, setChecked, setAllChecked } = useExport()
+  const checkedIds = new Set(chosen.map((bin) => bin.id))
 
   const totalBins = bins.length
   const anyError = chosen.some((b) => bakeStatus.get(b.id) === 'error')
@@ -531,23 +533,6 @@ function PreviewSidebar(): React.JSX.Element {
     () => chosen.flatMap((bin) => bakeResults.get(bin.id)?.warnings ?? []),
     [bakeResults, chosen]
   )
-
-  // Clicking rows selects bins as in Design, to export only those.
-  const selectedBinIds = selectedBins.map((bin) => bin.id)
-  const listAnchorRef = useRef<string | null>(null)
-  const handleRowClick = (id: string, e: React.MouseEvent): void => {
-    if (!engine) return
-    const next = selectionAfterClick({
-      order: bins.map((bin) => bin.id),
-      selected: selectedBinIds,
-      clicked: id,
-      anchor: listAnchorRef.current,
-      shift: e.shiftKey,
-      toggle: e.metaKey || e.ctrlKey
-    })
-    listAnchorRef.current = next.anchor
-    engine.select(next.selected)
-  }
 
   return (
     <div className="space-y-4">
@@ -558,10 +543,19 @@ function PreviewSidebar(): React.JSX.Element {
           <p className="text-xs text-zinc-500">No bins yet. Add one in Design.</p>
         ) : (
           <div className="space-y-1">
+            {totalBins > 1 && (
+              <label className="flex select-none items-center gap-2 px-2 py-1 text-xs text-zinc-600 dark:text-zinc-400">
+                <Checkbox
+                  checked={allCheckedState(chosen.length, totalBins)}
+                  onCheckedChange={(checked) => setAllChecked(checked === true)}
+                />
+                All bins
+              </label>
+            )}
             {bins.map((bin) => {
               const status = bakeStatus.get(bin.id) ?? 'baking'
               const meta = bin.metadata as BinMetadata
-              const isSelected = selectedBinIds.includes(bin.id)
+              const name = storedName(meta) ?? 'Bin'
               const pip =
                 status === 'ready'
                   ? { color: 'text-emerald-700 dark:text-emerald-500', label: '● Ready' }
@@ -572,27 +566,25 @@ function PreviewSidebar(): React.JSX.Element {
                         label: '◌ Building…'
                       }
               return (
-                <button
+                <label
                   key={bin.id}
-                  type="button"
-                  aria-pressed={isSelected}
-                  className={`flex w-full select-none items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition-colors ${
-                    isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-zinc-100/60 text-zinc-800 hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-200 dark:hover:bg-zinc-800'
-                  }`}
-                  onClick={(e) => handleRowClick(bin.id, e)}
+                  className="flex w-full select-none items-center gap-2 rounded-md bg-zinc-100/60 px-2 py-1.5 text-zinc-800 transition-colors hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 >
+                  {totalBins > 1 && (
+                    <Checkbox
+                      aria-label={`Export ${name}`}
+                      checked={checkedIds.has(bin.id)}
+                      onCheckedChange={(checked) => setChecked(bin.id, checked === true)}
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium">{storedName(meta) ?? 'Bin'}</p>
-                    <p className={`text-[10px] ${isSelected ? 'text-blue-100' : 'text-zinc-500'}`}>
+                    <p className="truncate text-xs font-medium">{name}</p>
+                    <p className="text-[10px] text-zinc-500">
                       {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                     </p>
                   </div>
-                  <span className={`text-[10px] ${isSelected ? 'text-white' : pip.color}`}>
-                    {pip.label}
-                  </span>
-                </button>
+                  <span className={`text-[10px] ${pip.color}`}>{pip.label}</span>
+                </label>
               )
             })}
           </div>

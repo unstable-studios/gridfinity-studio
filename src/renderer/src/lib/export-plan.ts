@@ -2,9 +2,6 @@
  * Which bins an export takes, and what the result is called.
  */
 
-/** Export every bin, or only the ones the selection points at. */
-export type ExportScope = 'all' | 'selected'
-
 interface Identified {
   id: string
 }
@@ -14,20 +11,19 @@ interface Named extends Identified {
   name?: string
 }
 
-/**
- * The bins a selection points at: bins that are selected, and bins holding a selected shape.
- * Returned in the order of `bins`.
- */
-export function binsInSelection<Bin extends Identified>(
+/** The bins an export takes: every bin that has not been unchecked, in the order of `bins`. */
+export function checkedBins<Bin extends Identified>(
   bins: Bin[],
-  shapes: Array<{ id: string; groupId: string | null }>,
-  selectedIds: string[]
+  unchecked: Iterable<string>
 ): Bin[] {
-  const picked = new Set(selectedIds)
-  for (const shape of shapes) {
-    if (shape.groupId !== null && picked.has(shape.id)) picked.add(shape.groupId)
-  }
-  return bins.filter((bin) => picked.has(bin.id))
+  const left = new Set(unchecked)
+  return bins.filter((bin) => !left.has(bin.id))
+}
+
+/** What a "check all" box shows for `checked` out of `total` bins. */
+export function allCheckedState(checked: number, total: number): boolean | 'indeterminate' {
+  if (checked === 0) return false
+  return checked >= total ? true : 'indeterminate'
 }
 
 /**
