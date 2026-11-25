@@ -133,6 +133,38 @@ export class ProjectValidator {
 
     this.validateHolesConfig(c.magnetHoles, 'magnetHoles', errors)
     this.validateHolesConfig(c.screwHoles, 'screwHoles', errors)
+    // Optional: files from before bins had defaults do not have it.
+    if (c.newBin !== undefined) this.validateNewBin(c.newBin, errors)
+  }
+
+  private static validateNewBin(newBin: unknown, errors: ValidationError[]): void {
+    if (!newBin || typeof newBin !== 'object') {
+      errors.push({
+        field: 'gridfinity.newBin',
+        message: 'newBin must be an object',
+        value: newBin
+      })
+      return
+    }
+    const b = newBin as Record<string, unknown>
+    if (
+      typeof b.heightUnits !== 'number' ||
+      !Number.isInteger(b.heightUnits) ||
+      b.heightUnits < 1
+    ) {
+      errors.push({
+        field: 'gridfinity.newBin.heightUnits',
+        message: 'heightUnits must be a whole number of at least 1',
+        value: b.heightUnits
+      })
+    }
+    if (typeof b.hasLip !== 'boolean') {
+      errors.push({
+        field: 'gridfinity.newBin.hasLip',
+        message: 'hasLip must be a boolean',
+        value: b.hasLip
+      })
+    }
   }
 
   private static validateHolesConfig(

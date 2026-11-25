@@ -8,6 +8,8 @@ import { useTheme } from '@unstable-studios/ui'
 import { Button } from '@unstable-studios/ui'
 import ColorPicker from '@/components/ui/color-picker'
 import GridfinitySettings from './GridfinitySettings'
+import { isNewProjectDefault, saveNewProjectDefaults } from '@/lib/new-project-defaults'
+import { cn } from '@/lib/utils'
 import {
   loadThemeConfig,
   saveThemeConfig,
@@ -35,11 +37,14 @@ export default function PreferencesModal({
         </DialogHeader>
         <Tabs defaultValue="general" orientation="vertical">
           <div className="flex gap-4 h-[420px]">
+            {/* Grouped by where a setting is kept: on this computer, or in the project file. */}
             <TabsList className="w-32 shrink-0 border-r border-zinc-200 dark:border-zinc-800 pr-4">
+              <TabGroupLabel>App</TabGroupLabel>
               <TabsTrigger value="general">General</TabsTrigger>
+              <TabsTrigger value="colors">Colors</TabsTrigger>
+              <TabGroupLabel className="mt-3">This project</TabGroupLabel>
               <TabsTrigger value="units">Units</TabsTrigger>
               <TabsTrigger value="gridfinity">Gridfinity</TabsTrigger>
-              <TabsTrigger value="colors">Colors</TabsTrigger>
             </TabsList>
             <div className="flex-1 min-w-0 overflow-y-auto">
               <TabsContent value="general">
@@ -59,6 +64,26 @@ export default function PreferencesModal({
         </Tabs>
       </DialogContent>
     </Dialog>
+  )
+}
+
+function TabGroupLabel({
+  className,
+  children
+}: {
+  className?: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <p
+      role="presentation"
+      className={cn(
+        'px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400',
+        className
+      )}
+    >
+      {children}
+    </p>
   )
 }
 
@@ -133,7 +158,39 @@ function GridfinityTab(): React.JSX.Element {
   }
 
   return (
-    <GridfinitySettings config={project.gridfinity} onChange={handleChange} hasBins={hasBins} />
+    <div className="space-y-4">
+      <GridfinitySettings config={project.gridfinity} onChange={handleChange} hasBins={hasBins} />
+      <NewProjectDefaults config={project.gridfinity} />
+    </div>
+  )
+}
+
+/** Keep this project's settings as what new projects start with. */
+function NewProjectDefaults({ config }: { config: GridfinityConfig }): React.JSX.Element {
+  // The saved defaults are not React state, so a save has to ask for a new render.
+  const [, setSaves] = useState(0)
+  const isDefault = isNewProjectDefault(config)
+
+  return (
+    <div className="space-y-1.5 border-t border-zinc-200 pt-4 dark:border-zinc-800">
+      <Button
+        variant="outline"
+        size="sm"
+        className="w-full"
+        disabled={isDefault}
+        onClick={() => {
+          saveNewProjectDefaults(config)
+          setSaves((count) => count + 1)
+        }}
+      >
+        Use for new projects
+      </Button>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        {isDefault
+          ? 'New projects start with these settings.'
+          : 'New projects start with different settings.'}
+      </p>
+    </div>
   )
 }
 

@@ -52,7 +52,11 @@ With more than one bin:
 
 ## Project settings
 
-Tolerance, unit height, and magnet and screw holes are set per project in **Edit > Preferences…**. The base unit can be changed there only while the project has no bins.
+Tolerance, unit height, and magnet and screw holes are set per project in **Edit > Preferences…**, under **Gridfinity**. The base unit can be changed there only while the project has no bins.
+
+**New bins** sets the height and stacking lip a bin starts with. Bins already in the project keep their own.
+
+**Use for new projects** keeps the project's settings as what every new project starts with. Preferences lists settings kept with the app apart from the ones saved in the project.
 
 ## Updates
 

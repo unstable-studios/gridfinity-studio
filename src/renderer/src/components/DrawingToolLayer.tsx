@@ -16,6 +16,8 @@ import { shapeTypeLabel } from '@/lib/shape-labels'
 import { boxFromDrag, type DrawOptions, type Point } from '@/lib/draw-box'
 import { binFromDrag, type DrawnBin } from '@/lib/draw-bin'
 import { addBin } from '@/lib/new-bin'
+import { useProject } from '@/hooks/useProject'
+import { DEFAULT_GRIDFINITY_CONFIG, newBinDefaults } from '../../../shared/types/project'
 import { checkGroupCollision } from '@/layout-engine/collision'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
@@ -421,7 +423,8 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         dragCurrentRef.current = null
         // A bin can't sit on another. The preview has already shown there is no room.
         if (binOverlaps(engine, bin)) return
-        addBin(engine, bin, cell, { adoptShapes: true })
+        const settings = useProject.getState().project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
+        addBin(engine, bin, cell, newBinDefaults(settings), { adoptShapes: true })
         setActiveTool('select')
         return
       }
