@@ -42,7 +42,9 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     // so only a snapshot that differs needs a name.
     if (before === json) return
     // The step is named for what it did, whichever event reported it.
-    const label = before ? describeChange(JSON.parse(before) as LayoutSnapshot, snapshot) : ''
+    const label = before
+      ? describeChange(JSON.parse(before) as LayoutSnapshot, snapshot)
+      : 'Change layout'
     stackRef.current.push(json, label)
     syncState()
   }, [engine, syncState])

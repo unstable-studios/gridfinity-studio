@@ -938,7 +938,7 @@ test('the history lists each step by what it did, and goes to the one clicked', 
   // Newest first, each named for what it did, with the latest marked as where things are.
   await expect(panel).toHaveCount(0)
   await page.getByRole('button', { name: 'History', exact: true }).click()
-  await expect(steps).toHaveText(['Add Bin 2', 'Add rectangle', 'Add Bin 1', 'Start'])
+  await expect(steps).toHaveText(['Add Bin 2', 'Add Rectangle 1', 'Add Bin 1', 'Start'])
   await expect(step('Add Bin 2')).toHaveAttribute('aria-current', 'step')
 
   // Back two steps at once. The steps after it stay, marked as undone.
@@ -946,17 +946,17 @@ test('the history lists each step by what it did, and goes to the one clicked', 
   await app.expectBinCount(1)
   await app.expectShapeCount(0)
   await expect(step('Add Bin 1')).toHaveAttribute('aria-current', 'step')
-  await expect(steps).toHaveText(['Add Bin 2Undone', 'Add rectangleUndone', 'Add Bin 1', 'Start'])
+  await expect(steps).toHaveText(['Add Bin 2Undone', 'Add Rectangle 1Undone', 'Add Bin 1', 'Start'])
 
   // Forward again to the newest.
   await steps.first().click()
   await app.expectBinCount(2)
   await app.expectShapeCount(1)
-  await expect(steps).toHaveText(['Add Bin 2', 'Add rectangle', 'Add Bin 1', 'Start'])
+  await expect(steps).toHaveText(['Add Bin 2', 'Add Rectangle 1', 'Add Bin 1', 'Start'])
 
   // Undo from the keyboard moves the mark, and the list follows.
   await page.keyboard.press('ControlOrMeta+z')
-  await expect(step('Add rectangle')).toHaveAttribute('aria-current', 'step')
+  await expect(step('Add Rectangle 1')).toHaveAttribute('aria-current', 'step')
 
   // Back to the start, then a new change: the steps that were undone are gone.
   await step('Start').click()

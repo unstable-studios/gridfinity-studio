@@ -131,7 +131,13 @@ function AppMenubar({
 }) {
   const { project, saveProject, saveProjectAs, loadProject, recentProjects, loadRecentProjects } =
     useProject()
-  const { undo, redo, canUndo, canRedo, historyOpen } = useUndoRedo()
+  // One value at a time: the store's history changes with every edit, which the menus do
+  // not need to follow.
+  const undo = useUndoRedo((s) => s.undo)
+  const redo = useUndoRedo((s) => s.redo)
+  const canUndo = useUndoRedo((s) => s.canUndo)
+  const canRedo = useUndoRedo((s) => s.canRedo)
+  const historyOpen = useUndoRedo((s) => s.historyOpen)
   const { mode } = useAppMode()
   const edit = useEditShortcuts()
   useCloseGuard()

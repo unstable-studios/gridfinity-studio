@@ -24,7 +24,6 @@ import { MOD_KEY } from '@/lib/platform'
 
 function LayoutViewport(): React.JSX.Element {
   const { engine } = useLayoutEngineContext()
-  useEngineUndoRedo(engine)
   const canUndo = useUndoRedo((s) => s.canUndo)
   const canRedo = useUndoRedo((s) => s.canRedo)
   const { tick } = useEngineState()
@@ -76,6 +75,8 @@ export default function Viewport(): React.JSX.Element {
   const { mode, activeTool } = useAppMode()
   const { project, bakeResults } = useProject()
   const engine = useLayoutEngine()
+  // Here, not in the Design-only part below: the history has to outlive a visit to Preview.
+  useEngineUndoRedo(engine)
 
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 
