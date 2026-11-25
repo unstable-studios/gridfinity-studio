@@ -134,12 +134,12 @@ test('failed and cancelled file operations tell the person what happened', async
   await expect(page.getByText(/\bReady$/)).toBeVisible({ timeout: 30_000 })
 
   await app.stubSaveDialog(join(missingFolder, 'bin.stl'))
-  await page.getByRole('button', { name: 'Export STL…' }).click()
+  await app.exportAs('STL')
   await expect(page.getByText('Couldn’t export')).toBeVisible()
   await dismissAll()
 
   await app.stubSaveDialog(join(app.dir, 'bin.stl'))
-  await page.getByRole('button', { name: 'Export STL…' }).click()
+  await app.exportAs('STL')
   await expect(page.getByText('Exported bin.stl')).toBeVisible()
 
   expect(app.errors).toEqual([])

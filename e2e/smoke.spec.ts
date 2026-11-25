@@ -80,7 +80,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   // ── Export 3MF: a zip holding a model with real geometry ────────────────
   const threeMfPath = join(app.dir, 'smoke.3mf')
   await app.stubSaveDialog(threeMfPath)
-  await page.getByRole('button', { name: 'Export 3MF…' }).click()
+  await app.exportAs('3MF')
   const model = await readWhenComplete(threeMfPath, async (bytes) => {
     const zip = await JSZip.loadAsync(bytes)
     const modelFile = Object.keys(zip.files).find((name) => name.endsWith('.model'))
@@ -94,7 +94,7 @@ test('design a bin with a pocket, export it, and reopen the project', async ({},
   // ── Export STL: binary layout is 80-byte header, count, 50 bytes each ───
   const stlPath = join(app.dir, 'smoke.stl')
   await app.stubSaveDialog(stlPath)
-  await page.getByRole('button', { name: 'Export STL…' }).click()
+  await app.exportAs('STL')
   const triangleCount = await readWhenComplete(stlPath, async (bytes) => {
     const count = bytes.length >= 84 ? bytes.readUInt32LE(80) : -1
     if (bytes.length !== 84 + count * 50) throw new Error(`STL is ${bytes.length} bytes`)

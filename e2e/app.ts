@@ -193,6 +193,21 @@ export class StudioApp {
     await this.page.getByRole('menuitem', { name: item }).click()
   }
 
+  /** Open Export in the top bar, unless it is open already. Its options and formats are inside. */
+  async openExport(): Promise<void> {
+    const format = this.page.getByRole('button', { name: 'Export STL…' })
+    if (!(await format.isVisible())) {
+      await this.page.getByRole('button', { name: 'Export', exact: true }).click()
+    }
+    await expect(format).toBeVisible()
+  }
+
+  /** Export from the top bar. */
+  async exportAs(format: '3MF' | 'STL'): Promise<void> {
+    await this.openExport()
+    await this.page.getByRole('button', { name: `Export ${format}…` }).click()
+  }
+
   /** A tool in the toolbar. "Bin" is also an option elsewhere, so the toolbar is named. */
   tool(name: 'Select' | 'Bin' | 'Rectangle' | 'Ellipse' | 'Polygon'): Locator {
     return this.page

@@ -523,8 +523,7 @@ function PreviewSidebar(): React.JSX.Element {
   const engine = useLayoutEngine()
   const bakeResults = useProject((s) => s.bakeResults)
   const bakeStatus = useProject((s) => s.bakeStatus)
-  const { bins, selectedBins, chosen, scope, setScope, files, setFiles, canExport, exportAs } =
-    useExport()
+  const { bins, selectedBins, chosen } = useExport()
 
   const totalBins = bins.length
   const anyError = chosen.some((b) => bakeStatus.get(b.id) === 'error')
@@ -613,75 +612,6 @@ function PreviewSidebar(): React.JSX.Element {
           ))}
         </ul>
       )}
-
-      <SidebarSection title="Export">
-        <div className="space-y-2">
-          {totalBins > 1 && (
-            <>
-              <ToggleGroup
-                type="single"
-                aria-label="Bins to export"
-                className="flex w-full"
-                value={scope}
-                onValueChange={(value) => {
-                  if (value === 'all' || value === 'selected') setScope(value)
-                }}
-              >
-                <ToggleGroupItem value="all" className="flex-1 justify-center">
-                  All bins
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="selected"
-                  className="flex-1 justify-center disabled:opacity-50"
-                  disabled={selectedBins.length === 0}
-                >
-                  Selected ({selectedBins.length})
-                </ToggleGroupItem>
-              </ToggleGroup>
-              {selectedBins.length === 0 && (
-                <p className="text-[10px] text-zinc-500">
-                  Click bins in the list to export only those.
-                </p>
-              )}
-              <ToggleGroup
-                type="single"
-                aria-label="Files to export"
-                className="flex w-full"
-                value={files}
-                onValueChange={(value) => {
-                  if (value === 'one' || value === 'perBin') setFiles(value)
-                }}
-              >
-                <ToggleGroupItem value="one" className="flex-1 justify-center">
-                  One file
-                </ToggleGroupItem>
-                <ToggleGroupItem value="perBin" className="flex-1 justify-center">
-                  File per bin
-                </ToggleGroupItem>
-              </ToggleGroup>
-            </>
-          )}
-          <Button
-            variant="default"
-            className="w-full"
-            disabled={!canExport}
-            onClick={() => void exportAs('3mf')}
-          >
-            Export 3MF…
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full"
-            disabled={!canExport}
-            onClick={() => void exportAs('stl')}
-          >
-            Export STL…
-          </Button>
-          {!canExport && !anyError && totalBins > 0 && (
-            <p className="text-[10px] text-zinc-500">Building the model…</p>
-          )}
-        </div>
-      </SidebarSection>
     </div>
   )
 }
