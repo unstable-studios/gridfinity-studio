@@ -15,6 +15,7 @@ Runs on macOS, Windows and Linux.
 - **3D preview.** See the finished bins, with the stacking lip, feet, and magnet and screw holes.
 - **Export.** Save 3MF or STL: every bin or only the selected ones, in one file or one file per bin.
 - **Projects.** Work is saved as a `.gfstudio` file, with undo, redo, cut, copy and paste.
+- **Examples.** Three example projects open from the welcome screen: a socket tray, a divided tray and a tool tray.
 
 ## Install
 
