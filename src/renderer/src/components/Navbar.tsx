@@ -345,6 +345,8 @@ function ToolBar() {
     <ToggleGroup
       type="single"
       aria-label="Tools"
+      // Hidden tools keep their width, so they must not take the keyboard either.
+      inert={hidden}
       value={activeTool ?? ''}
       onValueChange={(value) => {
         if (value) setActiveTool(value as typeof activeTool)
