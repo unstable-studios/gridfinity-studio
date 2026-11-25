@@ -15,4 +15,8 @@ jobs:
     with:
       config-file: .release-please-config.json
       manifest-file: .release-please-manifest.json
+      # A new release has no installers for the first few minutes. The release before it
+      # stays Latest, which is what the app's updater reads, until build-release.yml has
+      # attached them and moves the mark.
+      mark-latest: false
     secrets: inherit

@@ -16,39 +16,6 @@ env:
   NODE_VERSION: '24'
 
 jobs:
-  # A release is published before its installers exist, and the app's updater only looks at
-  # the release marked Latest. Until this one has its installers, the last release that has
-  # them stays Latest, so apps keep updating to it. `publish` moves the mark at the end. If a
-  # build fails, the mark never moves and nobody is offered a release with nothing in it.
-  hold:
-    name: Keep the last complete release as Latest
-    runs-on: ubuntu-latest
-    # A help, not a gate: if this fails, the installers must still be built and attached.
-    continue-on-error: true
-    steps:
-      - name: Mark the last release with installers as Latest
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          TAG: ${{ github.event.release.tag_name }}
-        # Named, so a failed request fails the step instead of reading as "no release".
-        shell: bash
-        run: |
-          # Newest first. `latest.yml` is the Windows update file, attached with the rest.
-          previous=$(gh api "repos/$REPO/releases?per_page=30" | jq -r --arg tag "$TAG" '
-            [.[]
-              | select(.draft | not)
-              | select(.prerelease | not)
-              | select(.tag_name != $tag)
-              | select(any(.assets[]; .name == "latest.yml"))
-            ][0].tag_name // empty')
-          if [ -z "$previous" ]; then
-            echo "No earlier release with installers. $TAG stays Latest."
-            exit 0
-          fi
-          echo "Keeping $previous as Latest while $TAG builds."
-          gh release edit "$previous" --repo "$REPO" --latest
-
   build:
     name: Build installers
     runs-on: ${{ matrix.os }}
@@ -152,7 +119,7 @@ jobs:
   publish:
     name: Publish release artifacts
     runs-on: ubuntu-latest
-    needs: [hold, build]
+    needs: build
     steps:
       # upload-artifact strips the leading `dist/` prefix when path uses a
       # wildcard, so artifact contents are flat. With merge-multiple the
@@ -181,9 +148,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Only now does this release have what an update needs. See the `hold` job. The mark
+      # The app's updater only looks at the release marked Latest. Release Please is told not
+      # to give a new release that mark (`mark-latest: false` in release-please.yml), since it
+      # has no installers yet. Only now does this one have what an update needs. The mark
       # goes to the newest release that has installers, which is this one unless a newer
       # release finished first or this is a re-run for an old tag: it never moves backwards.
+      # If a build fails, the mark stays where it was and nobody is offered an empty release.
       - name: Mark the newest complete release as Latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
