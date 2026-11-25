@@ -42,6 +42,13 @@ describe('updateMenuItems', () => {
     expect(actions({ kind: 'up-to-date' })).toEqual([undefined, 'check'])
   })
 
+  it('says a version is on its way when the newest release has no installers yet', () => {
+    expect(updateMenuItems({ kind: 'preparing' })).toEqual([
+      { label: 'A new version is on its way' },
+      { label: 'Check again', action: 'check' }
+    ])
+  })
+
   it('offers the restart when an update is ready', () => {
     expect(updateMenuItems({ kind: 'downloaded', version: '1.2.3' })).toEqual([
       { label: 'Restart to update to v1.2.3', action: 'install', tone: 'good' }

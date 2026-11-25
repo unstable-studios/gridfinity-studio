@@ -147,7 +147,7 @@ Help > About lists the open-source packages the app is built with (`AboutDialog.
 - **3D Preview**: Three.js via @react-three/fiber and @react-three/drei
 - **CSG**: Manifold (WASM) for solid geometry
 - **Build**: electron-vite, Vite 7, TypeScript 5.9
-- **Release**: release-please for automated versioning and CHANGELOG. `feat`, `fix`, `perf`, `docs`, `refactor` and `build` commits appear in the changelog and trigger a release; `chore`, `ci`, `test` and `style` do not. A release PR may change only the version, the changelog and the manifest; CI's "Release changes only the version" check fails otherwise (`.github/scripts/release-guard.sh`), and then the PR must not be merged until Release Please rebuilds it. The check compares the release branch with the commit it was built on
+- **Release**: release-please for automated versioning and CHANGELOG. `feat`, `fix`, `perf`, `docs`, `refactor` and `build` commits appear in the changelog and trigger a release; `chore`, `ci`, `test` and `style` do not. A release PR may change only the version, the changelog and the manifest; CI's "Release changes only the version" check fails otherwise (`.github/scripts/release-guard.sh`), and then the PR must not be merged until Release Please rebuilds it. The check compares the release branch with the commit it was built on. A release is published before its installers exist, so Release Please leaves the Latest mark on the release before it (`mark-latest: false`), `build-release.yml` checks that it did and moves the mark once the new one's installers are attached, and the app shows "A new version is on its way" (and looks again in five minutes) if it meets a release with none
 - **Project files**: `.gfstudio` (JSON, schema v0.5.0)
 
 ## Verifying Changes

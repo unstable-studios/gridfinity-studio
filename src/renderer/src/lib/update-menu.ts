@@ -35,6 +35,9 @@ export function updateMenuItems(state: UpdateState): UpdateMenuItem[] {
       return [{ label: 'Checking for updates…' }]
     case 'up-to-date':
       return [{ label: 'Up to date' }, { label: 'Check again', action: 'check' }]
+    case 'preparing':
+      // A release was published and its installers are still being built.
+      return [{ label: 'A new version is on its way' }, { label: 'Check again', action: 'check' }]
     case 'downloading': {
       // The updater can report a progress that is not a number, before it knows the size.
       const progress = Number.isFinite(state.progress) ? state.progress : 0

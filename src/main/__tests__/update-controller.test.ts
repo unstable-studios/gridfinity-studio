@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   CHECK_TIMEOUT_MS,
   DOWNLOAD_STALL_MS,
+  PREPARING_RETRY_MS,
+  PREPARING_ROUNDS,
   createUpdateController,
   type UpdateController
 } from '../update-controller'
@@ -217,6 +219,117 @@ describe('the update controller', () => {
     expect(updater.checks).toBe(2)
 
     stop()
+  })
+
+  // A release is published a few minutes before its installers are attached.
+  const stillBuilding = (): Error =>
+    Object.assign(new Error('Cannot find latest-mac.yml in the latest release artifacts'), {
+      code: 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND'
+    })
+
+  it('does not call a release with no installers yet a failure', async () => {
+    const updates = make()
+    updates.check()
+    updater.emit('error', stillBuilding())
+    await updater.reject(stillBuilding())
+
+    expect(kinds()).toEqual(['checking', 'preparing'])
+    expect(updates.state()).toEqual({ kind: 'preparing' })
+  })
+
+  it('says the same when the updater only rejects', async () => {
+    const updates = make()
+    updates.check()
+    await updater.reject(stillBuilding())
+
+    expect(updates.state()).toEqual({ kind: 'preparing' })
+  })
+
+  it('looks again a few minutes later, and then finds the update', () => {
+    const stop = make().start()
+    updater.emit('error', stillBuilding())
+    expect(updater.checks).toBe(1)
+
+    vi.advanceTimersByTime(PREPARING_RETRY_MS - 1)
+    expect(updater.checks).toBe(1)
+    vi.advanceTimersByTime(1)
+    expect(updater.checks).toBe(2)
+    updater.emit('update-available', { version: '1.2.3' })
+    expect(kinds().slice(-2)).toEqual(['checking', 'downloading'])
+
+    // Found: no more early checks.
+    vi.advanceTimersByTime(PREPARING_RETRY_MS)
+    expect(updater.checks).toBe(2)
+    stop()
+  })
+
+  it('keeps looking every few minutes while the installers are not there', () => {
+    const stop = make().start()
+    for (let round = 1; round <= 3; round++) {
+      updater.emit('error', stillBuilding())
+      vi.advanceTimersByTime(PREPARING_RETRY_MS)
+      expect(updater.checks).toBe(round + 1)
+    }
+    stop()
+  })
+
+  it('calls it a failure when the installers never come, and stops looking early', () => {
+    const updates = make()
+    updates.check()
+    for (let round = 0; round < PREPARING_ROUNDS; round++) {
+      updater.emit('error', stillBuilding())
+      expect(updates.state().kind).toBe('preparing')
+      vi.advanceTimersByTime(PREPARING_RETRY_MS)
+    }
+    updater.emit('error', stillBuilding())
+    expect(updates.state().kind).toBe('error')
+
+    const checks = updater.checks
+    vi.advanceTimersByTime(PREPARING_RETRY_MS * 3)
+    expect(updater.checks).toBe(checks)
+  })
+
+  it('starts counting again once a check has found its answer', () => {
+    const updates = make()
+    updates.check()
+    for (let round = 0; round < PREPARING_ROUNDS; round++) {
+      updater.emit('error', stillBuilding())
+      vi.advanceTimersByTime(PREPARING_RETRY_MS)
+    }
+    updater.emit('update-not-available')
+
+    updates.check()
+    updater.emit('error', stillBuilding())
+    expect(updates.state().kind).toBe('preparing')
+  })
+
+  it('lets a check be asked for while waiting, without a second one following it', () => {
+    const updates = make()
+    updates.check()
+    updater.emit('error', stillBuilding())
+    updates.check()
+    expect(updater.checks).toBe(2)
+    updater.emit('update-not-available')
+
+    vi.advanceTimersByTime(PREPARING_RETRY_MS)
+    expect(updater.checks).toBe(2)
+  })
+
+  it('stops looking when it is stopped', () => {
+    const stop = make().start()
+    updater.emit('error', stillBuilding())
+    stop()
+
+    vi.advanceTimersByTime(PREPARING_RETRY_MS * 2)
+    expect(updater.checks).toBe(1)
+  })
+
+  it('still calls any other missing-file message a failure', () => {
+    const updates = make()
+    updates.check()
+    updater.emit('error', new Error('Cannot find latest-mac.yml in the latest release artifacts'))
+
+    expect(updates.state().kind).toBe('error')
   })
 
   it('logs every failure', async () => {
