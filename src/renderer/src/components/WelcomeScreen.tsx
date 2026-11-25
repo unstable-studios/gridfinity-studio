@@ -49,8 +49,8 @@ export default function WelcomeScreen(): React.JSX.Element {
                 className={LIST_ROW_CLASS}
                 onClick={() => openExample(example)}
               >
-                <span className="font-medium">{example.name}</span>
-                <span className="ml-2 opacity-70">{example.description}</span>
+                <span className="font-medium">{example.name}</span>{' '}
+                <span className="ml-1 opacity-70">{example.description}</span>
               </button>
             ))}
           </div>

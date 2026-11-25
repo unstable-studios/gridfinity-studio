@@ -21,9 +21,9 @@ test('an example opens from the welcome screen as a new project, and builds', as
   await app.expectBinCount(2)
   await app.expectShapeCount(5)
 
-  // Every bin builds, with nothing to warn about.
+  // Both bins build, with nothing to warn about.
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
-  await expect(page.getByText(/\bReady$/)).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText(/\bReady$/)).toHaveCount(2, { timeout: 30_000 })
   await expect(page.getByText(/could not be cut|Couldn’t build/)).toHaveCount(0)
 
   // It has no file yet: saving asks where, and writes the example's bins and shapes.
