@@ -126,5 +126,5 @@
     "vitest-canvas-mock": "^1.2.0",
     "zustand": "^5.1.0"
   },
-  "packageManager": "pnpm@11.29.0"
+  "packageManager": "pnpm@12.22.0"
 }
