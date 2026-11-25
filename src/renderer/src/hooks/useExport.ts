@@ -58,8 +58,11 @@ export function useExport(): ExportCommands {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bins = useMemo(() => (engine?.getAllGroups() ?? []).filter(isBinGroup), [engine, tick])
-  const chosen = useMemo(() => checkedBins(bins, unchecked), [bins, unchecked])
-  // With one bin there is nothing to choose, and the choice is not shown.
+  // With one bin there is nothing to choose, and no checkbox is shown.
+  const chosen = useMemo(
+    () => (bins.length > 1 ? checkedBins(bins, unchecked) : bins),
+    [bins, unchecked]
+  )
   const files: ExportFiles = bins.length > 1 ? wantedFiles : 'one'
 
   // Bins are only built in Preview. In Design the last build can be out of date.

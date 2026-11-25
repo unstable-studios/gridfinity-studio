@@ -570,11 +570,13 @@ function PreviewSidebar(): React.JSX.Element {
                   key={bin.id}
                   className="flex w-full select-none items-center gap-2 rounded-md bg-zinc-100/60 px-2 py-1.5 text-zinc-800 transition-colors hover:bg-zinc-200 dark:bg-zinc-800/60 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 >
-                  <Checkbox
-                    aria-label={`Export ${name}`}
-                    checked={checkedIds.has(bin.id)}
-                    onCheckedChange={(checked) => setChecked(bin.id, checked === true)}
-                  />
+                  {totalBins > 1 && (
+                    <Checkbox
+                      aria-label={`Export ${name}`}
+                      checked={checkedIds.has(bin.id)}
+                      onCheckedChange={(checked) => setChecked(bin.id, checked === true)}
+                    />
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-xs font-medium">{name}</p>
                     <p className="text-[10px] text-zinc-500">
