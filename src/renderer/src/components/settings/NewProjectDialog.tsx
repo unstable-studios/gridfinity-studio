@@ -11,11 +11,21 @@ import {
 import { Button } from '@unstable-studios/ui'
 import type { TolerancePreset } from '../../../../shared/types/project'
 import { TOLERANCE_PRESETS } from '../../../../shared/types/project'
+import { loadNewProjectDefaults } from '@/lib/new-project-defaults'
 
 interface NewProjectDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onCreate: (config: { name: string; baseUnit: number; tolerance: number }) => void
+  /** Without `tolerance`, the project keeps the one new projects start with. */
+  onCreate: (config: { name: string; baseUnit: number; tolerance?: number }) => void
+}
+
+/** The preset with this tolerance, if one has it. */
+function presetFor(tolerance: number): TolerancePreset | null {
+  const match = (['tight', 'standard', 'loose'] as const).find(
+    (preset) => TOLERANCE_PRESETS[preset] === tolerance
+  )
+  return match ?? null
 }
 
 export default function NewProjectDialog({
@@ -24,34 +34,37 @@ export default function NewProjectDialog({
   onCreate
 }: NewProjectDialogProps): React.JSX.Element {
   const [name, setName] = useState('Untitled project')
-  const [baseUnit, setBaseUnit] = useState(42)
-  const [preset, setPreset] = useState<TolerancePreset>('standard')
+  // The grid starts as new projects do: the person's saved defaults, or the app's.
+  const [defaults, setDefaults] = useState(loadNewProjectDefaults)
+  const [baseUnit, setBaseUnit] = useState(defaults.baseUnit)
+  // No preset is picked when the saved tolerance is not one of them.
+  const [preset, setPreset] = useState<TolerancePreset | null>(presetFor(defaults.tolerance))
+
+  // Each time the dialog opens, start from the defaults as they are now: they may have been
+  // saved in Preferences since it was last shown.
+  const [wasOpen, setWasOpen] = useState(open)
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) {
+      const next = loadNewProjectDefaults()
+      setDefaults(next)
+      setName('Untitled project')
+      setBaseUnit(next.baseUnit)
+      setPreset(presetFor(next.tolerance))
+    }
+  }
 
   const handleCreate = (): void => {
     onCreate({
       name: name.trim() || 'Untitled project',
       baseUnit,
-      tolerance: TOLERANCE_PRESETS[preset]
+      ...(preset ? { tolerance: TOLERANCE_PRESETS[preset] } : {})
     })
     onOpenChange(false)
-    // Reset for next time
-    setName('Untitled project')
-    setBaseUnit(42)
-    setPreset('standard')
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(isOpen) => {
-        if (!isOpen) {
-          setName('Untitled project')
-          setBaseUnit(42)
-          setPreset('standard')
-        }
-        onOpenChange(isOpen)
-      }}
-    >
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>New project</DialogTitle>
@@ -107,6 +120,11 @@ export default function NewProjectDialog({
                 </button>
               ))}
             </div>
+            {preset === null && (
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Your default, {defaults.tolerance} mm.
+              </p>
+            )}
           </div>
         </div>
 

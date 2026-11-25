@@ -5,6 +5,7 @@ import { isBinGroup } from '@/layout-engine/types'
 import type { BinMetadata } from '@/layout-engine/types'
 import type { LayoutEngine } from '@/layout-engine/interface'
 import { storedName } from './item-name'
+import type { NewBinDefaults } from '../../../shared/types/project'
 
 export interface NewBin {
   /** Lower-left corner. */
@@ -92,6 +93,8 @@ export function addBin(
   engine: LayoutEngine,
   bin: NewBin,
   baseUnit: number,
+  /** The height and lip the bin starts with: the project's defaults for new bins. */
+  defaults: NewBinDefaults,
   options: { adoptShapes?: boolean } = {}
 ): string {
   const id = crypto.randomUUID()
@@ -100,8 +103,8 @@ export function addBin(
   const metadata: BinMetadata = {
     widthUnits: bin.widthUnits,
     depthUnits: bin.depthUnits,
-    heightUnits: 3,
-    hasLip: true,
+    heightUnits: defaults.heightUnits,
+    hasLip: defaults.hasLip,
     name: nextBinName(
       engine
         .getAllGroups()

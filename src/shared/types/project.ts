@@ -42,6 +42,20 @@ export interface GridfinityConfig {
     diameter: number
     depth: number
   }
+  /** What a bin added to the project starts with. Absent in files from before it existed. */
+  newBin?: NewBinDefaults
+}
+
+export interface NewBinDefaults {
+  heightUnits: number
+  hasLip: boolean
+}
+
+export const DEFAULT_NEW_BIN: NewBinDefaults = { heightUnits: 3, hasLip: true }
+
+/** What a bin added to a project with these settings starts with. */
+export function newBinDefaults(config: Pick<GridfinityConfig, 'newBin'>): NewBinDefaults {
+  return config.newBin ?? DEFAULT_NEW_BIN
 }
 
 /**
@@ -198,7 +212,11 @@ export function depthToOpacity(
 
 export const DEFAULT_GRIDFINITY_CONFIG: GridfinityConfig = GRIDFINITY_PRESETS.standard
 
-export function createEmptyProject(name: string = 'Untitled project'): ProjectData {
+/** `gridfinity` is what the project starts with: the app's defaults unless given. */
+export function createEmptyProject(
+  name: string = 'Untitled project',
+  gridfinity: GridfinityConfig = DEFAULT_GRIDFINITY_CONFIG
+): ProjectData {
   const now = new Date().toISOString()
 
   return {
@@ -212,13 +230,13 @@ export function createEmptyProject(name: string = 'Untitled project'): ProjectDa
       units: 'mm'
     },
     // A full copy: the hole settings are objects, and a project must not share them with
-    // the preset every other new project starts from.
-    gridfinity: structuredClone(DEFAULT_GRIDFINITY_CONFIG),
+    // the settings every other new project starts from.
+    gridfinity: structuredClone(gridfinity),
     layoutSnapshot: {
       version: '1.0.0',
       shapes: [],
       groups: [],
-      gridConfig: { size: 42, enabled: true, visible: true }
+      gridConfig: { size: gridfinity.baseUnit, enabled: true, visible: true }
     }
   }
 }

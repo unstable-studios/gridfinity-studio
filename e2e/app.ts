@@ -245,7 +245,12 @@ export class StudioApp {
   }
 
   async expectBinCount(count: number): Promise<void> {
-    await expect(this.page.getByText(`Bins (${count})`, { exact: true })).toBeVisible()
+    // Design shows no bin list at all while there are no bins.
+    if (count === 0) {
+      await expect(this.page.getByText(/^Bins \(\d+\)$/)).toHaveCount(0)
+    } else {
+      await expect(this.page.getByText(`Bins (${count})`, { exact: true })).toBeVisible()
+    }
   }
 
   async expectShapeCount(count: number): Promise<void> {

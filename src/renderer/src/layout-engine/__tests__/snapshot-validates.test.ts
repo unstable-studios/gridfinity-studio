@@ -20,7 +20,7 @@ import { KonvaEngine } from '../konva-engine'
 import type { LayoutShape } from '../types'
 import { addBin } from '@/lib/new-bin'
 import { copySelection, planPaste } from '@/lib/clipboard'
-import { createEmptyProject } from '../../../../shared/types/project'
+import { DEFAULT_NEW_BIN, createEmptyProject } from '../../../../shared/types/project'
 import { repairLayout, validateProject } from '../../../../shared/validation/project-validator'
 import type { LayoutSnapshotData } from '../../../../shared/types/project'
 
@@ -49,8 +49,20 @@ describe('a snapshot from the canvas', () => {
     container.remove()
   })
 
+  it('gives a new bin the height and lip it is told to start with', () => {
+    const usual = addBin(engine, { x: 0, y: 84, widthUnits: 1, depthUnits: 1 }, 42, DEFAULT_NEW_BIN)
+    const tall = addBin(engine, { x: 84, y: 84, widthUnits: 1, depthUnits: 1 }, 42, {
+      heightUnits: 6,
+      hasLip: false
+    })
+    const metadata = (id: string): unknown =>
+      engine.getAllGroups().find((group) => group.id === id)?.metadata
+    expect(metadata(usual)).toMatchObject({ heightUnits: 3, hasLip: true })
+    expect(metadata(tall)).toMatchObject({ heightUnits: 6, hasLip: false })
+  })
+
   it('is valid with bins, pockets of each kind, loose shapes and pasted copies', () => {
-    const bin = addBin(engine, { x: 0, y: 84, widthUnits: 2, depthUnits: 2 }, 42)
+    const bin = addBin(engine, { x: 0, y: 84, widthUnits: 2, depthUnits: 2 }, 42, DEFAULT_NEW_BIN)
     const shapes = [
       { ...base, id: 'rect', type: 'rect', x: 20, y: 40, width: 10, height: 8 },
       { ...base, id: 'ellipse', type: 'circle', x: 50, y: 40, radiusX: 6, radiusY: 3 },
@@ -91,7 +103,7 @@ describe('a snapshot from the canvas', () => {
   })
 
   it('is valid after a bin with pockets is removed', () => {
-    const bin = addBin(engine, { x: 0, y: 84, widthUnits: 2, depthUnits: 2 }, 42)
+    const bin = addBin(engine, { x: 0, y: 84, widthUnits: 2, depthUnits: 2 }, 42, DEFAULT_NEW_BIN)
     engine.addShape({
       ...base,
       id: 'rect',
