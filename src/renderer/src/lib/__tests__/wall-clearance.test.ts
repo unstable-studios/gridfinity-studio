@@ -87,6 +87,14 @@ describe('pocketWallIssue', () => {
   it('accepts a pocket drawn on the lip line', () => {
     expect(pocketWallIssue(bin({ hasLip: true }), rect(41.5 - 2 * 2.85, 10))).toBeNull()
   })
+
+  it('judges the lip by the outline as drawn, and the wall by the outline as cut', () => {
+    const onLipLine = rect(41.5 - 2 * 2.85, 10, 0, 0, { clearance: 0.25 })
+    expect(pocketWallIssue(bin({ hasLip: true }), onLipLine)).toBeNull()
+    // 1.1 mm from the wall as drawn, 0.85 mm once the clearance is cut.
+    const nearWall = rect(41.5 - 2 * 1.1, 10, 0, 0, { clearance: 0.25 })
+    expect(pocketWallIssue(bin(), nearWall)).toBe('thin-wall')
+  })
 })
 
 describe('wallWarnings', () => {
@@ -109,6 +117,14 @@ describe('wallWarnings', () => {
       'Bin 1: 2 shapes leave a wall thinner than 0.95 mm.',
       'Bin 1: Rectangle 1 cuts into the stacking lip.'
     ])
+  })
+
+  it('leaves out pockets that were not cut', () => {
+    const params = bin({ pockets: [rect(40, 10), rect(10, 40)] })
+    expect(wallWarnings(params, [0])).toEqual([
+      'Bin 1: Rectangle 1 leaves a wall thinner than 0.95 mm.'
+    ])
+    expect(wallWarnings(params, [0, 1])).toEqual([])
   })
 
   it('still reads well when nothing has a name', () => {

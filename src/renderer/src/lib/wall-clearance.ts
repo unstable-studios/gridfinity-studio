@@ -44,24 +44,32 @@ function insideBy(x: number, y: number, bin: BinOutline): number {
 }
 
 /**
- * The material left between a pocket and the outside of its bin at the closest point, in mm.
- * The bin's outline is convex, so the closest point of a pocket is one of its corners.
+ * How far inside the bin's outline a pocket's drawn outline stays at its closest point, in
+ * mm. The bin's outline is convex, so the closest point of a pocket is one of its corners.
  */
-export function wallLeft(bin: BinOutline, pocket: PocketSpec): number {
+export function insetOfOutline(bin: BinOutline, pocket: PocketSpec): number {
   let least = Infinity
   for (let i = 0; i < pocket.vertices.length; i += 2) {
     const x = pocket.posX + pocket.vertices[i]
     const y = pocket.posY + pocket.vertices[i + 1]
     least = Math.min(least, insideBy(x, y, bin))
   }
-  // The pocket is cut larger than drawn, by its clearance.
-  return least - pocket.clearance
+  return least
+}
+
+/**
+ * The material left between a pocket and the outside of its bin at the closest point, in mm.
+ * The pocket is cut larger than drawn, by its clearance.
+ */
+export function wallLeft(bin: BinOutline, pocket: PocketSpec): number {
+  return insetOfOutline(bin, pocket) - Math.max(0, pocket.clearance)
 }
 
 export function pocketWallIssue(bin: BinOutline, pocket: PocketSpec): WallIssue | null {
-  const left = wallLeft(bin, pocket)
-  if (left < WALL_THICKNESS - EPSILON) return 'thin-wall'
-  if (bin.hasLip && left < LIP_INSET - EPSILON) return 'cuts-lip'
+  if (wallLeft(bin, pocket) < WALL_THICKNESS - EPSILON) return 'thin-wall'
+  // The lip is judged by the outline as drawn, so a pocket drawn on the lip's guide line is
+  // accepted. Its clearance then shaves only the lip's thin lower edge.
+  if (bin.hasLip && insetOfOutline(bin, pocket) < LIP_INSET - EPSILON) return 'cuts-lip'
   return null
 }
 
@@ -85,12 +93,17 @@ export function wallIssueText(issue: WallIssue, count = 1): string {
   return `${plural ? 'cut' : 'cuts'} into the stacking lip`
 }
 
-/** One warning per kind of issue in a bin, naming the shape when there is only one. */
-export function wallWarnings(params: CSGBinParams): string[] {
+/**
+ * One warning per kind of issue in a bin, naming the shape when there is only one. Pockets
+ * in `skipped` were not cut at all, so they have no wall to warn about.
+ */
+export function wallWarnings(params: CSGBinParams, skipped: number[] = []): string[] {
   const where = params.name ? `${params.name}: ` : ''
   const warnings: string[] = []
   for (const issue of ['thin-wall', 'cuts-lip'] as const) {
-    const found = params.pockets.filter((pocket) => pocketWallIssue(params, pocket) === issue)
+    const found = params.pockets.filter(
+      (pocket, index) => !skipped.includes(index) && pocketWallIssue(params, pocket) === issue
+    )
     if (found.length === 0) continue
     const subject = found.length === 1 ? (found[0].name ?? 'A shape') : `${found.length} shapes`
     warnings.push(`${where}${subject} ${wallIssueText(issue, found.length)}.`)

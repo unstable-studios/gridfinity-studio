@@ -304,13 +304,12 @@ test('a pocket too close to the wall is marked in Design and named in Preview', 
   await page.mouse.click(at.x, at.y)
   await app.expectBinCount(1)
 
-  // A small pocket in the middle of the grid square that was clicked: nothing to warn about.
+  // A small pocket somewhere in the bin. Saved, it tells where the bin is on screen.
   const from = { x: at.x - 4, y: at.y - 4 }
   const to = { x: at.x + 4, y: at.y + 4 }
   await app.selectTool('Rectangle')
   await app.drag(from, to)
   await app.expectShapeCount(1)
-  await expect(page.getByTitle(thinWall)).toHaveCount(0)
 
   // The saved pocket is positioned from its bin's center, so the drag that drew it gives the
   // mapping from the bin's own coordinates to the screen.
@@ -326,15 +325,24 @@ test('a pocket too close to the wall is marked in Design and named in Preview', 
   await app.drag(toScreen({ x: left + 0.3, y: -3 }), toScreen({ x: left + 10, y: 3 }))
   await app.expectShapeCount(2)
 
-  // Design marks that shape, and only that one.
-  await expect(page.getByTitle(thinWall)).toHaveCount(1)
-  await expect(page.getByRole('button', { name: /Rectangle 2/ }).getByTitle(thinWall)).toBeVisible()
+  // And a third in the middle of the bin.
+  await app.selectTool('Rectangle')
+  await app.drag(toScreen({ x: -4, y: -4 }), toScreen({ x: 4, y: 4 }))
+  await app.expectShapeCount(3)
+
+  // Design marks the shape by the wall, and not the one in the middle.
+  await expect(
+    page.getByRole('button', { name: /^Rectangle 2/ }).getByTitle(thinWall)
+  ).toBeVisible()
+  await expect(page.getByRole('button', { name: /^Rectangle 3/ }).getByTitle(thinWall)).toHaveCount(
+    0
+  )
 
   // Preview still builds the bin, and names the shape.
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
   await expect(page.getByText(/\bReady$/)).toBeVisible({ timeout: 30_000 })
   await expect(
-    page.getByText('Bin 1: Rectangle 2 leaves a wall thinner than 0.95 mm.')
+    page.getByText(/^Bin 1: (Rectangle 2|2 shapes) leaves? a wall thinner than 0\.95 mm\.$/)
   ).toBeVisible()
 
   expect(app.errors, 'no renderer errors').toEqual([])

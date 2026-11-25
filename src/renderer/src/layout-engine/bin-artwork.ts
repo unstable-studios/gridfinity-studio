@@ -75,7 +75,11 @@ export function computeBinArtwork(meta: BinMetadata, config: GridfinityConfig): 
     }
   }
 
-  const lipInset: ArtworkLipInset | null = meta.hasLip ? { inset: LIP_INSET } : null
+  // The bin is smaller than its grid squares by the tolerance, and the guide is drawn from
+  // the edge of the grid squares, so the tolerance is part of the distance.
+  const lipInset: ArtworkLipInset | null = meta.hasLip
+    ? { inset: LIP_INSET + config.tolerance }
+    : null
 
   return { circles, lipInset }
 }

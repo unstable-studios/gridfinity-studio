@@ -87,7 +87,7 @@ addEventListener('message', (event: MessageEvent<WorkerRequest>): void => {
           )
         }
 
-        warnings.push(...wallWarnings(msg.binParams))
+        warnings.push(...wallWarnings(msg.binParams, skipped))
 
         const colors = new Float32Array(0)
         const response: WorkerResponse = {

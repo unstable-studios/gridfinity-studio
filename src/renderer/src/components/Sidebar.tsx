@@ -66,12 +66,12 @@ export default function Sidebar(): React.JSX.Element {
 /** A row while its name is being typed: the same size as the row it replaces. */
 const RENAME_ROW_CLASS = 'px-2 py-1 text-xs'
 
-/** A row in the bin or shape list. `select-none` keeps a Shift-click from selecting text. */
 /** "leaves a thin wall" -> "Leaves a thin wall." */
 function sentence(text: string): string {
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}.`
 }
 
+/** A row in the bin or shape list. `select-none` keeps a Shift-click from selecting text. */
 function listRowClass(isSelected: boolean): string {
   return `w-full select-none rounded px-2 py-1 text-left text-xs transition-colors ${
     isSelected
