@@ -8,7 +8,11 @@ import { useTheme } from '@unstable-studios/ui'
 import { Button } from '@unstable-studios/ui'
 import ColorPicker from '@/components/ui/color-picker'
 import GridfinitySettings from './GridfinitySettings'
-import { isNewProjectDefault, saveNewProjectDefaults } from '@/lib/new-project-defaults'
+import {
+  canBeNewProjectDefault,
+  isNewProjectDefault,
+  saveNewProjectDefaults
+} from '@/lib/new-project-defaults'
 import { cn } from '@/lib/utils'
 import {
   loadThemeConfig,
@@ -75,8 +79,9 @@ function TabGroupLabel({
   children: React.ReactNode
 }): React.JSX.Element {
   return (
+    // Headings for the eye only: a tab list may hold nothing but tabs.
     <p
-      role="presentation"
+      aria-hidden="true"
       className={cn(
         'px-3 pb-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500 dark:text-zinc-400',
         className
@@ -170,6 +175,7 @@ function NewProjectDefaults({ config }: { config: GridfinityConfig }): React.JSX
   // The saved defaults are not React state, so a save has to ask for a new render.
   const [, setSaves] = useState(0)
   const isDefault = isNewProjectDefault(config)
+  const usable = canBeNewProjectDefault(config)
 
   return (
     <div className="space-y-1.5 border-t border-zinc-200 pt-4 dark:border-zinc-800">
@@ -177,7 +183,7 @@ function NewProjectDefaults({ config }: { config: GridfinityConfig }): React.JSX
         variant="outline"
         size="sm"
         className="w-full"
-        disabled={isDefault}
+        disabled={isDefault || !usable}
         onClick={() => {
           saveNewProjectDefaults(config)
           setSaves((count) => count + 1)
@@ -188,7 +194,9 @@ function NewProjectDefaults({ config }: { config: GridfinityConfig }): React.JSX
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         {isDefault
           ? 'New projects start with these settings.'
-          : 'New projects start with different settings.'}
+          : usable
+            ? 'New projects start with different settings.'
+            : 'A project can’t start with these settings. Check the base unit and unit height.'}
       </p>
     </div>
   )

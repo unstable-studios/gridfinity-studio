@@ -3,56 +3,62 @@
  * the person saves a project's settings as their defaults, in Preferences. Kept on this
  * computer, not in any project file.
  */
-import { DEFAULT_GRIDFINITY_CONFIG, createEmptyProject } from '../../../shared/types/project'
+import {
+  DEFAULT_GRIDFINITY_CONFIG,
+  createEmptyProject,
+  newBinDefaults
+} from '../../../shared/types/project'
 import type { GridfinityConfig } from '../../../shared/types/project'
 import { validateProject } from '../../../shared/validation/project-validator'
 
 const STORAGE_KEY = 'gfstudio:newProjectDefaults'
 
-type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
+type Store = Pick<Storage, 'getItem' | 'setItem'>
 
-/** The saved defaults, or the app's own when none are saved or the saved ones are unsound. */
-export function loadNewProjectDefaults(store: Store = localStorage): GridfinityConfig {
+/** Whether a project could start with `config`: checked the way a project file is. */
+export function canBeNewProjectDefault(config: GridfinityConfig): boolean {
+  return validateProject({ ...createEmptyProject(), gridfinity: config }).valid
+}
+
+/**
+ * The saved defaults, or the app's own when none are saved or the saved ones are unsound.
+ * `store` is the browser's storage unless given.
+ */
+export function loadNewProjectDefaults(store?: Store): GridfinityConfig {
   try {
-    const raw = store.getItem(STORAGE_KEY)
+    // Inside the `try`: where there is no browser storage, naming it throws.
+    const raw = (store ?? localStorage).getItem(STORAGE_KEY)
     if (raw) {
       const saved = JSON.parse(raw) as GridfinityConfig
-      // Checked the way a project file is, so a damaged entry cannot start a broken project.
-      const project = { ...createEmptyProject(), gridfinity: saved }
-      if (validateProject(project).valid) return saved
+      // A damaged entry must not start a broken project.
+      if (canBeNewProjectDefault(saved)) return saved
     }
   } catch {
-    // Unreadable storage or JSON: fall through to the app's defaults.
+    // No storage, unreadable storage or bad JSON: fall through to the app's defaults.
   }
   return structuredClone(DEFAULT_GRIDFINITY_CONFIG)
 }
 
-export function saveNewProjectDefaults(
-  config: GridfinityConfig,
-  store: Store = localStorage
-): void {
-  store.setItem(STORAGE_KEY, JSON.stringify(config))
-}
-
-/** Go back to the app's own defaults. */
-export function clearNewProjectDefaults(store: Store = localStorage): void {
-  store.removeItem(STORAGE_KEY)
+/** Keep `config` as what new projects start with. Settings a project could not use are not kept. */
+export function saveNewProjectDefaults(config: GridfinityConfig, store?: Store): boolean {
+  if (!canBeNewProjectDefault(config)) return false
+  ;(store ?? localStorage).setItem(STORAGE_KEY, JSON.stringify(config))
+  return true
 }
 
 /** Whether `config` is what a new project would start with now. */
-export function isNewProjectDefault(
-  config: GridfinityConfig,
-  store: Store = localStorage
-): boolean {
-  const normal = (c: GridfinityConfig): string =>
-    JSON.stringify({
+export function isNewProjectDefault(config: GridfinityConfig, store?: Store): boolean {
+  const normal = (c: GridfinityConfig): string => {
+    const newBin = newBinDefaults(c)
+    return JSON.stringify({
       baseUnit: c.baseUnit,
       gridSpacing: c.gridSpacing,
       unitHeight: c.unitHeight,
       tolerance: c.tolerance,
       magnetHoles: [c.magnetHoles.enabled, c.magnetHoles.diameter, c.magnetHoles.depth],
       screwHoles: [c.screwHoles.enabled, c.screwHoles.diameter, c.screwHoles.depth],
-      newBin: [c.newBin?.heightUnits ?? 3, c.newBin?.hasLip ?? true]
+      newBin: [newBin.heightUnits, newBin.hasLip]
     })
+  }
   return normal(config) === normal(loadNewProjectDefaults(store))
 }

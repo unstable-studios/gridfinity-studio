@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  clearNewProjectDefaults,
+  canBeNewProjectDefault,
   isNewProjectDefault,
   loadNewProjectDefaults,
   saveNewProjectDefaults
@@ -11,13 +11,11 @@ import type { GridfinityConfig } from '../../../../shared/types/project'
 function memoryStore(initial: Record<string, string> = {}): {
   getItem: (key: string) => string | null
   setItem: (key: string, value: string) => void
-  removeItem: (key: string) => void
 } {
   const items = new Map(Object.entries(initial))
   return {
     getItem: (key) => items.get(key) ?? null,
-    setItem: (key, value) => void items.set(key, value),
-    removeItem: (key) => void items.delete(key)
+    setItem: (key, value) => void items.set(key, value)
   }
 }
 
@@ -45,11 +43,19 @@ describe('new project defaults', () => {
     expect(loadNewProjectDefaults(store)).toEqual(mine)
   })
 
-  it('go back to the app defaults when cleared', () => {
+  it('do not keep settings a project could not use', () => {
     const store = memoryStore()
-    saveNewProjectDefaults(mine, store)
-    clearNewProjectDefaults(store)
+    const broken = { ...mine, baseUnit: 0 }
+    expect(canBeNewProjectDefault(broken)).toBe(false)
+    expect(saveNewProjectDefaults(broken, store)).toBe(false)
     expect(loadNewProjectDefaults(store)).toEqual(DEFAULT_GRIDFINITY_CONFIG)
+    expect(saveNewProjectDefaults(mine, store)).toBe(true)
+  })
+
+  it('are the app defaults where there is no browser storage', () => {
+    // The tests run without one, as the main process does.
+    expect(typeof localStorage).toBe('undefined')
+    expect(loadNewProjectDefaults()).toEqual(DEFAULT_GRIDFINITY_CONFIG)
   })
 
   it('ignore a saved entry that is not JSON', () => {
