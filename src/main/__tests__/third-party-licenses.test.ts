@@ -42,6 +42,25 @@ describe('third-party licenses', () => {
     expect(bare.map((entry) => entry.name)).toEqual([])
   })
 
+  it('has the terms of every license that asks for them to be passed on', () => {
+    const missing = licenses.filter(
+      (entry) => /MIT|ISC|BSD|Apache|OFL|BlueOak/.test(entry.license) && !entry.text
+    )
+    expect(missing.map((entry) => entry.name)).toEqual([])
+  })
+
+  it('gives an MIT package with no license file the MIT terms under its author', () => {
+    const fiber = licenses.find((entry) => entry.name === '@react-three/fiber')
+    expect(fiber?.text).toMatch(/^MIT License\n\nCopyright \(c\) \S/)
+    expect(fiber?.text).toContain('Permission is hereby granted')
+  })
+
+  it('leaves out type declarations, optional packages and what only installs Electron', () => {
+    expect(names.filter((name) => name.startsWith('@types/'))).toEqual([])
+    expect(names.filter((name) => name.startsWith('@img/sharp-'))).toEqual([])
+    expect(names).not.toContain('@electron/get')
+  })
+
   it('leaves out Unstable Studios packages but lists what they depend on', () => {
     expect(names.filter((name) => name.startsWith('@unstable-studios/'))).toEqual([])
     expect(names).toContain('tailwindcss')

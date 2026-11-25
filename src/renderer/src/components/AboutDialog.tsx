@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { ChevronRightIcon } from 'lucide-react'
 import { Button } from '@unstable-studios/ui'
 import {
   Dialog,
@@ -32,13 +33,18 @@ export default function AboutDialog({
   updateActions: Record<UpdateAction, () => void>
 }): React.JSX.Element {
   // The list is large and only needed here, so it loads when the dialog first opens.
-  const [licenses, setLicenses] = useState<License[] | null>(null)
+  const [licenses, setLicenses] = useState<License[] | 'failed' | null>(null)
   useEffect(() => {
     if (!open || licenses) return
     let cancelled = false
-    void import('virtual:third-party-licenses').then((module) => {
-      if (!cancelled) setLicenses(module.default)
-    })
+    import('virtual:third-party-licenses').then(
+      (module) => {
+        if (!cancelled) setLicenses(module.default)
+      },
+      () => {
+        if (!cancelled) setLicenses('failed')
+      }
+    )
     return () => {
       cancelled = true
     }
@@ -102,13 +108,18 @@ export default function AboutDialog({
           <div className="h-56 overflow-y-auto rounded-md border border-zinc-200 text-xs dark:border-zinc-800">
             {licenses === null ? (
               <p className="p-2 text-zinc-500">Loading…</p>
+            ) : licenses === 'failed' ? (
+              <p className="p-2 text-red-700 dark:text-red-400">
+                Couldn’t load the list. Close this window and open it again.
+              </p>
             ) : (
               licenses.map((entry) => (
                 <details
                   key={`${entry.name}@${entry.version}`}
-                  className="border-b border-zinc-100 last:border-b-0 dark:border-zinc-900"
+                  className="group border-b border-zinc-100 last:border-b-0 dark:border-zinc-900"
                 >
-                  <summary className="flex cursor-pointer items-baseline gap-2 px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-900">
+                  <summary className="flex cursor-pointer items-center gap-1.5 px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-900">
+                    <ChevronRightIcon className="size-3 shrink-0 text-zinc-400 transition-transform group-open:rotate-90" />
                     <span className="min-w-0 flex-1 truncate text-zinc-800 dark:text-zinc-200">
                       {entry.name}
                       {entry.version && <span className="text-zinc-500"> {entry.version}</span>}
@@ -116,7 +127,7 @@ export default function AboutDialog({
                     <span className="shrink-0 text-zinc-500">{entry.license}</span>
                   </summary>
                   <pre className="whitespace-pre-wrap px-2 pb-2 pt-1 font-sans text-[11px] text-zinc-600 dark:text-zinc-400">
-                    {entry.text || 'This package ships no license file.'}
+                    {entry.text || 'This package includes no license file.'}
                   </pre>
                 </details>
               ))

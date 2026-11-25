@@ -4,7 +4,7 @@ Design Gridfinity bins with pockets shaped for your tools, check them in 3D, and
 
 ## Start a project
 
-Choose **New project**, then give it a name, a base unit and a tolerance. The welcome screen also has three examples to open and change.
+Choose **New project** on the welcome screen to start with the usual settings, or **File > New project** to set a name, a base unit and a tolerance first. The welcome screen also has three examples to open and change.
 
 Work is saved as a `.gfstudio` file. **File > Save** saves it, and the **Unsaved** mark in the top bar does the same.
 
@@ -29,7 +29,7 @@ Select a pocket to set its depth, size and position. A pocket drawn too close to
 
 - Click to select, and drag to move.
 - **Shift+click** adds to the selection.
-- Select two or more pockets to align or distribute them from the sidebar.
+- Select two or more pockets to align them from the sidebar, and three or more to space them evenly. One pocket can be centered in its bin.
 - Right-click a bin or pocket for cut, copy, paste, rename and delete.
 - Scroll to zoom, and drag with the middle button to pan.
 

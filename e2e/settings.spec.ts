@@ -66,16 +66,16 @@ test('the user guide and the About dialog open from the Help menu', async () => 
   // Built with: packages the source imports, one that only comes in through another, the
   // runtime, and the fonts. A row opens to the license text.
   const row = (name: string): ReturnType<typeof about.locator> =>
-    about.locator('summary > span:first-child').filter({ hasText: new RegExp(`^${name}( |$)`) })
+    about.locator('summary > span').filter({ hasText: new RegExp(`^${name}( |$)`) })
   for (const name of ['react', 'three', 'scheduler', 'electron', 'Inter']) {
     await expect(row(name).first(), name).toBeAttached()
   }
   await expect(
-    about.locator('summary > span:first-child').filter({ hasText: /^@unstable-studios\// })
+    about.locator('summary > span').filter({ hasText: /^@unstable-studios\// })
   ).toHaveCount(0)
   const react = about
     .locator('details')
-    .filter({ has: page.locator('summary > span:first-child', { hasText: /^react( |$)/ }) })
+    .filter({ has: page.locator('summary > span', { hasText: /^react( |$)/ }) })
   await expect(react.getByText('Permission is hereby granted')).toBeHidden()
   await react.locator('summary').click()
   await expect(react.getByText('Permission is hereby granted')).toBeVisible()

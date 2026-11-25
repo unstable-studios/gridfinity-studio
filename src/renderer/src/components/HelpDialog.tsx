@@ -41,16 +41,21 @@ export default function HelpDialog({
                   {children}
                 </code>
               ),
-              a: ({ href, children }) => (
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-blue-700 underline dark:text-blue-400"
-                >
-                  {children}
-                </a>
-              )
+              // A link opens in the browser, so only a web address is one. Anything else in
+              // the guide, such as a path that works on GitHub, shows as plain text.
+              a: ({ href, children }) =>
+                href?.startsWith('https://') ? (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-700 underline dark:text-blue-400"
+                  >
+                    {children}
+                  </a>
+                ) : (
+                  <>{children}</>
+                )
             }}
           >
             {BODY}

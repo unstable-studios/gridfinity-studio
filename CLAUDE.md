@@ -130,7 +130,7 @@ Every icon is generated from `build/icon-source.svg` by `scripts/build-icons.sh`
 
 `docs/HELP.md` is the user guide. The app imports that file and shows it under Help > User guide (`HelpDialog.tsx`), so a change to a user flow is documented there once. Its first line is the dialog's title.
 
-Help > About lists the open-source packages the app is built with (`AboutDialog.tsx`). The list is collected when the app is built (`tools/third-party-licenses.ts`, served as `virtual:third-party-licenses`): every package the source imports, Electron, and what those depend on, with each license file. Nothing is kept by hand.
+Help > About lists the open-source packages the app is built with (`AboutDialog.tsx`). The list is collected when the app is built (`tools/third-party-licenses.ts`, served as `virtual:third-party-licenses`): every package the source imports, Electron, and what those depend on, with each license file. It follows what packages declare, so it can name one whose code the bundler dropped; it leaves out type declarations, optional dependencies and Unstable Studios' own packages. Nothing is kept by hand. Links in the guide must be full `https://` addresses: anything else shows as plain text in the app.
 
 ## Code Style
 
