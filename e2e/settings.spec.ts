@@ -73,8 +73,12 @@ test('the user guide and the About dialog open from the Help menu', async () => 
   await expect(
     about.locator('summary > span:first-child').filter({ hasText: /^@unstable-studios\// })
   ).toHaveCount(0)
-  await row('react').first().click()
-  await expect(about.getByText('Permission is hereby granted').first()).toBeVisible()
+  const react = about
+    .locator('details')
+    .filter({ has: page.locator('summary > span:first-child', { hasText: /^react( |$)/ }) })
+  await expect(react.getByText('Permission is hereby granted')).toBeHidden()
+  await react.locator('summary').click()
+  await expect(react.getByText('Permission is hereby granted')).toBeVisible()
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
