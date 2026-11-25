@@ -818,8 +818,9 @@ test('the right-click menu changes with what is under it', async () => {
     width: 42,
     height: 42
   })
-  expect(here.x % 42, 'on the grid').toBe(0)
-  expect(here.y % 42, 'on the grid').toBe(0)
+  // A bin above or left of the origin has a remainder of -0.
+  expect(Math.abs(here.x % 42), 'on the grid').toBe(0)
+  expect(Math.abs(here.y % 42), 'on the grid').toBe(0)
 
   // The same square is now taken.
   await page.mouse.click(emptyCanvas.x, emptyCanvas.y, { button: 'right' })
