@@ -2,6 +2,7 @@
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
   "include": [
     "electron.vite.config.*",
+    "tools/**/*",
     "playwright.config.ts",
     "e2e/**/*",
     "src/main/**/*",

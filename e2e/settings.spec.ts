@@ -44,6 +44,41 @@ test('base unit is locked while the project has bins', async () => {
   expect(app.errors).toEqual([])
 })
 
+test('the user guide and the About dialog open from the Help menu', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  await page.getByRole('button', { name: 'New project' }).click()
+
+  // The guide is docs/HELP.md, with its first line as the title.
+  await app.menu('Help', 'User guide')
+  const guide = page.getByRole('dialog', { name: 'Using Gridfinity Studio' })
+  await expect(guide.getByRole('heading', { name: 'Draw pockets' })).toBeVisible()
+  await expect(guide.getByText('Uncheck a bin in the sidebar to leave it out.')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(guide).toBeHidden()
+
+  await app.menu('Help', 'About Gridfinity Studio')
+  const about = page.getByRole('dialog', { name: 'Gridfinity Studio', exact: true })
+  await expect(about.getByText(/^Version v\d+\.\d+\.\d+/)).toBeVisible()
+  await expect(about.getByText('This build doesn’t update itself')).toBeVisible()
+  await expect(about.getByText(/Electron \d+\.\d+\.\d+, Chromium /)).toBeVisible()
+
+  // Built with: packages the source imports, one that only comes in through another, the
+  // runtime, and the fonts. A row opens to the license text.
+  const row = (name: string): ReturnType<typeof about.locator> =>
+    about.locator('summary > span:first-child').filter({ hasText: new RegExp(`^${name}( |$)`) })
+  for (const name of ['react', 'three', 'scheduler', 'electron', 'Inter']) {
+    await expect(row(name).first(), name).toBeAttached()
+  }
+  await expect(
+    about.locator('summary > span:first-child').filter({ hasText: /^@unstable-studios\// })
+  ).toHaveCount(0)
+  await row('react').first().click()
+  await expect(about.getByText('Permission is hereby granted').first()).toBeVisible()
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
 test('the Help menu says where updates stand', async () => {
   app = await StudioApp.launch()
   const { page } = app

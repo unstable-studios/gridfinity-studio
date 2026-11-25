@@ -126,6 +126,12 @@ The app is shown as "Gridfinity Studio" (`productName` in `electron-builder.yml`
 
 Every icon is generated from `build/icon-source.svg` by `scripts/build-icons.sh`: `build/icon.icns` (macOS), `build/icon.ico` (Windows), `build/icons/` (Linux) and `resources/icon.png` (the Linux window icon). After changing the source, run the script and commit the results. The mark is the same as the in-app logo (`src/renderer/src/assets/StudioIcon.svg`).
 
+## Help and About
+
+`docs/HELP.md` is the user guide. The app imports that file and shows it under Help > User guide (`HelpDialog.tsx`), so a change to a user flow is documented there once. Its first line is the dialog's title.
+
+Help > About lists the open-source packages the app is built with (`AboutDialog.tsx`). The list is collected when the app is built (`tools/third-party-licenses.ts`, served as `virtual:third-party-licenses`): every package the source imports, Electron, and what those depend on, with each license file. Nothing is kept by hand.
+
 ## Code Style
 
 - Prettier: single quotes, no semicolons, 100 char width, no trailing commas
