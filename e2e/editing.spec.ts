@@ -983,8 +983,12 @@ test('the right-click menu resizes a bin, sets a depth and moves a pocket', asyn
     page.getByRole('button', { name: new RegExp(`^${name}`) })
   const menuItem = (name: string | RegExp): ReturnType<typeof page.getByRole> =>
     page.getByRole('menuitem', { name, exact: true })
-  /** Open a row's menu, and a submenu of it if one is named. */
+  /**
+   * Open a row's menu, and a submenu of it if one is named. The row is selected first: a
+   * right-click on a pocket whose bin is selected keeps the bin, and gives the bin's menu.
+   */
   const openMenu = async (name: string, submenu?: string): Promise<void> => {
+    await row(name).click()
     await row(name).click({ button: 'right' })
     if (submenu) await menuItem(submenu).hover()
   }
