@@ -2,7 +2,13 @@ import { useCallback, useEffect } from 'react'
 import { create } from 'zustand'
 import { useLayoutEngine, useEngineState } from '@/layout-engine'
 import { findContainingBinGroup } from '@/layout-engine/containment'
-import { copySelection, planPaste, type ClipboardContent } from '@/lib/clipboard'
+import {
+  copySelection,
+  planPaste,
+  planPasteAt,
+  type ClipboardContent,
+  type PastePlan
+} from '@/lib/clipboard'
 import { removeItems } from '@/lib/remove-items'
 import { useAppMode } from './useAppMode'
 import { useProject } from './useProject'
@@ -26,6 +32,10 @@ export interface EditCommands {
   copy: () => void
   cut: () => void
   paste: () => void
+  /** Whether what was copied fits with its middle at `point`, in world units. */
+  canPasteAt: (point: { x: number; y: number }) => boolean
+  /** Paste with the middle of what was copied at `point`. */
+  pasteAt: (point: { x: number; y: number }) => void
   /** Paste a copy of the selection without changing what is on the clipboard. */
   duplicate: () => void
   remove: () => void
@@ -78,12 +88,10 @@ export function useEditCommands(): EditCommands {
     if (copyToClipboard(0)) removeItems(engine, selected)
   }, [engine, copyToClipboard])
 
-  const pasteContent = useCallback(
-    (content: ClipboardContent, offset: number): void => {
+  /** Add what a paste planned to the layout, as one change, and select it. */
+  const applyPaste = useCallback(
+    (plan: PastePlan): void => {
       if (!engine) return
-      const plan = planPaste(content, engine.getAllGroups(), baseUnit, offset, () =>
-        crypto.randomUUID()
-      )
       const pasted: string[] = plan.groups.map((g) => g.id)
       engine.batch(() => {
         for (const group of plan.groups) engine.createGroup(group)
@@ -108,7 +116,46 @@ export function useEditCommands(): EditCommands {
       })
       engine.select(pasted)
     },
+    [engine]
+  )
+
+  const pasteContent = useCallback(
+    (content: ClipboardContent, offset: number): void => {
+      if (!engine) return
+      applyPaste(
+        planPaste(content, engine.getAllGroups(), baseUnit, offset, () => crypto.randomUUID())
+      )
+    },
+    [engine, baseUnit, applyPaste]
+  )
+
+  /** Null when nothing is copied, or a copied bin would land on another. */
+  const planAt = useCallback(
+    (point: { x: number; y: number }): PastePlan | null => {
+      const { content, nextOffset } = useClipboard.getState()
+      if (!engine || !content) return null
+      // After a cut the first paste puts back the things themselves, under their own names.
+      return planPasteAt(content, engine.getAllGroups(), baseUnit, point, nextOffset > 0, () =>
+        crypto.randomUUID()
+      )
+    },
     [engine, baseUnit]
+  )
+
+  const canPasteAt = useCallback(
+    (point: { x: number; y: number }) => planAt(point) !== null,
+    [planAt]
+  )
+
+  const pasteAt = useCallback(
+    (point: { x: number; y: number }) => {
+      const plan = planAt(point)
+      if (!plan) return
+      applyPaste(plan)
+      // The next paste is a copy, and an ordinary one lands beside this, not on it.
+      useClipboard.setState((s) => ({ nextOffset: s.nextOffset + 1 }))
+    },
+    [planAt, applyPaste]
   )
 
   const paste = useCallback(() => {
@@ -160,6 +207,8 @@ export function useEditCommands(): EditCommands {
     copy,
     cut,
     paste,
+    canPasteAt,
+    pasteAt,
     duplicate,
     remove,
     rename,

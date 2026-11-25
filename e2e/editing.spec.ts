@@ -975,3 +975,101 @@ test('the history lists each step by what it did, and goes to the one clicked', 
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('the right-click menu resizes a bin, sets a depth and moves a pocket', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const row = (name: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${name}`) })
+  const menuItem = (name: string | RegExp): ReturnType<typeof page.getByRole> =>
+    page.getByRole('menuitem', { name, exact: true })
+  /** Open a row's menu, and a submenu of it if one is named. */
+  const openMenu = async (name: string, submenu?: string): Promise<void> => {
+    await row(name).click({ button: 'right' })
+    if (submenu) await menuItem(submenu).hover()
+  }
+  const file = join(app.dir, 'menu-rest.gfstudio')
+  type Saved = {
+    layoutSnapshot: {
+      groups: Array<{ id: string; width: number; metadata: { name: string; heightUnits: number } }>
+      shapes: Array<{
+        groupId: string | null
+        metadata: { name: string; pocket?: { depth?: number } }
+      }>
+    }
+  }
+  const saved = async (): Promise<Saved['layoutSnapshot']> =>
+    ((await app.save(file)) as unknown as Saved).layoutSnapshot
+
+  // A bin with a pocket in it.
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.selectTool('Rectangle')
+  await app.drag({ x: 400, y: 600 }, { x: 440, y: 640 })
+  await app.expectShapeCount(1)
+  expect((await saved()).shapes[0].groupId, 'the rectangle is a pocket').not.toBeNull()
+
+  // ── Bin: one unit wider, one unit taller.
+  await openMenu('Bin 1', 'Size')
+  await menuItem('Wider').click()
+  await openMenu('Bin 1', 'Size')
+  await menuItem('Taller').click()
+  const [bin1] = (await saved()).groups
+  expect(bin1.width, 'three units wide').toBe(126)
+  expect(bin1.metadata.heightUnits).toBe(4)
+
+  // ── Pocket: half as deep as the bin allows. The item says how deep that is.
+  await openMenu('Rectangle 1', 'Depth')
+  const half = page.getByRole('menuitem', { name: /^Half \(/ })
+  const halfDepth = Number((await half.textContent())!.match(/\(([\d.]+) mm\)/)![1])
+  expect(halfDepth).toBeGreaterThan(5)
+  await half.click()
+  expect((await saved()).shapes[0].metadata.pocket?.depth).toBe(halfDepth)
+
+  // Full depth keeps no depth of its own, so the pocket follows the bin.
+  await openMenu('Rectangle 1', 'Depth')
+  await page.getByRole('menuitem', { name: /^Full depth/ }).click()
+  expect((await saved()).shapes[0].metadata.pocket?.depth).toBeUndefined()
+
+  // ── Pocket: to another bin, then out of every bin.
+  await row('Bin 1').click({ button: 'right' })
+  await menuItem('Add bin beside').click()
+  await app.expectBinCount(2)
+  await openMenu('Rectangle 1', 'Move to bin')
+  // Its own bin is not somewhere to move it to.
+  await expect(menuItem('Bin 1')).toHaveCount(0)
+  await menuItem('Bin 2').click()
+  let layout = await saved()
+  const bin2 = layout.groups.find((group) => group.metadata.name === 'Bin 2')!
+  expect(layout.shapes[0].groupId, 'now in Bin 2').toBe(bin2.id)
+
+  await row('Rectangle 1').click({ button: 'right' })
+  await menuItem('Take out of bin').click()
+  layout = await saved()
+  expect(layout.shapes[0].groupId, 'in no bin').toBeNull()
+  // Out of a bin it has no depth to set and no bin to leave.
+  await row('Rectangle 1').click({ button: 'right' })
+  await expect(menuItem('Depth')).toHaveCount(0)
+  await expect(menuItem('Take out of bin')).toHaveCount(0)
+
+  // ── Empty canvas: what was copied goes where the pointer is.
+  await menuItem('Copy').click()
+  await page.mouse.click(900, 250)
+  await page.mouse.click(900, 250, { button: 'right' })
+  await menuItem('Paste here').click()
+  await app.expectShapeCount(2)
+  expect((await saved()).shapes.map((shape) => shape.metadata.name)).toEqual([
+    'Rectangle 1',
+    'Rectangle 1 copy'
+  ])
+
+  // ── Bin: Preview opens with only that bin checked and Export showing.
+  await row('Bin 2').click({ button: 'right' })
+  await menuItem('Export this bin…').click()
+  await expect(page.getByRole('checkbox', { name: 'Export Bin 2' })).toBeChecked()
+  await expect(page.getByRole('checkbox', { name: 'Export Bin 1' })).not.toBeChecked()
+  await expect(page.getByRole('button', { name: 'Export STL…' })).toBeVisible()
+  await expect(page.getByText('1 of 2 bins')).toBeVisible()
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})

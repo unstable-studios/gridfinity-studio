@@ -30,7 +30,10 @@ Select a pocket to set its depth, size and position. A pocket drawn too close to
 - Click to select, and drag to move. Where shapes overlap, a click selects the smallest one under the pointer.
 - **Shift+click** adds to the selection.
 - Select two or more pockets to align them from the sidebar, and three or more to space them evenly. One pocket can be centered in its bin.
-- Right-click a bin or pocket for cut, copy, paste, rename and delete. On a bin the menu also turns its stacking lip on or off and adds an empty bin beside it. On pockets it also aligns and distributes them. On empty canvas it adds a bin there and resets the view.
+- Right-click a bin or pocket for cut, copy, paste, rename and delete. The menu has more, depending on what is under the pointer:
+  - A bin: turn its stacking lip on or off, add an empty bin beside it, make it one unit wider, deeper or taller (or less), or go to Preview to export it on its own.
+  - Pockets: align and distribute them, set how deep they are cut, move them to another bin, or take them out of their bin.
+  - Empty canvas: add a bin there, paste what was copied there, or reset the view.
 - Scroll to zoom, and drag with the middle button to pan.
 
 **Edit > Undo** and **Redo** step through every change. **History**, in the corner of the canvas, lists the steps by what they did. Click one to go straight to it; the steps after it stay until you make a new change.

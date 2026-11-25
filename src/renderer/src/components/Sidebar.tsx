@@ -17,6 +17,8 @@ import { storedName } from '@/lib/item-name'
 import { shapeWallIssue, wallIssueText, type WallIssue } from '@/lib/wall-clearance'
 import { removeItems } from '@/lib/remove-items'
 import { addBin, placeForNewBin } from '@/lib/new-bin'
+import { updateBin } from '@/lib/bin-update'
+import { withPocketDepth } from '@/lib/pocket-depth'
 import {
   addBinSection,
   addBinSectionOpen,
@@ -41,7 +43,7 @@ import {
   useEngineState,
   isBinGroup
 } from '@/layout-engine'
-import type { BinMetadata, LayoutGroup, LayoutShape, LayoutEngine } from '@/layout-engine'
+import type { BinMetadata, LayoutShape, LayoutEngine } from '@/layout-engine'
 import { useExport } from '@/hooks/useExport'
 import {
   computeDefaultPocketDepth,
@@ -238,21 +240,7 @@ function LayoutSidebar(): React.JSX.Element {
   }
 
   const handleUpdateBinMetadata = (groupId: string, patch: Partial<BinMetadata>): void => {
-    if (!engine) return
-    const group = engine.getGroup(groupId)
-    if (!group || !isBinGroup(group)) return
-
-    const updated: BinMetadata = { ...group.metadata, ...patch }
-    const groupPatch: Partial<LayoutGroup> = { metadata: updated }
-
-    // If width/depth units changed, just update dimensions.
-    // x,y is the lower-left corner, so it stays fixed — bin grows rightward and upward.
-    if (patch.widthUnits !== undefined || patch.depthUnits !== undefined) {
-      groupPatch.width = updated.widthUnits * baseUnit
-      groupPatch.height = updated.depthUnits * baseUnit
-    }
-
-    if (!engine.updateGroup(groupId, groupPatch)) notifyResizeBlocked()
+    if (engine && !updateBin(engine, groupId, patch, baseUnit)) notifyResizeBlocked()
   }
 
   const handleDeleteSelected = (): void => {
@@ -699,14 +687,7 @@ function ShapeDepthField({
   const nearMax = !isAuto && effectiveDepth >= maxSafe - DEPTH_WARN_MARGIN
 
   const writeDepth = (next: number | null, options?: { transient?: boolean }): void => {
-    const nextMeta = {
-      ...meta,
-      pocket: {
-        clearance: pocket.clearance ?? 0.25,
-        ...(next === null ? {} : { depth: next })
-      }
-    }
-    engine.updateShape(shape.id, { metadata: nextMeta }, options)
+    engine.updateShape(shape.id, { metadata: withPocketDepth(shape.metadata, next) }, options)
   }
 
   // Each step of a depth adjustment is shown live. The adjustment is

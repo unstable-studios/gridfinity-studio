@@ -125,12 +125,35 @@ export function planPaste(
   }
   const looseShift = PASTE_OFFSET * pasteCount
 
+  return place(content, { x: binShift, y: 0 }, { x: looseShift, y: looseShift }, nameFor, newId)
+}
+
+interface Shift {
+  x: number
+  y: number
+}
+
+/** New bins and shapes from `content`, moved by the given amounts. */
+function place(
+  content: ClipboardContent,
+  binShift: Shift,
+  looseShift: Shift,
+  nameFor: (name: unknown) => string | undefined,
+  newId: () => string
+): PastePlan {
   const newGroupId = new Map<string, string>()
   const groups = content.groups.map((group) => {
     const id = newId()
     newGroupId.set(group.id, id)
     const metadata = renamed(group.metadata, nameFor(group.metadata?.name))
-    return { ...structuredClone(group), id, x: group.x + binShift, childIds: [], metadata }
+    return {
+      ...structuredClone(group),
+      id,
+      x: group.x + binShift.x,
+      y: group.y + binShift.y,
+      childIds: [],
+      metadata
+    }
   })
 
   const shapeGroup = new Map<string, string>()
@@ -142,15 +165,58 @@ export function planPaste(
     // a name that tells them apart.
     const keptName = typeof shape.metadata?.name === 'string' ? shape.metadata.name : undefined
     const metadata = renamed(shape.metadata, groupId ? keptName : nameFor(keptName))
+    const shift = groupId ? binShift : looseShift
     return {
       ...structuredClone(shape),
       id,
-      x: shape.x + (groupId ? binShift : looseShift),
-      y: shape.y + (groupId ? 0 : looseShift),
+      x: shape.x + shift.x,
+      y: shape.y + shift.y,
       groupId: null,
       metadata
     }
   })
 
   return { groups, shapes, shapeGroup }
+}
+
+/**
+ * Where "Paste here" puts things: the middle of what was copied goes to `point`, and
+ * everything keeps its arrangement. Copied bins move by whole grid squares, so they stay on
+ * the grid. Null when a pasted bin would land on a bin that is already there.
+ *
+ * `asCopy` is false for the first paste after a cut, which keeps the names.
+ */
+export function planPasteAt(
+  content: ClipboardContent,
+  existingGroups: LayoutGroup[],
+  baseUnit: number,
+  point: { x: number; y: number },
+  asCopy: boolean,
+  newId: () => string
+): PastePlan | null {
+  // The box around the copied bins, and around the middles of the copied shapes.
+  const xs = [
+    ...content.groups.flatMap((g) => [g.x, g.x + g.width]),
+    ...content.shapes.map((s) => s.x)
+  ]
+  const ys = [
+    ...content.groups.flatMap((g) => [g.y - g.height, g.y]),
+    ...content.shapes.map((s) => s.y)
+  ]
+  if (xs.length === 0) return null
+  const middle = {
+    x: (Math.min(...xs) + Math.max(...xs)) / 2,
+    y: (Math.min(...ys) + Math.max(...ys)) / 2
+  }
+  const onGrid = (value: number): number =>
+    content.groups.length > 0 ? Math.round(value / baseUnit) * baseUnit : value
+  const shift = { x: onGrid(point.x - middle.x), y: onGrid(point.y - middle.y) }
+
+  const nameFor = (name: unknown): string | undefined =>
+    asCopy ? copyName(name) : typeof name === 'string' ? name : undefined
+  const plan = place(content, shift, shift, nameFor, newId)
+  const blocked = plan.groups.some((pasted) =>
+    existingGroups.some((existing) => overlaps(pasted, existing))
+  )
+  return blocked ? null : plan
 }

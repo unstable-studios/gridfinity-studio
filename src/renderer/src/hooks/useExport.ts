@@ -23,10 +23,33 @@ type Bin = LayoutGroup & { metadata: BinMetadata }
  * What the person asked for. Bins are checked until unchecked, so a new bin starts checked.
  * `useExportChoiceReset` checks them all again.
  */
-const useExportOptions = create<{ unchecked: string[]; files: ExportFiles }>(() => ({
+const useExportOptions = create<{
+  unchecked: string[]
+  files: ExportFiles
+  /** Whether the Export popover in the top bar is showing. */
+  menuOpen: boolean
+  /** A bin asked for on its own from Design: the one bin checked on arriving in Preview. */
+  onlyNext: string | null
+}>(() => ({
   unchecked: [],
-  files: 'one'
+  files: 'one',
+  menuOpen: false,
+  onlyNext: null
 }))
+
+/** Whether the Export popover in the top bar is showing, and a way to show or hide it. */
+export function useExportMenuOpen(): [boolean, (open: boolean) => void] {
+  const open = useExportOptions((s) => s.menuOpen)
+  return [open, (menuOpen) => useExportOptions.setState({ menuOpen })]
+}
+
+/**
+ * Ask for one bin to be exported on its own. Call it, then go to Preview: only that bin is
+ * checked there, and Export is open.
+ */
+export function exportOnly(binId: string): void {
+  useExportOptions.setState({ onlyNext: binId })
+}
 
 export interface ExportCommands {
   /** Every bin in the project. */
@@ -136,9 +159,15 @@ export function useExport(): ExportCommands {
  * earlier that would quietly export part of a project. Mount once.
  */
 export function useExportChoiceReset(): void {
+  const engine = useLayoutEngine()
   const { mode } = useAppMode()
   const projectKey = useProject((s) => s.project?.settings.createdAt)
   useEffect(() => {
-    useExportOptions.setState({ unchecked: [] })
-  }, [mode, projectKey])
+    // The one exception: a bin asked for on its own, on the way into Preview.
+    const only = mode === 'review' ? useExportOptions.getState().onlyNext : null
+    const others = only
+      ? (engine?.getAllGroups() ?? []).map((group) => group.id).filter((id) => id !== only)
+      : []
+    useExportOptions.setState({ unchecked: others, menuOpen: only !== null, onlyNext: null })
+  }, [engine, mode, projectKey])
 }
