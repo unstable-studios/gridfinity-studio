@@ -1,5 +1,8 @@
 appId: com.unstablestudios.gridfinity-studio
-productName: gridfinity-studio
+# The name people see: the macOS app, shortcuts, and the deb's folder under /opt. Installer
+# and executable file names, the Windows install folder and the data folder come from `name`
+# in package.json and stay `gridfinity-studio`.
+productName: Gridfinity Studio
 directories:
   buildResources: build
 files:
@@ -11,7 +14,7 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
   # The app runs from `out/`, `resources/`, `node_modules/` and `package.json`. Nothing else
   # in the repo belongs in an installer: planning notes, tests, docs and tool settings.
-  - '!{docs,specs,e2e,.specify,.claude,.github,.husky}/**'
+  - '!{docs,specs,e2e,scripts,.specify,.claude,.github,.husky}/**'
   - '!{CLAUDE.md,CONTRIBUTING.md,components.json,renovate.json,pnpm-workspace.yaml}'
   - '!{playwright.config.ts,vitest.config.mts,vite.config.ts,commitlint.config.mjs}'
   - '!{.actrc,.nvmrc,.editorconfig,.release-please-config.json,.release-please-manifest.json}'
@@ -25,6 +28,8 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  # The zip the updater downloads. Its default name starts with productName.
+  artifactName: ${name}-${version}-${arch}-mac.${ext}
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
@@ -43,6 +48,10 @@ linux:
     - deb
   maintainer: Unstable Studios <info@unstablestudios.com>
   category: Utility
+  desktop:
+    entry:
+      # Windows identify as the package name. This must match, or the dock shows a second icon.
+      StartupWMClass: gridfinity-studio
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
