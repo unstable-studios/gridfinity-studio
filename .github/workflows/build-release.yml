@@ -23,12 +23,16 @@ jobs:
   hold:
     name: Keep the last complete release as Latest
     runs-on: ubuntu-latest
+    # A help, not a gate: if this fails, the installers must still be built and attached.
+    continue-on-error: true
     steps:
       - name: Mark the last release with installers as Latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
           TAG: ${{ github.event.release.tag_name }}
+        # Named, so a failed request fails the step instead of reading as "no release".
+        shell: bash
         run: |
           # Newest first. `latest.yml` is the Windows update file, attached with the rest.
           previous=$(gh api "repos/$REPO/releases?per_page=30" | jq -r --arg tag "$TAG" '
@@ -177,10 +181,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Only now does this release have what an update needs. See the `hold` job.
-      - name: Mark this release as Latest
+      # Only now does this release have what an update needs. See the `hold` job. The mark
+      # goes to the newest release that has installers, which is this one unless a newer
+      # release finished first or this is a re-run for an old tag: it never moves backwards.
+      - name: Mark the newest complete release as Latest
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          TAG: ${{ github.event.release.tag_name }}
-        run: gh release edit "$TAG" --repo "$REPO" --latest
+        shell: bash
+        run: |
+          newest=$(gh api "repos/$REPO/releases?per_page=30" | jq -r '
+            [.[]
+              | select(.draft | not)
+              | select(.prerelease | not)
+              | select(any(.assets[]; .name == "latest.yml"))
+            ][0].tag_name // empty')
+          if [ -z "$newest" ]; then
+            echo "::error::No release has installers attached."
+            exit 1
+          fi
+          echo "Marking $newest as Latest."
+          gh release edit "$newest" --repo "$REPO" --latest

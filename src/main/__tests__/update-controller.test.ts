@@ -3,6 +3,7 @@ import {
   CHECK_TIMEOUT_MS,
   DOWNLOAD_STALL_MS,
   PREPARING_RETRY_MS,
+  PREPARING_ROUNDS,
   createUpdateController,
   type UpdateController
 } from '../update-controller'
@@ -270,6 +271,36 @@ describe('the update controller', () => {
       expect(updater.checks).toBe(round + 1)
     }
     stop()
+  })
+
+  it('calls it a failure when the installers never come, and stops looking early', () => {
+    const updates = make()
+    updates.check()
+    for (let round = 0; round < PREPARING_ROUNDS; round++) {
+      updater.emit('error', stillBuilding())
+      expect(updates.state().kind).toBe('preparing')
+      vi.advanceTimersByTime(PREPARING_RETRY_MS)
+    }
+    updater.emit('error', stillBuilding())
+    expect(updates.state().kind).toBe('error')
+
+    const checks = updater.checks
+    vi.advanceTimersByTime(PREPARING_RETRY_MS * 3)
+    expect(updater.checks).toBe(checks)
+  })
+
+  it('starts counting again once a check has found its answer', () => {
+    const updates = make()
+    updates.check()
+    for (let round = 0; round < PREPARING_ROUNDS; round++) {
+      updater.emit('error', stillBuilding())
+      vi.advanceTimersByTime(PREPARING_RETRY_MS)
+    }
+    updater.emit('update-not-available')
+
+    updates.check()
+    updater.emit('error', stillBuilding())
+    expect(updates.state().kind).toBe('preparing')
   })
 
   it('lets a check be asked for while waiting, without a second one following it', () => {

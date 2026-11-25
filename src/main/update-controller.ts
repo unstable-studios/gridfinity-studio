@@ -36,6 +36,12 @@ export const DOWNLOAD_STALL_MS = 10 * 60 * 1000
 const HOUR_MS = 60 * 60 * 1000
 /** How soon to look again when the newest release has no installers yet. They take minutes. */
 export const PREPARING_RETRY_MS = 5 * 60 * 1000
+/**
+ * How many checks in a row may find no installers before it counts as a failure. Installers
+ * take about ten minutes. A release still without them after half an hour is broken, and
+ * "on its way" would be a promise nobody keeps.
+ */
+export const PREPARING_ROUNDS = 6
 
 /**
  * Whether a failed check only means the newest release has no update file yet. The updater
@@ -51,6 +57,8 @@ export function createUpdateController(options: UpdateControllerOptions): Update
   let state: UpdateState = active ? IDLE_STATE : { kind: 'unavailable' }
   let stalled: ReturnType<typeof setTimeout> | null = null
   let retry: ReturnType<typeof setTimeout> | null = null
+  /** Checks in a row that found a release with no installers. */
+  let emptyRounds = 0
 
   /**
    * The updater has no time limit of its own under Electron. Without one, a request that
@@ -84,7 +92,8 @@ export function createUpdateController(options: UpdateControllerOptions): Update
 
   /** What a failed check or download becomes. */
   const fail = (err: unknown): void => {
-    if (isReleaseStillBuilding(err)) {
+    if (isReleaseStillBuilding(err) && emptyRounds < PREPARING_ROUNDS) {
+      emptyRounds++
       set({ kind: 'preparing' })
     } else {
       set({ kind: 'error', message: err instanceof Error ? err.message : String(err) })
@@ -92,8 +101,12 @@ export function createUpdateController(options: UpdateControllerOptions): Update
   }
 
   updater.on('checking-for-update', () => set({ kind: 'checking' }))
-  updater.on('update-not-available', () => set({ kind: 'up-to-date' }))
+  updater.on('update-not-available', () => {
+    emptyRounds = 0
+    set({ kind: 'up-to-date' })
+  })
   updater.on('update-available', (info: { version: string }) => {
+    emptyRounds = 0
     set({ kind: 'downloading', version: info.version, progress: 0 })
   })
   updater.on('download-progress', (info: { percent: number }) => {
