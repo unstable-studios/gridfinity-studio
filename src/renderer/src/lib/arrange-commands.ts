@@ -20,7 +20,7 @@ import type { AlignMode, DistributeAxis } from '@/layout-engine/arrange'
 import { arrangeTarget } from '@/layout-engine/arrange-target'
 import type { ArrangeTarget } from '@/layout-engine/arrange-target'
 
-export const ALIGN_ACTIONS: Array<{ mode: AlignMode; label: string; icon: LucideIcon }> = [
+const ALIGN_ACTIONS: Array<{ mode: AlignMode; label: string; icon: LucideIcon }> = [
   { mode: 'left', label: 'Align left', icon: AlignStartVertical },
   { mode: 'centerX', label: 'Align horizontal centers', icon: AlignCenterVertical },
   { mode: 'right', label: 'Align right', icon: AlignEndVertical },

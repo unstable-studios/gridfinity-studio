@@ -48,25 +48,9 @@ export default function EditContextMenu({
   disabled = false,
   canvasPoint
 }: EditContextMenuProps): React.JSX.Element {
-  const edit = useEditCommands()
-  const engine = useLayoutEngine()
-  const { selectedIds } = useEngineState()
-  const gridfinity = useProject((s) => s.project?.gridfinity) ?? DEFAULT_GRIDFINITY_CONFIG
   // Rename puts the keyboard in a text field. The closing menu would take it straight back,
   // so the rename starts once the menu has closed.
   const afterClose = useRef<(() => void) | null>(null)
-
-  const groups = engine?.getAllGroups() ?? []
-  const target = menuTarget(groups, selectedIds)
-  const hasSelection = target.kind !== 'none'
-  const arrange = engine && target.kind === 'shapes' ? arrangeTarget(engine, selectedIds) : null
-
-  // On empty canvas: a 1×1 bin in the grid square under the pointer, if it is free.
-  const cell = engine?.getGridConfig().size ?? gridfinity.baseUnit
-  const binHere =
-    target.kind === 'none' && canvasPoint ? binFromDrag(canvasPoint, canvasPoint, cell) : null
-  // Beside a bin: an empty one the same size and height.
-  const beside = target.kind === 'bin' ? placeBeside(target.bin, groups) : null
 
   return (
     <ContextMenu>
@@ -86,114 +70,153 @@ export default function EditContextMenu({
           run()
         }}
       >
-        {binHere && (
-          <>
-            <ContextMenuItem
-              disabled={!engine || binOverlaps(groups, binHere)}
-              onSelect={() => {
-                if (engine) addBin(engine, binHere, cell, newBinDefaults(gridfinity))
-              }}
-            >
-              Add bin here
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-          </>
-        )}
-
-        {hasSelection && (
-          <ContextMenuItem
-            disabled={!edit.canRename}
-            onSelect={() => {
-              afterClose.current = edit.rename
-            }}
-          >
-            Rename
-          </ContextMenuItem>
-        )}
-
-        {target.kind === 'bin' && (
-          <>
-            <ContextMenuCheckboxItem
-              checked={target.bin.metadata.hasLip}
-              onCheckedChange={(checked) => {
-                engine?.updateGroup(target.bin.id, {
-                  metadata: { ...target.bin.metadata, hasLip: checked === true }
-                })
-              }}
-            >
-              Stacking lip
-            </ContextMenuCheckboxItem>
-            <ContextMenuItem
-              disabled={!engine || !beside}
-              onSelect={() => {
-                if (!engine || !beside) return
-                const { heightUnits, hasLip } = target.bin.metadata
-                addBin(engine, beside, cell, { heightUnits, hasLip })
-              }}
-            >
-              Add bin beside
-            </ContextMenuItem>
-          </>
-        )}
-
-        {engine && arrange && (
-          <ContextMenuSub>
-            <ContextMenuSubTrigger>Arrange</ContextMenuSubTrigger>
-            <ContextMenuSubContent className="min-w-52">
-              {alignActionsFor(arrange).map(({ mode, label, icon: Icon }) => (
-                <ContextMenuItem
-                  key={mode}
-                  onSelect={() => alignSelection(engine, selectedIds, mode)}
-                >
-                  <Icon aria-hidden />
-                  {label}
-                </ContextMenuItem>
-              ))}
-              {arrange.canDistribute && (
-                <>
-                  <ContextMenuSeparator />
-                  {DISTRIBUTE_ACTIONS.map(({ axis, label, icon: Icon }) => (
-                    <ContextMenuItem
-                      key={axis}
-                      onSelect={() => distributeSelection(engine, selectedIds, axis)}
-                    >
-                      <Icon aria-hidden />
-                      {label}
-                    </ContextMenuItem>
-                  ))}
-                </>
-              )}
-            </ContextMenuSubContent>
-          </ContextMenuSub>
-        )}
-
-        {hasSelection && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuItem onSelect={edit.cut}>Cut</ContextMenuItem>
-            <ContextMenuItem onSelect={edit.copy}>Copy</ContextMenuItem>
-          </>
-        )}
-        <ContextMenuItem disabled={!edit.canPaste} onSelect={edit.paste}>
-          Paste
-        </ContextMenuItem>
-        {hasSelection && <ContextMenuItem onSelect={edit.duplicate}>Duplicate</ContextMenuItem>}
-        <ContextMenuSeparator />
-        <ContextMenuItem disabled={!edit.canSelectAll} onSelect={edit.selectAll}>
-          Select all
-        </ContextMenuItem>
-        {canvasPoint && !hasSelection && (
-          <ContextMenuItem onSelect={() => engine?.resetView()}>Reset view</ContextMenuItem>
-        )}
-        {hasSelection && (
-          <>
-            <ContextMenuSeparator />
-            <ContextMenuItem variant="destructive" onSelect={edit.remove}>
-              Delete
-            </ContextMenuItem>
-          </>
-        )}
+        <MenuItems
+          canvasPoint={canvasPoint}
+          onRename={(rename) => {
+            afterClose.current = rename
+          }}
+        />
       </ContextMenuContent>
     </ContextMenu>
+  )
+}
+
+/**
+ * The items, for what is selected now. Its own component so that it exists only while the
+ * menu is open: it measures the layout, which must not happen on every pan and zoom.
+ */
+function MenuItems({
+  canvasPoint,
+  onRename
+}: {
+  canvasPoint?: Point | null
+  /** Rename once the menu has closed. */
+  onRename: (rename: () => void) => void
+}): React.JSX.Element {
+  const edit = useEditCommands()
+  const engine = useLayoutEngine()
+  const { selectedIds } = useEngineState()
+  const gridfinity = useProject((s) => s.project?.gridfinity) ?? DEFAULT_GRIDFINITY_CONFIG
+
+  const groups = engine?.getAllGroups() ?? []
+  const target = menuTarget(groups, selectedIds)
+  const hasSelection = target.kind !== 'none'
+  const arrange = engine && target.kind === 'shapes' ? arrangeTarget(engine, selectedIds) : null
+
+  // On empty canvas: a 1×1 bin in the grid square under the pointer, if it is free.
+  const cell = engine?.getGridConfig().size ?? gridfinity.baseUnit
+  const binHere =
+    target.kind === 'none' && canvasPoint ? binFromDrag(canvasPoint, canvasPoint, cell) : null
+  // Beside a bin: an empty one the same size and height.
+  const beside = target.kind === 'bin' ? placeBeside(target.bin, groups) : null
+
+  return (
+    <>
+      {binHere && (
+        <>
+          <ContextMenuItem
+            disabled={!engine || binOverlaps(groups, binHere)}
+            onSelect={() => {
+              // Like a bin drawn with the Bin tool, it takes in a loose shape it lands on.
+              if (engine) {
+                addBin(engine, binHere, cell, newBinDefaults(gridfinity), { adoptShapes: true })
+              }
+            }}
+          >
+            Add bin here
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+        </>
+      )}
+
+      {hasSelection && (
+        <ContextMenuItem disabled={!edit.canRename} onSelect={() => onRename(edit.rename)}>
+          Rename
+        </ContextMenuItem>
+      )}
+
+      {target.kind === 'bin' && (
+        <>
+          <ContextMenuCheckboxItem
+            checked={target.bin.metadata.hasLip}
+            onCheckedChange={(checked) => {
+              engine?.updateGroup(target.bin.id, {
+                metadata: { ...target.bin.metadata, hasLip: checked === true }
+              })
+            }}
+          >
+            Stacking lip
+          </ContextMenuCheckboxItem>
+          <ContextMenuItem
+            disabled={!engine || !beside}
+            onSelect={() => {
+              if (!engine || !beside) return
+              const { heightUnits, hasLip } = target.bin.metadata
+              addBin(engine, beside, cell, { heightUnits, hasLip }, { adoptShapes: true })
+            }}
+          >
+            Add bin beside
+          </ContextMenuItem>
+        </>
+      )}
+
+      {engine && arrange && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Arrange</ContextMenuSubTrigger>
+          <ContextMenuSubContent className="min-w-52">
+            {alignActionsFor(arrange).map(({ mode, label, icon: Icon }) => (
+              <ContextMenuItem
+                key={mode}
+                onSelect={() => alignSelection(engine, selectedIds, mode)}
+              >
+                <Icon aria-hidden />
+                {label}
+              </ContextMenuItem>
+            ))}
+            {arrange.canDistribute && (
+              <>
+                <ContextMenuSeparator />
+                {DISTRIBUTE_ACTIONS.map(({ axis, label, icon: Icon }) => (
+                  <ContextMenuItem
+                    key={axis}
+                    onSelect={() => distributeSelection(engine, selectedIds, axis)}
+                  >
+                    <Icon aria-hidden />
+                    {label}
+                  </ContextMenuItem>
+                ))}
+              </>
+            )}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+
+      {hasSelection && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={edit.cut}>Cut</ContextMenuItem>
+          <ContextMenuItem onSelect={edit.copy}>Copy</ContextMenuItem>
+        </>
+      )}
+      <ContextMenuItem disabled={!edit.canPaste} onSelect={edit.paste}>
+        Paste
+      </ContextMenuItem>
+      {hasSelection && <ContextMenuItem onSelect={edit.duplicate}>Duplicate</ContextMenuItem>}
+      <ContextMenuSeparator />
+      <ContextMenuItem disabled={!edit.canSelectAll} onSelect={edit.selectAll}>
+        Select all
+      </ContextMenuItem>
+      {canvasPoint && !hasSelection && (
+        <ContextMenuItem onSelect={() => engine?.resetView()}>Reset view</ContextMenuItem>
+      )}
+      {hasSelection && (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem variant="destructive" onSelect={edit.remove}>
+            Delete
+          </ContextMenuItem>
+        </>
+      )}
+    </>
   )
 }

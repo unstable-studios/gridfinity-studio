@@ -4,6 +4,7 @@
  */
 import { isBinGroup } from '@/layout-engine/types'
 import type { BinMetadata, LayoutGroup } from '@/layout-engine/types'
+import { binOverlaps } from './draw-bin'
 import type { DrawnBin } from './draw-bin'
 
 export type Bin = LayoutGroup & { metadata: BinMetadata }
@@ -40,16 +41,6 @@ export function placeBeside(bin: Bin, groups: LayoutGroup[]): DrawnBin | null {
     { x: bin.x, y: bin.y - height },
     { x: bin.x, y: bin.y + height }
   ]
-  // Two boxes that only share an edge do not overlap, so a hair is taken off each side.
-  const hair = 1e-6
-  const free = places.find((place) =>
-    groups.every(
-      (other) =>
-        place.x + width - hair <= other.x ||
-        other.x + other.width <= place.x + hair ||
-        place.y - hair <= other.y - other.height ||
-        other.y <= place.y - height + hair
-    )
-  )
-  return free ? { ...free, width, height, widthUnits, depthUnits } : null
+  const beside = places.map((place) => ({ ...place, width, height, widthUnits, depthUnits }))
+  return beside.find((place) => !binOverlaps(groups, place)) ?? null
 }
