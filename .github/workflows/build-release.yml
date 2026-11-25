@@ -16,6 +16,35 @@ env:
   NODE_VERSION: '24'
 
 jobs:
+  # A release is published before its installers exist, and the app's updater only looks at
+  # the release marked Latest. Until this one has its installers, the last release that has
+  # them stays Latest, so apps keep updating to it. `publish` moves the mark at the end. If a
+  # build fails, the mark never moves and nobody is offered a release with nothing in it.
+  hold:
+    name: Keep the last complete release as Latest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark the last release with installers as Latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # Newest first. `latest.yml` is the Windows update file, attached with the rest.
+          previous=$(gh api "repos/$REPO/releases?per_page=30" | jq -r --arg tag "$TAG" '
+            [.[]
+              | select(.draft | not)
+              | select(.prerelease | not)
+              | select(.tag_name != $tag)
+              | select(any(.assets[]; .name == "latest.yml"))
+            ][0].tag_name // empty')
+          if [ -z "$previous" ]; then
+            echo "No earlier release with installers. $TAG stays Latest."
+            exit 0
+          fi
+          echo "Keeping $previous as Latest while $TAG builds."
+          gh release edit "$previous" --repo "$REPO" --latest
+
   build:
     name: Build installers
     runs-on: ${{ matrix.os }}
@@ -119,7 +148,7 @@ jobs:
   publish:
     name: Publish release artifacts
     runs-on: ubuntu-latest
-    needs: build
+    needs: [hold, build]
     steps:
       # upload-artifact strips the leading `dist/` prefix when path uses a
       # wildcard, so artifact contents are flat. With merge-multiple the
@@ -147,3 +176,11 @@ jobs:
             latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Only now does this release have what an update needs. See the `hold` job.
+      - name: Mark this release as Latest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release edit "$TAG" --repo "$REPO" --latest
