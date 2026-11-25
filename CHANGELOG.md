@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.1...v1.18.2) (2026-11-25)
+
+
+### Documentation
+
+* ship the license of the bundled fonts with them ([#549](https://github.com/unstable-studios/gridfinity-studio/issues/549)) ([b4b1302](https://github.com/unstable-studios/gridfinity-studio/commit/b4b130271003fb12170926a0c6e7d132d4c4aadb))
+
 ## [1.18.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.0...v1.18.1) (2026-11-25)
 
 
