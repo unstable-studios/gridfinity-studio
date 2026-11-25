@@ -49,7 +49,6 @@ async function threeMfModel(path: string): Promise<string> {
 test('export every bin or only the selected ones', async () => {
   app = await StudioApp.launch()
   const { page } = app
-  const exportStl = page.getByRole('button', { name: 'Export STL…' })
   const scope = (name: string | RegExp): ReturnType<typeof page.getByRole> =>
     page.getByRole('radio', { name })
 
@@ -64,32 +63,36 @@ test('export every bin or only the selected ones', async () => {
   await expect(page.getByText(/\bReady$/)).toHaveCount(3, { timeout: 30_000 })
 
   // The bin added last is still selected, but an export takes every bin until asked.
+  await app.openExport()
   await expect(scope('All bins')).toBeChecked()
   await expect(scope('Selected (1)')).toBeEnabled()
   const allPath = join(app.dir, 'all.stl')
   await app.stubSaveDialog(allPath)
-  await exportStl.click()
+  await app.exportAs('STL')
   const allTriangles = await stlTriangles(allPath)
   expect(await app.lastSaveDialogDefault(), 'named after the project').toBe('kit.stl')
 
   // One bin: a third of the triangles, named after the bin.
   await page.getByRole('button', { name: /^Bin 2/ }).click()
+  await app.openExport()
   await scope('Selected (1)').click()
   const onePath = join(app.dir, 'one.stl')
   await app.stubSaveDialog(onePath)
-  await exportStl.click()
+  await app.exportAs('STL')
   expect(await stlTriangles(onePath)).toBe(allTriangles / 3)
   expect(await app.lastSaveDialogDefault(), 'named after the bin').toBe('Bin 2.stl')
 
   const oneModelPath = join(app.dir, 'one.3mf')
   await app.stubSaveDialog(oneModelPath)
-  await page.getByRole('button', { name: 'Export 3MF…' }).click()
+  await app.exportAs('3MF')
   expect(await threeMfModel(oneModelPath)).toContain('name="Bin 2"')
   expect(await app.lastSaveDialogDefault()).toBe('Bin 2.3mf')
 
   // Two bins, picked with Shift. The File menu exports the same bins.
   await page.getByRole('button', { name: /^Bin 3/ }).click({ modifiers: ['Shift'] })
+  await app.openExport()
   await expect(scope('Selected (2)')).toBeChecked()
+  await page.keyboard.press('Escape')
   const twoPath = join(app.dir, 'two.stl')
   await app.stubSaveDialog(twoPath)
   await page.getByRole('menuitem', { name: 'File', exact: true }).click()
@@ -103,15 +106,19 @@ test('export every bin or only the selected ones', async () => {
   // With nothing selected there is only one choice left.
   await page.getByRole('button', { name: /^Bin 2/ }).click()
   await page.getByRole('button', { name: /^Bin 2/ }).click({ modifiers: ['ControlOrMeta'] })
+  await app.openExport()
   await expect(scope('Selected (0)')).toBeDisabled()
   await expect(scope('All bins')).toBeChecked()
 
   // "Selected" does not outlive a visit to Preview: coming back, an export takes every bin.
   await page.getByRole('button', { name: /^Bin 2/ }).click()
+  await app.openExport()
   await scope('Selected (1)').click()
   await expect(scope('Selected (1)')).toBeChecked()
+  await page.keyboard.press('Escape')
   await page.getByRole('radio', { name: 'Design', exact: true }).click()
   await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await app.openExport()
   await expect(scope('All bins')).toBeChecked()
 
   expect(app.errors, 'no renderer errors').toEqual([])
@@ -120,7 +127,6 @@ test('export every bin or only the selected ones', async () => {
 test('export one file per bin into a folder', async () => {
   app = await StudioApp.launch()
   const { page } = app
-  const exportStl = page.getByRole('button', { name: 'Export STL…' })
 
   await page.getByRole('button', { name: 'New project' }).click()
   for (let i = 0; i < 3; i++) {
@@ -134,7 +140,7 @@ test('export one file per bin into a folder', async () => {
   // One file with every bin, to compare with. The third bin is four units right of the first.
   const allPath = join(app.dir, 'all.stl')
   await app.stubSaveDialog(allPath)
-  await exportStl.click()
+  await app.exportAs('STL')
   const allTriangles = await stlTriangles(allPath)
   const all = await stlXRange(allPath)
   expect(all.max - all.min, 'bins keep their places in one file').toBeGreaterThan(150)
@@ -143,8 +149,9 @@ test('export one file per bin into a folder', async () => {
   const folder = join(app.dir, 'parts')
   await mkdir(folder)
   await app.stubOpenDialog(folder)
+  await app.openExport()
   await page.getByRole('radio', { name: 'File per bin' }).click()
-  await exportStl.click()
+  await app.exportAs('STL')
   await expect(page.getByText('Exported 3 files to parts')).toBeVisible()
   expect((await readdir(folder)).sort()).toEqual(['Bin 1.stl', 'Bin 2.stl', 'Bin 3.stl'])
   for (const name of ['Bin 1.stl', 'Bin 2.stl', 'Bin 3.stl']) {
@@ -157,7 +164,7 @@ test('export one file per bin into a folder', async () => {
   await writeFile(join(folder, 'Bin 1.stl'), 'old')
   const untouched = (await stat(join(folder, 'Bin 2.stl'))).mtimeMs
   await app.answerReplacePrompt('cancel')
-  await exportStl.click()
+  await app.exportAs('STL')
   await expect.poll(() => app.promptCount()).toBe(1)
   // Long enough for a write that should not happen to show up.
   await page.waitForTimeout(300)
@@ -165,16 +172,17 @@ test('export one file per bin into a folder', async () => {
   expect((await stat(join(folder, 'Bin 2.stl'))).mtimeMs, 'Bin 2 untouched').toBe(untouched)
 
   await app.answerReplacePrompt('replace')
-  await exportStl.click()
+  await app.exportAs('STL')
   expect(await stlTriangles(join(folder, 'Bin 1.stl'))).toBe(allTriangles / 3)
   expect(await app.promptCount()).toBe(2)
 
   // One selected bin needs no folder: an ordinary save, still at the origin.
   await page.getByRole('button', { name: /^Bin 3/ }).click()
+  await app.openExport()
   await page.getByRole('radio', { name: 'Selected (1)' }).click()
   const onePath = join(app.dir, 'one.stl')
   await app.stubSaveDialog(onePath)
-  await exportStl.click()
+  await app.exportAs('STL')
   const one = await stlXRange(onePath)
   expect(Math.abs(one.min + one.max)).toBeLessThan(0.01)
   expect(await app.lastSaveDialogDefault()).toBe('Bin 3.stl')

@@ -33,6 +33,7 @@ import type { UpdateState } from '../../../shared/types/updates'
 import { updateMenuItems, type UpdateAction } from '@/lib/update-menu'
 import { cn } from '@/lib/utils'
 import { useExport, useExportScopeReset } from '@/hooks/useExport'
+import ExportMenu from './ExportMenu'
 import {
   SquareDashedIcon,
   BoxIcon,
@@ -101,7 +102,11 @@ export default function Navbar(): React.JSX.Element {
         </NavbarContent>
         <NavbarActions className="ml-auto gap-2">
           <ViewModeToggle />
-          <ToolBar />
+          {/* Export takes the tools' place in Preview, so the mode switch does not move. */}
+          <div className="relative flex items-center">
+            <ToolBar />
+            <PreviewActions />
+          </div>
           <ThemeToggle />
         </NavbarActions>
       </NavbarRoot>
@@ -317,6 +322,12 @@ function ViewModeToggle() {
   )
 }
 
+function PreviewActions() {
+  const { mode } = useAppMode()
+  if (mode !== 'review') return null
+  return <ExportMenu className="absolute left-0" />
+}
+
 function ToolBar() {
   const { mode, activeTool, setActiveTool } = useAppMode()
 
@@ -334,6 +345,8 @@ function ToolBar() {
     <ToggleGroup
       type="single"
       aria-label="Tools"
+      // Hidden tools keep their width, so they must not take the keyboard either.
+      inert={hidden}
       value={activeTool ?? ''}
       onValueChange={(value) => {
         if (value) setActiveTool(value as typeof activeTool)

@@ -193,6 +193,21 @@ export class StudioApp {
     await this.page.getByRole('menuitem', { name: item }).click()
   }
 
+  /** Open Export in the top bar, unless it is open already. Its options and formats are inside. */
+  async openExport(): Promise<void> {
+    // Ask the button, not the popover: a popover that is closing is still on the page.
+    const button = this.page.getByRole('button', { name: 'Export', exact: true })
+    if ((await button.getAttribute('aria-expanded')) !== 'true') await button.click()
+    await expect(button).toHaveAttribute('aria-expanded', 'true')
+    await expect(this.page.getByRole('button', { name: 'Export STL…' })).toBeVisible()
+  }
+
+  /** Export from the top bar. */
+  async exportAs(format: '3MF' | 'STL'): Promise<void> {
+    await this.openExport()
+    await this.page.getByRole('button', { name: `Export ${format}…` }).click()
+  }
+
   /** A tool in the toolbar. "Bin" is also an option elsewhere, so the toolbar is named. */
   tool(name: 'Select' | 'Bin' | 'Rectangle' | 'Ellipse' | 'Polygon'): Locator {
     return this.page

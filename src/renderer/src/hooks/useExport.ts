@@ -1,6 +1,6 @@
 /**
  * Exporting the baked bins: which ones, whether they are ready, and writing the file.
- * The sidebar and the File menu both export through this, so they always agree.
+ * The top bar and the File menu both export through this, so they always agree.
  */
 import { useCallback, useEffect, useMemo } from 'react'
 import { create } from 'zustand'
