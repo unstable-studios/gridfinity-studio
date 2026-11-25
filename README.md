@@ -76,3 +76,5 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org), chec
 ## License
 
 [MIT](LICENSE)
+
+The app includes the [Inter](src/renderer/public/fonts/Inter-LICENSE.txt) and [JetBrains Mono](src/renderer/public/fonts/JetBrainsMono-LICENSE.txt) fonts, each under the SIL Open Font License 1.1.

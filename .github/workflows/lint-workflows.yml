@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - '.github/workflows/**'
+      - '.github/scripts/**'
 
 jobs:
   actionlint:
@@ -13,3 +14,6 @@ jobs:
 
       - name: Run actionlint
         uses: rhysd/actionlint@v1.7.12
+
+      - name: Check the workflow scripts
+        run: shellcheck .github/scripts/*.sh
