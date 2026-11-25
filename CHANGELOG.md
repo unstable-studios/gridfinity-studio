@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.18.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.18.0...v1.18.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* restore the package list the 1.18.0 release commit undid ([#547](https://github.com/unstable-studios/gridfinity-studio/issues/547)) ([b50896d](https://github.com/unstable-studios/gridfinity-studio/commit/b50896d5b22070bd50e7550034affa4d6b77fe0d))
+
 ## [1.18.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.17.3...v1.18.0) (2026-11-25)
 
 
