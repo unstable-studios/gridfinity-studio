@@ -84,8 +84,8 @@ export default function EditContextMenu({
       >
         <MenuItems
           canvasPoint={canvasPoint}
-          onRename={(rename) => {
-            afterClose.current = rename
+          afterClose={(run) => {
+            afterClose.current = run
           }}
         />
       </ContextMenuContent>
@@ -99,11 +99,15 @@ export default function EditContextMenu({
  */
 function MenuItems({
   canvasPoint,
-  onRename
+  afterClose
 }: {
   canvasPoint?: Point | null
-  /** Rename once the menu has closed. */
-  onRename: (rename: () => void) => void
+  /**
+   * Run something once the menu has closed, in place of the keyboard going back to where
+   * the menu was opened from. For what puts the keyboard somewhere itself, or opens
+   * something that would close again when the keyboard moved.
+   */
+  afterClose: (run: () => void) => void
 }): React.JSX.Element {
   const edit = useEditCommands()
   const engine = useLayoutEngine()
@@ -159,6 +163,7 @@ function MenuItems({
     })
   // A bin every selected shape is already in is not somewhere to move them to.
   const home =
+    pockets.length > 0 &&
     pockets.length === selectedIds.length &&
     pockets.every((pocket) => pocket.bin.id === pockets[0].bin.id)
       ? pockets[0].bin.id
@@ -193,7 +198,7 @@ function MenuItems({
       )}
 
       {hasSelection && (
-        <ContextMenuItem disabled={!edit.canRename} onSelect={() => onRename(edit.rename)}>
+        <ContextMenuItem disabled={!edit.canRename} onSelect={() => afterClose(edit.rename)}>
           Rename
         </ContextMenuItem>
       )}
@@ -238,10 +243,14 @@ function MenuItems({
           </ContextMenuSub>
           <ContextMenuItem
             onSelect={() => {
-              // Preview opens with only this bin checked and Export showing.
-              exportOnly(target.bin.id)
-              setMode('review')
-              setActiveTool(null)
+              const binId = target.bin.id
+              // Preview opens with only this bin checked and Export showing. After the menu
+              // has closed, or the keyboard going back to the canvas would close Export.
+              afterClose(() => {
+                exportOnly(binId)
+                setMode('review')
+                setActiveTool(null)
+              })
             }}
           >
             Export this bin…

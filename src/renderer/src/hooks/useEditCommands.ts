@@ -152,8 +152,8 @@ export function useEditCommands(): EditCommands {
       const plan = planAt(point)
       if (!plan) return
       applyPaste(plan)
-      // The next paste is a copy, and an ordinary one lands beside this, not on it.
-      useClipboard.setState((s) => ({ nextOffset: s.nextOffset + 1 }))
+      // After a cut, this put back the things themselves. Any later paste is a copy.
+      useClipboard.setState((s) => ({ nextOffset: Math.max(1, s.nextOffset) }))
     },
     [planAt, applyPaste]
   )
