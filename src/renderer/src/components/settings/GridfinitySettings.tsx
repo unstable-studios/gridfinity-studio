@@ -5,7 +5,11 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import type { GridfinityConfig, TolerancePreset } from '../../../../shared/types/project'
-import { DEFAULT_GRIDFINITY_CONFIG, TOLERANCE_PRESETS } from '../../../../shared/types/project'
+import {
+  DEFAULT_GRIDFINITY_CONFIG,
+  TOLERANCE_PRESETS,
+  newBinDefaults
+} from '../../../../shared/types/project'
 
 interface GridfinitySettingsProps {
   config: GridfinityConfig
@@ -43,6 +47,14 @@ export default function GridfinitySettings({
         onChange({ ...config, [key]: value })
       }
     }
+  }
+
+  const newBin = newBinDefaults(config)
+
+  function updateNewBinHeight(raw: string): void {
+    const value = Math.round(parseFloat(raw))
+    if (!isNaN(value) && value >= 1)
+      onChange({ ...config, newBin: { ...newBin, heightUnits: value } })
   }
 
   function handleReset(): void {
@@ -130,6 +142,29 @@ export default function GridfinitySettings({
         />
       </div>
 
+      {/* What a bin added from now on starts with. Bins already in the project keep theirs. */}
+      <div className="space-y-3">
+        <Label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          New bins
+        </Label>
+        <div className="grid grid-cols-2 gap-3">
+          <NumberField
+            label="Height"
+            value={newBin.heightUnits}
+            suffix="units"
+            min={1}
+            onChange={updateNewBinHeight}
+          />
+        </div>
+        <ToggleRow
+          label="Stacking lip"
+          checked={newBin.hasLip}
+          onCheckedChange={(checked) =>
+            onChange({ ...config, newBin: { ...newBin, hasLip: checked } })
+          }
+        />
+      </div>
+
       {/* Reset */}
       <Button variant="outline" size="sm" className="w-full" onClick={handleReset}>
         Reset to defaults
@@ -145,6 +180,7 @@ function NumberField({
   value,
   suffix,
   step = 1,
+  min,
   disabled,
   onChange
 }: {
@@ -152,6 +188,7 @@ function NumberField({
   value: number
   suffix?: string
   step?: number
+  min?: number
   disabled?: boolean
   onChange: (raw: string) => void
 }): React.JSX.Element {
@@ -161,7 +198,9 @@ function NumberField({
       <div className="flex items-center gap-1.5">
         <Input
           type="number"
+          aria-label={label}
           step={step}
+          min={min}
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}

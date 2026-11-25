@@ -129,6 +129,59 @@ describe('ProjectValidator', () => {
       expect(result.valid).toBe(false)
       expect(result.errors.some((e) => e.field === 'gridfinity.magnetHoles.enabled')).toBe(true)
     })
+
+    it('accepts a project with no defaults for new bins, as older files have none', () => {
+      const project = createEmptyProject()
+      expect('newBin' in project.gridfinity).toBe(false)
+      expect(ProjectValidator.validate(project).valid).toBe(true)
+    })
+
+    it('accepts defaults for new bins', () => {
+      const project = createEmptyProject()
+      project.gridfinity.newBin = { heightUnits: 6, hasLip: false }
+      expect(ProjectValidator.validate(project).valid).toBe(true)
+    })
+
+    it.each([0, -2, 2.5, '3', null])('rejects a new-bin height of %s', (heightUnits) => {
+      const project = createEmptyProject()
+      ;(project.gridfinity as Record<string, unknown>).newBin = { heightUnits, hasLip: true }
+      const result = ProjectValidator.validate(project)
+      expect(result.valid).toBe(false)
+      expect(result.errors.some((e) => e.field === 'gridfinity.newBin.heightUnits')).toBe(true)
+    })
+
+    it('rejects a new-bin lip that is not on or off', () => {
+      const project = createEmptyProject()
+      ;(project.gridfinity as Record<string, unknown>).newBin = { heightUnits: 3, hasLip: 'yes' }
+      const result = ProjectValidator.validate(project)
+      expect(result.valid).toBe(false)
+      expect(result.errors.some((e) => e.field === 'gridfinity.newBin.hasLip')).toBe(true)
+    })
+
+    it('rejects new-bin defaults that are not an object', () => {
+      const project = createEmptyProject()
+      ;(project.gridfinity as Record<string, unknown>).newBin = 3
+      const result = ProjectValidator.validate(project)
+      expect(result.valid).toBe(false)
+      expect(result.errors.some((e) => e.field === 'gridfinity.newBin')).toBe(true)
+    })
+  })
+
+  describe('a new project', () => {
+    it('starts with the settings it is given, as its own copy', () => {
+      const mine = {
+        ...structuredClone(createEmptyProject().gridfinity),
+        baseUnit: 50,
+        gridSpacing: 50,
+        newBin: { heightUnits: 6, hasLip: false }
+      }
+      const project = createEmptyProject('Mine', mine)
+      expect(project.gridfinity).toEqual(mine)
+      expect(project.gridfinity).not.toBe(mine)
+      expect(project.gridfinity.magnetHoles).not.toBe(mine.magnetHoles)
+      expect(project.layoutSnapshot.gridConfig.size).toBe(50)
+      expect(ProjectValidator.validate(project).valid).toBe(true)
+    })
   })
 
   describe('empty or missing sections', () => {

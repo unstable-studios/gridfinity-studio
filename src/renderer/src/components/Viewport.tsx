@@ -139,12 +139,15 @@ export default function Viewport(): React.JSX.Element {
 
   // The right-click menu belongs to the Select tool. A drawing tool keeps its own clicks.
   const canUseMenu = mode === 'layout' && (activeTool === 'select' || activeTool === null)
+  // Where the last right-click on the canvas was, for the menu's "Add bin here".
+  const [menuPoint, setMenuPoint] = useState<{ x: number; y: number } | null>(null)
   /** The menu acts on the selection, so a right-click first selects what is under it. */
   const selectUnderPointer = (e: React.MouseEvent): void => {
     if (!engine || !canUseMenu) return
     // The engine measures from the corner of the canvas, which this element covers.
     const canvas = e.currentTarget.getBoundingClientRect()
     const world = engine.screenToWorld(e.clientX - canvas.left, e.clientY - canvas.top)
+    setMenuPoint(world)
     const hit = engine.objectAt(world.x, world.y)
     if (!hit) {
       engine.clearSelection()
@@ -160,7 +163,7 @@ export default function Viewport(): React.JSX.Element {
   return (
     <div className="absolute inset-0 overflow-hidden">
       {/* Layout canvas always mounted so engine survives mode switches */}
-      <EditContextMenu disabled={!canUseMenu}>
+      <EditContextMenu disabled={!canUseMenu} canvasPoint={menuPoint}>
         <div
           className={
             mode === 'layout' ? 'relative h-full' : 'absolute inset-0 invisible pointer-events-none'

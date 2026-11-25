@@ -14,9 +14,10 @@ import type { LayoutShape, BinMetadata, LayoutGroup } from '@/layout-engine/type
 import { findBestBinForShape, type ShapeAABB } from '@/layout-engine/containment'
 import { shapeTypeLabel } from '@/lib/shape-labels'
 import { boxFromDrag, type DrawOptions, type Point } from '@/lib/draw-box'
-import { binFromDrag, type DrawnBin } from '@/lib/draw-bin'
+import { binFromDrag, binOverlaps, type DrawnBin } from '@/lib/draw-bin'
 import { addBin } from '@/lib/new-bin'
-import { checkGroupCollision } from '@/layout-engine/collision'
+import { useProject } from '@/hooks/useProject'
+import { DEFAULT_GRIDFINITY_CONFIG, newBinDefaults } from '../../../shared/types/project'
 
 // ─── Coordinate conversion ──────────────────────────────────────────────────
 
@@ -420,8 +421,9 @@ export default function DrawingToolLayer(): React.JSX.Element | null {
         dragStartRef.current = null
         dragCurrentRef.current = null
         // A bin can't sit on another. The preview has already shown there is no room.
-        if (binOverlaps(engine, bin)) return
-        addBin(engine, bin, cell, { adoptShapes: true })
+        if (binOverlaps(engine.getAllGroups(), bin)) return
+        const settings = useProject.getState().project?.gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
+        addBin(engine, bin, cell, newBinDefaults(settings), { adoptShapes: true })
         setActiveTool('select')
         return
       }
@@ -550,11 +552,6 @@ function DragPreviewSvg({
 const BIN_PREVIEW = { fill: 'rgba(59, 130, 246, 0.15)', stroke: '#3b82f6' }
 const BIN_PREVIEW_BLOCKED = { fill: 'rgba(239, 68, 68, 0.15)', stroke: '#ef4444' }
 
-/** Whether a drawn bin would sit on a bin that is already there. */
-function binOverlaps(engine: LayoutEngine, bin: DrawnBin): boolean {
-  return checkGroupCollision(bin, '', engine.getAllGroups()) !== null
-}
-
 /** The bin being drawn, with its size in grid units. Red when there is no room for it. */
 function BinPreviewSvg({
   bin,
@@ -569,7 +566,7 @@ function BinPreviewSvg({
   const y = (bin.y - bin.height) * viewport.zoom - viewport.panY
   const width = bin.width * viewport.zoom
   const height = bin.height * viewport.zoom
-  const blocked = binOverlaps(engine, bin)
+  const blocked = binOverlaps(engine.getAllGroups(), bin)
   const colors = blocked ? BIN_PREVIEW_BLOCKED : BIN_PREVIEW
 
   return (

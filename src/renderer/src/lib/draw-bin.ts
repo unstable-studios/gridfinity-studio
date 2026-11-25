@@ -3,6 +3,8 @@
  * and where the pointer is.
  */
 import type { Point } from './draw-box'
+import { checkGroupCollision } from '@/layout-engine/collision'
+import type { LayoutGroup } from '@/layout-engine/types'
 
 export interface DrawnBin {
   /** Lower-left corner, as a `LayoutGroup` stores it: the largest y, since y grows downward. */
@@ -34,4 +36,9 @@ export function binFromDrag(start: Point, current: Point, baseUnit: number): Dra
     widthUnits,
     depthUnits
   }
+}
+
+/** Whether a bin drawn there would sit on one of `groups`. */
+export function binOverlaps(groups: LayoutGroup[], bin: DrawnBin): boolean {
+  return checkGroupCollision(bin, '', groups) !== null
 }

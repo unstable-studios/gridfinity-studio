@@ -43,7 +43,11 @@ import {
 } from '@/layout-engine'
 import type { BinMetadata, LayoutGroup, LayoutShape, LayoutEngine } from '@/layout-engine'
 import { useExport } from '@/hooks/useExport'
-import { computeDefaultPocketDepth, DEFAULT_GRIDFINITY_CONFIG } from '../../../shared/types/project'
+import {
+  computeDefaultPocketDepth,
+  DEFAULT_GRIDFINITY_CONFIG,
+  newBinDefaults
+} from '../../../shared/types/project'
 
 /** Depth threshold (mm) below the bin's max safe depth at which we warn. */
 const DEPTH_WARN_MARGIN = 2
@@ -228,7 +232,7 @@ function LayoutSidebar(): React.JSX.Element {
   const handleAddBin = (widthUnits: number, depthUnits: number): void => {
     if (!engine) return
     const place = placeForNewBin(binGroups, widthUnits, depthUnits, baseUnit)
-    addBin(engine, { ...place, widthUnits, depthUnits }, baseUnit)
+    addBin(engine, { ...place, widthUnits, depthUnits }, baseUnit, newBinDefaults(gridfinity))
     // Someone adding bins from the grid wants it to stay there for the next one.
     setAddBinSection(noteAddBinUsed())
   }
