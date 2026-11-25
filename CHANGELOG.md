@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.21.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.20.0...v1.21.0) (2026-11-25)
+
+
+### Features
+
+* **ui:** add a user guide and an about dialog ([#562](https://github.com/unstable-studios/gridfinity-studio/issues/562)) ([2d42699](https://github.com/unstable-studios/gridfinity-studio/commit/2d4269973a374132b91d577d6978a4ab85d1da37))
+
 ## [1.20.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.19.0...v1.20.0) (2026-11-25)
 
 
