@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_THEME_CONFIG } from '../theme-config'
-import { CLICK_SLOP_PX, glowIntensity, isClick, leftOutColor } from '../preview-pick'
+import {
+  CLICK_SLOP_PX,
+  LEFT_OUT_OPACITY,
+  glowIntensity,
+  isClick,
+  leftOutColor
+} from '../preview-pick'
 
 describe('isClick', () => {
   it('takes a press that did not move, or barely moved, as a click', () => {
@@ -15,67 +21,56 @@ describe('isClick', () => {
 })
 
 describe('leftOutColor', () => {
-  it('fades the mesh color most of the way into a light floor', () => {
-    expect(leftOutColor('#000000', '#ffffff')).toBe('#bfbfbf')
+  it('takes the color out and keeps the brightness', () => {
+    expect(leftOutColor('#000000')).toBe('#000000')
+    expect(leftOutColor('#ffffff')).toBe('#ffffff')
+    // Green counts for most of how bright a color looks, blue for least.
+    expect(leftOutColor('#00ff00')).toBe('#b6b6b6')
+    expect(leftOutColor('#0000ff')).toBe('#121212')
   })
 
-  it('fades less into a dark floor, so the bin can still be made out', () => {
-    expect(leftOutColor('#ffffff', '#000000')).toBe('#737373')
-  })
-
-  it('fades the default themes by the amount each was tuned for', () => {
-    const { dark, light } = DEFAULT_THEME_CONFIG
-    expect(leftOutColor(dark.meshColor, dark.reviewFloor)).toBe('#2a4f7c')
-    expect(leftOutColor(light.meshColor, light.reviewFloor)).toBe('#aec2e3')
-  })
-
-  it('counts a floor as dark below a quarter of full brightness', () => {
-    expect(leftOutColor('#ffffff', '#3f3f3f')).toBe('#959595')
-    expect(leftOutColor('#ffffff', '#404040')).toBe('#707070')
-  })
-
-  it('differs from both colors it is mixed from', () => {
-    const color = leftOutColor('#4f9ef8', '#0c0f17')
-    expect(color).not.toBe('#4f9ef8')
-    expect(color).not.toBe('#0c0f17')
+  it('grays the default mesh colors of both themes', () => {
+    expect(leftOutColor(DEFAULT_THEME_CONFIG.dark.meshColor)).toBe('#949494')
+    expect(leftOutColor(DEFAULT_THEME_CONFIG.light.meshColor)).toBe('#7b7b7b')
   })
 
   it('reads colors without a leading # and in either case', () => {
-    expect(leftOutColor('000000', 'FFFFFF')).toBe('#bfbfbf')
+    expect(leftOutColor('00FF00')).toBe('#b6b6b6')
   })
 
-  it('gives the mesh color back when a color is not #rrggbb', () => {
-    expect(leftOutColor('#4f9ef8', 'red')).toBe('#4f9ef8')
-    expect(leftOutColor('rgb(0,0,0)', '#ffffff')).toBe('rgb(0,0,0)')
+  it('gives the mesh color back when it is not #rrggbb', () => {
+    expect(leftOutColor('rgb(0,0,0)')).toBe('rgb(0,0,0)')
+    expect(leftOutColor('red')).toBe('red')
   })
 })
 
 describe('glowIntensity', () => {
-  const resting = { hovered: false }
-  const hovered = { hovered: true }
-
-  it('does not glow while every bin is checked', () => {
-    expect(glowIntensity({ checked: true, choosing: false, ...resting })).toBe(0)
+  it('glows the same on every checked bin', () => {
+    expect(glowIntensity({ checked: true, hovered: false })).toBeGreaterThan(0)
   })
 
-  it('glows on a checked bin while some bin is left out', () => {
-    expect(glowIntensity({ checked: true, choosing: true, ...resting })).toBeGreaterThan(0)
-    expect(glowIntensity({ checked: false, choosing: true, ...resting })).toBe(0)
+  it('does not glow on a left-out bin', () => {
+    expect(glowIntensity({ checked: false, hovered: false })).toBe(0)
   })
 
   it('glows more on the bin under the pointer', () => {
-    for (const choosing of [false, true]) {
-      for (const checked of [false, true]) {
-        expect(glowIntensity({ checked, choosing, ...hovered })).toBeGreaterThan(
-          glowIntensity({ checked, choosing, ...resting })
-        )
-      }
+    for (const checked of [false, true]) {
+      expect(glowIntensity({ checked, hovered: true })).toBeGreaterThan(
+        glowIntensity({ checked, hovered: false })
+      )
     }
   })
 
   it('keeps a left-out bin under the pointer dimmer than a checked bin at rest', () => {
-    expect(glowIntensity({ checked: false, choosing: true, ...hovered })).toBeLessThan(
-      glowIntensity({ checked: true, choosing: true, ...resting })
-    )
+    // A see-through bin shows only part of its glow.
+    const shown = glowIntensity({ checked: false, hovered: true }) * LEFT_OUT_OPACITY
+    expect(shown).toBeLessThan(glowIntensity({ checked: true, hovered: false }))
+  })
+})
+
+describe('LEFT_OUT_OPACITY', () => {
+  it('leaves a left-out bin partly see-through', () => {
+    expect(LEFT_OUT_OPACITY).toBeGreaterThan(0)
+    expect(LEFT_OUT_OPACITY).toBeLessThan(1)
   })
 })
