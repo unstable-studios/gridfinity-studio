@@ -284,7 +284,14 @@ export class KonvaEngine implements LayoutEngine {
       }
     })
 
+    node.on('dragstart', () => this.capturePreDragPositions())
+
     node.on('dragend', () => {
+      // A multi-selection is committed as one change for every shape in it.
+      if ((this.transformer?.nodes().length ?? 0) > 1) {
+        this.finalizeMultiSelectDrag()
+        return
+      }
       // One change: listeners see the shape at its new position and in its
       // new bin together, so the move is a single undo step.
       this.batch(() => {
@@ -1020,7 +1027,8 @@ export class KonvaEngine implements LayoutEngine {
    * 2. Apply that delta to all other selected groups (positions only, no data model)
    * 3. Check collision for every group against non-selected groups
    * 4. Collision → revert all nodes to pre-drag positions, flash red
-   * 5. No collision → update data model (groupMap + shapeMap), emit events
+   * 5. No collision → put each shape in the bin its centroid is in, update data model
+   *    (groupMap + shapeMap), emit events, all in one batch so it is one undo step
    */
   private finalizeMultiSelectDrag(): void {
     if (this.multiDragFinalized) return
@@ -1105,40 +1113,51 @@ export class KonvaEngine implements LayoutEngine {
       return
     }
 
-    // Step 5: No collision → commit all data model updates, emit events
-    for (const node of nodes) {
-      const id = node.id()
-      if (node.name() === 'group') {
-        const renderer = this.rendererMap.get(id)
-        if (!renderer) continue
-        const pos = renderer.readPosition()
-        const g = this.groupMap.get(id)
-        if (g) {
-          g.x = pos.x
-          g.y = pos.y
-        }
-        this.emit('groupMoved', { id, x: pos.x, y: pos.y })
-      } else {
-        const data = this.shapeMap.get(id)
-        if (data) {
-          data.x = node.x()
-          data.y = node.y()
-        }
-        this.emit('shapeMoved', { id, x: node.x(), y: node.y() })
+    // Step 5: No collision → commit all data model updates, emit events. One batch, so
+    // listeners see every move and every reassignment together: one undo step.
+    this.clearDropHighlight()
+    this.batch(() => {
+      // A shape whose bin is dragged with it keeps that bin. The rest are assigned by
+      // their own centers, the same as a single shape dropped on its own.
+      for (const node of nodes) {
+        if (node.name() === 'group') continue
+        const parentId = this.shapeMap.get(node.id())?.groupId
+        if (parentId && selectedIds.has(parentId)) continue
+        this.reassignByCentroid(node.id())
       }
-    }
+      // Read positions after reassigning: a shape's position is measured from its bin.
+      for (const node of nodes) {
+        const id = node.id()
+        if (node.name() === 'group') {
+          const renderer = this.rendererMap.get(id)
+          if (!renderer) continue
+          const pos = renderer.readPosition()
+          const g = this.groupMap.get(id)
+          if (g) {
+            g.x = pos.x
+            g.y = pos.y
+          }
+          this.emit('groupMoved', { id, x: pos.x, y: pos.y })
+        } else {
+          const data = this.shapeMap.get(id)
+          if (data) {
+            data.x = node.x()
+            data.y = node.y()
+          }
+          this.emit('shapeMoved', { id, x: node.x(), y: node.y() })
+        }
+      }
+    })
   }
 
   /**
-   * Evaluate whether a shape should be reassigned to a different bin (or unassigned)
-   * based on its world-space centroid after a drag ends.
+   * Evaluate whether a shape dragged on its own should be reassigned to a different bin
+   * (or unassigned) based on its world-space centroid after a drag ends. A multi-selection
+   * is finalized as a whole by `finalizeMultiSelectDrag`.
    */
   private evaluateShapeReassignment(shapeId: string): void {
     // Clear any drag highlight
     this.clearDropHighlight()
-
-    // Skip during multi-select drag
-    if ((this.transformer?.nodes().length ?? 0) > 1) return
 
     this.reassignByCentroid(shapeId)
   }
