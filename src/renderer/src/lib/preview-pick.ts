@@ -20,7 +20,7 @@ function channels(hex: string): [number, number, number] | null {
 
 /**
  * Color of a bin that is unchecked for export: `meshColor` with its color taken out, a gray
- * of the same brightness. Colors are `#rrggbb`; anything else gives `meshColor` back.
+ * of about the same brightness. Colors are `#rrggbb`; anything else gives `meshColor` back.
  */
 export function leftOutColor(meshColor: string): string {
   const rgb = channels(meshColor)
@@ -37,10 +37,11 @@ const CHECKED_GLOW = 0.16
 /** Glow added to the bin under the pointer. */
 const HOVER_GLOW = 0.2
 /**
- * Glow of a left-out bin under the pointer. Much less, because the glow is in the color of a
- * checked bin: more would make the bin look checked before it is clicked.
+ * Glow of a left-out bin under the pointer. A see-through bin shows only `LEFT_OUT_OPACITY`
+ * of its glow, so this is set higher than what should reach the screen: less than a checked
+ * bin's glow, or the bin would look checked before it is clicked.
  */
-const LEFT_OUT_HOVER_GLOW = 0.07
+const LEFT_OUT_HOVER_GLOW = 0.25
 
 /**
  * How strongly a bin glows in the mesh color. A checked bin always glows the same, whether or

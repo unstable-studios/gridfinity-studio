@@ -62,9 +62,9 @@ describe('glowIntensity', () => {
   })
 
   it('keeps a left-out bin under the pointer dimmer than a checked bin at rest', () => {
-    expect(glowIntensity({ checked: false, hovered: true })).toBeLessThan(
-      glowIntensity({ checked: true, hovered: false })
-    )
+    // A see-through bin shows only part of its glow.
+    const shown = glowIntensity({ checked: false, hovered: true }) * LEFT_OUT_OPACITY
+    expect(shown).toBeLessThan(glowIntensity({ checked: true, hovered: false }))
   })
 })
 
