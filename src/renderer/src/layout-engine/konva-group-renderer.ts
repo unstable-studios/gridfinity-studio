@@ -33,6 +33,24 @@ export const DROP_TARGET_STYLE = {
 } as const
 
 /**
+ * How a bin that carries a warning is marked: a solid amber line just inside its outline, and
+ * a faint amber tint. Amber reads as a warning on a dark canvas and a light one, and is the
+ * color of the warnings in the sidebar. The line is solid and heavy so it is not taken for
+ * the bin's artwork, which is thin, dashed and a duller yellow.
+ */
+export const WARNING_MARK_STYLE = {
+  fill: 'rgba(245, 158, 11, 0.14)',
+  stroke: '#f59e0b',
+  strokeWidth: 3
+} as const
+
+/**
+ * How far inside the bin's outline the mark is drawn, in world units. Inside, so the mark
+ * never makes the bin's bounds, and the selection frame around them, any bigger.
+ */
+const WARNING_MARK_INSET = 1
+
+/**
  * Konva implementation of GroupRenderer.
  *
  * Handles internally:
@@ -70,6 +88,10 @@ export class KonvaGroupRenderer implements GroupRenderer {
   private preResizeBounds: { x: number; y: number; width: number; height: number } | null = null
   /** Non-scaling overlay rect shown during resize as ghost preview. */
   private resizeOverlay: Konva.Rect | null = null
+  /** The mark shown while the group carries a warning. */
+  private warningMark: Konva.Rect | null = null
+  /** Corner radius from the group style, which the warning mark follows. */
+  private cornerRadius: number
 
   constructor(
     group: LayoutGroup,
@@ -88,6 +110,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
     this.origStroke = group.style.stroke
     this.origStrokeWidth = group.style.strokeWidth
     this.origFill = group.style.fill
+    this.cornerRadius = group.style.cornerRadius ?? 0
 
     // Lower-left → centroid
     const centroidX = group.x + group.width / 2
@@ -160,10 +183,12 @@ export class KonvaGroupRenderer implements GroupRenderer {
           this.origStroke = current.style.stroke
           this.origStrokeWidth = current.style.strokeWidth
           this.origFill = current.style.fill
+          this.cornerRadius = current.style.cornerRadius ?? 0
           // A style change must not wipe out a highlight that is still showing.
           if (this.highlighted) bgRect.setAttrs(DROP_TARGET_STYLE)
         }
       }
+      this.warningMark?.setAttrs(this.warningMarkBounds())
     }
 
     this.refreshTransformerIfSelected()
@@ -493,6 +518,46 @@ export class KonvaGroupRenderer implements GroupRenderer {
       this.resizeOverlay = null
     }
     this.konvaGroup.opacity(1)
+    this.deps.layer.batchDraw()
+  }
+
+  /** Where the warning mark goes, in the group's own coordinates. */
+  private warningMarkBounds(): {
+    x: number
+    y: number
+    width: number
+    height: number
+    cornerRadius: number
+  } {
+    // A bin too small to hold an inset mark gets one of no size at its center.
+    const inset = Math.min(WARNING_MARK_INSET, this.width / 2, this.height / 2)
+    return {
+      x: -this.width / 2 + inset,
+      y: -this.height / 2 + inset,
+      width: this.width - inset * 2,
+      height: this.height - inset * 2,
+      cornerRadius: Math.max(0, this.cornerRadius - inset)
+    }
+  }
+
+  setWarning(warned: boolean): void {
+    if (warned === (this.warningMark !== null)) return
+    if (warned) {
+      this.warningMark = new Konva.Rect({
+        ...this.warningMarkBounds(),
+        ...WARNING_MARK_STYLE,
+        strokeScaleEnabled: false,
+        listening: false,
+        name: '__warningMark'
+      })
+      this.konvaGroup.add(this.warningMark)
+      // Under the bin's artwork and over its background.
+      this.warningMark.moveToBottom()
+      this.konvaGroup.findOne('.__groupBg')?.moveToBottom()
+    } else {
+      this.warningMark?.destroy()
+      this.warningMark = null
+    }
     this.deps.layer.batchDraw()
   }
 

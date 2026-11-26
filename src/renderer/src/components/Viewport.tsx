@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useAppMode } from '@/hooks/useAppMode'
 import { useProject } from '@/hooks/useProject'
 import { useUndoRedo } from '@/hooks/useUndoRedo'
+import { useBedMarks } from '@/hooks/useBedMarks'
 import ReviewCanvas from './review/ReviewCanvas'
 import {
   LayoutEngineCanvas,
@@ -40,6 +41,8 @@ function LayoutViewport(): React.JSX.Element {
 
   // Render bin detail artwork (magnet holes, screw holes, lip boundary)
   useBinArtwork(engine, project?.gridfinity, tick)
+  // Mark bins that do not fit the print bed
+  useBedMarks(engine, project?.gridfinity, tick)
 
   // Delete key for selected shapes
   useEffect(() => {

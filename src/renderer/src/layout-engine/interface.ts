@@ -59,6 +59,19 @@ export interface LayoutEngine {
   /** Render non-interactive artwork within a group (replaces any existing decorations) */
   setGroupDecorations(groupId: string, decorations: GroupDecoration[]): void
 
+  // ─── Group Warnings ────────────────────────────────────────────────────────
+  /**
+   * Mark these groups, and no others, as carrying a warning. The mark is drawn on the canvas
+   * for the person to see. It is not part of a snapshot or of an undo step, and setting it
+   * raises no event.
+   *
+   * An id with no group is kept: the mark appears if a group with that id is created, as when
+   * an undo brings one back.
+   */
+  setGroupWarnings(groupIds: readonly string[]): void
+  /** The groups that exist and carry a warning. */
+  getGroupWarnings(): string[]
+
   // ─── Selection ──────────────────────────────────────────────────────────────
   select(ids: string[]): void
   /** Alias for select() — used by InputActionHandler. */

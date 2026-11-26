@@ -44,6 +44,9 @@ export interface GroupRenderer {
   /** Restore the group's own fill and stroke after highlight(). Idempotent. */
   unhighlight(): void
 
+  /** Show or hide the mark of a group that carries a warning. Idempotent. */
+  setWarning(warned: boolean): void
+
   /** Remove from canvas/layer and clean up all native objects. */
   destroy(): void
 }
