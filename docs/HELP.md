@@ -29,6 +29,7 @@ Select a pocket to set its depth, size and position. A pocket drawn too close to
 
 - Click to select, and drag to move. Where shapes overlap, a click selects the smallest one under the pointer.
 - **Shift+click** adds to the selection.
+- A pocket belongs to the bin its center is in. Dropping pockets, or resizing a bin, takes in the pockets it now covers and releases the ones it no longer does.
 - Select two or more pockets to align them from the sidebar, and three or more to space them evenly. One pocket can be centered in its bin.
 - Right-click a bin or pocket for cut, copy, paste, rename and delete. The menu has more, depending on what is under the pointer:
   - A bin: turn its stacking lip on or off, add an empty bin beside it, add or remove a column or a row, make it taller or shorter, or go to Preview to export it on its own.

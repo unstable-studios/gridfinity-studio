@@ -15,7 +15,7 @@ import { KonvaGroupRenderer, isBinFurniture } from './konva-group-renderer'
 import { checkGroupCollision, wouldOverlapAnotherGroup } from './collision'
 import type { HitResult } from './input-action-handler'
 import { largestFirst } from './stacking'
-import { findContainingBinGroup, findChildrenOutsideBin } from './containment'
+import { findContainingBinGroup } from './containment'
 import type { ShapeAABB } from './containment'
 import type { ShapeMove } from './arrange'
 import { isBinGroup } from './types'
@@ -681,25 +681,28 @@ export class KonvaEngine implements LayoutEngine {
         this.emit('groupMoved', { id, x, y })
       },
       (id, x, y, width, height) => {
-        const g = this.groupMap.get(id)
-        if (g) {
-          g.x = x
-          g.y = y
-          g.width = width
-          g.height = height
-          // Update bin metadata units if this is a bin group
-          const meta = g.metadata as Record<string, unknown> | undefined
-          if (meta && typeof meta.widthUnits === 'number') {
-            meta.widthUnits = Math.round(width / this.gridConfig.size)
-            meta.depthUnits = Math.round(height / this.gridConfig.size)
+        // One change: the new size and every shape taken in or released by it are
+        // reported together, so the resize is a single undo step.
+        this.batch(() => {
+          const g = this.groupMap.get(id)
+          if (g) {
+            g.x = x
+            g.y = y
+            g.width = width
+            g.height = height
+            // Update bin metadata units if this is a bin group
+            const meta = g.metadata as Record<string, unknown> | undefined
+            if (meta && typeof meta.widthUnits === 'number') {
+              meta.widthUnits = Math.round(width / this.gridConfig.size)
+              meta.depthUnits = Math.round(height / this.gridConfig.size)
+            }
+            // The user-handle resize commits state directly through this callback and
+            // doesn't go through updateGroup, so it reassigns shapes here too.
+            this.reassignAllShapes()
           }
-          // Eviction-on-resize (#297) — same logic as updateGroup, also
-          // needed here because the user-handle resize path commits state
-          // directly via this callback and doesn't go through updateGroup.
-          this.evictChildrenOutsideGroup(g)
-        }
-        this.emit('groupResized', { id, width, height })
-        this.emit('groupChanged', { groupId: id, childIds: [...(g?.childIds ?? [])] })
+          this.emit('groupResized', { id, width, height })
+          this.emit('groupChanged', { groupId: id, childIds: [...(g?.childIds ?? [])] })
+        })
       },
       (id, reason) => {
         this.emit('collisionRejected', { id, reason })
@@ -783,34 +786,24 @@ export class KonvaEngine implements LayoutEngine {
 
     renderer.update(patch, group)
 
-    if (patch.width !== undefined || patch.height !== undefined) {
-      this.evictChildrenOutsideGroup(group)
-    }
-
-    this.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
+    this.batch(() => {
+      if (patch.width !== undefined || patch.height !== undefined) {
+        this.reassignAllShapes()
+      }
+      this.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
+    })
     return true
   }
 
   /**
-   * After a group resize, detach any child shape whose world centroid lies
-   * outside the group's new AABB. Otherwise they'd remain parented but
-   * unselectable (hit-testing is gated by the parent group's AABB) and (for
-   * bins) would bake pockets that extend past the bin walls. Issue #297.
-   *
-   * Reads child coords via `getShape` (which derives them from the live
-   * konva node) rather than `shapeMap`, since the in-place dx/dy
-   * compensation in resize paths doesn't write back to the shape map.
+   * After a bin is resized, put every shape in the bin its center is now in, or in none,
+   * by the same rule as a drop: shapes the bin no longer covers are released and shapes it
+   * now covers are taken in. A released shape would otherwise stay parented but
+   * unselectable (hit-testing is gated by the parent's AABB) and bake pockets past the
+   * bin walls (#297). Callers batch, so the reassignments and the resize are one change.
    */
-  private evictChildrenOutsideGroup(group: LayoutGroup): void {
-    if (group.childIds.length === 0) return
-    const children = group.childIds
-      .map((cid) => this.getShape(cid))
-      .filter((s): s is LayoutShape => s !== undefined)
-    const toEvict = findChildrenOutsideBin(group, children)
-    // The caller emits groupChanged for this group.
-    for (const cid of toEvict) {
-      this.detachFromGroup(cid)
-    }
+  private reassignAllShapes(): void {
+    for (const id of [...this.shapeMap.keys()]) this.reassignByCentroid(id)
   }
 
   removeGroup(id: string): void {
