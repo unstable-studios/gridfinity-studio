@@ -2,6 +2,17 @@ import { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from '@/components/ui/select'
+import { NumericInput } from '@/components/ui/numeric-input'
+import { setPrintBed, usePrintBed } from '@/hooks/usePrintBed'
+import { BED_SIDE_LIMITS, PRINTERS, printerWithBed } from '@/lib/print-bed'
+import type { PrintBed } from '@/lib/print-bed'
 import { useProject } from '@/hooks/useProject'
 import { isBinGroup, useEngineState, useLayoutEngine } from '@/layout-engine'
 import { useTheme } from '@unstable-studios/ui'
@@ -46,6 +57,7 @@ export default function PreferencesModal({
               <TabGroupLabel>App</TabGroupLabel>
               <TabsTrigger value="general">General</TabsTrigger>
               <TabsTrigger value="colors">Colors</TabsTrigger>
+              <TabsTrigger value="printer">Printer</TabsTrigger>
               <TabGroupLabel className="mt-3">This project</TabGroupLabel>
               <TabsTrigger value="units">Units</TabsTrigger>
               <TabsTrigger value="gridfinity">Gridfinity</TabsTrigger>
@@ -62,6 +74,9 @@ export default function PreferencesModal({
               </TabsContent>
               <TabsContent value="colors">
                 <ColorsTab />
+              </TabsContent>
+              <TabsContent value="printer">
+                <PrinterTab />
               </TabsContent>
             </div>
           </div>
@@ -113,6 +128,92 @@ function GeneralTab(): React.JSX.Element {
           <ToggleGroupItem value="dark">Dark</ToggleGroupItem>
         </ToggleGroup>
       </div>
+    </div>
+  )
+}
+
+/** The bed a new custom size starts from. */
+const STARTING_CUSTOM_BED: PrintBed = { width: 220, depth: 220 }
+
+function PrinterTab(): React.JSX.Element {
+  const bed = usePrintBed()
+  // "Custom" stays picked while its size happens to match a listed printer.
+  const [custom, setCustom] = useState(() => bed !== null && printerWithBed(bed) === null)
+  const picked = bed === null ? 'none' : custom ? 'custom' : (printerWithBed(bed)?.id ?? 'custom')
+
+  const pick = (value: string): void => {
+    if (value === 'none') {
+      setCustom(false)
+      setPrintBed(null)
+    } else if (value === 'custom') {
+      setCustom(true)
+      setPrintBed(bed ?? STARTING_CUSTOM_BED)
+    } else {
+      const printer = PRINTERS.find((p) => p.id === value)
+      if (!printer) return
+      setCustom(false)
+      setPrintBed(printer.bed)
+    }
+  }
+  const resize = (side: Partial<PrintBed>): void => {
+    if (!bed) return
+    setCustom(true)
+    setPrintBed({ ...bed, ...side })
+  }
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label
+          htmlFor="print-bed"
+          className="mb-2 block text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400"
+        >
+          Print bed
+        </label>
+        <Select value={picked} onValueChange={pick}>
+          <SelectTrigger id="print-bed" className="w-64">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="none">None</SelectItem>
+            {PRINTERS.map((printer) => (
+              <SelectItem key={printer.id} value={printer.id}>
+                {printer.name}
+              </SelectItem>
+            ))}
+            <SelectItem value="custom">Custom</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      {bed && (
+        <div className="flex w-64 gap-2">
+          <NumericInput
+            label="Width"
+            value={bed.width}
+            suffix="mm"
+            step={1}
+            precision={0}
+            min={BED_SIDE_LIMITS.min}
+            max={BED_SIDE_LIMITS.max}
+            onChange={(width) => resize({ width })}
+          />
+          <NumericInput
+            label="Depth"
+            value={bed.depth}
+            suffix="mm"
+            step={1}
+            precision={0}
+            min={BED_SIDE_LIMITS.min}
+            max={BED_SIDE_LIMITS.max}
+            onChange={(depth) => resize({ depth })}
+          />
+        </div>
+      )}
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        {bed
+          ? 'Bins larger than the bed are marked in the bin list.'
+          : 'Choose a bed to mark bins that are too large to print.'}
+      </p>
     </div>
   )
 }
