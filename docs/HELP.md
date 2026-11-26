@@ -63,7 +63,7 @@ Tolerance, unit height, and magnet and screw holes are set per project in **Edit
 
 ## Print bed
 
-Choose your printer in **Edit > Preferences…**, under **Printer**, or choose **Custom** and enter the bed's width and depth. A bin too large for the bed at any angle is marked with ⚠ in the bin list. Preview names it when it is checked for export. It can still be made and exported.
+Choose your printer in **Edit > Preferences…**, under **Printer**, or choose **Custom** and enter the bed's width and depth. A bin too large for the bed at any angle is outlined in amber on the canvas and marked with ⚠ in the bin list. Preview names it when it is checked for export. It can still be made and exported.
 
 The bed is kept on this computer, for every project.
 

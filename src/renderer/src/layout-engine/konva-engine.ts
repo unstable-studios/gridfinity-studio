@@ -11,7 +11,7 @@ import type {
   EngineEventMap,
   GroupDecoration
 } from './types'
-import { KonvaGroupRenderer } from './konva-group-renderer'
+import { KonvaGroupRenderer, isBinFurniture } from './konva-group-renderer'
 import { checkGroupCollision, wouldOverlapAnotherGroup } from './collision'
 import type { HitResult } from './input-action-handler'
 import { largestFirst } from './stacking'
@@ -135,6 +135,8 @@ export class KonvaEngine implements LayoutEngine {
   private insets: ViewportInsets = {}
   /** mm per height unit — used to derive depth-based shape opacity. */
   private unitHeight = 7
+  /** Groups marked as carrying a warning, including ids that have no group at the moment. */
+  private warnedGroupIds = new Set<string>()
   /** Currently highlighted group ID during shape drag (for drop-target feedback). */
   private highlightedGroupId: string | null = null
   /** The selected shapes as they were when the handles were grabbed. */
@@ -696,6 +698,7 @@ export class KonvaEngine implements LayoutEngine {
       }
     )
     this.rendererMap.set(group.id, renderer)
+    renderer.setWarning(this.warnedGroupIds.has(group.id))
 
     // Capture pre-drag positions for all selected nodes when any group starts dragging
     renderer.konvaGroup.on('dragstart', () => {
@@ -765,7 +768,7 @@ export class KonvaEngine implements LayoutEngine {
 
     if (dx !== 0 || dy !== 0) {
       for (const child of renderer.konvaGroup.getChildren()) {
-        if (child.hasName('__groupBg') || child.hasName('__binArtwork')) continue
+        if (isBinFurniture(child)) continue
         child.position({ x: child.x() + dx, y: child.y() + dy })
       }
     }
@@ -941,6 +944,18 @@ export class KonvaEngine implements LayoutEngine {
     const renderer = this.rendererMap.get(groupId)
     if (!renderer) return
     renderer.setDecorations(decorations)
+  }
+
+  setGroupWarnings(groupIds: readonly string[]): void {
+    if (this.disposed) return
+    this.warnedGroupIds = new Set(groupIds)
+    for (const [id, renderer] of this.rendererMap) {
+      renderer.setWarning(this.warnedGroupIds.has(id))
+    }
+  }
+
+  getGroupWarnings(): string[] {
+    return [...this.groupMap.keys()].filter((id) => this.warnedGroupIds.has(id))
   }
 
   getGroup(id: string): LayoutGroup | undefined {

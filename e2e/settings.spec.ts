@@ -193,6 +193,8 @@ test('a bin larger than the print bed is marked, and can still be made', async (
     await page.getByRole('option', { name, exact: true }).click()
     await expect(page.getByRole('combobox', { name: 'Print bed' })).toHaveText(name)
     await page.keyboard.press('Escape')
+    // Gone, not fading out: it would be in a picture of the canvas.
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   }
   const row = (bin: string): ReturnType<typeof page.getByRole> =>
     page.getByRole('button', { name: new RegExp(`^${bin}`) })
@@ -203,13 +205,30 @@ test('a bin larger than the print bed is marked, and can still be made', async (
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
   await app.expectBinCount(2)
 
+  // What is drawn on the canvas, beside the sidebar and under the top bar. Nothing reads the
+  // canvas, so a mark drawn on a bin is told by the picture changing.
+  const canvasPicture = async (): Promise<Buffer> => {
+    const sidebar = await page.getByRole('complementary').boundingBox()
+    const topBar = await page.getByRole('menubar').boundingBox()
+    if (!sidebar || !topBar) throw new Error('Design is not showing')
+    const window = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }))
+    const x = Math.ceil(sidebar.x + sidebar.width) + 8
+    const y = Math.ceil(topBar.y + topBar.height) + 24
+    return page.screenshot({ clip: { x, y, width: window.width - x, height: window.height - y } })
+  }
+  const canvasMatches = async (picture: Buffer): Promise<boolean> =>
+    (await canvasPicture()).equals(picture)
+
   // With no bed chosen nothing is marked.
   await expect(page.getByTitle(tooBig)).toHaveCount(0)
+  const unmarked = await canvasPicture()
+  await expect.poll(() => canvasMatches(unmarked), 'the canvas is still').toBe(true)
 
   // A 180 mm bed: the large bin does not fit, the small one does.
   await choosePrinter('Bambu Lab A1 mini')
   await expect(row('Bin 1').getByTitle(tooBig)).toBeVisible()
   await expect(row('Bin 2').getByTitle(tooBig)).toHaveCount(0)
+  await expect.poll(() => canvasMatches(unmarked), 'the bin is marked on the canvas').toBe(false)
 
   // Selected, the bin says how big the bed is.
   await row('Bin 1').click()
@@ -221,9 +240,13 @@ test('a bin larger than the print bed is marked, and can still be made', async (
   await expect(page.getByText(/\bReady$/)).toHaveCount(2, { timeout: 30_000 })
   await page.getByRole('radio', { name: 'Design', exact: true }).click()
 
-  // A 256 mm bed takes it.
+  // A 256 mm bed takes it. The canvas has changed since the first picture, so the mark going
+  // is told from a new one.
+  const marked = await canvasPicture()
+  await expect.poll(() => canvasMatches(marked), 'the canvas is still').toBe(true)
   await choosePrinter('Bambu Lab A1, P1, X1')
   await expect(page.getByTitle(tooBig)).toHaveCount(0)
+  await expect.poll(() => canvasMatches(marked), 'the mark is gone from the canvas').toBe(false)
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })

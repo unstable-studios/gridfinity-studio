@@ -8,7 +8,8 @@ import {
   fitsBed,
   isUsableBed,
   loadBedChoice,
-  saveBedChoice
+  saveBedChoice,
+  tooBigBinIds
 } from '../print-bed'
 
 function memoryStore(initial: Record<string, string> = {}): {
@@ -172,6 +173,24 @@ describe('binTooBig', () => {
   it('lets a long bin one unit wide lie across the corners', () => {
     expect(binTooBig({ widthUnits: 5, depthUnits: 1 }, standard, miniBed)).toBe(false)
     expect(binTooBig({ widthUnits: 7, depthUnits: 1 }, standard, miniBed)).toBe(true)
+  })
+})
+
+describe('tooBigBinIds', () => {
+  const bins = [
+    { id: 'small', metadata: { widthUnits: 2, depthUnits: 2 } },
+    { id: 'wide', metadata: { widthUnits: 5, depthUnits: 2 } },
+    { id: 'long', metadata: { widthUnits: 5, depthUnits: 1 } },
+    { id: 'huge', metadata: { widthUnits: 6, depthUnits: 6 } }
+  ]
+
+  it('names the bins that do not fit, in their own order', () => {
+    expect(tooBigBinIds(bins, standard, { width: 180, depth: 180 })).toEqual(['wide', 'huge'])
+  })
+
+  it('names none on a bed that takes them all, or with no bed', () => {
+    expect(tooBigBinIds(bins, standard, { width: 360, depth: 360 })).toEqual([])
+    expect(tooBigBinIds(bins, standard, null)).toEqual([])
   })
 })
 
