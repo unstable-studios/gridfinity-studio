@@ -17,6 +17,8 @@ test('undo and redo work as before after a visit to Preview', async () => {
   await app.selectTool('Rectangle')
   await app.drag({ x: 820, y: 180 }, { x: 880, y: 230 })
   await app.expectShapeCount(1)
+  // Drawing ends with the tool put back to Select.
+  await app.selectTool('Rectangle')
   await app.drag({ x: 820, y: 280 }, { x: 880, y: 330 })
   await app.expectShapeCount(2)
 
