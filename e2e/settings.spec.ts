@@ -132,7 +132,11 @@ test('the user guide and the About dialog open from the Help menu', async () => 
   await app.menu('Help', 'User guide')
   const guide = page.getByRole('dialog', { name: 'Using Gridfinity Studio' })
   await expect(guide.getByRole('heading', { name: 'Draw pockets' })).toBeVisible()
-  await expect(guide.getByText('Uncheck a bin in the sidebar to leave it out.')).toBeVisible()
+  await expect(
+    guide.getByText(
+      'Uncheck a bin in the sidebar to leave it out, or click the bin in the 3D view.'
+    )
+  ).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(guide).toBeHidden()
 

@@ -78,7 +78,7 @@ test('export every bin or only the checked ones', async () => {
   await app.openExport()
   await expect(page.getByText('0 of 3 bins')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Export STL…' })).toBeDisabled()
-  await expect(page.getByText('Check a bin in the list to export it.')).toBeVisible()
+  await expect(page.getByText('Check a bin to export it.')).toBeVisible()
   await page.keyboard.press('Escape')
 
   // One bin: a third of the triangles, named after the bin.
@@ -188,6 +188,84 @@ test('export one file per bin into a folder', async () => {
   const one = await stlXRange(onePath)
   expect(Math.abs(one.min + one.max)).toBeLessThan(0.01)
   expect(await app.lastSaveDialogDefault()).toBe('Bin 3.stl')
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})
+
+test('click a bin in the 3D view to check or uncheck it', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const checked = page.getByRole('checkbox', { name: /^Export Bin \d$/, checked: true })
+  const allBins = page.getByRole('checkbox', { name: 'All bins' })
+
+  await page.getByRole('button', { name: 'New project' }).click()
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole('button', { name: '1×1', exact: true }).first().click()
+  }
+  await app.expectBinCount(3)
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await expect(page.getByText(/\bReady$/)).toHaveCount(3, { timeout: 30_000 })
+  await expect(checked).toHaveCount(3)
+
+  // The bins are framed in the part of the 3D view the sidebar does not cover, so the middle
+  // of that part is on a bin: the row of three is centered there.
+  const view = await page.locator('canvas[data-engine^="three"]').boundingBox()
+  const sidebar = await page.getByRole('complementary').boundingBox()
+  if (!view || !sidebar) throw new Error('Preview is not showing')
+  const left = Math.max(view.x, sidebar.x + sidebar.width)
+  const x = (left + view.x + view.width) / 2
+  const y = view.y + view.height / 2
+
+  // The pointer shows a hand over a bin once the view has framed the bins. Until then the
+  // point may be between two of them.
+  let nudge = 0
+  await expect
+    .poll(async () => {
+      nudge = 1 - nudge
+      await page.mouse.move(x + nudge, y)
+      return page.evaluate(() => document.body.style.cursor)
+    })
+    .toBe('pointer')
+
+  // A click unchecks the bin under it, in the list and for the export.
+  await page.mouse.click(x, y)
+  await expect(checked).toHaveCount(2)
+  await expect(allBins).toHaveAttribute('aria-checked', 'mixed')
+  await app.openExport()
+  await expect(page.getByText('2 of 3 bins')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.screenshot({ path: test.info().outputPath('one-left-out.png') })
+
+  // Clicking it again checks it.
+  await page.mouse.click(x, y)
+  await expect(checked).toHaveCount(3)
+  await expect(allBins).toBeChecked()
+
+  // A bin unchecked in the list is checked again by a click in the view, and the other way.
+  await allBins.click()
+  await expect(checked).toHaveCount(0)
+  await page.mouse.click(x, y)
+  await expect(checked).toHaveCount(1)
+  await allBins.click()
+  await expect(checked).toHaveCount(3)
+
+  // A click on a bin that closes Export does only that.
+  await app.openExport()
+  await page.mouse.click(x, y)
+  await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'false'
+  )
+  await expect(checked).toHaveCount(3)
+
+  // Dragging from a bin orbits the view and changes nothing.
+  await page.mouse.move(x, y)
+  await page.mouse.down()
+  await page.mouse.move(x + 90, y + 30, { steps: 6 })
+  await page.mouse.up()
+  // Long enough for a change that should not happen to show up.
+  await page.waitForTimeout(300)
+  await expect(checked).toHaveCount(3)
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })

@@ -1,5 +1,5 @@
 import { Canvas, useThree } from '@react-three/fiber'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, useCursor } from '@react-three/drei'
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { useReviewPrefs } from '@/hooks/useReviewPrefs'
@@ -7,8 +7,10 @@ import { useTheme } from '@unstable-studios/ui'
 import { resolveColors, type CanvasThemeColors } from '@/lib/theme-config'
 import type { BakeResult } from '@/hooks/useProject'
 import { useLayoutEngine, useLayoutEngineContext, useEngineState } from '@/layout-engine'
+import { useExport, useExportMenuOpen } from '@/hooks/useExport'
 import { boundsKey, frameBounds } from '@/lib/camera-framing'
 import type { Bounds3 } from '@/lib/camera-framing'
+import { isClick, leftOutColor } from '@/lib/preview-pick'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
@@ -90,7 +92,15 @@ interface ReviewCanvasProps {
   baseUnit: number
 }
 
-interface SceneProps {
+/** Which bins are left out of the export, and how a click changes that. */
+interface ExportChoice {
+  /** Bins unchecked for export. */
+  leftOut: ReadonlySet<string>
+  /** Check or uncheck a bin. Absent when there is nothing to choose: one bin. */
+  onPick?: (binId: string) => void
+}
+
+interface SceneProps extends ExportChoice {
   bakeResults: Map<string, BakeResult>
   baseUnit: number
   debugColors: boolean
@@ -102,7 +112,9 @@ function ReviewScene({
   bakeResults,
   debugColors,
   wireframe,
-  colors
+  colors,
+  leftOut,
+  onPick
 }: SceneProps): React.JSX.Element {
   const controlsRef = useRef<OrbitControlsImpl>(null)
   const engine = useLayoutEngine()
@@ -247,6 +259,9 @@ function ReviewScene({
           debugColors={debugColors}
           wireframe={wireframe}
           meshColor={colors.meshColor}
+          leftOutMeshColor={leftOutColor(colors.meshColor, colors.reviewFloor)}
+          leftOut={leftOut}
+          onPick={onPick}
         />
       ) : (
         <EmptyState color={colors.emptyState} />
@@ -268,12 +283,16 @@ function BakedBins({
   placements,
   debugColors,
   wireframe,
-  meshColor
-}: {
+  meshColor,
+  leftOutMeshColor,
+  leftOut,
+  onPick
+}: ExportChoice & {
   placements: BinPlacement[]
   debugColors: boolean
   wireframe: boolean
   meshColor: string
+  leftOutMeshColor: string
 }): React.JSX.Element {
   return (
     <>
@@ -281,10 +300,12 @@ function BakedBins({
         <BakedMeshPreview
           key={id}
           mesh={mesh}
-          debugColors={debugColors}
+          // A bin left out of the export is drawn faded, in one flat color.
+          debugColors={debugColors && !leftOut.has(id)}
           wireframe={wireframe}
-          meshColor={meshColor}
+          meshColor={leftOut.has(id) ? leftOutMeshColor : meshColor}
           position={position}
+          onPick={onPick && (() => onPick(id))}
         />
       ))}
     </>
@@ -296,16 +317,22 @@ function BakedMeshPreview({
   debugColors,
   wireframe,
   meshColor,
-  position
+  position,
+  onPick
 }: {
   mesh: BakedMeshData
   debugColors: boolean
   wireframe: boolean
   meshColor: string
   position?: [number, number, number]
+  /** Called when the bin is clicked. Without it the bin cannot be clicked. */
+  onPick?: () => void
 }): React.JSX.Element {
   const hasColors = mesh.colors && mesh.colors.length > 0
   const useColors = hasColors && debugColors
+  const [hovered, setHovered] = useState(false)
+  // A pointing hand over a bin that can be clicked. It goes back when the bin goes.
+  useCursor(hovered && onPick !== undefined)
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
@@ -319,7 +346,28 @@ function BakedMeshPreview({
   }, [mesh.positions, mesh.indices, mesh.normals, mesh.colors, hasColors])
 
   return (
-    <group rotation={[-Math.PI / 2, 0, 0]} position={position}>
+    <group
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={position}
+      onClick={
+        onPick &&
+        ((event) => {
+          // Only the nearest bin under the pointer takes the click. Without this the click
+          // would reach every bin behind it too.
+          event.stopPropagation()
+          // `delta` is how far the pointer moved while pressed: further is an orbit.
+          if (isClick(event.delta)) onPick()
+        })
+      }
+      onPointerOver={
+        onPick &&
+        ((event) => {
+          event.stopPropagation()
+          setHovered(true)
+        })
+      }
+      onPointerOut={onPick && (() => setHovered(false))}
+    >
       <mesh geometry={geometry} castShadow>
         <meshStandardMaterial
           key={useColors ? 'vc' : 'solid'}
@@ -331,7 +379,8 @@ function BakedMeshPreview({
         />
       </mesh>
       {wireframe && (
-        <mesh geometry={geometry}>
+        // The solid mesh above answers the pointer; the overlay would only repeat its hits.
+        <mesh geometry={geometry} raycast={() => null}>
           <meshBasicMaterial wireframe color="#000000" opacity={0.08} transparent depthTest />
         </mesh>
       )}
@@ -355,25 +404,51 @@ export default function ReviewCanvas({
   const { debugColors, wireframe } = useReviewPrefs()
   const { resolvedTheme } = useTheme()
   const colors = resolveColors(resolvedTheme)
+  const { bins, chosen, setChecked } = useExport()
+
+  const leftOut = useMemo(() => {
+    const checked = new Set(chosen.map((bin) => bin.id))
+    return new Set(bins.filter((bin) => !checked.has(bin.id)).map((bin) => bin.id))
+  }, [bins, chosen])
+  // A press that closes the Export popover is only that: it does not also pick the bin under it.
+  const [exportMenuOpen] = useExportMenuOpen()
+  const pressedWithMenuOpen = useRef(false)
+  // With one bin there is nothing to choose, as in the sidebar, which shows no checkbox.
+  const onPick =
+    bins.length > 1
+      ? (binId: string): void => {
+          if (!pressedWithMenuOpen.current) setChecked(binId, leftOut.has(binId))
+        }
+      : undefined
 
   return (
-    <Canvas
-      shadows={{ type: THREE.PCFShadowMap }}
-      camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: CAMERA_FAR }}
-      dpr={[1, 1.75]}
+    <div
       style={{ width: '100%', height: '100%' }}
-      gl={{ antialias: true }}
+      // Capture, so this runs before the popover closes on the same press.
+      onPointerDownCapture={() => {
+        pressedWithMenuOpen.current = exportMenuOpen
+      }}
     >
-      <Suspense fallback={null}>
-        <color attach="background" args={[colors.reviewBg]} />
-        <ReviewScene
-          bakeResults={bakeResults}
-          baseUnit={baseUnit}
-          debugColors={debugColors}
-          wireframe={wireframe}
-          colors={colors}
-        />
-      </Suspense>
-    </Canvas>
+      <Canvas
+        shadows={{ type: THREE.PCFShadowMap }}
+        camera={{ position: [60, 60, 100], fov: 50, near: 0.1, far: CAMERA_FAR }}
+        dpr={[1, 1.75]}
+        style={{ width: '100%', height: '100%' }}
+        gl={{ antialias: true }}
+      >
+        <Suspense fallback={null}>
+          <color attach="background" args={[colors.reviewBg]} />
+          <ReviewScene
+            bakeResults={bakeResults}
+            baseUnit={baseUnit}
+            debugColors={debugColors}
+            wireframe={wireframe}
+            colors={colors}
+            leftOut={leftOut}
+            onPick={onPick}
+          />
+        </Suspense>
+      </Canvas>
+    </div>
   )
 }
