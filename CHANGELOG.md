@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.24.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.23.1...v1.24.0) (2026-11-26)
+
+
+### Features
+
+* **ui:** finish the right-click menu ([#572](https://github.com/unstable-studios/gridfinity-studio/issues/572)) ([3e42c84](https://github.com/unstable-studios/gridfinity-studio/commit/3e42c8437afa77ea2515d533a946301f9cba8ad8))
+* **ui:** make room when a resized bin has none ([#573](https://github.com/unstable-studios/gridfinity-studio/issues/573)) ([e170158](https://github.com/unstable-studios/gridfinity-studio/commit/e1701588787f2be662f4a8a3e3620d1cc51d4348))
+
 ## [1.23.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.23.0...v1.23.1) (2026-11-25)
 
 
