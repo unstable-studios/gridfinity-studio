@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.27.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.26.0...v1.27.0) (2026-11-26)
+
+
+### Features
+
+* **ui:** outline bins larger than the print bed on the canvas ([#589](https://github.com/unstable-studios/gridfinity-studio/issues/589)) ([e3618e8](https://github.com/unstable-studios/gridfinity-studio/commit/e3618e8126455ec0c4dc5f3ad8ea718c6c5eb39a))
+* **ui:** warn about bins larger than the print bed ([#586](https://github.com/unstable-studios/gridfinity-studio/issues/586)) ([2c3f970](https://github.com/unstable-studios/gridfinity-studio/commit/2c3f9703fe27abe2dd88e4b5bab83738e575d12f))
+
 ## [1.26.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.25.0...v1.26.0) (2026-11-26)
 
 
