@@ -1,16 +1,15 @@
-import { useState } from 'react'
 import { ChevronDownIcon, DownloadIcon } from 'lucide-react'
 import { Button } from '@unstable-studios/ui'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import { useExport } from '@/hooks/useExport'
+import { useExport, useExportMenuOpen } from '@/hooks/useExport'
 import { useProject } from '@/hooks/useProject'
 import { cn } from '@/lib/utils'
 import type { ExportFormat } from '../../../shared/types/export'
 
 /** Export in the top bar, in Preview: what to export, and the two formats. */
 export default function ExportMenu({ className }: { className?: string }): React.JSX.Element {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useExportMenuOpen()
   const bakeStatus = useProject((s) => s.bakeStatus)
   const { bins, chosen, files, setFiles, canExport, exportAs } = useExport()
   const anyError = chosen.some((bin) => bakeStatus.get(bin.id) === 'error')

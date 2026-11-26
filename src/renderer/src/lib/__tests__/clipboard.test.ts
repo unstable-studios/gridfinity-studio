@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { copySelection, PASTE_OFFSET, planPaste } from '../clipboard'
+import { copySelection, PASTE_OFFSET, planPaste, planPasteAt } from '../clipboard'
 import type { LayoutGroup, LayoutShape } from '@/layout-engine/types'
 
 function bin(id: string, x: number, overrides: Partial<LayoutGroup> = {}): LayoutGroup {
@@ -182,5 +182,54 @@ describe('planPaste', () => {
 
     expect(new Set(ids).size).toBe(4)
     expect(ids.some((id) => ['a', 'b', 's1', 's2'].includes(id))).toBe(false)
+  })
+})
+
+describe('planPasteAt', () => {
+  it('puts the middle of a copied shape at the point', () => {
+    const content = copySelection([], [rect('s', 10, 20)], ['s'])!
+    const plan = planPasteAt(content, [], 42, { x: 100, y: 50 }, true, counter())!
+    expect(plan.shapes[0]).toMatchObject({ x: 100, y: 50, groupId: null })
+  })
+
+  it('keeps several shapes arranged as they were, around the point', () => {
+    const content = copySelection([], [rect('s', 0, 0), rect('t', 20, 10)], ['s', 't'])!
+    const plan = planPasteAt(content, [], 42, { x: 100, y: 100 }, true, counter())!
+    expect(plan.shapes.map(({ x, y }) => ({ x, y }))).toEqual([
+      { x: 90, y: 95 },
+      { x: 110, y: 105 }
+    ])
+  })
+
+  it('moves a bin by whole grid squares, with its pockets', () => {
+    const groups = [bin('a', 0)]
+    const content = copySelection(groups, [rect('s', 5, -5, 'a')], ['a'])!
+    // The bin's middle is at (42, 42). The point is 110 right and 95 down of it.
+    const plan = planPasteAt(content, groups, 42, { x: 152, y: 137 }, true, counter())!
+    expect(plan.groups[0]).toMatchObject({ x: 126, y: 168, width: 84, height: 84 })
+    // The pocket was at (47, 37) on the canvas and moved the same 126 and 84.
+    expect(plan.shapes[0]).toMatchObject({ x: 173, y: 121 })
+    expect(plan.shapeGroup.get(plan.shapes[0].id)).toBe(plan.groups[0].id)
+  })
+
+  it('refuses when a pasted bin would land on another', () => {
+    const groups = [bin('a', 0)]
+    const content = copySelection(groups, [], ['a'])!
+    expect(planPasteAt(content, groups, 42, { x: 60, y: 42 }, true, counter())).toBeNull()
+  })
+
+  it('lets a pasted bin touch another', () => {
+    const groups = [bin('a', 0)]
+    const content = copySelection(groups, [], ['a'])!
+    const plan = planPasteAt(content, groups, 42, { x: 126, y: 42 }, true, counter())!
+    expect(plan.groups[0].x).toBe(84)
+  })
+
+  it('names copies, and keeps names after a cut', () => {
+    const content = copySelection([], [rect('s', 0, 0)], ['s'])!
+    const copy = planPasteAt(content, [], 42, { x: 5, y: 5 }, true, counter())!
+    const cut = planPasteAt(content, [], 42, { x: 5, y: 5 }, false, counter())!
+    expect(copy.shapes[0].metadata?.name).toBe('Rectangle s copy')
+    expect(cut.shapes[0].metadata?.name).toBe('Rectangle s')
   })
 })

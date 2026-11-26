@@ -24,7 +24,20 @@ import { binFromDrag, binOverlaps } from '@/lib/draw-bin'
 import type { Point } from '@/lib/draw-box'
 import { menuTarget, placeBeside } from '@/lib/menu-target'
 import { addBin } from '@/lib/new-bin'
-import { DEFAULT_GRIDFINITY_CONFIG, newBinDefaults } from '../../../shared/types/project'
+import { updateBin } from '@/lib/bin-update'
+import { depthChoices, movesIntoBin, movesOutOfBins, sizeSteps } from '@/lib/menu-actions'
+import { withPocketDepth } from '@/lib/pocket-depth'
+import { storedName } from '@/lib/item-name'
+import { notifyResizeBlocked } from '@/lib/project-notices'
+import { useAppMode } from '@/hooks/useAppMode'
+import { exportOnly } from '@/hooks/useExport'
+import { isBinGroup } from '@/layout-engine/types'
+import type { ShapeAABB } from '@/layout-engine/containment'
+import {
+  DEFAULT_GRIDFINITY_CONFIG,
+  computeDefaultPocketDepth,
+  newBinDefaults
+} from '../../../shared/types/project'
 
 interface EditContextMenuProps {
   /** One element. A right-click anywhere on it opens the menu. */
@@ -72,8 +85,8 @@ export default function EditContextMenu({
       >
         <MenuItems
           canvasPoint={canvasPoint}
-          onRename={(rename) => {
-            afterClose.current = rename
+          afterClose={(run) => {
+            afterClose.current = run
           }}
         />
       </ContextMenuContent>
@@ -87,16 +100,21 @@ export default function EditContextMenu({
  */
 function MenuItems({
   canvasPoint,
-  onRename
+  afterClose
 }: {
   canvasPoint?: Point | null
-  /** Rename once the menu has closed. */
-  onRename: (rename: () => void) => void
+  /**
+   * Run something once the menu has closed, in place of the keyboard going back to where
+   * the menu was opened from. For what puts the keyboard somewhere itself, or opens
+   * something that would close again when the keyboard moved.
+   */
+  afterClose: (run: () => void) => void
 }): React.JSX.Element {
   const edit = useEditCommands()
   const engine = useLayoutEngine()
   const { selectedIds } = useEngineState()
   const gridfinity = useProject((s) => s.project?.gridfinity) ?? DEFAULT_GRIDFINITY_CONFIG
+  const { setMode, setActiveTool } = useAppMode()
 
   const groups = engine?.getAllGroups() ?? []
   const target = menuTarget(groups, selectedIds)
@@ -109,6 +127,49 @@ function MenuItems({
     target.kind === 'none' && canvasPoint ? binFromDrag(canvasPoint, canvasPoint, cell) : null
   // Beside a bin: an empty one the same size and height.
   const beside = target.kind === 'bin' ? placeBeside(target.bin, groups) : null
+
+  // Pockets: the selected shapes that are in a bin, each with its bin and how deep that
+  // bin lets a pocket go.
+  const bins = groups.filter(isBinGroup)
+  const pockets =
+    engine && target.kind === 'shapes'
+      ? selectedIds.flatMap((id) => {
+          const shape = engine.getShape(id)
+          const bin = bins.find((candidate) => candidate.id === shape?.groupId)
+          if (!shape || !bin) return []
+          const maxDepth = computeDefaultPocketDepth(
+            bin.metadata.heightUnits,
+            gridfinity.unitHeight
+          )
+          return [{ shape, bin, maxDepth }]
+        })
+      : []
+  // The depths are named with their millimeters when every pocket would get the same ones.
+  const sameDepths = new Set(pockets.map((pocket) => pocket.maxDepth)).size === 1
+  const depths = pockets.length > 0 ? depthChoices(pockets[0].maxDepth) : []
+  const setDepth = (choice: number): void => {
+    engine?.batch(() => {
+      for (const { shape, maxDepth } of pockets) {
+        const { depth } = depthChoices(maxDepth)[choice]
+        engine.updateShape(shape.id, { metadata: withPocketDepth(shape.metadata, depth) })
+      }
+    })
+  }
+
+  /** Where the selected shapes are on the canvas, for moving them as they are arranged. */
+  const boxes = (ids: string[]): Array<ShapeAABB & { id: string }> =>
+    ids.flatMap((id) => {
+      const bounds = engine?.getShapeBounds(id)
+      return bounds ? [{ id, ...bounds }] : []
+    })
+  // A bin every selected shape is already in is not somewhere to move them to.
+  const home =
+    pockets.length > 0 &&
+    pockets.length === selectedIds.length &&
+    pockets.every((pocket) => pocket.bin.id === pockets[0].bin.id)
+      ? pockets[0].bin.id
+      : null
+  const otherBins = target.kind === 'shapes' ? bins.filter((bin) => bin.id !== home) : []
 
   return (
     <>
@@ -125,12 +186,20 @@ function MenuItems({
           >
             Add bin here
           </ContextMenuItem>
+          <ContextMenuItem
+            disabled={!canvasPoint || !edit.canPaste || !edit.canPasteAt(canvasPoint)}
+            onSelect={() => {
+              if (canvasPoint) edit.pasteAt(canvasPoint)
+            }}
+          >
+            Paste here
+          </ContextMenuItem>
           <ContextMenuSeparator />
         </>
       )}
 
       {hasSelection && (
-        <ContextMenuItem disabled={!edit.canRename} onSelect={() => onRename(edit.rename)}>
+        <ContextMenuItem disabled={!edit.canRename} onSelect={() => afterClose(edit.rename)}>
           Rename
         </ContextMenuItem>
       )}
@@ -157,7 +226,80 @@ function MenuItems({
           >
             Add bin beside
           </ContextMenuItem>
+          <ContextMenuSub>
+            <ContextMenuSubTrigger>Size</ContextMenuSubTrigger>
+            <ContextMenuSubContent>
+              {sizeSteps(target.bin.metadata).map(({ label, patch, enabled }) => (
+                <ContextMenuItem
+                  key={label}
+                  disabled={!engine || !enabled}
+                  onSelect={() => {
+                    if (engine && !updateBin(engine, target.bin.id, patch, cell)) {
+                      notifyResizeBlocked()
+                    }
+                  }}
+                >
+                  {label}
+                </ContextMenuItem>
+              ))}
+            </ContextMenuSubContent>
+          </ContextMenuSub>
+          <ContextMenuItem
+            onSelect={() => {
+              const binId = target.bin.id
+              // Preview opens with only this bin checked and Export showing. After the menu
+              // has closed, or the keyboard going back to the canvas would close Export.
+              afterClose(() => {
+                exportOnly(binId)
+                setMode('review')
+                setActiveTool(null)
+              })
+            }}
+          >
+            Export this bin…
+          </ContextMenuItem>
         </>
+      )}
+
+      {pockets.length > 0 && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Depth</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {depths.map(({ label }, choice) => (
+              <ContextMenuItem key={label} onSelect={() => setDepth(choice)}>
+                {sameDepths ? label : label.replace(/ \(.*\)$/, '')}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+
+      {engine && otherBins.length > 0 && (
+        <ContextMenuSub>
+          <ContextMenuSubTrigger>Move to bin</ContextMenuSubTrigger>
+          <ContextMenuSubContent>
+            {otherBins.map((bin) => (
+              <ContextMenuItem
+                key={bin.id}
+                onSelect={() => engine.translateShapes(movesIntoBin(boxes(selectedIds), bin))}
+              >
+                {storedName(bin.metadata) ?? 'Bin'}
+              </ContextMenuItem>
+            ))}
+          </ContextMenuSubContent>
+        </ContextMenuSub>
+      )}
+
+      {engine && pockets.length > 0 && (
+        <ContextMenuItem
+          onSelect={() =>
+            engine.translateShapes(
+              movesOutOfBins(boxes(pockets.map((pocket) => pocket.shape.id)), bins)
+            )
+          }
+        >
+          Take out of bin
+        </ContextMenuItem>
       )}
 
       {engine && arrange && (
