@@ -698,7 +698,7 @@ export class KonvaEngine implements LayoutEngine {
             }
             // The user-handle resize commits state directly through this callback and
             // doesn't go through updateGroup, so it reassigns shapes here too.
-            this.reassignAllShapes()
+            this.reassignShapesAfterResize(id)
           }
           this.emit('groupResized', { id, width, height })
           this.emit('groupChanged', { groupId: id, childIds: [...(g?.childIds ?? [])] })
@@ -788,7 +788,7 @@ export class KonvaEngine implements LayoutEngine {
 
     this.batch(() => {
       if (patch.width !== undefined || patch.height !== undefined) {
-        this.reassignAllShapes()
+        this.reassignShapesAfterResize(id)
       }
       this.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
     })
@@ -796,14 +796,18 @@ export class KonvaEngine implements LayoutEngine {
   }
 
   /**
-   * After a bin is resized, put every shape in the bin its center is now in, or in none,
-   * by the same rule as a drop: shapes the bin no longer covers are released and shapes it
-   * now covers are taken in. A released shape would otherwise stay parented but
-   * unselectable (hit-testing is gated by the parent's AABB) and bake pockets past the
-   * bin walls (#297). Callers batch, so the reassignments and the resize are one change.
+   * After a bin is resized, put the shapes it can affect in the bin their center is now in,
+   * or in none, by the same rule as a drop: its own shapes that it no longer covers are
+   * released, and loose shapes it now covers are taken in. A released shape would otherwise
+   * stay parented but unselectable (hit-testing is gated by the parent's AABB) and bake
+   * pockets past the bin walls (#297). Shapes in other bins are left alone: bins cannot
+   * overlap, so the resize changes nothing for them. Callers batch, so the reassignments
+   * and the resize are one change.
    */
-  private reassignAllShapes(): void {
-    for (const id of [...this.shapeMap.keys()]) this.reassignByCentroid(id)
+  private reassignShapesAfterResize(groupId: string): void {
+    for (const [id, shape] of [...this.shapeMap]) {
+      if (shape.groupId === groupId || shape.groupId === null) this.reassignByCentroid(id)
+    }
   }
 
   removeGroup(id: string): void {

@@ -149,6 +149,19 @@ describe('resizing a bin', () => {
     expect(engine.getShape('loose')!.groupId).toBeNull()
   })
 
+  it('leaves the shapes in other bins alone', () => {
+    engine.createGroup({ ...makeBin(), id: 'other', x: 200, metadata: { ...makeBin().metadata! } })
+    engine.addShape(makeRect('mine', 250))
+    engine.addToGroup('mine', 'other')
+    // Its center is outside its own bin, as after a nudge: only a drop or a move reassigns it.
+    engine.updateShape('mine', { x: -100 })
+    const groupId = engine.getShape('mine')!.groupId
+
+    resizeBin(2)
+
+    expect(engine.getShape('mine')!.groupId).toBe(groupId)
+  })
+
   it('does the same through updateGroup', () => {
     engine.addShape(makeRect('loose', 100))
     engine.updateGroup('bin', { width: 168 })
