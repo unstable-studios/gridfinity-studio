@@ -10,8 +10,8 @@ import {
   SelectValue
 } from '@/components/ui/select'
 import { NumericInput } from '@/components/ui/numeric-input'
-import { setPrintBed, usePrintBed } from '@/hooks/usePrintBed'
-import { BED_SIDE_LIMITS, PRINTERS, printerWithBed } from '@/lib/print-bed'
+import { setBedChoice, useBedChoice } from '@/hooks/usePrintBed'
+import { BED_SIDE_LIMITS, PRINTERS } from '@/lib/print-bed'
 import type { PrintBed } from '@/lib/print-bed'
 import { useProject } from '@/hooks/useProject'
 import { isBinGroup, useEngineState, useLayoutEngine } from '@/layout-engine'
@@ -46,7 +46,15 @@ export default function PreferencesModal({
 }: PreferencesModalProps): React.JSX.Element {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent
+        className="sm:max-w-4xl"
+        // Escape in a number being typed gives up the typing. It does not close Preferences.
+        onEscapeKeyDown={(event) => {
+          if (event.target instanceof Element && event.target.matches('[data-numeric-edit]')) {
+            event.preventDefault()
+          }
+        }}
+      >
         <DialogHeader>
           <DialogTitle>Preferences</DialogTitle>
         </DialogHeader>
@@ -136,29 +144,23 @@ function GeneralTab(): React.JSX.Element {
 const STARTING_CUSTOM_BED: PrintBed = { width: 220, depth: 220 }
 
 function PrinterTab(): React.JSX.Element {
-  const bed = usePrintBed()
-  // "Custom" stays picked while its size happens to match a listed printer.
-  const [custom, setCustom] = useState(() => bed !== null && printerWithBed(bed) === null)
-  const picked = bed === null ? 'none' : custom ? 'custom' : (printerWithBed(bed)?.id ?? 'custom')
+  const choice = useBedChoice()
+  const bed = choice?.bed ?? null
+  const picked = choice === null ? 'none' : (choice.printer ?? 'custom')
 
   const pick = (value: string): void => {
     if (value === 'none') {
-      setCustom(false)
-      setPrintBed(null)
+      setBedChoice(null)
     } else if (value === 'custom') {
-      setCustom(true)
-      setPrintBed(bed ?? STARTING_CUSTOM_BED)
+      setBedChoice({ bed: bed ?? STARTING_CUSTOM_BED, printer: null })
     } else {
       const printer = PRINTERS.find((p) => p.id === value)
-      if (!printer) return
-      setCustom(false)
-      setPrintBed(printer.bed)
+      if (printer) setBedChoice({ bed: printer.bed, printer: printer.id })
     }
   }
+  // A size typed in is the person's own, whichever printer it started from.
   const resize = (side: Partial<PrintBed>): void => {
-    if (!bed) return
-    setCustom(true)
-    setPrintBed({ ...bed, ...side })
+    if (bed) setBedChoice({ bed: { ...bed, ...side }, printer: null })
   }
 
   return (

@@ -54,23 +54,33 @@ export function isUsableBed(bed: unknown): bed is PrintBed {
   )
 }
 
-/** The listed printer with exactly this bed, if there is one. The first, when several match. */
-export function printerWithBed(bed: PrintBed): Printer | null {
-  return PRINTERS.find((p) => p.bed.width === bed.width && p.bed.depth === bed.depth) ?? null
+/**
+ * What the person chose: a bed, and the listed printer it was chosen as. `printer` is null for
+ * a size they typed in, even one that happens to match a listed printer.
+ */
+export interface BedChoice {
+  bed: PrintBed
+  printer: string | null
 }
 
 const STORAGE_KEY = 'gfstudio:printBed'
 
 type Store = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>
 
-/** The saved bed, or none when nothing is saved or what is saved is unsound. */
-export function loadPrintBed(store?: Store): PrintBed | null {
+/** The saved choice, or none when nothing is saved or what is saved is unsound. */
+export function loadBedChoice(store?: Store): BedChoice | null {
   try {
     // Inside the `try`: where there is no browser storage, naming it throws.
     const raw = (store ?? localStorage).getItem(STORAGE_KEY)
     if (raw) {
       const saved: unknown = JSON.parse(raw)
-      if (isUsableBed(saved)) return { width: saved.width, depth: saved.depth }
+      if (isUsableBed(saved)) {
+        const bed = { width: saved.width, depth: saved.depth }
+        // A printer that is no longer listed, or whose bed has changed, leaves a typed-in size.
+        const named = PRINTERS.find((p) => p.id === (saved as { printer?: unknown }).printer)
+        const stillThatBed = named?.bed.width === bed.width && named.bed.depth === bed.depth
+        return { bed, printer: named && stillThatBed ? named.id : null }
+      }
     }
   } catch {
     // No storage, unreadable storage or bad JSON: no bed.
@@ -78,11 +88,15 @@ export function loadPrintBed(store?: Store): PrintBed | null {
   return null
 }
 
-/** Keep `bed` as the person's print bed, or forget it when there is none. */
-export function savePrintBed(bed: PrintBed | null, store?: Store): void {
+/** Keep `choice` as the person's print bed, or forget it when there is none. */
+export function saveBedChoice(choice: BedChoice | null, store?: Store): void {
   try {
-    if (bed) (store ?? localStorage).setItem(STORAGE_KEY, JSON.stringify(bed))
-    else (store ?? localStorage).removeItem(STORAGE_KEY)
+    if (choice) {
+      const saved = { ...choice.bed, printer: choice.printer }
+      ;(store ?? localStorage).setItem(STORAGE_KEY, JSON.stringify(saved))
+    } else {
+      ;(store ?? localStorage).removeItem(STORAGE_KEY)
+    }
   } catch {
     // Without storage the choice lasts until the app closes.
   }
@@ -102,11 +116,27 @@ export function binFootprint(
 /** Sizes are compared this loosely, in mm, so a bin exactly as wide as the bed fits. */
 const EPSILON = 1e-6
 
-/** Whether something `footprint` big fits on `bed`, lying either way round. */
+/**
+ * Whether a rectangle `footprint` big fits on `bed`, turned to any angle. A long, narrow bin
+ * that is longer than the bed can still fit laid from corner to corner.
+ */
 export function fitsBed(footprint: PrintBed, bed: PrintBed): boolean {
-  const fits = (width: number, depth: number): boolean =>
-    width <= bed.width + EPSILON && depth <= bed.depth + EPSILON
-  return fits(footprint.width, footprint.depth) || fits(footprint.depth, footprint.width)
+  // The long and short sides of each.
+  const long = Math.max(footprint.width, footprint.depth)
+  const short = Math.min(footprint.width, footprint.depth)
+  const bedLong = Math.max(bed.width, bed.depth) + EPSILON
+  const bedShort = Math.min(bed.width, bed.depth) + EPSILON
+
+  // Too wide for the bed's short side, it fits at no angle.
+  if (short > bedShort) return false
+  // Square to the bed.
+  if (long <= bedLong) return true
+  // Longer than the bed, it may fit at an angle. The condition for one rectangle to fit in
+  // another is from Carver, "On Fitting One Rectangle Inside Another", Mathematics Magazine
+  // 30 (1957). Here `long` is more than `short`, since it is more than the bed's long side.
+  const sums = (bedLong + bedShort) / (long + short)
+  const differences = (bedLong - bedShort) / (long - short)
+  return sums * sums + differences * differences >= 2
 }
 
 /** Whether a bin is too big for `bed`. Never, when no bed is chosen. */

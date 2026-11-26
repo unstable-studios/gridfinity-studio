@@ -197,16 +197,16 @@ test('a bin larger than the print bed is marked, and can still be made', async (
   const row = (bin: string): ReturnType<typeof page.getByRole> =>
     page.getByRole('button', { name: new RegExp(`^${bin}`) })
 
-  // Five units is 209.5 mm, two is 83.5 mm.
+  // Five units is 209.5 mm, two is 83.5 mm. Five by two fits a 180 mm bed at no angle.
   await page.getByRole('button', { name: 'New project' }).click()
-  await page.getByRole('button', { name: '5×1', exact: true }).first().click()
+  await page.getByRole('button', { name: '5×2', exact: true }).first().click()
   await page.getByRole('button', { name: '2×2', exact: true }).first().click()
   await app.expectBinCount(2)
 
   // With no bed chosen nothing is marked.
   await expect(page.getByTitle(tooBig)).toHaveCount(0)
 
-  // A 180 mm bed: the long bin does not fit, the small one does.
+  // A 180 mm bed: the large bin does not fit, the small one does.
   await choosePrinter('Bambu Lab A1 mini')
   await expect(row('Bin 1').getByTitle(tooBig)).toBeVisible()
   await expect(row('Bin 2').getByTitle(tooBig)).toHaveCount(0)

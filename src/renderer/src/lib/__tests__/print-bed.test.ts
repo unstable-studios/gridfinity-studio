@@ -7,9 +7,8 @@ import {
   binTooBig,
   fitsBed,
   isUsableBed,
-  loadPrintBed,
-  printerWithBed,
-  savePrintBed
+  loadBedChoice,
+  saveBedChoice
 } from '../print-bed'
 
 function memoryStore(initial: Record<string, string> = {}): {
@@ -54,45 +53,49 @@ describe('isUsableBed', () => {
   })
 })
 
-describe('printerWithBed', () => {
-  it('finds the listed printer with that bed', () => {
-    expect(printerWithBed({ width: 250, depth: 210 })?.id).toBe('prusa-mk4s')
-  })
+describe('loadBedChoice and saveBedChoice', () => {
+  const stored = (value: string): ReturnType<typeof memoryStore> =>
+    memoryStore({ 'gfstudio:printBed': value })
 
-  it('finds none for a bed no listed printer has', () => {
-    expect(printerWithBed({ width: 210, depth: 250 })).toBeNull()
-    expect(printerWithBed({ width: 123, depth: 123 })).toBeNull()
-  })
-})
-
-describe('loadPrintBed and savePrintBed', () => {
   it('has no bed until one is saved', () => {
-    expect(loadPrintBed(memoryStore())).toBeNull()
+    expect(loadBedChoice(memoryStore())).toBeNull()
   })
 
-  it('gives back the bed that was saved', () => {
+  it('gives back the printer that was chosen, not another with the same bed', () => {
+    // The A1 mini and the MINI+ both have a 180 mm bed.
     const store = memoryStore()
-    savePrintBed({ width: 250, depth: 210 }, store)
-    expect(loadPrintBed(store)).toEqual({ width: 250, depth: 210 })
+    saveBedChoice({ bed: { width: 180, depth: 180 }, printer: 'prusa-mini' }, store)
+    expect(loadBedChoice(store)).toEqual({
+      bed: { width: 180, depth: 180 },
+      printer: 'prusa-mini'
+    })
+  })
+
+  it('keeps a typed-in size as that, even one a listed printer has', () => {
+    const store = memoryStore()
+    saveBedChoice({ bed: { width: 220, depth: 220 }, printer: null }, store)
+    expect(loadBedChoice(store)).toEqual({ bed: { width: 220, depth: 220 }, printer: null })
   })
 
   it('forgets the bed when none is saved over it', () => {
     const store = memoryStore()
-    savePrintBed({ width: 250, depth: 210 }, store)
-    savePrintBed(null, store)
-    expect(loadPrintBed(store)).toBeNull()
+    saveBedChoice({ bed: { width: 250, depth: 210 }, printer: 'prusa-mk4s' }, store)
+    saveBedChoice(null, store)
+    expect(loadBedChoice(store)).toBeNull()
     expect(store.keys()).toEqual([])
   })
 
   it('has no bed when what is stored is damaged or unsound', () => {
-    expect(loadPrintBed(memoryStore({ 'gfstudio:printBed': 'not json' }))).toBeNull()
-    expect(loadPrintBed(memoryStore({ 'gfstudio:printBed': '{"width":1,"depth":1}' }))).toBeNull()
-    expect(loadPrintBed(memoryStore({ 'gfstudio:printBed': '[256,256]' }))).toBeNull()
+    expect(loadBedChoice(stored('not json'))).toBeNull()
+    expect(loadBedChoice(stored('{"width":1,"depth":1}'))).toBeNull()
+    expect(loadBedChoice(stored('[256,256]'))).toBeNull()
   })
 
-  it('keeps only the size from what is stored', () => {
-    const store = memoryStore({ 'gfstudio:printBed': '{"width":256,"depth":256,"extra":true}' })
-    expect(loadPrintBed(store)).toEqual({ width: 256, depth: 256 })
+  it('keeps the size and drops a printer that is not listed or has another bed', () => {
+    const size = { bed: { width: 256, depth: 256 }, printer: null }
+    expect(loadBedChoice(stored('{"width":256,"depth":256}'))).toEqual(size)
+    expect(loadBedChoice(stored('{"width":256,"depth":256,"printer":"gone"}'))).toEqual(size)
+    expect(loadBedChoice(stored('{"width":256,"depth":256,"printer":"prusa-xl"}'))).toEqual(size)
   })
 })
 
@@ -128,9 +131,27 @@ describe('fitsBed', () => {
     expect(fitsBed({ width: 100, depth: 240 }, bed)).toBe(true)
   })
 
-  it('does not fit something longer than the bed either way round', () => {
-    expect(fitsBed({ width: 251, depth: 100 }, bed)).toBe(false)
-    expect(fitsBed({ width: 220, depth: 220 }, bed)).toBe(false)
+  it('fits something long and narrow from corner to corner', () => {
+    // The diagonal of a 180 mm square is 254.6 mm.
+    const square = { width: 180, depth: 180 }
+    expect(fitsBed({ width: 250, depth: 1 }, square)).toBe(true)
+    expect(fitsBed({ width: 1, depth: 250 }, square)).toBe(true)
+    expect(fitsBed({ width: 209.5, depth: 41.5 }, square)).toBe(true)
+  })
+
+  it('does not fit something too wide to lie at any angle', () => {
+    const square = { width: 180, depth: 180 }
+    // At 45 degrees a rectangle needs (long + short) / sqrt(2) of a square bed.
+    expect(fitsBed({ width: 209.5, depth: 83.5 }, square)).toBe(false)
+    expect(fitsBed({ width: 255, depth: 1 }, square)).toBe(false)
+    expect(fitsBed({ width: 181, depth: 181 }, square)).toBe(false)
+  })
+
+  it('agrees with the 45 degree rule on a square bed', () => {
+    const square = { width: 100, depth: 100 }
+    // Longer than the bed, it fits a square exactly when long + short is at most 141.42.
+    expect(fitsBed({ width: 120, depth: 21 }, square)).toBe(true)
+    expect(fitsBed({ width: 120, depth: 22 }, square)).toBe(false)
   })
 })
 
@@ -144,15 +165,13 @@ describe('binTooBig', () => {
   it('tells a bin that fits from one that does not', () => {
     // 4 units is 167.5 mm, 5 units is 209.5 mm.
     expect(binTooBig({ widthUnits: 4, depthUnits: 4 }, standard, miniBed)).toBe(false)
-    expect(binTooBig({ widthUnits: 5, depthUnits: 1 }, standard, miniBed)).toBe(true)
-    expect(binTooBig({ widthUnits: 1, depthUnits: 5 }, standard, miniBed)).toBe(true)
+    expect(binTooBig({ widthUnits: 5, depthUnits: 2 }, standard, miniBed)).toBe(true)
+    expect(binTooBig({ widthUnits: 2, depthUnits: 5 }, standard, miniBed)).toBe(true)
   })
 
-  it('lets a bin lie either way round on a bed that is not square', () => {
-    const bed = { width: 250, depth: 210 }
-    // 6 units is 251.5 mm: too long for this bed. 5 units is 209.5 mm: fits its short side.
-    expect(binTooBig({ widthUnits: 5, depthUnits: 5 }, standard, bed)).toBe(false)
-    expect(binTooBig({ widthUnits: 6, depthUnits: 1 }, standard, bed)).toBe(true)
+  it('lets a long bin one unit wide lie across the corners', () => {
+    expect(binTooBig({ widthUnits: 5, depthUnits: 1 }, standard, miniBed)).toBe(false)
+    expect(binTooBig({ widthUnits: 7, depthUnits: 1 }, standard, miniBed)).toBe(true)
   })
 })
 
