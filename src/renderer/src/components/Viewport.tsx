@@ -29,15 +29,7 @@ function LayoutViewport(): React.JSX.Element {
   const canRedo = useUndoRedo((s) => s.canRedo)
   const { tick } = useEngineState()
 
-  // Wire grid config from gridfinity settings
   const project = useProject((s) => s.project)
-  const baseUnit = project?.gridfinity.baseUnit ?? 42
-
-  useEffect(() => {
-    if (!engine) return
-    engine.setGridConfig({ size: baseUnit, enabled: true, visible: true })
-  }, [engine, baseUnit])
-
   // Render bin detail artwork (magnet holes, screw holes, lip boundary)
   useBinArtwork(engine, project?.gridfinity, tick)
   // Mark bins that do not fit the print bed
@@ -79,11 +71,19 @@ export default function Viewport(): React.JSX.Element {
   const engine = useLayoutEngine()
   // Here, not in the Design-only part below: the history has to outlive a visit to Preview.
   useEngineUndoRedo(engine)
-  // Here too: it loads the project into the engine and resets the history when it first runs,
-  // so running it again on coming back from Preview would drop the history.
+  // Here too: it loads each new project into the engine and resets the history when it does,
+  // so a remount would load the project again and drop the history on coming back from Preview.
   useProjectEngineSync()
 
   const baseUnit = project?.gridfinity.baseUnit ?? 42
+  const projectId = project?.settings?.createdAt ?? null
+
+  // Wire grid config from gridfinity settings. After the sync above has loaded a project (a
+  // snapshot carries its own grid size), so the project's base unit is what the grid ends up at.
+  useEffect(() => {
+    if (!engine) return
+    engine.setGridConfig({ size: baseUnit, enabled: true, visible: true })
+  }, [engine, baseUnit, projectId])
 
   // The right-click menu belongs to the Select tool. A drawing tool keeps its own clicks.
   const canUseMenu = mode === 'layout' && (activeTool === 'select' || activeTool === null)
