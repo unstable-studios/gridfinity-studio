@@ -35,7 +35,6 @@ import type { PositionFrame } from '@/layout-engine/position-frame'
 import { usePositionFrame } from '@/hooks/usePositionFrame'
 import { useProject } from '@/hooks/useProject'
 import { useProjectName } from '@/hooks/useProjectName'
-import { notifyResizeBlocked } from '@/lib/project-notices'
 import { useAppMode } from '@/hooks/useAppMode'
 import {
   useLayoutEngine,
@@ -240,7 +239,7 @@ function LayoutSidebar(): React.JSX.Element {
   }
 
   const handleUpdateBinMetadata = (groupId: string, patch: Partial<BinMetadata>): void => {
-    if (engine && !updateBin(engine, groupId, patch, baseUnit)) notifyResizeBlocked()
+    if (engine) updateBin(engine, groupId, patch, baseUnit)
   }
 
   const handleDeleteSelected = (): void => {
