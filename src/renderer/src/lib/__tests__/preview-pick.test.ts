@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { DEFAULT_THEME_CONFIG } from '../theme-config'
 import { CLICK_SLOP_PX, glowIntensity, isClick, leftOutColor } from '../preview-pick'
 
 describe('isClick', () => {
@@ -20,6 +21,17 @@ describe('leftOutColor', () => {
 
   it('fades less into a dark floor, so the bin can still be made out', () => {
     expect(leftOutColor('#ffffff', '#000000')).toBe('#737373')
+  })
+
+  it('fades the default themes by the amount each was tuned for', () => {
+    const { dark, light } = DEFAULT_THEME_CONFIG
+    expect(leftOutColor(dark.meshColor, dark.reviewFloor)).toBe('#2a4f7c')
+    expect(leftOutColor(light.meshColor, light.reviewFloor)).toBe('#aec2e3')
+  })
+
+  it('counts a floor as dark below a quarter of full brightness', () => {
+    expect(leftOutColor('#ffffff', '#3f3f3f')).toBe('#959595')
+    expect(leftOutColor('#ffffff', '#404040')).toBe('#707070')
   })
 
   it('differs from both colors it is mixed from', () => {

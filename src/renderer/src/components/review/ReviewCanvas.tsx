@@ -386,11 +386,12 @@ function BakedMeshPreview({
           vertexColors={useColors}
           color={useColors ? undefined : meshColor}
           emissive={glowColor}
-          emissiveIntensity={glowIntensity({
-            checked,
-            choosing,
-            hovered: hovered && onPick !== undefined
-          })}
+          // Debug colors are there to be read as they are, so nothing is added over them.
+          emissiveIntensity={
+            useColors
+              ? 0
+              : glowIntensity({ checked, choosing, hovered: hovered && onPick !== undefined })
+          }
           metalness={0.15}
           roughness={0.35}
           side={THREE.FrontSide}

@@ -50,7 +50,7 @@ In Preview, choose **Export** in the top bar, then **Export 3MF…** or **Export
 
 With more than one bin:
 
-- Uncheck a bin in the sidebar to leave it out, or click the bin in the 3D view. A bin that is left out is shown faded.
+- Uncheck a bin in the sidebar to leave it out, or click the bin in the 3D view. A bin that is left out is shown faded, and the bins that will be exported glow.
 - Choose **File per bin** to save each bin as its own file in a folder.
 
 ## Project settings
