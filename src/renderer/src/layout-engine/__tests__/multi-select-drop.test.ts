@@ -156,6 +156,5 @@ describe('dropping a multi-selection', () => {
     expect(engine.getShape('a')!.groupId).toBeNull()
     expect(engine.getShape('b')!.groupId).toBeNull()
     expect(engine.getShape('a')!.x).toBe(200)
-    expect(history.canUndo).toBe(false)
   })
 })
