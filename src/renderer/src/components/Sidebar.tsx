@@ -15,6 +15,8 @@ import EditContextMenu from './EditContextMenu'
 import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
 import { shapeWallIssue, wallIssueText, type WallIssue } from '@/lib/wall-clearance'
+import { usePrintBed } from '@/hooks/usePrintBed'
+import { TOO_BIG_TEXT, bedSizeText, binTooBig } from '@/lib/print-bed'
 import { removeItems } from '@/lib/remove-items'
 import { addBin, placeForNewBin } from '@/lib/new-bin'
 import { updateBin } from '@/lib/bin-update'
@@ -111,6 +113,18 @@ function LayoutSidebar(): React.JSX.Element {
     }
     return found
   }, [shapes, binGroups, gridfinity])
+
+  // Bins that do not fit the person's print bed. A warning, never a block.
+  const printBed = usePrintBed()
+  const tooBig = useMemo(
+    () =>
+      new Set(
+        binGroups
+          .filter((group) => binTooBig(group.metadata, gridfinity, printBed))
+          .map((group) => group.id)
+      ),
+    [binGroups, gridfinity, printBed]
+  )
 
   // Clicking rows in the two lists selects as in a file manager. The lists count as one,
   // bins first, so a Shift-click can reach from a bin down into the shapes.
@@ -291,6 +305,15 @@ function LayoutSidebar(): React.JSX.Element {
                     onContextMenu={() => selectForMenu(group.id)}
                   >
                     <span className="font-medium">{storedName(meta) ?? 'Bin'}</span>
+                    {tooBig.has(group.id) && (
+                      <span
+                        className={`float-right pl-2 ${isSelected ? 'text-white' : 'text-amber-700 dark:text-amber-400'}`}
+                        title={sentence(TOO_BIG_TEXT)}
+                      >
+                        <span aria-hidden="true">⚠</span>
+                        <span className="sr-only">, {sentence(TOO_BIG_TEXT)}</span>
+                      </span>
+                    )}
                     <span className="ml-2 opacity-60">
                       {meta.widthUnits}×{meta.depthUnits} ({meta.heightUnits}u)
                     </span>
@@ -415,6 +438,14 @@ function LayoutSidebar(): React.JSX.Element {
                 }
               />
             </label>
+            {tooBig.has(selectedGroup.id) && printBed && (
+              <div className="flex items-start gap-1 text-amber-700 dark:text-amber-400 text-[10px] leading-tight">
+                <span aria-hidden="true">⚠</span>
+                <span>
+                  {sentence(TOO_BIG_TEXT)} The bed is {bedSizeText(printBed)}.
+                </span>
+              </div>
+            )}
           </div>
         </SidebarSection>
       )}
@@ -520,9 +551,17 @@ function PreviewSidebar(): React.JSX.Element {
 
   const totalBins = bins.length
   const anyError = chosen.some((b) => bakeStatus.get(b.id) === 'error')
+  const gridfinity = useProject((s) => s.project?.gridfinity) ?? DEFAULT_GRIDFINITY_CONFIG
+  const printBed = usePrintBed()
   const warnings = useMemo(
-    () => chosen.flatMap((bin) => bakeResults.get(bin.id)?.warnings ?? []),
-    [bakeResults, chosen]
+    () =>
+      chosen.flatMap((bin) => [
+        ...(binTooBig(bin.metadata, gridfinity, printBed)
+          ? [`${storedName(bin.metadata) ?? 'Bin'} is ${TOO_BIG_TEXT}.`]
+          : []),
+        ...(bakeResults.get(bin.id)?.warnings ?? [])
+      ]),
+    [bakeResults, chosen, gridfinity, printBed]
   )
 
   return (

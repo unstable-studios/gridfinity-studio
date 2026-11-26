@@ -61,6 +61,12 @@ Tolerance, unit height, and magnet and screw holes are set per project in **Edit
 
 **Use for new projects** keeps the project's settings as what every new project starts with. Preferences shows the app's settings under **App** and the project's under **This project**.
 
+## Print bed
+
+Choose your printer in **Edit > Preferences…**, under **Printer**, or choose **Custom** and enter the bed's width and depth. A bin too large for the bed at any angle is marked with ⚠ in the bin list. Preview names it when it is checked for export. It can still be made and exported.
+
+The bed is kept on this computer, for every project.
+
 ## Updates
 
 The app checks for updates when it starts and every hour, and offers to restart when one is ready. **Help > Check for updates** checks at once.

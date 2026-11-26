@@ -181,3 +181,49 @@ test('the Help menu says where updates stand', async () => {
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
+
+test('a bin larger than the print bed is marked, and can still be made', async () => {
+  app = await StudioApp.launch()
+  const { page } = app
+  const tooBig = 'Larger than the print bed.'
+  const choosePrinter = async (name: string): Promise<void> => {
+    await app.menu('Edit', /^Preferences/)
+    await page.getByRole('tab', { name: 'Printer' }).click()
+    await page.getByRole('combobox', { name: 'Print bed' }).click()
+    await page.getByRole('option', { name, exact: true }).click()
+    await expect(page.getByRole('combobox', { name: 'Print bed' })).toHaveText(name)
+    await page.keyboard.press('Escape')
+  }
+  const row = (bin: string): ReturnType<typeof page.getByRole> =>
+    page.getByRole('button', { name: new RegExp(`^${bin}`) })
+
+  // Five units is 209.5 mm, two is 83.5 mm. Five by two fits a 180 mm bed at no angle.
+  await page.getByRole('button', { name: 'New project' }).click()
+  await page.getByRole('button', { name: '5×2', exact: true }).first().click()
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.expectBinCount(2)
+
+  // With no bed chosen nothing is marked.
+  await expect(page.getByTitle(tooBig)).toHaveCount(0)
+
+  // A 180 mm bed: the large bin does not fit, the small one does.
+  await choosePrinter('Bambu Lab A1 mini')
+  await expect(row('Bin 1').getByTitle(tooBig)).toBeVisible()
+  await expect(row('Bin 2').getByTitle(tooBig)).toHaveCount(0)
+
+  // Selected, the bin says how big the bed is.
+  await row('Bin 1').click()
+  await expect(page.getByText(`${tooBig} The bed is 180 × 180 mm.`)).toBeVisible()
+
+  // Preview names the bin and still builds it.
+  await page.getByRole('radio', { name: 'Preview', exact: true }).click()
+  await expect(page.getByText('Bin 1 is larger than the print bed.')).toBeVisible()
+  await expect(page.getByText(/\bReady$/)).toHaveCount(2, { timeout: 30_000 })
+  await page.getByRole('radio', { name: 'Design', exact: true }).click()
+
+  // A 256 mm bed takes it.
+  await choosePrinter('Bambu Lab A1, P1, X1')
+  await expect(page.getByTitle(tooBig)).toHaveCount(0)
+
+  expect(app.errors, 'no renderer errors').toEqual([])
+})

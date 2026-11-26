@@ -268,6 +268,8 @@ export function NumericInput({
             ref={inputRef}
             type="text"
             inputMode="decimal"
+            // Lets a dialog tell a number being typed from its other fields: see Preferences.
+            data-numeric-edit
             className="w-20 max-w-full bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200 font-mono text-xs text-right rounded px-1.5 py-0.5 outline-none ring-1 ring-blue-500"
             value={editText}
             onChange={(e) => setEditText(e.target.value)}
