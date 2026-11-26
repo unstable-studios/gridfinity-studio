@@ -10,7 +10,7 @@ import { useLayoutEngine, useLayoutEngineContext, useEngineState } from '@/layou
 import { useExport, useExportMenuOpen } from '@/hooks/useExport'
 import { boundsKey, frameBounds } from '@/lib/camera-framing'
 import type { Bounds3 } from '@/lib/camera-framing'
-import { glowIntensity, isClick, leftOutColor } from '@/lib/preview-pick'
+import { LEFT_OUT_OPACITY, glowIntensity, isClick, leftOutColor } from '@/lib/preview-pick'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
@@ -259,7 +259,7 @@ function ReviewScene({
           debugColors={debugColors}
           wireframe={wireframe}
           meshColor={colors.meshColor}
-          leftOutMeshColor={leftOutColor(colors.meshColor, colors.reviewFloor)}
+          leftOutMeshColor={leftOutColor(colors.meshColor)}
           leftOut={leftOut}
           onPick={onPick}
         />
@@ -300,13 +300,12 @@ function BakedBins({
         <BakedMeshPreview
           key={id}
           mesh={mesh}
-          // A bin left out of the export is drawn faded, in one flat color.
+          // A bin left out of the export is drawn gray and see-through, in one flat color.
           debugColors={debugColors && !leftOut.has(id)}
           wireframe={wireframe}
           meshColor={leftOut.has(id) ? leftOutMeshColor : meshColor}
           glowColor={meshColor}
           checked={!leftOut.has(id)}
-          choosing={leftOut.size > 0}
           position={position}
           onPick={onPick && (() => onPick(id))}
         />
@@ -322,7 +321,6 @@ function BakedMeshPreview({
   meshColor,
   glowColor,
   checked,
-  choosing,
   position,
   onPick
 }: {
@@ -332,10 +330,8 @@ function BakedMeshPreview({
   meshColor: string
   /** The color the bin glows in: see `glowIntensity`. */
   glowColor: string
-  /** Whether the bin is checked for export. */
+  /** Whether the bin is checked for export. One that is not is drawn see-through. */
   checked: boolean
-  /** Whether some bin is left out. */
-  choosing: boolean
   position?: [number, number, number]
   /** Called when the bin is clicked. Without it the bin cannot be clicked. */
   onPick?: () => void
@@ -380,17 +376,26 @@ function BakedMeshPreview({
       }
       onPointerOut={onPick && (() => setHovered(false))}
     >
-      <mesh geometry={geometry} castShadow>
+      {!checked && (
+        // A see-through bin shows only its nearest surface: this draws no color, only depth,
+        // so the walls and pockets behind that surface are not blended in over each other.
+        // It is drawn with the see-through things, after everything solid, or it would hide
+        // the floor and the bins behind this one.
+        <mesh geometry={geometry} raycast={() => null} renderOrder={1}>
+          <meshBasicMaterial colorWrite={false} transparent />
+        </mesh>
+      )}
+      <mesh geometry={geometry} castShadow={checked} renderOrder={checked ? 0 : 2}>
         <meshStandardMaterial
-          key={useColors ? 'vc' : 'solid'}
+          key={`${useColors ? 'vc' : 'solid'}-${checked ? 'opaque' : 'see-through'}`}
           vertexColors={useColors}
           color={useColors ? undefined : meshColor}
+          transparent={!checked}
+          opacity={checked ? 1 : LEFT_OUT_OPACITY}
           emissive={glowColor}
           // Debug colors are there to be read as they are, so nothing is added over them.
           emissiveIntensity={
-            useColors
-              ? 0
-              : glowIntensity({ checked, choosing, hovered: hovered && onPick !== undefined })
+            useColors ? 0 : glowIntensity({ checked, hovered: hovered && onPick !== undefined })
           }
           metalness={0.15}
           roughness={0.35}
