@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.26.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.25.0...v1.26.0) (2026-11-26)
+
+
+### Features
+
+* **ui:** glow on bins chosen for export in preview ([#581](https://github.com/unstable-studios/gridfinity-studio/issues/581)) ([0e9a3b0](https://github.com/unstable-studios/gridfinity-studio/commit/0e9a3b03cd972085ef7b41f539a188c9433782f2))
+* **ui:** show left-out bins gray and see-through in preview ([#583](https://github.com/unstable-studios/gridfinity-studio/issues/583)) ([bc92aeb](https://github.com/unstable-studios/gridfinity-studio/commit/bc92aebdcf848350f39563f41357ff354f69740a))
+
 ## [1.25.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.24.0...v1.25.0) (2026-11-26)
 
 
