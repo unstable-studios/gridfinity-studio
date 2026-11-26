@@ -78,7 +78,7 @@ export default function ExportMenu({ className }: { className?: string }): React
         {!canExport && bins.length > 0 && (
           <p className="text-[10px] text-zinc-500">
             {chosen.length === 0
-              ? 'Check a bin in the list to export it.'
+              ? 'Check a bin to export it.'
               : anyError
                 ? 'Couldn’t build one or more bins.'
                 : 'Building the model…'}
