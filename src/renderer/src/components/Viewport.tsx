@@ -28,7 +28,6 @@ function LayoutViewport(): React.JSX.Element {
   const canUndo = useUndoRedo((s) => s.canUndo)
   const canRedo = useUndoRedo((s) => s.canRedo)
   const { tick } = useEngineState()
-  useProjectEngineSync()
 
   // Wire grid config from gridfinity settings
   const project = useProject((s) => s.project)
@@ -80,6 +79,9 @@ export default function Viewport(): React.JSX.Element {
   const engine = useLayoutEngine()
   // Here, not in the Design-only part below: the history has to outlive a visit to Preview.
   useEngineUndoRedo(engine)
+  // Here too: it loads the project into the engine and resets the history when it first runs,
+  // so running it again on coming back from Preview would drop the history.
+  useProjectEngineSync()
 
   const baseUnit = project?.gridfinity.baseUnit ?? 42
 

@@ -37,6 +37,9 @@ function isValidSnapshot(data: unknown): data is LayoutSnapshot {
  *   the "Unsaved" badge shows. Suppressed during project load to avoid
  *   false positives.
  * - After load: reads project.layoutSnapshot → engine.loadSnapshot()
+ *
+ * Call it from a component that stays mounted: the restore resets the undo history, and a
+ * remount would run it again (it remembers what it loaded in a ref).
  */
 export function useProjectEngineSync(): void {
   const engine = useLayoutEngine()
