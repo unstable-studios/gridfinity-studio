@@ -288,7 +288,8 @@ export class KonvaEngine implements LayoutEngine {
 
     node.on('dragend', () => {
       // A multi-selection is committed as one change for every shape in it.
-      if ((this.transformer?.nodes().length ?? 0) > 1) {
+      const selected = this.transformer?.nodes() ?? []
+      if (selected.length > 1 && selected.includes(node)) {
         this.finalizeMultiSelectDrag()
         return
       }
