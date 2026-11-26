@@ -65,13 +65,18 @@ describe('resizing a bin', () => {
 
   const internals = (): EngineInternals => engine as unknown as EngineInternals
   const snapshot = (): string => JSON.stringify(engine.toSnapshot())
-  /** Drag a handle of the selected bin so its width is scaled by `factor`. */
+  /**
+   * Drag the right-hand handle of the bin so its width is scaled by `factor`. The node's
+   * center moves with the dragged edge, which keeps the left edge in place.
+   */
   const resizeBin = (factor: number): void => {
     engine.select(['bin'])
     const binNode = internals().transformer.nodes()[0]
+    const { x, width } = engine.getGroup('bin')!
     binNode.fire('transformstart')
     internals().transformer.fire('transformstart')
     binNode.scaleX(factor)
+    binNode.x(x + (width * factor) / 2)
     binNode.fire('transform')
     const transformer = internals().transformer as Konva.Transformer & { _transforming: boolean }
     transformer._transforming = true
@@ -94,7 +99,7 @@ describe('resizing a bin', () => {
   })
 
   it('releases a shape the smaller bin no longer covers, and takes it back when it grows', () => {
-    // Centered at x 65: inside the 84 wide bin, outside the 42 wide one.
+    // Centered at x 60: inside the 84 wide bin, outside the 42 wide one.
     engine.addShape(makeRect('far', 60))
     engine.addToGroup('far', 'bin')
     engine.addShape(makeRect('near', 15))
