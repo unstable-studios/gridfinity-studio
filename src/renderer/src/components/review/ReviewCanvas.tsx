@@ -10,7 +10,7 @@ import { useLayoutEngine, useLayoutEngineContext, useEngineState } from '@/layou
 import { useExport, useExportMenuOpen } from '@/hooks/useExport'
 import { boundsKey, frameBounds } from '@/lib/camera-framing'
 import type { Bounds3 } from '@/lib/camera-framing'
-import { isClick, leftOutColor } from '@/lib/preview-pick'
+import { glowIntensity, isClick, leftOutColor } from '@/lib/preview-pick'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 
 const CAMERA_KEY = 'gfstudio:reviewCamera'
@@ -304,6 +304,9 @@ function BakedBins({
           debugColors={debugColors && !leftOut.has(id)}
           wireframe={wireframe}
           meshColor={leftOut.has(id) ? leftOutMeshColor : meshColor}
+          glowColor={meshColor}
+          checked={!leftOut.has(id)}
+          choosing={leftOut.size > 0}
           position={position}
           onPick={onPick && (() => onPick(id))}
         />
@@ -317,6 +320,9 @@ function BakedMeshPreview({
   debugColors,
   wireframe,
   meshColor,
+  glowColor,
+  checked,
+  choosing,
   position,
   onPick
 }: {
@@ -324,6 +330,12 @@ function BakedMeshPreview({
   debugColors: boolean
   wireframe: boolean
   meshColor: string
+  /** The color the bin glows in: see `glowIntensity`. */
+  glowColor: string
+  /** Whether the bin is checked for export. */
+  checked: boolean
+  /** Whether some bin is left out. */
+  choosing: boolean
   position?: [number, number, number]
   /** Called when the bin is clicked. Without it the bin cannot be clicked. */
   onPick?: () => void
@@ -373,6 +385,13 @@ function BakedMeshPreview({
           key={useColors ? 'vc' : 'solid'}
           vertexColors={useColors}
           color={useColors ? undefined : meshColor}
+          emissive={glowColor}
+          // Debug colors are there to be read as they are, so nothing is added over them.
+          emissiveIntensity={
+            useColors
+              ? 0
+              : glowIntensity({ checked, choosing, hovered: hovered && onPick !== undefined })
+          }
           metalness={0.15}
           roughness={0.35}
           side={THREE.FrontSide}
