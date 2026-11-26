@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.25.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.24.0...v1.25.0) (2026-11-26)
+
+
+### Features
+
+* **ui:** click a bin in preview to choose it for export ([#579](https://github.com/unstable-studios/gridfinity-studio/issues/579)) ([863723b](https://github.com/unstable-studios/gridfinity-studio/commit/863723b90191c2e49332fe17d06298b7d91026b0))
+
 ## [1.24.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.23.1...v1.24.0) (2026-11-26)
 
 
