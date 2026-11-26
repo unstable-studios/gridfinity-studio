@@ -16,7 +16,7 @@ import { useRenaming } from '@/hooks/useEditCommands'
 import { storedName } from '@/lib/item-name'
 import { shapeWallIssue, wallIssueText, type WallIssue } from '@/lib/wall-clearance'
 import { usePrintBed } from '@/hooks/usePrintBed'
-import { TOO_BIG_TEXT, bedSizeText, binTooBig } from '@/lib/print-bed'
+import { TOO_BIG_TEXT, bedSizeText, binTooBig, tooBigBinIds } from '@/lib/print-bed'
 import { removeItems } from '@/lib/remove-items'
 import { addBin, placeForNewBin } from '@/lib/new-bin'
 import { updateBin } from '@/lib/bin-update'
@@ -117,12 +117,7 @@ function LayoutSidebar(): React.JSX.Element {
   // Bins that do not fit the person's print bed. A warning, never a block.
   const printBed = usePrintBed()
   const tooBig = useMemo(
-    () =>
-      new Set(
-        binGroups
-          .filter((group) => binTooBig(group.metadata, gridfinity, printBed))
-          .map((group) => group.id)
-      ),
+    () => new Set(tooBigBinIds(binGroups, gridfinity, printBed)),
     [binGroups, gridfinity, printBed]
   )
 

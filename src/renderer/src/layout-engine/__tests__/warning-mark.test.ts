@@ -98,6 +98,40 @@ describe('warning mark', () => {
     expect(background().zIndex()).toBe(0)
   })
 
+  /** Whether the mark is one unit inside the background on every side. */
+  const expectMarkInsideBackground = (): void => {
+    const mark = marks()[0]
+    expect(mark.x()).toBe(background().x() + 1)
+    expect(mark.y()).toBe(background().y() + 1)
+    expect(mark.width()).toBe(background().width() - 2)
+    expect(mark.height()).toBe(background().height() - 2)
+  }
+  /** Drag a handle of the bin, as the transformer does: it scales the node, then lets go. */
+  const dragHandle = (scaleX: number, shiftX: number): void => {
+    const node = binNode()
+    node.fire('transformstart')
+    node.scaleX(scaleX)
+    node.x(node.x() + shiftX)
+    node.fire('transform')
+    node.fire('transformend')
+  }
+
+  it('follows a bin made wider by its handle', () => {
+    engine.setGroupWarnings(['bin'])
+    dragHandle(2, 42)
+    expect(engine.getGroup('bin')!.width).toBe(168)
+    expectMarkInsideBackground()
+  })
+
+  it('follows a bin made narrower by its handle, and leaves its bounds no bigger', () => {
+    engine.updateGroup('bin', { width: 168 })
+    engine.setGroupWarnings(['bin'])
+    dragHandle(0.5, -42)
+    expect(engine.getGroup('bin')!.width).toBe(84)
+    expectMarkInsideBackground()
+    expect(binNode().getClientRect({ skipTransform: true }).width).toBeLessThan(90)
+  })
+
   it('follows the bin when it is resized', () => {
     engine.setGroupWarnings(['bin'])
     engine.updateGroup('bin', { width: 168, height: 42 })

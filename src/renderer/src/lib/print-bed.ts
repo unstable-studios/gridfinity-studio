@@ -148,6 +148,15 @@ export function binTooBig(
   return bed !== null && !fitsBed(binFootprint(bin, gridfinity), bed)
 }
 
+/** The ids of the bins that are too big for `bed`, in the order of `bins`. */
+export function tooBigBinIds(
+  bins: readonly { id: string; metadata: { widthUnits: number; depthUnits: number } }[],
+  gridfinity: Pick<GridfinityConfig, 'baseUnit' | 'tolerance'>,
+  bed: PrintBed | null
+): string[] {
+  return bins.filter((bin) => binTooBig(bin.metadata, gridfinity, bed)).map((bin) => bin.id)
+}
+
 /** "256 × 256 mm" */
 export function bedSizeText(bed: PrintBed): string {
   return `${bed.width} × ${bed.depth} mm`

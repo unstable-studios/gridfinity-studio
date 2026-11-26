@@ -11,7 +11,7 @@ import type {
   EngineEventMap,
   GroupDecoration
 } from './types'
-import { KonvaGroupRenderer } from './konva-group-renderer'
+import { KonvaGroupRenderer, isBinFurniture } from './konva-group-renderer'
 import { checkGroupCollision, wouldOverlapAnotherGroup } from './collision'
 import type { HitResult } from './input-action-handler'
 import { largestFirst } from './stacking'
@@ -768,7 +768,7 @@ export class KonvaEngine implements LayoutEngine {
 
     if (dx !== 0 || dy !== 0) {
       for (const child of renderer.konvaGroup.getChildren()) {
-        if (child.hasName('__groupBg') || child.hasName('__binArtwork')) continue
+        if (isBinFurniture(child)) continue
         child.position({ x: child.x() + dx, y: child.y() + dy })
       }
     }

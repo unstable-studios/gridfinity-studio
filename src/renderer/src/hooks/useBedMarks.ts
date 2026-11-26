@@ -5,7 +5,7 @@
 import { useEffect } from 'react'
 import { isBinGroup } from '@/layout-engine'
 import type { LayoutEngine } from '@/layout-engine'
-import { binTooBig } from '@/lib/print-bed'
+import { tooBigBinIds } from '@/lib/print-bed'
 import { DEFAULT_GRIDFINITY_CONFIG } from '../../../shared/types/project'
 import type { GridfinityConfig } from '../../../shared/types/project'
 import { usePrintBed } from './usePrintBed'
@@ -20,12 +20,6 @@ export function useBedMarks(
   useEffect(() => {
     if (!engine) return
     const config = gridfinity ?? DEFAULT_GRIDFINITY_CONFIG
-    engine.setGroupWarnings(
-      engine
-        .getAllGroups()
-        .filter(isBinGroup)
-        .filter((bin) => binTooBig(bin.metadata, config, bed))
-        .map((bin) => bin.id)
-    )
+    engine.setGroupWarnings(tooBigBinIds(engine.getAllGroups().filter(isBinGroup), config, bed))
   }, [engine, gridfinity, tick, bed])
 }

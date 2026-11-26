@@ -45,6 +45,17 @@ export const WARNING_MARK_STYLE = {
 } as const
 
 /**
+ * Whether a child of a bin's node is part of how the bin itself is drawn: its background, its
+ * artwork or its warning mark. Everything else in the node is a shape the person put there,
+ * which keeps its place on the canvas when the bin is resized around it.
+ */
+export function isBinFurniture(child: Konva.Node): boolean {
+  return (
+    child.hasName('__groupBg') || child.hasName('__binArtwork') || child.hasName('__warningMark')
+  )
+}
+
+/**
  * How far inside the bin's outline the mark is drawn, in world units. Inside, so the mark
  * never makes the bin's bounds, and the selection frame around them, any bigger.
  */
@@ -412,6 +423,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
       if (bgRect) {
         bgRect.setAttrs({ x: -newW / 2, y: -newH / 2, width: newW, height: newH })
       }
+      this.warningMark?.setAttrs(this.warningMarkBounds())
 
       // Translate user-shape children so their world positions stay constant.
       // Lower-left is preserved across the resize, so the bin's centroid
@@ -425,7 +437,7 @@ export class KonvaGroupRenderer implements GroupRenderer {
       const dy = preCentroidY - postCentroidY
       if (dx !== 0 || dy !== 0) {
         for (const child of this.konvaGroup.getChildren()) {
-          if (child.hasName('__groupBg') || child.hasName('__binArtwork')) continue
+          if (isBinFurniture(child)) continue
           child.position({ x: child.x() + dx, y: child.y() + dy })
         }
       }
