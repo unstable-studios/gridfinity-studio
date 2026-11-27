@@ -5,7 +5,7 @@
  * world-space point using the lower-left corner coordinate convention.
  */
 
-import type { LayoutGroup, LayoutShape, BinMetadata } from './types'
+import type { LayoutGroup, BinMetadata } from './types'
 import { isBinGroup } from './types'
 
 /**
@@ -14,6 +14,19 @@ import { isBinGroup } from './types'
  * away, so allow that much. In millimeters.
  */
 const EDGE_TOLERANCE = 1e-6
+
+/**
+ * Whether a world-space point is inside a group's AABB, its edges included. Uses the
+ * lower-left corner convention, as `findContainingBinGroup` does.
+ */
+export function groupContainsPoint(group: LayoutGroup, worldX: number, worldY: number): boolean {
+  return (
+    worldX >= group.x - EDGE_TOLERANCE &&
+    worldX <= group.x + group.width + EDGE_TOLERANCE &&
+    worldY <= group.y + EDGE_TOLERANCE &&
+    worldY >= group.y - group.height - EDGE_TOLERANCE
+  )
+}
 
 /**
  * Find the bin group whose AABB contains the given world-space point.
@@ -37,12 +50,7 @@ export function findContainingBinGroup(
 
   for (const group of groups) {
     if (!isBinGroup(group)) continue
-    if (
-      worldX >= group.x - EDGE_TOLERANCE &&
-      worldX <= group.x + group.width + EDGE_TOLERANCE &&
-      worldY <= group.y + EDGE_TOLERANCE &&
-      worldY >= group.y - group.height - EDGE_TOLERANCE
-    ) {
+    if (groupContainsPoint(group, worldX, worldY)) {
       // Tie-break by distance to bin center
       const cx = group.x + group.width / 2
       const cy = group.y - group.height / 2
@@ -124,34 +132,4 @@ export function findBestBinForShape(
   }
 
   return bestByCentroid ?? bestByOverlap?.bin ?? null
-}
-
-/**
- * Find children whose world centroid lies outside the bin's AABB. Used after
- * a bin resize to evict shapes that no longer fit so they remain selectable
- * (and don't bake pockets that extend past the bin's walls).
- *
- * Children store coords relative to the parent's centroid, so the world
- * centroid is `(bin.x + bin.width/2 + shape.x, bin.y - bin.height/2 + shape.y)`.
- *
- * Edge inclusivity: a child centroid sitting exactly on the bin edge counts
- * as inside (not evicted) — matches `findContainingBinGroup`'s convention.
- */
-export function findChildrenOutsideBin(bin: LayoutGroup, children: LayoutShape[]): string[] {
-  const minX = bin.x - EDGE_TOLERANCE
-  const maxX = bin.x + bin.width + EDGE_TOLERANCE
-  const minY = bin.y - bin.height - EDGE_TOLERANCE
-  const maxY = bin.y + EDGE_TOLERANCE
-  const cxBin = bin.x + bin.width / 2
-  const cyBin = bin.y - bin.height / 2
-
-  const out: string[] = []
-  for (const child of children) {
-    const cx = cxBin + child.x
-    const cy = cyBin + child.y
-    if (cx < minX || cx > maxX || cy < minY || cy > maxY) {
-      out.push(child.id)
-    }
-  }
-  return out
 }
