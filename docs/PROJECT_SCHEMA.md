@@ -55,7 +55,7 @@ interface LayoutSnapshotData {
 }
 ```
 
-`gridConfig.size` is the grid the canvas draws and snaps bins to. The app writes it equal to `gridfinity.baseUnit`.
+`gridConfig.size` is the grid the canvas draws and snaps bins to. The app writes it equal to `gridfinity.baseUnit`, and on open uses `gridfinity.baseUnit` when the two differ.
 
 ### Coordinates
 
