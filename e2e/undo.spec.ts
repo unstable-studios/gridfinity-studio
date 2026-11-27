@@ -41,6 +41,7 @@ test('undo and redo work as before after a visit to Preview', async () => {
 
   // A new project starts a history of its own.
   await app.menu('File', /^New project/)
+  await app.page.getByRole('button', { name: 'Create', exact: true }).click()
   await app.page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
   await expect(app.page.getByRole('menuitem', { name: /^Undo/ })).toBeDisabled()
 })
