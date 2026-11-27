@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.27.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.27.1...v1.27.2) (2026-11-27)
+
+
+### Bug Fixes
+
+* **core:** adopt and release shapes when a bin is resized ([#594](https://github.com/unstable-studios/gridfinity-studio/issues/594)) ([2d30715](https://github.com/unstable-studios/gridfinity-studio/commit/2d3071576f185d3fa1faced371bc82889ec4067c))
+* **ui:** keep the undo history across a visit to Preview ([#595](https://github.com/unstable-studios/gridfinity-studio/issues/595)) ([53ad047](https://github.com/unstable-studios/gridfinity-studio/commit/53ad0470334a83dc32e073e5b15c6d5edb9f9239))
+
 ## [1.27.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.27.0...v1.27.1) (2026-11-27)
 
 
