@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.3](https://github.com/unstable-studios/gridfinity-studio/compare/v1.27.2...v1.27.3) (2026-11-27)
+
+
+### Bug Fixes
+
+* **core:** reload a project each time it is opened ([#602](https://github.com/unstable-studios/gridfinity-studio/issues/602)) ([e24b550](https://github.com/unstable-studios/gridfinity-studio/commit/e24b5501192a4aeb3f6d73b014c2c6bf1651f1f8))
+
 ## [1.27.2](https://github.com/unstable-studios/gridfinity-studio/compare/v1.27.1...v1.27.2) (2026-11-27)
 
 
