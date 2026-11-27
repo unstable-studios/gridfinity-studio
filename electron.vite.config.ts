@@ -64,10 +64,7 @@ export default defineConfig({
         // externalize + warn. Both bare `module` and the `node:` prefixed
         // form are aliased because rolldown treats them as distinct specifiers.
         module: resolve(__dirname, 'src/renderer/src/lib/empty-module.ts'),
-        'node:module': resolve(__dirname, 'src/renderer/src/lib/empty-module.ts'),
-        // @unstable-studios/ui dynamically imports its optional peer "shiki";
-        // without it installed the dev server fails import analysis.
-        shiki: resolve(__dirname, 'src/renderer/src/lib/shiki-stub.ts')
+        'node:module': resolve(__dirname, 'src/renderer/src/lib/empty-module.ts')
       }
     },
     optimizeDeps: {
