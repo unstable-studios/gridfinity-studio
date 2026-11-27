@@ -46,7 +46,8 @@ export function useProjectEngineSync(): void {
   const engine = useLayoutEngine()
   const { setLayoutSnapshot, registerBeforeSave } = useProject()
   const project = useProject((s) => s.project)
-  const loadedProjectRef = useRef<string | null>(null)
+  const loadId = useProject((s) => s.loadId)
+  const loadedLoadIdRef = useRef<number | null>(null)
 
   // True during engine.loadSnapshot() calls triggered by project load.
   // Engine events fire synchronously during loadSnapshot, so this ref
@@ -54,13 +55,13 @@ export function useProjectEngineSync(): void {
   const isRestoringRef = useRef(false)
 
   // On project load: restore engine state from layoutSnapshot.
-  // Only runs when a NEW project is loaded (different createdAt).
-  const projectId = project?.settings?.createdAt ?? null
+  // Runs once per load (#598): a project is not identified by `settings.createdAt`, which
+  // opening the same file again, or a Save as copy, leaves unchanged.
   const baseUnit = project?.gridfinity.baseUnit
   useEffect(() => {
     if (!engine || !project?.layoutSnapshot) return
-    if (loadedProjectRef.current === projectId) return
-    loadedProjectRef.current = projectId
+    if (loadedLoadIdRef.current === loadId) return
+    loadedLoadIdRef.current = loadId
 
     if (!isValidSnapshot(project.layoutSnapshot)) {
       console.warn('Invalid layout snapshot in project file. Skipping restore.')
@@ -78,7 +79,7 @@ export function useProjectEngineSync(): void {
     isRestoringRef.current = false
     // Loading a project is not an undoable edit: the loaded state is the baseline.
     useUndoRedo.getState().reset()
-  }, [engine, project?.layoutSnapshot, projectId, baseUnit])
+  }, [engine, project?.layoutSnapshot, loadId, baseUnit])
 
   const captureSnapshot = useCallback((): void => {
     if (!engine) return

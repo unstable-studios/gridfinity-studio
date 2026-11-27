@@ -57,7 +57,7 @@ With more than one bin:
 
 ## Project settings
 
-Tolerance, unit height, and magnet and screw holes are set per project in **Edit > Preferences…**, under **Gridfinity**. The base unit can be changed there only while the project has no bins.
+Tolerance, unit height, and magnet and screw holes are set per project in **Edit > Preferences…**, under **Gridfinity**. The base unit can be changed there only while the project has no bins. Changing it clears the undo history, so Undo starts again from that point.
 
 **New bins** sets the height and stacking lip a bin starts with. Bins already in the project keep their own.
 
