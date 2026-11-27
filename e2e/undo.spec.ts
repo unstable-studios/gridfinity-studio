@@ -2,6 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { expect, test } from '@playwright/test'
 import { StudioApp, readWhenComplete } from './app'
+import type { SavedProject } from './app'
 
 let app: StudioApp
 
@@ -117,39 +118,61 @@ test('reopening the open project drops the edits and starts the history over', a
   await expect(page.getByRole('menuitem', { name: /^Redo/ })).toBeDisabled()
   await page.keyboard.press('Escape')
 
-  // Saving writes what was opened, not the discarded edit.
-  const saved = await app.save(file)
+  // Saving to a new file writes what was opened, not the discarded edit. A new file, since
+  // the opened one already holds one shape whatever the canvas shows.
+  const copy = join(app.dir, 'reopen-copy.gfstudio')
+  await app.stubSaveDialog(copy)
+  await app.menu('File', /^Save as/)
+  const saved = await readWhenComplete(
+    copy,
+    async (bytes) => JSON.parse(bytes.toString('utf8')) as SavedProject
+  )
   expect(saved.layoutSnapshot.shapes).toHaveLength(1)
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
 
-test('undo after a base unit change keeps the new grid', async () => {
+test('a base unit change starts the history over, so undo cannot bring back old bins', async () => {
   app = await StudioApp.launch()
   const { page } = app
   const file = join(app.dir, 'unit-undo.gfstudio')
-  type Grid = { gridfinity: { baseUnit: number }; layoutSnapshot: { gridConfig: { size: number } } }
+  type Grid = {
+    gridfinity: { baseUnit: number }
+    layoutSnapshot: { gridConfig: { size: number }; groups: unknown[]; shapes: unknown[] }
+  }
 
   await page.getByRole('button', { name: 'New project' }).click()
-  await app.selectTool('Rectangle')
-  await app.drag({ x: 820, y: 180 }, { x: 880, y: 230 })
-  await app.expectShapeCount(1)
+  // A bin sized for the old unit, added and then deleted: the base unit is locked while one exists.
+  await page.getByRole('button', { name: '2×2', exact: true }).first().click()
+  await app.expectBinCount(1)
+  await page.getByRole('button', { name: /^Bin 1/ }).click()
+  await page.getByRole('button', { name: 'Delete selected' }).click()
+  await app.expectBinCount(0)
 
-  // The base unit can change while the project has no bins.
   await app.menu('Edit', /^Preferences/)
   await page.getByRole('tab', { name: 'Gridfinity' }).click()
   await page.getByRole('tabpanel').getByRole('spinbutton').first().fill('40')
   await page.keyboard.press('Escape')
 
+  // Nothing to undo past the change: the bin is not coming back.
+  await page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: /^Undo/ })).toBeDisabled()
+  await page.keyboard.press('Escape')
+
+  // Edits after it undo as usual, and only back to the change.
   await app.selectTool('Rectangle')
   await app.drag({ x: 820, y: 280 }, { x: 880, y: 330 })
-  await app.expectShapeCount(2)
-  await app.menu('Edit', /^Undo/)
   await app.expectShapeCount(1)
+  await app.menu('Edit', /^Undo/)
+  await app.expectShapeCount(0)
+  await page.getByRole('menuitem', { name: 'Edit', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: /^Undo/ })).toBeDisabled()
+  await page.keyboard.press('Escape')
 
   const saved = (await app.save(file)) as unknown as Grid
   expect(saved.gridfinity.baseUnit).toBe(40)
   expect(saved.layoutSnapshot.gridConfig.size).toBe(40)
+  expect(saved.layoutSnapshot.groups).toHaveLength(0)
 
   expect(app.errors, 'no renderer errors').toEqual([])
 })
