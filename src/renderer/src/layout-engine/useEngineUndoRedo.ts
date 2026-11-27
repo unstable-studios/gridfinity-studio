@@ -49,26 +49,40 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
     syncState()
   }, [engine, syncState])
 
+  // The grid is the project's base unit, which Preferences can change after a step was
+  // recorded. A step restores the layout, not the grid size it was recorded with (#598).
+  const restore = useCallback(
+    (json: string): void => {
+      if (!engine) return
+      const snapshot = JSON.parse(json) as LayoutSnapshot
+      engine.loadSnapshot({
+        ...snapshot,
+        gridConfig: { ...snapshot.gridConfig, size: engine.getGridConfig().size }
+      })
+    },
+    [engine]
+  )
+
   const undo = useCallback(() => {
     if (!engine) return
     // An adjustment still waiting to be recorded becomes the step to undo.
     flushPendingCommits()
     isUndoingRef.current = true
     const json = stackRef.current.undo()
-    if (json) engine.loadSnapshot(JSON.parse(json))
+    if (json) restore(json)
     syncState()
     isUndoingRef.current = false
-  }, [engine, syncState])
+  }, [engine, restore, syncState])
 
   const redo = useCallback(() => {
     if (!engine) return
     flushPendingCommits()
     isUndoingRef.current = true
     const json = stackRef.current.redo()
-    if (json) engine.loadSnapshot(JSON.parse(json))
+    if (json) restore(json)
     syncState()
     isUndoingRef.current = false
-  }, [engine, syncState])
+  }, [engine, restore, syncState])
 
   const goTo = useCallback(
     (index: number) => {
@@ -76,11 +90,11 @@ export function useEngineUndoRedo(engine: LayoutEngine | null): {
       flushPendingCommits()
       isUndoingRef.current = true
       const json = stackRef.current.goTo(index)
-      if (json) engine.loadSnapshot(JSON.parse(json))
+      if (json) restore(json)
       syncState()
       isUndoingRef.current = false
     },
-    [engine, syncState]
+    [engine, restore, syncState]
   )
 
   const reset = useCallback(() => {
