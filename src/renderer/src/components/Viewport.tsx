@@ -76,14 +76,13 @@ export default function Viewport(): React.JSX.Element {
   useProjectEngineSync()
 
   const baseUnit = project?.gridfinity.baseUnit ?? 42
-  const projectId = project?.settings?.createdAt ?? null
 
-  // Wire grid config from gridfinity settings. After the sync above has loaded a project (a
-  // snapshot carries its own grid size), so the project's base unit is what the grid ends up at.
+  // Keep the grid at the base unit when it is changed in the settings. A loaded project
+  // already has it: the sync above loads the layout at the project's base unit.
   useEffect(() => {
     if (!engine) return
     engine.setGridConfig({ size: baseUnit, enabled: true, visible: true })
-  }, [engine, baseUnit, projectId])
+  }, [engine, baseUnit])
 
   // The right-click menu belongs to the Select tool. A drawing tool keeps its own clicks.
   const canUseMenu = mode === 'layout' && (activeTool === 'select' || activeTool === null)

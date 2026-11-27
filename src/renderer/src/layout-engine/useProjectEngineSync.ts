@@ -36,7 +36,8 @@ function isValidSnapshot(data: unknown): data is LayoutSnapshot {
  * - On mutation: marks the project as modified (isModified = true) so
  *   the "Unsaved" badge shows. Suppressed during project load to avoid
  *   false positives.
- * - After load: reads project.layoutSnapshot → engine.loadSnapshot()
+ * - After load: reads project.layoutSnapshot → engine.loadSnapshot(), with the
+ *   grid at the project's base unit, then resets the undo history
  *
  * Call it from a component that stays mounted: the restore resets the undo history, and a
  * remount would run it again (it remembers what it loaded in a ref).
@@ -55,6 +56,7 @@ export function useProjectEngineSync(): void {
   // On project load: restore engine state from layoutSnapshot.
   // Only runs when a NEW project is loaded (different createdAt).
   const projectId = project?.settings?.createdAt ?? null
+  const baseUnit = project?.gridfinity.baseUnit
   useEffect(() => {
     if (!engine || !project?.layoutSnapshot) return
     if (loadedProjectRef.current === projectId) return
@@ -65,12 +67,18 @@ export function useProjectEngineSync(): void {
       return
     }
 
+    // The grid is the project's base unit. A hand-edited or older file can store another size
+    // in its layout, and loading that would put it in the undo baseline, for Undo to restore.
+    const snapshot = project.layoutSnapshot as unknown as LayoutSnapshot
     isRestoringRef.current = true
-    engine.loadSnapshot(project.layoutSnapshot as unknown as LayoutSnapshot)
+    engine.loadSnapshot({
+      ...snapshot,
+      gridConfig: { ...snapshot.gridConfig, size: baseUnit ?? snapshot.gridConfig.size }
+    })
     isRestoringRef.current = false
     // Loading a project is not an undoable edit: the loaded state is the baseline.
     useUndoRedo.getState().reset()
-  }, [engine, project?.layoutSnapshot, projectId])
+  }, [engine, project?.layoutSnapshot, projectId, baseUnit])
 
   const captureSnapshot = useCallback((): void => {
     if (!engine) return
