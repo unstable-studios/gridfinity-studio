@@ -53,6 +53,12 @@ export type BakeStatus = 'baking' | 'ready' | 'error'
 interface ProjectState {
   project: ProjectData | null
   filePath: string | null
+  /**
+   * Counts every project put in place (new, opened or example). Each load has its own value,
+   * so the layout engine reloads when the same file is opened again, which `settings.createdAt`
+   * cannot tell apart. Not saved with the session: a reload starts over at 0.
+   */
+  loadId: number
   isModified: boolean
   recentProjects: string[]
   bakeResults: Map<string, BakeResult>
@@ -141,6 +147,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
     // Initial state
     project: saved.project,
     filePath: saved.filePath,
+    loadId: 0,
     isModified: saved.isModified,
     recentProjects: [],
     bakeResults: new Map(),
@@ -238,6 +245,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
           set({
             project,
             filePath: result.data.filePath,
+            loadId: get().loadId + 1,
             isModified: false,
             bakeResults: new Map(),
             bakeStatus: new Map()
@@ -270,6 +278,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       set({
         project,
         filePath: null,
+        loadId: get().loadId + 1,
         isModified: true,
         bakeResults: new Map(),
         bakeStatus: new Map()
@@ -280,6 +289,7 @@ const useProjectStore = create<ProjectState>()((set, get) => {
       set({
         project: repairProject(example.build()),
         filePath: null,
+        loadId: get().loadId + 1,
         // Nothing of the person's is in it yet, so closing it does not ask to save.
         isModified: false,
         bakeResults: new Map(),
