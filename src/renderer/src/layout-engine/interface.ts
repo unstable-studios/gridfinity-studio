@@ -47,6 +47,9 @@ export interface LayoutEngine {
   /**
    * Change a group. A change of position or size that would put it on top of another group is
    * refused: nothing changes, `collisionRejected` is emitted and the result is false.
+   * A change of size reassigns shapes in the same change: a bin takes in loose shapes whose
+   * center is inside it and lets go of its own whose center is outside it, which go to the
+   * bin their center is in or to none. Any other group only lets go of its own.
    */
   updateGroup(id: string, patch: Partial<LayoutGroup>): boolean
   removeGroup(id: string): void

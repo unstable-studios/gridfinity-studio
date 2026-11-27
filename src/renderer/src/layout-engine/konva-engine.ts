@@ -15,7 +15,7 @@ import { KonvaGroupRenderer, isBinFurniture } from './konva-group-renderer'
 import { checkGroupCollision, wouldOverlapAnotherGroup } from './collision'
 import type { HitResult } from './input-action-handler'
 import { largestFirst } from './stacking'
-import { findContainingBinGroup } from './containment'
+import { findContainingBinGroup, groupContainsPoint } from './containment'
 import type { ShapeAABB } from './containment'
 import type { ShapeMove } from './arrange'
 import { isBinGroup } from './types'
@@ -787,7 +787,9 @@ export class KonvaEngine implements LayoutEngine {
     renderer.update(patch, group)
 
     this.batch(() => {
-      if (patch.width !== undefined || patch.height !== undefined) {
+      // A patch that repeats the current size, such as a click on it in the sidebar, is not
+      // a resize and takes nothing in.
+      if (deltaW !== 0 || deltaH !== 0) {
         this.reassignShapesAfterResize(id)
       }
       this.emit('groupChanged', { groupId: id, childIds: [...group.childIds] })
@@ -797,12 +799,15 @@ export class KonvaEngine implements LayoutEngine {
 
   /**
    * After a group is resized, settle the shapes it can affect. Shapes in other groups are
-   * left alone: bins cannot overlap, so the resize changes nothing for them. Callers batch,
-   * so the reassignments and the resize are one change.
+   * left alone, even one whose center is now inside this group: only a drop or a move takes
+   * a shape from its group. Callers batch
+   * and emit `groupChanged` for this group, so the reassignments and the resize are one
+   * change.
    *
-   * For a bin, by the same rule as a drop: its own shapes whose center is now elsewhere
-   * go to the bin they are in, or to none, and loose shapes whose center is in the bin are
-   * taken in. A loose shape in another bin's area is not this resize's to move.
+   * For a bin: loose shapes whose center is inside it are taken in, and its own shapes whose
+   * center is outside it go to the bin their center is in, as on a drop, or to none. Only
+   * this bin is considered for a shape inside it, so a shape centered on the wall it shares
+   * with another bin stays with it or joins it.
    *
    * A group that is not a bin only releases its children whose center is now outside it.
    *
@@ -813,20 +818,19 @@ export class KonvaEngine implements LayoutEngine {
     const group = this.getGroup(groupId)
     if (!group) return
     const isBin = isBinGroup(group)
-    const inside = (center: { x: number; y: number }): boolean =>
-      center.x >= group.x - 1e-6 &&
-      center.x <= group.x + group.width + 1e-6 &&
-      center.y <= group.y + 1e-6 &&
-      center.y >= group.y - group.height - 1e-6
     for (const [id, shape] of [...this.shapeMap]) {
+      const own = shape.groupId === groupId
+      if (!own && !(isBin && shape.groupId === null)) continue
       const bounds = this.getShapeBounds(id)
       if (!bounds) continue
-      const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
-      if (shape.groupId === groupId) {
+      const centerX = (bounds.minX + bounds.maxX) / 2
+      const centerY = (bounds.minY + bounds.maxY) / 2
+      const inside = groupContainsPoint(group, centerX, centerY)
+      if (own && !inside) {
         if (isBin) this.reassignByCentroid(id)
-        else if (!inside(center)) this.detachFromGroup(id)
-      } else if (isBin && shape.groupId === null && inside(center)) {
-        this.reassignByCentroid(id)
+        else this.detachFromGroup(id)
+      } else if (!own && inside && this.attachToGroup(id, groupId)) {
+        this.emit('shapeReassigned', { shapeId: id, oldGroupId: null, newGroupId: groupId })
       }
     }
   }

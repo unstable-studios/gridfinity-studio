@@ -402,6 +402,22 @@ export class KonvaGroupRenderer implements GroupRenderer {
       this.konvaGroup.scaleX(1)
       this.konvaGroup.scaleY(1)
 
+      // Konva ends a transform on every release of a handle, so a click on one, or a drag
+      // that snaps back to the same size, ends here too. That is not a change.
+      const unchanged = (a: number, b: number): boolean => Math.abs(a - b) < 1e-6
+      if (
+        unchanged(finalX, orig.x) &&
+        unchanged(finalY, orig.y) &&
+        unchanged(newW, orig.width) &&
+        unchanged(newH, orig.height)
+      ) {
+        this.konvaGroup.position({ x: orig.x + orig.width / 2, y: orig.y - orig.height / 2 })
+        this.deps.getTransformer()?.forceUpdate()
+        this.deps.layer.batchDraw()
+        this.preResizeBounds = null
+        return
+      }
+
       // Collision check
       const proposed = { x: finalX, y: finalY, width: newW, height: newH }
       const collider = checkGroupCollision(proposed, this.groupId, this.deps.getAllGroups())

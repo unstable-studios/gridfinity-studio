@@ -10,7 +10,12 @@
  */
 import { describe, it, expect } from 'vitest'
 import type { LayoutGroup } from '../types'
-import { findContainingBinGroup, findBestBinForShape, type ShapeAABB } from '../containment'
+import {
+  findContainingBinGroup,
+  findBestBinForShape,
+  groupContainsPoint,
+  type ShapeAABB
+} from '../containment'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -208,5 +213,16 @@ describe('findContainingBinGroup at an edge', () => {
   it('counts a point clearly past the edge as outside', () => {
     expect(findContainingBinGroup([bin], 84.01, 42)).toBeNull()
     expect(findContainingBinGroup([bin], 42, -0.01)).toBeNull()
+  })
+})
+
+describe('groupContainsPoint at an edge', () => {
+  const bin = makeBin('bin', 0, 84, 84, 84)
+
+  it('counts a point a rounding error past the edge as inside, and one clearly past it as not', () => {
+    expect(groupContainsPoint(bin, 84 + 1e-9, 42)).toBe(true)
+    expect(groupContainsPoint(bin, 42, 0)).toBe(true)
+    expect(groupContainsPoint(bin, 84.01, 42)).toBe(false)
+    expect(groupContainsPoint(bin, 42, 84.01)).toBe(false)
   })
 })

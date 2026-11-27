@@ -16,6 +16,19 @@ import { isBinGroup } from './types'
 const EDGE_TOLERANCE = 1e-6
 
 /**
+ * Whether a world-space point is inside a group's AABB, its edges included. Uses the
+ * lower-left corner convention, as `findContainingBinGroup` does.
+ */
+export function groupContainsPoint(group: LayoutGroup, worldX: number, worldY: number): boolean {
+  return (
+    worldX >= group.x - EDGE_TOLERANCE &&
+    worldX <= group.x + group.width + EDGE_TOLERANCE &&
+    worldY <= group.y + EDGE_TOLERANCE &&
+    worldY >= group.y - group.height - EDGE_TOLERANCE
+  )
+}
+
+/**
  * Find the bin group whose AABB contains the given world-space point.
  *
  * Uses the lower-left corner convention:
@@ -37,12 +50,7 @@ export function findContainingBinGroup(
 
   for (const group of groups) {
     if (!isBinGroup(group)) continue
-    if (
-      worldX >= group.x - EDGE_TOLERANCE &&
-      worldX <= group.x + group.width + EDGE_TOLERANCE &&
-      worldY <= group.y + EDGE_TOLERANCE &&
-      worldY >= group.y - group.height - EDGE_TOLERANCE
-    ) {
+    if (groupContainsPoint(group, worldX, worldY)) {
       // Tie-break by distance to bin center
       const cx = group.x + group.width / 2
       const cy = group.y - group.height / 2

@@ -149,6 +149,73 @@ describe('resizing a bin', () => {
     expect(engine.getShape('loose')!.groupId).toBeNull()
   })
 
+  it('changes nothing when a handle is let go without changing the size', () => {
+    // Dragging a bin over a shape does not take the shape in, so it can sit loose in a bin.
+    engine.addShape(makeRect('loose', 30))
+    const history = new UndoRedoStack()
+    history.init(snapshot())
+    const steps: string[] = []
+    for (const name of ['groupResized', 'shapeMoved', 'shapeUpdated', 'groupChanged'] as const) {
+      engine.on(name, () => {
+        if (history.push(snapshot(), name)) steps.push(name)
+      })
+    }
+
+    resizeBin(1)
+
+    expect(steps).toEqual([])
+    expect(engine.getShape('loose')!.groupId).toBeNull()
+    expect(engine.getGroup('bin')).toMatchObject({ x: 0, y: 84, width: 84, height: 84 })
+  })
+
+  it('takes in a loose shape centered on the wall it shares with another bin', () => {
+    engine.createGroup({ ...makeBin(), id: 'other', x: 84, metadata: { ...makeBin().metadata! } })
+    // Centered at x 84, on the wall between the bins.
+    engine.addShape(makeRect('loose', 79))
+
+    engine.updateGroup('bin', { height: 126 })
+
+    expect(engine.getShape('loose')!.groupId).toBe('bin')
+  })
+
+  it('keeps its own shape centered on the wall it shares with another bin', () => {
+    engine.createGroup({ ...makeBin(), id: 'other', x: 84, metadata: { ...makeBin().metadata! } })
+    engine.addShape(makeRect('mine', 79))
+    engine.addToGroup('mine', 'bin')
+
+    engine.updateGroup('bin', { height: 126 })
+
+    expect(engine.getShape('mine')!.groupId).toBe('bin')
+  })
+
+  it('sends its own shape already centered in another bin to that bin', () => {
+    engine.createGroup({ ...makeBin(), id: 'other', x: 200, metadata: { ...makeBin().metadata! } })
+    engine.addShape(makeRect('mine', 15))
+    engine.addToGroup('mine', 'bin')
+    // Moved from the sidebar into the other bin's area: that alone does not reassign it.
+    engine.updateShape('mine', { x: 200 })
+    const bounds = engine.getShapeBounds('mine')!
+    expect((bounds.minX + bounds.maxX) / 2).toBeGreaterThan(200)
+    expect(engine.getShape('mine')!.groupId).toBe('bin')
+
+    engine.updateGroup('bin', { height: 126 })
+
+    expect(engine.getShape('mine')!.groupId).toBe('other')
+  })
+
+  it('takes nothing in when updateGroup repeats the current size', () => {
+    engine.addShape(makeRect('loose', 30))
+    const events: string[] = []
+    for (const name of ['groupChanged', 'shapeReassigned'] as const) {
+      engine.on(name, () => events.push(name))
+    }
+
+    engine.updateGroup('bin', { width: 84, height: 84 })
+
+    expect(engine.getShape('loose')!.groupId).toBeNull()
+    expect(events).not.toContain('shapeReassigned')
+  })
+
   it('leaves the shapes in other bins alone', () => {
     engine.createGroup({ ...makeBin(), id: 'other', x: 200, metadata: { ...makeBin().metadata! } })
     engine.addShape(makeRect('mine', 250))
