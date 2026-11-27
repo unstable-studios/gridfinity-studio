@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.27.1](https://github.com/unstable-studios/gridfinity-studio/compare/v1.27.0...v1.27.1) (2026-11-27)
+
+
+### Bug Fixes
+
+* **core:** assign shapes to bins when a multi-selection is dropped ([#593](https://github.com/unstable-studios/gridfinity-studio/issues/593)) ([9468827](https://github.com/unstable-studios/gridfinity-studio/commit/9468827b2954d8c2d788655351233c0a131afe49))
+
 ## [1.27.0](https://github.com/unstable-studios/gridfinity-studio/compare/v1.26.0...v1.27.0) (2026-11-26)
 
 
