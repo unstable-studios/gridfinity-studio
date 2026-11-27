@@ -796,17 +796,38 @@ export class KonvaEngine implements LayoutEngine {
   }
 
   /**
-   * After a bin is resized, put the shapes it can affect in the bin their center is now in,
-   * or in none, by the same rule as a drop: its own shapes that it no longer covers are
-   * released, and loose shapes it now covers are taken in. A released shape would otherwise
-   * stay parented but unselectable (hit-testing is gated by the parent's AABB) and bake
-   * pockets past the bin walls (#297). Shapes in other bins are left alone: bins cannot
-   * overlap, so the resize changes nothing for them. Callers batch, so the reassignments
-   * and the resize are one change.
+   * After a group is resized, settle the shapes it can affect. Shapes in other groups are
+   * left alone: bins cannot overlap, so the resize changes nothing for them. Callers batch,
+   * so the reassignments and the resize are one change.
+   *
+   * For a bin, by the same rule as a drop: its own shapes whose center is now elsewhere
+   * go to the bin they are in, or to none, and loose shapes whose center is in the bin are
+   * taken in. A loose shape in another bin's area is not this resize's to move.
+   *
+   * A group that is not a bin only releases its children whose center is now outside it.
+   *
+   * A released shape would otherwise stay parented but unselectable (hit-testing is gated
+   * by the parent's AABB) and bake pockets past the bin walls (#297).
    */
   private reassignShapesAfterResize(groupId: string): void {
+    const group = this.getGroup(groupId)
+    if (!group) return
+    const isBin = isBinGroup(group)
+    const inside = (center: { x: number; y: number }): boolean =>
+      center.x >= group.x - 1e-6 &&
+      center.x <= group.x + group.width + 1e-6 &&
+      center.y <= group.y + 1e-6 &&
+      center.y >= group.y - group.height - 1e-6
     for (const [id, shape] of [...this.shapeMap]) {
-      if (shape.groupId === groupId || shape.groupId === null) this.reassignByCentroid(id)
+      const bounds = this.getShapeBounds(id)
+      if (!bounds) continue
+      const center = { x: (bounds.minX + bounds.maxX) / 2, y: (bounds.minY + bounds.maxY) / 2 }
+      if (shape.groupId === groupId) {
+        if (isBin) this.reassignByCentroid(id)
+        else if (!inside(center)) this.detachFromGroup(id)
+      } else if (isBin && shape.groupId === null && inside(center)) {
+        this.reassignByCentroid(id)
+      }
     }
   }
 

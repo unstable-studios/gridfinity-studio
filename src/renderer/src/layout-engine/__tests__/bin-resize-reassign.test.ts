@@ -162,6 +162,24 @@ describe('resizing a bin', () => {
     expect(engine.getShape('mine')!.groupId).toBe(groupId)
   })
 
+  it('leaves a loose shape alone when its center is in another bin', () => {
+    engine.createGroup({ ...makeBin(), id: 'other', x: 200, metadata: { ...makeBin().metadata! } })
+    // Dragging a bin over a shape does not take the shape in, so it can sit loose in a bin.
+    engine.addShape(makeRect('loose', 250))
+
+    resizeBin(2)
+
+    expect(engine.getShape('loose')!.groupId).toBeNull()
+  })
+
+  it('takes in the shapes at the new spot when the bin moves as it is resized', () => {
+    engine.addShape(makeRect('loose', 150))
+
+    engine.updateGroup('bin', { x: 100, width: 126 })
+
+    expect(engine.getShape('loose')!.groupId).toBe('bin')
+  })
+
   it('does the same through updateGroup', () => {
     engine.addShape(makeRect('loose', 100))
     engine.updateGroup('bin', { width: 168 })

@@ -230,14 +230,7 @@ describe('LayoutEngine coord invariants', () => {
     })
 
     it('shrinking a bin keeps a still-contained child at the same world position', () => {
-      const bin = makeGroup({
-        id: 'bin',
-        x: 0,
-        y: 200,
-        width: 200,
-        height: 200,
-        metadata: { widthUnits: 1, depthUnits: 1, heightUnits: 3, hasLip: true, name: 'Bin' }
-      })
+      const bin = makeGroup({ id: 'bin', x: 0, y: 200, width: 200, height: 200 })
       // Child at world (90, 110) → local (-10, 10) since centroid is (100, 100)
       const child = makeRect({ id: 'r1', x: -10, y: 10, width: 20, height: 20, groupId: 'bin' })
       engine.createGroup({ ...bin, childIds: ['r1'] })

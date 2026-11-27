@@ -305,14 +305,7 @@ describe('LayoutEngine contract', () => {
     })
 
     it('C27 (#281): updateGroup({ width, height }) preserves child world position', () => {
-      const bin = makeGroup({
-        id: 'bin',
-        x: 0,
-        y: 84,
-        width: 84,
-        height: 84,
-        metadata: { widthUnits: 1, depthUnits: 1, heightUnits: 3, hasLip: true, name: 'Bin' }
-      })
+      const bin = makeGroup({ id: 'bin', x: 0, y: 84, width: 84, height: 84 })
       // Shape at world (40, 40) inside the bin — local (-2, -2) since centroid is (42, 42).
       const rect = makeRect({ id: 'r1', x: -2, y: -2, width: 20, height: 20, groupId: 'bin' })
 
@@ -386,14 +379,7 @@ describe('LayoutEngine contract', () => {
     })
 
     it('C30 (#297): shrinking a bin still containing the child keeps it parented', () => {
-      const bin = makeGroup({
-        id: 'bin',
-        x: 0,
-        y: 200,
-        width: 200,
-        height: 200,
-        metadata: { widthUnits: 1, depthUnits: 1, heightUnits: 3, hasLip: true, name: 'Bin' }
-      })
+      const bin = makeGroup({ id: 'bin', x: 0, y: 200, width: 200, height: 200 })
       // Child at world (90, 100) → local (-10, 0). Well inside the new bin too.
       const rect = makeRect({ id: 'r1', x: -10, y: 0, width: 20, height: 20, groupId: 'bin' })
 
