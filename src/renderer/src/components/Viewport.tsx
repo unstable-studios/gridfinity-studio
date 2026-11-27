@@ -81,7 +81,11 @@ export default function Viewport(): React.JSX.Element {
   // already has it: the sync above loads the layout at the project's base unit.
   useEffect(() => {
     if (!engine) return
+    const changed = engine.getGridConfig().size !== baseUnit
     engine.setGridConfig({ size: baseUnit, enabled: true, visible: true })
+    // A new base unit starts a new history (#598). Steps recorded on the old grid would bring
+    // back bins sized for it, and the grid change itself records no step.
+    if (changed) useUndoRedo.getState().reset()
   }, [engine, baseUnit])
 
   // The right-click menu belongs to the Select tool. A drawing tool keeps its own clicks.
