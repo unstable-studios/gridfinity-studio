@@ -19,7 +19,7 @@ socket a bin's foot drops into. In the app it is a rectangle of `widthUnits × d
 on the canvas, under the bins, with:
 
 - **Features**: what is cut into or added to the plate. Magnet holes and screw holes to start,
-  each with its own settings. More can be added later without changing the others (see
+  each with its own settings. More can be added later, each in one place (see
   [Modularity](#modularity)).
 - **Padding**: solid frame added outside the cells on each side (left, right, front, back), in
   mm, so the plate fills a drawer that is not a whole number of cells.
@@ -142,7 +142,9 @@ The cut logic is shared with splitting bins (#585), as far as their answers allo
 ### Edge cases
 
 - A bin across two baseplates belongs to the one its center is on, or neither if the center is
-  on neither.
+  on neither. Where overlapping baseplates both hold the center, it belongs to the one whose
+  center is nearest, as `findContainingBinGroup` breaks ties for pockets, so a bin is never
+  the contents of two baseplates at once.
 - Baseplates may overlap; they are not pushed apart like bins. Overlap is marked, since the
   plates could not both be printed and laid there.
 - A bin larger than any baseplate is fine: baseplates do not constrain bins.
@@ -169,16 +171,33 @@ interface LayoutBaseplateData {
   cuts?: { x: number[]; y: number[] } // cell boundaries, counted from the left / front
 }
 
-// project.baseplates — project-wide baseplate settings
+// layoutSnapshot.drawer — in the snapshot, so aligning or filling the drawer and the change
+// it causes to baseplates are one undo step
+interface DrawerData {
+  x: number
+  y: number
+  width: number
+  depth: number
+  clearance: number
+}
+
+// project.baseplates — project-wide baseplate preferences, not part of undo
 interface BaseplateSettings {
   moveContents: boolean // default true
-  drawer?: { x: number; y: number; width: number; depth: number; clearance: number }
 }
 ```
 
+If question 2 is answered A, the grid origin goes in `layoutSnapshot.gridConfig` for the same
+reason.
+
 - The validator checks baseplates as it checks groups (unique ids, numbers, known feature
-  types; an unknown feature type is kept and ignored, so a file from a newer app with a feature
-  this one does not know still opens).
+  types). An unknown feature type makes the file invalid: a new feature module raises the
+  schema version (with a migration that has nothing to convert), because an older app that
+  ignored the feature would export a different plate. An older app then refuses the file as
+  `too-new`, which is what the format already does.
+- The whole 0.6.0 format (baseplates with padding, features and cuts, the drawer and the
+  preference) is defined, validated and saved from the first PR, even before the controls that
+  set each part exist, so no release in between drops a part it does not know yet.
 - `docs/PROJECT_SCHEMA.md` and `docs/HELP.md` are updated in the PRs that build each part.
 
 ### Layout engine
@@ -193,10 +212,11 @@ interface BaseplateSettings {
 
 ### Geometry
 
-- Cells follow the published Gridfinity baseplate profile: the socket is the inverse of a bin's
-  foot (0.7 mm 45° chamfer, 1.8 mm vertical, 2.15 mm 45° chamfer, 4.65 mm in all, at 42 mm
-  pitch). The numbers go in `gridfinity-dimensions.ts` next to the bin's, and are checked
-  against the spec when built.
+- Cells follow the published Gridfinity baseplate profile (0.7 mm 45° chamfer, 1.8 mm
+  vertical, 2.15 mm 45° chamfer, 4.65 mm in all, at 42 mm pitch). This is its own profile, not
+  derived from the bin foot in `BASE_PROFILE` (steps 0.8 / 1.8 / 2.35 mm high, 4.95 mm tall),
+  which differs from it. The numbers go in `gridfinity-dimensions.ts` as
+  `BASEPLATE_PROFILE`, next to the bin's, and are checked against the spec when built.
 - A plain plate is the profile alone. A feature can ask for a solid layer under the profile
   (magnets need their depth plus a floor); the plate's base is the thickest any feature asks
   for.
@@ -228,10 +248,18 @@ same pattern (`BaseplateJointModule`), so a second kind of joint can be added la
   diameter and depth default to the project's magnet settings (6.5 × 2.4 mm).
 - **Screw holes**: see question 4 for which kind.
 
+Features that share a place are combined by the module, not by stacking holes: bin screw
+holes sit at the magnet positions, so with both on, each corner gets a magnet pocket with the
+smaller screw hole through its floor, the usual Gridfinity design. A module can declare which
+others it combines with (`combinesWith`), and the builder applies such a pair as one cut.
+
 ### Export
 
-- `export-plan.ts` takes items that are bins or baseplates (or baseplate pieces), and the
-  names follow the same rules ("Kitchen drawer - baseplate", "... - baseplate 2 of 3").
+- `export-plan.ts` takes items that are bins or baseplates (or baseplate pieces). Today's
+  naming stays for bins: the project's name when everything is checked, the item's name when
+  one is, and "project - N bins" otherwise. New rules for baseplates: one unnamed baseplate
+  is "project - baseplate"; a piece of a split one is "<baseplate> - piece 2 of 3"; a mix of
+  items is "project - N items".
 - 3MF and STL writers are unchanged; they get more meshes.
 
 ### Tests
@@ -247,8 +275,8 @@ same pattern (`BaseplateJointModule`), so a second kind of joint can be added la
 
 One PR per step, each usable on its own and passing `pnpm verify`:
 
-1. Schema 0.6.0 and migration, baseplates in the engine and snapshot, baseplate mode: draw,
-   select, move, resize, copy, delete, sidebar. No 3D yet.
+1. Schema 0.6.0 and migration (the whole format, see Data model), baseplates in the engine and
+   snapshot, baseplate mode: draw, select, move, resize, copy, delete, sidebar. No 3D yet.
 2. Geometry: plain plate, magnet holes, screw holes; preview and export.
 3. "Move contents with baseplate".
 4. Drawer bounds, alignment, Fill drawer, Pad to drawer.
