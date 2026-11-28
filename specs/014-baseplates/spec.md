@@ -204,8 +204,9 @@ reason.
 
 - `LayoutEngine` gains baseplate operations (add, update, remove, list, hit testing in
   baseplate mode) and a mode switch that changes what can be selected. Konva draws baseplates
-  in a layer under the bins. Baseplates are part of `LayoutSnapshot`, so undo and redo,
-  save and open cover them with no extra work.
+  in a layer under the bins. It also gains drawer operations (set, update, remove), and Konva
+  draws the drawer outline in baseplate mode. Baseplates and the drawer are part of
+  `LayoutSnapshot`, so undo and redo, save and open cover them with no extra work.
 - "Contents" is computed outside the adapter, from snapshots (`containment.ts`), so it is the
   same for any engine.
 - Positions shown in the sidebar use `position-frame.ts`, like everything else.
@@ -248,18 +249,23 @@ same pattern (`BaseplateJointModule`), so a second kind of joint can be added la
   diameter and depth default to the project's magnet settings (6.5 × 2.4 mm).
 - **Screw holes**: see question 4 for which kind.
 
-Features that share a place are combined by the module, not by stacking holes: bin screw
-holes sit at the magnet positions, so with both on, each corner gets a magnet pocket with the
-smaller screw hole through its floor, the usual Gridfinity design. A module can declare which
-others it combines with (`combinesWith`), and the builder applies such a pair as one cut.
+Features that share a place need no rule between them: each module only removes material,
+and the builder subtracts every module's cuts from the plate. Bin screw holes sit at the
+magnet positions, so with both on, each corner gets the magnet pocket and the narrower screw
+hole through its floor, the usual Gridfinity design.
+
+Adding a feature module touches the registry and one more place: the schema version is raised
+with a migration that has nothing to convert (see Data model). The cost is that an older app
+refuses every file a newer one saves, even one that does not use the new feature.
 
 ### Export
 
 - `export-plan.ts` takes items that are bins or baseplates (or baseplate pieces). Today's
   naming stays for bins: the project's name when everything is checked, the item's name when
   one is, and "project - N bins" otherwise. New rules for baseplates: one unnamed baseplate
-  is "project - baseplate"; a piece of a split one is "<baseplate> - piece 2 of 3"; a mix of
-  items is "project - N items".
+  is "project - baseplate"; several baseplates and no bins are "project - N baseplates"; a piece
+  of a split one is "<baseplate name, or project - baseplate> - piece 2 of 3"; a mix of bins
+  and baseplates is "project - N items".
 - 3MF and STL writers are unchanged; they get more meshes.
 
 ### Tests
