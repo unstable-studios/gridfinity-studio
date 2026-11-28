@@ -206,16 +206,16 @@ importers:
         version: 21.2.4
       '@commitlint/cz-commitlint':
         specifier: ^21.2.4
-        version: 21.2.4(commitizen@4.3.2(@types/node@25.9.9)(typescript@6.0.3))(inquirer@9.3.8(@types/node@25.9.9))(typescript@6.0.3)
+        version: 21.2.4(commitizen@4.3.2(@types/node@26.6.11)(typescript@6.0.3))(inquirer@9.3.8(@types/node@26.6.11))(typescript@6.0.3)
       '@commitlint/prompt':
         specifier: ^21.2.4
-        version: 21.2.4(@types/node@25.9.9)(typescript@6.0.3)
+        version: 21.2.4(@types/node@26.6.11)(typescript@6.0.3)
       '@commitlint/prompt-cli':
         specifier: ^21.2.4
-        version: 21.2.4(@types/node@25.9.9)(typescript@6.0.3)
+        version: 21.2.4(@types/node@26.6.11)(typescript@6.0.3)
       '@electron-toolkit/tsconfig':
         specifier: ^2.0.0
-        version: 2.0.0(@types/node@25.9.9)
+        version: 2.0.0(@types/node@26.6.11)
       '@eslint/js':
         specifier: ^9.39.5
         version: 9.39.5
@@ -269,10 +269,10 @@ importers:
         version: 9.8.2(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(three@0.187.0)
       '@tailwindcss/vite':
         specifier: ^4.3.5
-        version: 4.3.5(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+        version: 4.3.5(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
       '@types/node':
-        specifier: ^25.9.9
-        version: 25.9.9
+        specifier: ^26.0.0
+        version: 26.6.11
       '@types/react':
         specifier: ^19.3.0
         version: 19.3.0
@@ -287,7 +287,7 @@ importers:
         version: 2.0.2(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(tailwindcss@4.3.5)(vitest@5.1.1)
       '@vitejs/plugin-react':
         specifier: ^6.3.0
-        version: 6.3.0(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+        version: 6.3.0(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
       '@vitest/coverage-v8':
         specifier: ^5.0.0
         version: 5.1.1(vitest@5.1.1)
@@ -302,7 +302,7 @@ importers:
         version: 1.1.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       commitizen:
         specifier: ^4.3.2
-        version: 4.3.2(@types/node@25.9.9)(typescript@6.0.3)
+        version: 4.3.2(@types/node@26.6.11)(typescript@6.0.3)
       electron:
         specifier: ^45.4.1
         version: 45.4.1(supports-color@7.2.0)
@@ -314,7 +314,7 @@ importers:
         version: 26.18.0(dmg-builder@26.18.0)(supports-color@7.2.0)
       electron-vite:
         specifier: ^6.0.0
-        version: 6.0.0(supports-color@7.2.0)(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+        version: 6.0.0(supports-color@7.2.0)(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
       eslint:
         specifier: ^9.39.5
         version: 9.39.5(jiti@2.7.0)(supports-color@7.2.0)
@@ -353,13 +353,13 @@ importers:
         version: 1.79.0(@types/react@19.3.0)(react@19.3.1)
       manifold-3d:
         specifier: ^3.5.5
-        version: 3.5.5(@types/node@25.9.9)
+        version: 3.5.5(@types/node@26.6.11)
       mitt:
         specifier: ^3.0.1
         version: 3.0.1
       node:
-        specifier: runtime:^24.22.3
-        version: runtime:24.22.3
+        specifier: runtime:^26.0.0
+        version: runtime:26.13.1
       prettier:
         specifier: ^3.10.1
         version: 3.10.1
@@ -395,13 +395,13 @@ importers:
         version: 8.74.0(eslint@9.39.5(jiti@2.7.0)(supports-color@7.2.0))(supports-color@7.2.0)(typescript@6.0.3)
       vite:
         specifier: ^8.3.8
-        version: 8.3.8(@types/node@25.9.9)(jiti@2.7.0)
+        version: 8.3.8(@types/node@26.6.11)(jiti@2.7.0)
       vite-plugin-svgr:
         specifier: ^5.2.0
-        version: 5.2.0(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+        version: 5.2.0(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
       vitest:
         specifier: ^5.0.0
-        version: 5.1.1(@types/node@25.9.9)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+        version: 5.1.1(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
       vitest-canvas-mock:
         specifier: ^1.2.0
         version: 1.2.0(vitest@5.1.1)
@@ -1873,8 +1873,8 @@ packages:
   '@types/node@24.19.2':
     resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
-  '@types/node@25.9.9':
-    resolution: {integrity: sha512-b4e2xxj/yMeT2hNlD6x7zNFiQK2Dlmkb9CQ6v3/1G2RezKN4YS2lcEv8lzGm1mhs4f2lM4yNAMI/zUDBZBBt7w==}
+  '@types/node@26.6.11':
+    resolution: {integrity: sha512-uUyQ2XLEz+EXh34lmS3GhKrkqn/8FU7KUiKRpk347At2bmnMVWss45yz8b4FG/tUtmV1tV/+TVkITItPROyeeQ==}
 
   '@types/offscreencanvas@2019.7.3':
     resolution: {integrity: sha512-ieXiYmgSRXUDeOntE1InxjWyvEelZGP63M+cGuquuRLuIKKT1osnkXjxev9B7d1nXSug5vpunx+gNlbVxMlC9A==}
@@ -3937,7 +3937,7 @@ packages:
     resolution: {integrity: sha512-PfvofsGQ+MiOQIPkX9fU8ELUWmy5zL74CdQaph/ismKszfFkfwXaw0cGiwbwym2hT9k5+mdyl8O5WQ1MD8EHmA==}
     engines: {node: '>=18'}
 
-  node@runtime:24.22.3:
+  node@runtime:26.13.1:
     resolution:
       type: variations
       variants:
@@ -3945,9 +3945,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-aT/ojEqF5+Fy7BMvdg5ns5JbLWRCyxyzp0tz/Pgx9wo=
+            integrity: sha256-ZeVfsT3W2dQ+JhNSbnKssb/8svPxhVmNe3bnjsI3rQM=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-aix-ppc64.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-aix-ppc64.tar.gz
           targets:
             - cpu: ppc64
               os: aix
@@ -3955,9 +3955,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-/24X1IdLdtJyISuQjMAg1ugV+6Wmx+qqBq3XJYQDB/0=
+            integrity: sha256-rsJRTqHOsrpSRV6exlmG9nSaBt11nl2ypy5oiWaMlzU=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-darwin-arm64.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-darwin-arm64.tar.gz
           targets:
             - cpu: arm64
               os: darwin
@@ -3965,9 +3965,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-l3YUrwUEyBBF5/2FWW28oOX5UblmgVFtra/tzKjER/c=
+            integrity: sha256-gruWB4okylC5yaOPI3nmvm2HFx/NQA/BTIk0s7zpbi8=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-darwin-x64.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-darwin-x64.tar.gz
           targets:
             - cpu: x64
               os: darwin
@@ -3975,9 +3975,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-JhryryUN/X6fJc8VHRsnE6Ct+PEKmtEWxJR/aGJ6/+g=
+            integrity: sha256-gKMws1QVOCh43xjUGvvRBuqJv7O+AIfWYI4omhTFzH0=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-arm64.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-linux-arm64.tar.gz
           targets:
             - cpu: arm64
               os: linux
@@ -3985,9 +3985,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-uksmreH3s/W6Z1aFaBXeWONTdGAE5+RsyDgkOmy/Mpk=
+            integrity: sha256-+Vi7pelENE1N2HMF67q6Vc21vlghGiT09qEqaua9Fu4=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-ppc64le.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-linux-ppc64le.tar.gz
           targets:
             - cpu: ppc64le
               os: linux
@@ -3995,9 +3995,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-2PhDl8FHjA7QwbKTQ2Ju0PXxoJhd8MWXXDDwwDg2Yx8=
+            integrity: sha256-8rrre+iCFpfnA4RGvY0GrxZMDo3LxAQ5r+hB3Gjm2N4=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-s390x.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-linux-s390x.tar.gz
           targets:
             - cpu: s390x
               os: linux
@@ -4005,9 +4005,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-VJm2Y/Yscgk3FdqY9K6m+DQnrYurnPnHXwkk4ORWzhQ=
+            integrity: sha256-uqI7bs2FVYBL96TocC8WNyA5FqENKG0+4W/Oi/Vje4M=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-x64-musl.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-linux-x64-musl.tar.gz
           targets:
             - cpu: x64
               os: linux
@@ -4016,9 +4016,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-Bh7D4wYhFXBbVrUfqcwzCrUNNLaWk4fU5LGlDGgJrMI=
+            integrity: sha256-UYZ03itiFyil5EhvX7O30pALs8xKqXlp7apGPbmfl3g=
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-x64.tar.gz
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-linux-x64.tar.gz
           targets:
             - cpu: x64
               os: linux
@@ -4026,10 +4026,10 @@ packages:
             archive: zip
             bin:
               node: node.exe
-            integrity: sha256-s8x0opWznU8nMnHpb1jAbdKzV1fKEqvsZMfQWYtDTxQ=
-            prefix: node-v24.22.3-win-arm64
+            integrity: sha256-GB6+QxuQeHETqeT8gNOM6G03iIo1OgOG3kTShy5Iy5c=
+            prefix: node-v26.13.1-win-arm64
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-win-arm64.zip
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-win-arm64.zip
           targets:
             - cpu: arm64
               os: win32
@@ -4037,10 +4037,10 @@ packages:
             archive: zip
             bin:
               node: node.exe
-            integrity: sha256-5hKvmfYmq0FeoiWva85clx/rRIy1yuJQuxw/pQxffZ8=
-            prefix: node-v24.22.3-win-x64
+            integrity: sha256-4u3adb+wiWVHBc9loTtYkzv9X1cUjo69qRb1iiR08fc=
+            prefix: node-v26.13.1-win-x64
             type: binary
-            url: https://nodejs.org/download/release/v24.22.3/node-v24.22.3-win-x64.zip
+            url: https://nodejs.org/download/release/v26.13.1/node-v26.13.1-win-x64.zip
           targets:
             - cpu: x64
               os: win32
@@ -4048,9 +4048,9 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-JIyWqE9sgzhka5/XO/ElEkZ4+PsI218jAj9GIFXg7tw=
+            integrity: sha256-QmhOfxgw756q3QQGcsukG7r/lUnYNGAGmfku4e5bH7E=
             type: binary
-            url: https://unofficial-builds.nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-arm64-musl.tar.gz
+            url: https://unofficial-builds.nodejs.org/download/release/v26.13.1/node-v26.13.1-linux-arm64-musl.tar.gz
           targets:
             - cpu: arm64
               os: linux
@@ -4059,14 +4059,14 @@ packages:
             archive: tarball
             bin:
               node: bin/node
-            integrity: sha256-LbT4pAq+X1tdEZlkIj/tycTHxefGMpAa6GCvUix4RLI=
+            integrity: sha256-BL+e0+MuoTnJr1L23QaHn/b4iAVVoKoRg+8tFWwOAtM=
             type: binary
-            url: https://unofficial-builds.nodejs.org/download/release/v24.22.3/node-v24.22.3-linux-x64-musl.tar.gz
+            url: https://unofficial-builds.nodejs.org/download/release/v26.13.1/node-v26.13.1-linux-x64-musl.tar.gz
           targets:
             - cpu: x64
               os: linux
               libc: musl
-    version: 24.22.3
+    version: 26.13.1
     hasBin: true
 
   nopt@9.0.0:
@@ -4901,6 +4901,9 @@ packages:
   undici-types@7.24.6:
     resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
 
+  undici-types@8.9.0:
+    resolution: {integrity: sha512-KTDyRTYX8sWmKXAikPHHSyc63CRPETMctyjKFupcC6OBLXT3xsN0e9aF7m+mIXutFWpUXuedtowG7iLOzp0kQg==}
+
   undici@6.29.1:
     resolution: {integrity: sha512-EvRlUt/QqAEvXdQeRMYUfwOQsfzpDztykrG2owGEE/rBOBoYv9uF39ZzsNDh4lTFHhTr2XOZjKkYgueD12ZmGA==}
     engines: {node: '>=18.17'}
@@ -5416,13 +5419,13 @@ snapshots:
       '@commitlint/types': 21.2.3
       ajv: 8.20.0
 
-  '@commitlint/cz-commitlint@21.2.4(commitizen@4.3.2(@types/node@25.9.9)(typescript@6.0.3))(inquirer@9.3.8(@types/node@25.9.9))(typescript@6.0.3)':
+  '@commitlint/cz-commitlint@21.2.4(commitizen@4.3.2(@types/node@26.6.11)(typescript@6.0.3))(inquirer@9.3.8(@types/node@26.6.11))(typescript@6.0.3)':
     dependencies:
       '@commitlint/ensure': 21.2.4
       '@commitlint/load': 21.2.4(typescript@6.0.3)
       '@commitlint/types': 21.2.3
-      commitizen: 4.3.2(@types/node@25.9.9)(typescript@6.0.3)
-      inquirer: 9.3.8(@types/node@25.9.9)
+      commitizen: 4.3.2(@types/node@26.6.11)(typescript@6.0.3)
+      inquirer: 9.3.8(@types/node@26.6.11)
       is-plain-obj: 4.1.0
       picocolors: 1.1.1
       word-wrap: 1.2.5
@@ -5475,21 +5478,21 @@ snapshots:
       conventional-changelog-angular: 9.4.0
       conventional-commits-parser: 7.1.4
 
-  '@commitlint/prompt-cli@21.2.4(@types/node@25.9.9)(typescript@6.0.3)':
+  '@commitlint/prompt-cli@21.2.4(@types/node@26.6.11)(typescript@6.0.3)':
     dependencies:
-      '@commitlint/prompt': 21.2.4(@types/node@25.9.9)(typescript@6.0.3)
-      inquirer: 9.3.8(@types/node@25.9.9)
+      '@commitlint/prompt': 21.2.4(@types/node@26.6.11)(typescript@6.0.3)
+      inquirer: 9.3.8(@types/node@26.6.11)
       tinyexec: 1.3.1
     transitivePeerDependencies:
       - '@types/node'
       - typescript
 
-  '@commitlint/prompt@21.2.4(@types/node@25.9.9)(typescript@6.0.3)':
+  '@commitlint/prompt@21.2.4(@types/node@26.6.11)(typescript@6.0.3)':
     dependencies:
       '@commitlint/ensure': 21.2.4
       '@commitlint/load': 21.2.4(typescript@6.0.3)
       '@commitlint/types': 21.2.3
-      inquirer: 9.3.8(@types/node@25.9.9)
+      inquirer: 9.3.8(@types/node@26.6.11)
       picocolors: 1.1.1
     transitivePeerDependencies:
       - '@types/node'
@@ -5551,9 +5554,9 @@ snapshots:
     dependencies:
       electron: 45.4.1(supports-color@7.2.0)
 
-  '@electron-toolkit/tsconfig@2.0.0(@types/node@25.9.9)':
+  '@electron-toolkit/tsconfig@2.0.0(@types/node@26.6.11)':
     dependencies:
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
 
   '@electron-toolkit/utils@4.0.0(electron@45.4.1(supports-color@7.2.0))':
     dependencies:
@@ -5769,14 +5772,14 @@ snapshots:
       '@gltf-transform/core': 4.5.1
       ktx-parse: 1.1.0
 
-  '@gltf-transform/functions@4.5.1(@types/node@25.9.9)':
+  '@gltf-transform/functions@4.5.1(@types/node@26.6.11)':
     dependencies:
       '@gltf-transform/core': 4.5.1
       '@gltf-transform/extensions': 4.5.1
       ktx-parse: 1.1.0
       ndarray: 1.1.1
       ndarray-lanczos: 0.3.0
-      ndarray-pixels: 5.2.0(@types/node@25.9.9)
+      ndarray-pixels: 5.2.0(@types/node@26.6.11)
     transitivePeerDependencies:
       - '@types/node'
 
@@ -5912,12 +5915,12 @@ snapshots:
   '@img/sharp-win32-x64@0.35.5':
     optional: true
 
-  '@inquirer/external-editor@1.0.3(@types/node@25.9.9)':
+  '@inquirer/external-editor@1.0.3(@types/node@26.6.11)':
     dependencies:
       chardet: 2.2.0
       iconv-lite: 0.7.3
     optionalDependencies:
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
 
   '@inquirer/figures@1.0.15': {}
 
@@ -6747,12 +6750,12 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.3.5
       '@tailwindcss/oxide-win32-x64-msvc': 4.3.5
 
-  '@tailwindcss/vite@4.3.5(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))':
+  '@tailwindcss/vite@4.3.5(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))':
     dependencies:
       '@tailwindcss/node': 4.3.5
       '@tailwindcss/oxide': 4.3.5
       tailwindcss: 4.3.5
-      vite: 8.3.8(@types/node@25.9.9)(jiti@2.7.0)
+      vite: 8.3.8(@types/node@26.6.11)(jiti@2.7.0)
 
   '@tweenjs/tween.js@23.1.3': {}
 
@@ -6765,7 +6768,7 @@ snapshots:
     dependencies:
       '@types/http-cache-semantics': 4.2.0
       '@types/keyv': 3.1.4
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
       '@types/responselike': 1.0.3
 
   '@types/chai@5.2.3':
@@ -6789,7 +6792,7 @@ snapshots:
 
   '@types/fs-extra@9.0.13':
     dependencies:
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
 
   '@types/hast@3.0.5':
     dependencies:
@@ -6801,7 +6804,7 @@ snapshots:
 
   '@types/keyv@3.1.4':
     dependencies:
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
 
   '@types/mdast@4.0.4':
     dependencies:
@@ -6815,9 +6818,9 @@ snapshots:
     dependencies:
       undici-types: 7.24.6
 
-  '@types/node@25.9.9':
+  '@types/node@26.6.11':
     dependencies:
-      undici-types: 7.24.6
+      undici-types: 8.9.0
 
   '@types/offscreencanvas@2019.7.3': {}
 
@@ -6835,7 +6838,7 @@ snapshots:
 
   '@types/responselike@1.0.3':
     dependencies:
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
 
   '@types/stats.js@0.17.4': {}
 
@@ -6966,7 +6969,7 @@ snapshots:
       sonner: 2.0.8(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       tailwind-merge: 3.7.1
       tailwindcss: 4.3.5
-      vitest: 5.1.1(@types/node@25.9.9)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+      vitest: 5.1.1(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
     transitivePeerDependencies:
       - '@types/react'
       - '@types/react-dom'
@@ -6978,10 +6981,10 @@ snapshots:
       '@use-gesture/core': 10.3.1
       react: 19.3.1
 
-  '@vitejs/plugin-react@6.3.0(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))':
+  '@vitejs/plugin-react@6.3.0(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))':
     dependencies:
       '@rolldown/pluginutils': 1.1.1
-      vite: 8.3.8(@types/node@25.9.9)(jiti@2.7.0)
+      vite: 8.3.8(@types/node@26.6.11)(jiti@2.7.0)
 
   '@vitest/coverage-v8@5.1.1(vitest@5.1.1)':
     dependencies:
@@ -6993,7 +6996,7 @@ snapshots:
       obug: 3.0.0
       std-env: 4.3.0
       tinyrainbow: 3.2.0
-      vitest: 5.1.1(@types/node@25.9.9)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+      vitest: 5.1.1(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
 
   '@vitest/istanbul-lib-coverage@2.1.1': {}
 
@@ -7001,14 +7004,14 @@ snapshots:
     dependencies:
       '@vitest/istanbul-lib-coverage': 2.1.1
 
-  '@vitest/mocker@5.1.1(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))':
+  '@vitest/mocker@5.1.1(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))':
     dependencies:
       '@jridgewell/trace-mapping': 0.3.31
       '@vitest/spy': 5.1.1
       estree-walker: 3.0.3
       magic-string: 1.4.5
     optionalDependencies:
-      vite: 8.3.8(@types/node@25.9.9)(jiti@2.7.0)
+      vite: 8.3.8(@types/node@26.6.11)(jiti@2.7.0)
 
   '@vitest/spy@5.1.1': {}
 
@@ -7446,7 +7449,7 @@ snapshots:
   commander@9.5.0:
     optional: true
 
-  commitizen@4.3.2(@types/node@25.9.9)(typescript@6.0.3):
+  commitizen@4.3.2(@types/node@26.6.11)(typescript@6.0.3):
     dependencies:
       cachedir: 2.4.0
       cz-conventional-changelog: 3.3.0(typescript@6.0.3)
@@ -7456,7 +7459,7 @@ snapshots:
       find-root: 1.1.0
       fs-extra: 9.1.0
       glob: 7.2.3
-      inquirer: 8.2.7(@types/node@25.9.9)
+      inquirer: 8.2.7(@types/node@26.6.11)
       is-utf8: 0.2.1
       lodash: 4.18.1
       minimist: 1.2.8
@@ -7531,7 +7534,7 @@ snapshots:
   cz-conventional-changelog@3.3.0(typescript@6.0.3):
     dependencies:
       chalk: 2.4.2
-      commitizen: 4.3.2(@types/node@25.9.9)(typescript@6.0.3)
+      commitizen: 4.3.2(@types/node@26.6.11)(typescript@6.0.3)
       conventional-commit-types: 3.0.0
       lodash.map: 4.6.0
       longest: 2.0.1
@@ -7733,7 +7736,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron-vite@6.0.0(supports-color@7.2.0)(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0)):
+  electron-vite@6.0.0(supports-color@7.2.0)(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0)):
     dependencies:
       '@babel/core': 7.29.13(supports-color@7.2.0)
       '@babel/plugin-transform-arrow-functions': 7.29.7(@babel/core@7.29.13(supports-color@7.2.0))
@@ -7741,7 +7744,7 @@ snapshots:
       magic-string: 1.4.5
       picocolors: 1.1.1
       rolldown: 1.2.19
-      vite: 8.3.8(@types/node@25.9.9)(jiti@2.7.0)
+      vite: 8.3.8(@types/node@26.6.11)(jiti@2.7.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -8507,9 +8510,9 @@ snapshots:
 
   inline-style-parser@0.2.9: {}
 
-  inquirer@8.2.7(@types/node@25.9.9):
+  inquirer@8.2.7(@types/node@26.6.11):
     dependencies:
-      '@inquirer/external-editor': 1.0.3(@types/node@25.9.9)
+      '@inquirer/external-editor': 1.0.3(@types/node@26.6.11)
       ansi-escapes: 4.3.2
       chalk: 4.1.2
       cli-cursor: 3.1.0
@@ -8527,9 +8530,9 @@ snapshots:
     transitivePeerDependencies:
       - '@types/node'
 
-  inquirer@9.3.8(@types/node@25.9.9):
+  inquirer@9.3.8(@types/node@26.6.11):
     dependencies:
-      '@inquirer/external-editor': 1.0.3(@types/node@25.9.9)
+      '@inquirer/external-editor': 1.0.3(@types/node@26.6.11)
       '@inquirer/figures': 1.0.15
       ansi-escapes: 4.3.2
       cli-width: 4.1.0
@@ -8947,11 +8950,11 @@ snapshots:
       '@babel/types': 7.29.15
       source-map-js: 1.2.4
 
-  manifold-3d@3.5.5(@types/node@25.9.9):
+  manifold-3d@3.5.5(@types/node@26.6.11):
     dependencies:
       '@gltf-transform/core': 4.5.1
       '@gltf-transform/extensions': 4.5.1
-      '@gltf-transform/functions': 4.5.1(@types/node@25.9.9)
+      '@gltf-transform/functions': 4.5.1(@types/node@26.6.11)
       '@jridgewell/resolve-uri': 3.1.3
       '@jridgewell/trace-mapping': 0.3.31
       '@jscadui/3mf-export': 0.5.0
@@ -9285,12 +9288,12 @@ snapshots:
     dependencies:
       cwise-compiler: 1.1.3
 
-  ndarray-pixels@5.2.0(@types/node@25.9.9):
+  ndarray-pixels@5.2.0(@types/node@26.6.11):
     dependencies:
       '@types/ndarray': 1.1.0
       ndarray: 1.1.1
       ndarray-ops: 1.2.2
-      sharp: 0.35.5(@types/node@25.9.9)
+      sharp: 0.35.5(@types/node@26.6.11)
     transitivePeerDependencies:
       - '@types/node'
 
@@ -9336,7 +9339,7 @@ snapshots:
 
   node-releases@2.0.65: {}
 
-  node@runtime:24.22.3: {}
+  node@runtime:26.13.1: {}
 
   nopt@9.0.0:
     dependencies:
@@ -9868,7 +9871,7 @@ snapshots:
 
   setimmediate@1.0.5: {}
 
-  sharp@0.35.5(@types/node@25.9.9):
+  sharp@0.35.5(@types/node@26.6.11):
     dependencies:
       '@img/colour': 1.1.0
       detect-libc: 2.1.2
@@ -9899,7 +9902,7 @@ snapshots:
       '@img/sharp-win32-arm64': 0.35.5
       '@img/sharp-win32-ia32': 0.35.5
       '@img/sharp-win32-x64': 0.35.5
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
 
   shebang-command@2.0.0:
     dependencies:
@@ -10294,6 +10297,8 @@ snapshots:
 
   undici-types@7.24.6: {}
 
+  undici-types@8.9.0: {}
+
   undici@6.29.1: {}
 
   undici@7.30.2:
@@ -10395,18 +10400,18 @@ snapshots:
       '@types/unist': 3.0.3
       vfile-message: 4.0.4
 
-  vite-plugin-svgr@5.2.0(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0)):
+  vite-plugin-svgr@5.2.0(supports-color@7.2.0)(typescript@6.0.3)(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0)):
     dependencies:
       '@rollup/pluginutils': 5.5.1
       '@svgr/core': 8.1.0(supports-color@7.2.0)(typescript@6.0.3)
       '@svgr/plugin-jsx': 8.1.0(@svgr/core@8.1.0(supports-color@7.2.0)(typescript@6.0.3))(supports-color@7.2.0)
-      vite: 8.3.8(@types/node@25.9.9)(jiti@2.7.0)
+      vite: 8.3.8(@types/node@26.6.11)(jiti@2.7.0)
     transitivePeerDependencies:
       - rollup
       - supports-color
       - typescript
 
-  vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0):
+  vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0):
     dependencies:
       lightningcss: 1.33.0
       picomatch: 4.0.7
@@ -10414,7 +10419,7 @@ snapshots:
       rolldown: 1.2.19
       tinyglobby: 0.2.17
     optionalDependencies:
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
       fsevents: 2.3.3
       jiti: 2.7.0
 
@@ -10422,12 +10427,12 @@ snapshots:
     dependencies:
       cssfontparser: 1.2.1
       moo-color: 1.0.3
-      vitest: 5.1.1(@types/node@25.9.9)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+      vitest: 5.1.1(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
 
-  vitest@5.1.1(@types/node@25.9.9)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0)):
+  vitest@5.1.1(@types/node@26.6.11)(@vitest/coverage-v8@5.1.1)(jsdom@31.0.1(@noble/hashes@1.8.0))(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0)):
     dependencies:
       '@types/chai': 5.2.3
-      '@vitest/mocker': 5.1.1(vite@8.3.8(@types/node@25.9.9)(jiti@2.7.0))
+      '@vitest/mocker': 5.1.1(vite@8.3.8(@types/node@26.6.11)(jiti@2.7.0))
       chai: 6.3.0
       es-module-lexer: 2.3.2
       expect-type: 1.4.0
@@ -10438,10 +10443,10 @@ snapshots:
       tinybench: 6.2.5
       tinyexec: 1.3.1
       tinyglobby: 0.2.17
-      vite: 8.3.8(@types/node@25.9.9)(jiti@2.7.0)
+      vite: 8.3.8(@types/node@26.6.11)(jiti@2.7.0)
       why-is-node-running: 3.2.1
     optionalDependencies:
-      '@types/node': 25.9.9
+      '@types/node': 26.6.11
       '@vitest/coverage-v8': 5.1.1(vitest@5.1.1)
       jsdom: 31.0.1(@noble/hashes@1.8.0)
     transitivePeerDependencies:
