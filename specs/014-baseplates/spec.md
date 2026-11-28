@@ -19,7 +19,7 @@ socket a bin's foot drops into. In the app it is a rectangle of `widthUnits × d
 on the canvas, under the bins, with:
 
 - **Features**: what is cut into or added to the plate. Magnet holes and screw holes to start,
-  each with its own settings. More can be added later, each in one place (see
+  each with its own settings. More can be added later, each as one module (see
   [Modularity](#modularity)).
 - **Padding**: solid frame added outside the cells on each side (left, right, front, back), in
   mm, so the plate fills a drawer that is not a whole number of cells.
@@ -237,20 +237,21 @@ interface BaseplateFeatureModule<Settings> {
   validate(raw: unknown): Settings | null
   Editor: React.ComponentType<{ value: Settings; onChange(next: Settings): void }>
   baseThickness(settings: Settings): number // solid needed under the profile
-  apply(plate: Solid, cells: CellGrid, settings: Settings): Solid // in the worker
+  add?(cells: CellGrid, settings: Settings): Solid // material added, in the worker
+  cut?(cells: CellGrid, settings: Settings): Solid // material removed, in the worker
 }
 ```
 
 Magnet holes and screw holes are the first two modules. A weighted base, a lightweight plate,
-a different joint or a label tab are later modules, each added in one place. Joints follow the
+a different joint or a label tab are later modules, each added as one module. Joints follow the
 same pattern (`BaseplateJointModule`), so a second kind of joint can be added later.
 
 - **Magnet holes**: at the four corners of each cell, 8 mm in from its edges (as on bins);
   diameter and depth default to the project's magnet settings (6.5 × 2.4 mm).
 - **Screw holes**: see question 4 for which kind.
 
-Features that share a place need no rule between them: each module only removes material,
-and the builder subtracts every module's cuts from the plate. Bin screw holes sit at the
+Features that share a place need no rule between them: the builder joins the plate and every
+module's `add`, then subtracts every module's `cut`, so a cut always wins over an addition. Bin screw holes sit at the
 magnet positions, so with both on, each corner gets the magnet pocket and the narrower screw
 hole through its floor, the usual Gridfinity design.
 
